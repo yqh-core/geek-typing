@@ -144,6 +144,48 @@ class SoundEngine {
     })
   }
 
+  /** 连击里程碑提示音 */
+  milestone() {
+    if (!this.enabled) return
+    const ctx = this.ensure()
+    if (!ctx) return
+    ;[523, 659, 784].forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      const t = ctx.currentTime + i * 0.05
+      osc.type = this.theme === '8bit' ? 'square' : 'sine'
+      osc.frequency.value = freq * (this.theme === '8bit' ? 2 : 1)
+      gain.gain.setValueAtTime(0.0001, t)
+      gain.gain.exponentialRampToValueAtTime(0.07, t + 0.012)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18)
+      osc.connect(gain).connect(ctx.destination)
+      osc.start(t)
+      osc.stop(t + 0.22)
+    })
+  }
+
+  /** 一轮通关：上行音阶小彩蛋 */
+  fanfare() {
+    if (!this.enabled) return
+    const ctx = this.ensure()
+    if (!ctx) return
+    const scale = [523, 587, 659, 784, 880, 1047]
+    scale.forEach((freq, i) => {
+      const t = ctx.currentTime + i * 0.085
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = this.theme === '8bit' ? 'square' : 'triangle'
+      osc.frequency.value = freq
+      const dur = this.theme === '8bit' ? 0.12 : 0.45
+      gain.gain.setValueAtTime(0.0001, t)
+      gain.gain.exponentialRampToValueAtTime(0.08, t + 0.015)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+      osc.connect(gain).connect(ctx.destination)
+      osc.start(t)
+      osc.stop(t + dur + 0.05)
+    })
+  }
+
   /** 点击 UI 按钮的轻微反馈 */
   tap() {
     if (!this.enabled) return

@@ -3,13 +3,18 @@ import Header from './components/Header'
 import StatsBar from './components/StatsBar'
 import PracticePanel from './components/PracticePanel'
 import ResultOverlay from './components/ResultOverlay'
+import StreakBar from './components/StreakBar'
 import { DEFAULT_BANK_ID, WORD_BANKS, type WordItem } from './data/wordBanks'
 import { sound, type SoundTheme } from './lib/sound'
 import { THEMES, type ThemeId } from './lib/theme'
+import { getTodayCount, loadHistory, recordSeconds, recordWord, type History } from './lib/streak'
 import { Terminal } from 'lucide-react'
 
 /** 每一轮练习的词数 */
 const CHAPTER_SIZE = 20
+
+/** 连击里程碑阈值 */
+const MILESTONES = [10, 20, 30, 50, 100]
 
 interface RoundStats {
   keys: number
@@ -55,9 +60,14 @@ export default function App() {
   const [stats, setStats] = useState<RoundStats>(EMPTY_STATS)
   const [elapsedMs, setElapsedMs] = useState(0)
   const [wrongWords, setWrongWords] = useState<string[]>([])
+  const [milestone, setMilestone] = useState<number | null>(null)
+
+  const [history, setHistory] = useState<History>(() => loadHistory())
 
   const startedRef = useRef<number | null>(null)
   const lockRef = useRef(false)
+  const milestoneTimer = useRef<number | null>(null)
+  const statsRef = useRef<RoundStats>(EMPTY_STATS)
   const flashTimer = useRef<number | null>(null)
 
   const theme = THEMES[themeId]
@@ -116,6 +126,10 @@ export default function App() {
     sound.theme = soundTheme
   }, [soundEnabled, soundTheme])
 
+  useEffect(() => {
+    statsRef.current = stats
+  }, [stats])
+
   /* ---------------- 计时器 ---------------- */
   useEffect(() => {
     if (finished || startedRef.current === null) return
@@ -153,6 +167,7 @@ export default function App() {
 
       // ✅ 敲对了
       if (targetLower.startsWith(next)) {
+        const nextCombo = statsRef.current.combo + 1
         sound.correct()
         setTyped(next)
         setErrorFlash(false)
@@ -164,15 +179,28 @@ export default function App() {
           bestCombo: Math.max(s.bestCombo, s.combo + 1),
         }))
 
+        // 🎉 连击里程碑提示
+        if (MILESTONES.includes(nextCombo)) {
+          sound.milestone()
+          setMilestone(nextCombo)
+          if (milestoneTimer.current) window.clearTimeout(milestoneTimer.current)
+          milestoneTimer.current = window.setTimeout(() => setMilestone(null), 1400)
+        }
+
         // 整个单词敲完
         if (next === targetLower) {
           lockRef.current = true
           sound.complete()
+          setHistory(recordWord())
           window.setTimeout(() => {
             lockRef.current = false
             setTyped('')
             if (wordIndex + 1 >= queue.length) {
               setFinished(true)
+              const secs = startedRef.current ? Math.round((Date.now() - startedRef.current) / 1000) : 0
+              setHistory(recordSeconds(secs))
+              setElapsedMs(secs * 1000)
+              sound.fanfare()
             } else {
               setWordIndex((i) => i + 1)
             }
@@ -198,6 +226,7 @@ export default function App() {
   useEffect(() => {
     return () => {
       if (flashTimer.current) window.clearTimeout(flashTimer.current)
+      if (milestoneTimer.current) window.clearTimeout(milestoneTimer.current)
     }
   }, [])
 
@@ -212,6 +241,8 @@ export default function App() {
     () => WORD_BANKS.flatMap((b) => b.words).filter((w) => wrongWords.includes(w.word.toLowerCase())),
     [wrongWords],
   )
+
+  const todayCount = getTodayCount(history)
 
   return (
     <div className={`min-h-screen ${theme.root} transition-colors duration-300`}>
@@ -249,7 +280,14 @@ export default function App() {
           />
         </div>
 
-        <div className="flex-1 w-full flex items-center justify-center py-4">
+        <div className="flex-1 w-full flex items-center justify-center py-4 relative">
+          {milestone && (
+            <div
+              className={`pointer-events-none absolute top-0 z-20 px-5 py-2 rounded-full border ${theme.border} ${theme.card} ${theme.accent} text-sm font-bold animate-popIn shadow-2xl`}
+            >
+              🔥 {milestone} 连击！手感来了
+            </div>
+          )}
           {current ? (
             <PracticePanel
               theme={theme}
@@ -273,6 +311,8 @@ export default function App() {
           <span>敲错会被拦住，必须敲对当前字母</span>
           <span>Enter 结算后重来</span>
         </footer>
+
+        <StreakBar theme={theme} history={history} todayCount={todayCount} />
       </div>
 
       {finished && (
@@ -286,6 +326,7 @@ export default function App() {
             seconds: Math.round(elapsedMs / 1000),
             wrongCount: wrongItems.length,
           }}
+          todayCount={todayCount}
           onRestart={() => {
             sound.tap()
             startRound()

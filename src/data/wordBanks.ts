@@ -1,3 +1,5 @@
+import { CET4, CET6, IELTS_TOEFL } from './englishBanks'
+
 export interface WordItem {
   word: string
   translation: string
@@ -137,6 +139,27 @@ export const WORD_BANKS: WordBank[] = [
     description: 'React / 构建工具高频词',
     icon: 'Code2',
     words: FRONTEND,
+  },
+  {
+    id: 'cet4',
+    name: '四级 CET-4',
+    description: '大学英语四级高频核心词',
+    icon: 'GraduationCap',
+    words: CET4,
+  },
+  {
+    id: 'cet6',
+    name: '六级 CET-6',
+    description: '大学英语六级进阶词',
+    icon: 'ScrollText',
+    words: CET6,
+  },
+  {
+    id: 'ielts',
+    name: '雅思 / 托福',
+    description: '留学考试学术核心词',
+    icon: 'Globe',
+    words: IELTS_TOEFL,
   },
 ]
 
