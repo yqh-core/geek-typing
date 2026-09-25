@@ -164,6 +164,12 @@ class SoundEngine {
     })
   }
 
+  /** 按对错播放对应音（拼写模式用） */
+  correctOrError(ok: boolean) {
+    if (ok) this.correct()
+    else this.error()
+  }
+
   /** 一轮通关：上行音阶小彩蛋 */
   fanfare() {
     if (!this.enabled) return

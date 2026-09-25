@@ -2,7 +2,8 @@ import { Volume2, VolumeX, Shuffle, ArrowLeftRight, RotateCcw } from 'lucide-rea
 import { sound, type SoundTheme } from '../lib/sound'
 import { THEME_LIST } from '../lib/theme'
 import type { ThemeConfig, ThemeId } from '../lib/theme'
-import { WORD_BANKS } from '../data/wordBanks'
+import type { WordBank } from '../data/wordBanks'
+import BankManager from './BankManager'
 import { useState } from 'react'
 
 const SOUND_THEMES: { id: SoundTheme; label: string }[] = [
@@ -13,6 +14,7 @@ const SOUND_THEMES: { id: SoundTheme; label: string }[] = [
 
 interface HeaderProps {
   theme: ThemeConfig
+  banks: WordBank[]
   bankId: string
   onBankChange: (id: string) => void
   onThemeChange: (id: ThemeId) => void
@@ -28,6 +30,7 @@ interface HeaderProps {
 export default function Header(props: HeaderProps) {
   const {
     theme,
+    banks,
     bankId,
     onBankChange,
     onThemeChange,
@@ -41,7 +44,7 @@ export default function Header(props: HeaderProps) {
   } = props
 
   const [bankOpen, setBankOpen] = useState(false)
-  const activeBank = WORD_BANKS.find((b) => b.id === bankId) ?? WORD_BANKS[0]
+  const activeBank = banks.find((b) => b.id === bankId) ?? banks[0]
 
   const ghostBtn = `flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${theme.border} text-xs transition-all hover:opacity-80`
 
@@ -70,7 +73,7 @@ export default function Header(props: HeaderProps) {
               <div
                 className={`absolute right-0 mt-2 w-56 ${theme.card} border ${theme.border} rounded-xl shadow-2xl overflow-hidden z-20 animate-popIn`}
               >
-                {WORD_BANKS.map((b) => (
+                {banks.map((b) => (
                   <button
                     key={b.id}
                     onClick={() => {
@@ -87,6 +90,14 @@ export default function Header(props: HeaderProps) {
               </div>
             )}
           </div>
+
+          <BankManager
+            theme={theme}
+            onBankChange={(id) => {
+              setBankOpen(false)
+              onBankChange(id)
+            }}
+          />
 
           {/* 乱序 */}
           <button

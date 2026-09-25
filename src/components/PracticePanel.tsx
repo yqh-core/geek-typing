@@ -1,5 +1,7 @@
 import type { ThemeConfig } from '../lib/theme'
 
+export type PracticeMode = 'classic' | 'spell' | 'timed'
+
 interface PracticePanelProps {
   theme: ThemeConfig
   word: string
@@ -8,6 +10,7 @@ interface PracticePanelProps {
   errorFlash: boolean
   wrongKey: string | null
   upcoming: { word: string; translation: string }[]
+  mode: PracticeMode
 }
 
 interface LettersProps {
@@ -15,21 +18,36 @@ interface LettersProps {
   word: string
   typed: string
   errorFlash: boolean
+  mode: PracticeMode
 }
 
-/** 逐字母渲染：已敲对变强调色，光标处有呼吸 caret */
-function Letters({ theme, word, typed, errorFlash }: LettersProps) {
+/** 逐字母渲染：已敲对变强调色，光标处有呼吸 caret；拼写模式下逐个标红错字母 */
+function Letters({ theme, word, typed, errorFlash, mode }: LettersProps) {
+  const lower = word.toLowerCase()
+
   return (
-    <>
+    <span data-testid="word" className="inline-block">
       {word.split('').map((ch, i) => {
-        const done = i < typed.length
+        const chLower = lower[i]
+        const isTyped = i < typed.length
         const isCursor = i === typed.length
+        const hit = typed[i] === chLower
+        const wrong = isTyped && !hit
+
         return (
           <span
             key={`${i}-${ch}`}
+            data-letter={chLower}
+            data-state={wrong ? 'wrong' : isTyped ? 'correct' : isCursor ? 'cursor' : 'pending'}
             className={[
               'relative inline-block transition-colors duration-100',
-              done ? theme.correct : theme.pending,
+              wrong
+                ? 'text-red-400'
+                : isTyped
+                  ? theme.correct
+                  : mode === 'spell'
+                    ? theme.pending
+                    : theme.pending,
               isCursor && errorFlash ? `${theme.wrongBg} rounded-sm animate-shake` : '',
             ].join(' ')}
           >
@@ -38,11 +56,18 @@ function Letters({ theme, word, typed, errorFlash }: LettersProps) {
                 className={`absolute -left-[3px] top-[6%] h-[88%] w-[3px] rounded ${theme.caret} animate-blink`}
               />
             )}
-            <span className={done && i === typed.length - 1 ? 'inline-block animate-pop' : ''}>{ch}</span>
+            {wrong && (
+              <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[11px] text-red-400/90">
+                {typed[i]}
+              </span>
+            )}
+            <span className={isTyped && i === typed.length - 1 ? 'inline-block animate-pop' : ''}>
+              {mode === 'spell' && !isTyped && ch !== '-' && ch !== ' ' ? '·' : ch}
+            </span>
           </span>
         )
       })}
-    </>
+    </span>
   )
 }
 
@@ -54,6 +79,7 @@ export default function PracticePanel({
   errorFlash,
   wrongKey,
   upcoming,
+  mode,
 }: PracticePanelProps) {
   const lower = word.toLowerCase()
 
@@ -62,7 +88,6 @@ export default function PracticePanel({
     const lines = 6
     return (
       <div className="w-full max-w-3xl mx-auto rounded-xl overflow-hidden border border-[#333] shadow-2xl bg-[#1e1e1e] font-mono text-sm">
-        {/* 标题栏 */}
         <div className="flex items-center gap-2 px-3 py-2 bg-[#323233] border-b border-[#252526]">
           <div className="flex gap-1.5">
             <span className="w-3 h-3 rounded-full bg-[#ff5f57]" />
@@ -79,7 +104,6 @@ export default function PracticePanel({
         </div>
 
         <div className="flex">
-          {/* 行号 + 代码 */}
           <div className="flex-1 px-0 py-4 overflow-x-auto">
             <div className="flex">
               <div className="select-none px-3 text-right text-[#5a5a5a] text-[13px] leading-7">
@@ -97,7 +121,7 @@ export default function PracticePanel({
                   <span className="text-[#d4d4d4]"> = </span>
                   <span className="text-[#ce9178]">"</span>
                   <span className="text-[22px] tracking-wider align-middle">
-                    <Letters theme={theme} word={word} typed={typed} errorFlash={errorFlash} />
+                    <Letters theme={theme} word={word} typed={typed} errorFlash={errorFlash} mode={mode} />
                   </span>
                   <span className="text-[#ce9178]">"</span>
                 </div>
@@ -105,8 +129,8 @@ export default function PracticePanel({
                   {'// '}
                   <span className={errorFlash ? 'text-[#f14c4c]' : 'text-[#4ec9b0]'}>
                     {errorFlash
-                      ? `SyntaxError: unexpected token '${wrongKey ?? '?'}' — 按正确的下一个字母`
-                      : '直接在键盘敲 `dev`，别人以为你在疯狂写代码'}
+                      ? `SyntaxError: unexpected token '${wrongKey ?? '?'}'`
+                      : '在键盘上敲出来，别人以为你在疯狂写代码'}
                   </span>
                 </div>
               </div>
@@ -114,7 +138,6 @@ export default function PracticePanel({
           </div>
         </div>
 
-        {/* 状态栏 */}
         <div className="flex items-center justify-between px-3 py-1 bg-[#007acc] text-white text-[11px]">
           <span>main*</span>
           <span>{`${lower.slice(typed.length) ? 'typing…' : 'done'}  |  UTF-8  |  TypeScript React`}</span>
@@ -128,32 +151,35 @@ export default function PracticePanel({
     <div
       className={`w-full max-w-2xl mx-auto ${theme.card} border ${theme.border} rounded-2xl px-6 py-10 text-center shadow-2xl`}
     >
-      {/* 中文释义 */}
       <div className={`text-lg mb-8 ${theme.sub}`}>
         <span className="opacity-50">[ </span>
         {translation}
         <span className="opacity-50"> ]</span>
       </div>
 
-      {/* 单词字母 */}
       <div className="text-4xl sm:text-5xl font-bold tracking-[0.18em] mb-6 min-h-[3.5rem]">
-        <Letters theme={theme} word={word} typed={typed} errorFlash={errorFlash} />
+        <Letters theme={theme} word={word} typed={typed} errorFlash={errorFlash} mode={mode} />
       </div>
 
-      {/* 错误提示 */}
       <div className="h-5">
-        {errorFlash && wrongKey && (
+        {errorFlash && wrongKey && mode !== 'spell' && (
           <span className="text-xs text-red-400 animate-popIn">
             敲错了：<span className="line-through">{wrongKey}</span> ，请敲下一个正确的字母
           </span>
         )}
+        {mode === 'spell' && (
+          <span className="text-xs opacity-60">
+            {typed.length > 0 ? '拼错了可以用 Backspace 删除重来' : '默写模式：只看中文把单词拼出来'}
+          </span>
+        )}
       </div>
 
-      {/* 接下来要练的词 */}
       <div className={`mt-8 pt-5 border-t ${theme.border} flex items-center justify-center gap-6 flex-wrap`}>
         {upcoming.map((item, idx) => (
           <div key={`${item.word}-${idx}`} className="flex flex-col items-center gap-1 opacity-40">
-            <span className="text-sm tracking-wider">{item.word}</span>
+            <span className="text-sm tracking-wider">
+              {mode === 'spell' ? '•'.repeat(item.word.length) : item.word}
+            </span>
             <span className="text-[11px]">{item.translation}</span>
           </div>
         ))}

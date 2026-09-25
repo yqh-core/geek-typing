@@ -1,6 +1,7 @@
-import { RotateCcw, Sparkles, BookMarked, Flame } from 'lucide-react'
+import { RotateCcw, Sparkles, BookMarked, Flame, Timer } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
 import { DAILY_GOAL } from '../lib/streak'
+import { getMode, type PracticeModeId } from '../lib/modes'
 
 interface ResultProps {
   theme: ThemeConfig
@@ -12,6 +13,7 @@ interface ResultProps {
     seconds: number
     wrongCount: number
   }
+  mode: PracticeModeId
   todayCount: number
   onRestart: () => void
   onReview: () => void
@@ -21,6 +23,7 @@ interface ResultProps {
 export default function ResultOverlay({
   theme,
   stats,
+  mode,
   todayCount,
   onRestart,
   onReview,
@@ -38,8 +41,15 @@ export default function ResultOverlay({
     <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 z-30">
       <div className={`w-full max-w-lg ${theme.card} border ${theme.border} rounded-2xl p-8 shadow-2xl animate-popIn`}>
         <div className="flex items-center gap-2 mb-6">
-          <Sparkles size={18} className={theme.accent} />
-          <h2 className={`text-lg font-bold tracking-wider ${theme.accent}`}>Round Complete</h2>
+          {mode === 'timed' ? (
+            <Timer size={18} className={theme.accent} />
+          ) : (
+            <Sparkles size={18} className={theme.accent} />
+          )}
+          <h2 className={`text-lg font-bold tracking-wider ${theme.accent}`}>
+            {mode === 'timed' ? 'Time Up' : 'Round Complete'}
+          </h2>
+          <span className={`text-[11px] ${theme.sub}`}>{getMode(mode).label}</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-7">

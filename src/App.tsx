@@ -4,9 +4,12 @@ import StatsBar from './components/StatsBar'
 import PracticePanel from './components/PracticePanel'
 import ResultOverlay from './components/ResultOverlay'
 import StreakBar from './components/StreakBar'
-import { DEFAULT_BANK_ID, WORD_BANKS, type WordItem } from './data/wordBanks'
+import KeyMap from './components/KeyMap'
+import { DEFAULT_BANK_ID, WORD_BANKS, type WordBank, type WordItem } from './data/wordBanks'
 import { sound, type SoundTheme } from './lib/sound'
 import { THEMES, type ThemeId } from './lib/theme'
+import { MODES, getMode, type PracticeModeId } from './lib/modes'
+import { loadCustomBanks, type CustomBank } from './lib/customBanks'
 import { getTodayCount, loadHistory, recordSeconds, recordWord, type History } from './lib/streak'
 import { Terminal } from 'lucide-react'
 
@@ -49,6 +52,9 @@ export default function App() {
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => readStorage('gt.sound', true))
   const [soundTheme, setSoundTheme] = useState<SoundTheme>(() => readStorage('gt.soundTheme', 'mech'))
   const [shuffled, setShuffled] = useState<boolean>(() => readStorage('gt.shuffle', true))
+  const [mode, setMode] = useState<PracticeModeId>(() => readStorage('gt.mode', 'classic'))
+  const [running, setRunning] = useState(false)
+  const [countdown, setCountdown] = useState<number | null>(null)
 
   const [queue, setQueue] = useState<WordItem[]>([])
   const [wordIndex, setWordIndex] = useState(0)
@@ -63,6 +69,7 @@ export default function App() {
   const [milestone, setMilestone] = useState<number | null>(null)
 
   const [history, setHistory] = useState<History>(() => loadHistory())
+  const [customBanks, setCustomBanks] = useState<CustomBank[]>(() => loadCustomBanks())
 
   const startedRef = useRef<number | null>(null)
   const lockRef = useRef(false)
@@ -71,9 +78,30 @@ export default function App() {
   const flashTimer = useRef<number | null>(null)
 
   const theme = THEMES[themeId]
+
+  /** 内置词库 + 我的自定义词库 */
+  const banks = useMemo<WordBank[]>(
+    () => [
+      ...WORD_BANKS,
+      ...customBanks.map((c) => ({
+        id: c.id,
+        name: c.name,
+        description: '我的自定义词库',
+        icon: 'FileText',
+        words: c.words,
+      })),
+    ],
+    [customBanks],
+  )
+
+  // 切换词库时顺带刷新一次自定义词库列表（导入新词库后会触发这里）
+  useEffect(() => {
+    setCustomBanks(loadCustomBanks())
+  }, [bankId])
+
   const bank = useMemo(
-    () => WORD_BANKS.find((b) => b.id === bankId) ?? WORD_BANKS[0],
-    [bankId],
+    () => banks.find((b) => b.id === bankId) ?? banks[0],
+    [banks, bankId],
   )
 
   /* ---------------- 生成一轮练习队列 ---------------- */
@@ -105,9 +133,29 @@ export default function App() {
       setWrongWords([])
       startedRef.current = null
       lockRef.current = false
+      setRunning(false)
+      setCountdown(null)
     },
     [buildQueue],
   )
+
+  /** 结算本轮 */
+  const finishRound = useCallback(() => {
+    setFinished(true)
+    const secs = startedRef.current ? Math.round((Date.now() - startedRef.current) / 1000) : 0
+    setHistory(recordSeconds(secs))
+    setElapsedMs(secs * 1000)
+    sound.fanfare()
+  }, [])
+
+  /** 切下一个词，或本轮结束 */
+  const advance = useCallback(() => {
+    if (wordIndex + 1 >= queue.length) {
+      finishRound()
+    } else {
+      setWordIndex((i) => i + 1)
+    }
+  }, [wordIndex, queue.length, finishRound])
 
   // 切换词库 / 切换排序方式 → 重开一轮
   useEffect(() => {
@@ -120,6 +168,20 @@ export default function App() {
   useEffect(() => writeStorage('gt.sound', soundEnabled), [soundEnabled])
   useEffect(() => writeStorage('gt.soundTheme', soundTheme), [soundTheme])
   useEffect(() => writeStorage('gt.shuffle', shuffled), [shuffled])
+  useEffect(() => writeStorage('gt.mode', mode), [mode])
+
+  /* ---------------- 限时模式倒计时 ---------------- */
+  useEffect(() => {
+    if (mode !== 'timed' || !running || finished) return
+    const total = getMode('timed').duration ?? 60
+    if (countdown === null) setCountdown(total)
+    const id = window.setInterval(() => setCountdown((c) => (c === null ? c : Math.max(0, c - 1))), 1000)
+    return () => window.clearInterval(id)
+  }, [mode, running, finished, countdown])
+
+  useEffect(() => {
+    if (mode === 'timed' && countdown === 0 && running && !finished) finishRound()
+  }, [countdown, running, finished, mode, finishRound])
 
   useEffect(() => {
     sound.enabled = soundEnabled
@@ -155,14 +217,81 @@ export default function App() {
       }
       if (finished) return
 
+      // 拼写模式的退格要在长度过滤之前处理
+      if (mode === 'spell' && e.key === 'Backspace') {
+        e.preventDefault()
+        sound.tap()
+        setTyped((t) => t.slice(0, -1))
+        setErrorFlash(false)
+        return
+      }
+
       // 只处理单字符按键，忽略 Shift / CapsLock / Tab 等功能键
       if (e.key.length !== 1) return
       e.preventDefault()
       if (lockRef.current || !current) return
 
-      if (startedRef.current === null) startedRef.current = Date.now()
+      if (startedRef.current === null) {
+        startedRef.current = Date.now()
+        setRunning(true)
+      }
 
       const key = e.key.toLowerCase()
+
+      /* ================= 拼写（默写）模式：允许自由输入 ================= */
+      if (mode === 'spell') {
+        const next = typed + key
+        const pos = typed.length
+        const good = next[pos] === targetLower[pos]
+        setTyped(next)
+        sound.correctOrError(good)
+        if (!good) {
+          setWrongKey(key)
+          setErrorFlash(true)
+          if (flashTimer.current) window.clearTimeout(flashTimer.current)
+          flashTimer.current = window.setTimeout(() => setErrorFlash(false), 280)
+          setWrongWords((prev) => (prev.includes(targetLower) ? prev : [...prev, targetLower]))
+          setStats((s) => ({ ...s, keys: s.keys + 1, errors: s.errors + 1, combo: 0 }))
+          return
+        }
+        const nextCombo = statsRef.current.combo + 1
+        setErrorFlash(false)
+        setStats((s) => ({
+          ...s,
+          keys: s.keys + 1,
+          correct: s.correct + 1,
+          combo: s.combo + 1,
+          bestCombo: Math.max(s.bestCombo, s.combo + 1),
+        }))
+        if (MILESTONES.includes(nextCombo)) {
+          sound.milestone()
+          setMilestone(nextCombo)
+          if (milestoneTimer.current) window.clearTimeout(milestoneTimer.current)
+          milestoneTimer.current = window.setTimeout(() => setMilestone(null), 1400)
+        }
+        if (next.length >= targetLower.length) {
+          // 长度够但仍有错字母：不许过关，提示用退格修正
+          const perfect = next === targetLower
+          if (!perfect) {
+            sound.error()
+            setErrorFlash(true)
+            if (flashTimer.current) window.clearTimeout(flashTimer.current)
+            flashTimer.current = window.setTimeout(() => setErrorFlash(false), 400)
+            return
+          }
+          lockRef.current = true
+          sound.complete()
+          setHistory(recordWord())
+          window.setTimeout(() => {
+            lockRef.current = false
+            setTyped('')
+            advance()
+          }, 220)
+        }
+        return
+      }
+
+      /* ================= 经典 / 限时模式：严格纠错 ================= */
       const next = typed + key
 
       // ✅ 敲对了
@@ -196,11 +325,7 @@ export default function App() {
             lockRef.current = false
             setTyped('')
             if (wordIndex + 1 >= queue.length) {
-              setFinished(true)
-              const secs = startedRef.current ? Math.round((Date.now() - startedRef.current) / 1000) : 0
-              setHistory(recordSeconds(secs))
-              setElapsedMs(secs * 1000)
-              sound.fanfare()
+              finishRound()
             } else {
               setWordIndex((i) => i + 1)
             }
@@ -221,7 +346,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [typed, wordIndex, queue, targetLower, current, finished, startRound])
+  }, [typed, wordIndex, queue, targetLower, current, finished, startRound, mode, advance, finishRound])
 
   useEffect(() => {
     return () => {
@@ -238,11 +363,13 @@ export default function App() {
   const upcoming = queue.slice(wordIndex + 1, wordIndex + 4)
 
   const wrongItems = useMemo(
-    () => WORD_BANKS.flatMap((b) => b.words).filter((w) => wrongWords.includes(w.word.toLowerCase())),
-    [wrongWords],
+    () => banks.flatMap((b) => b.words).filter((w) => wrongWords.includes(w.word.toLowerCase())),
+    [banks, wrongWords],
   )
 
   const todayCount = getTodayCount(history)
+  const nextKey = current ? current.word.toLowerCase()[typed.length] ?? null : null
+  const completedWords = finished ? Math.min(wordIndex + (countdown === 0 ? 0 : 1), queue.length) : wordIndex
 
   return (
     <div className={`min-h-screen ${theme.root} transition-colors duration-300`}>
@@ -254,6 +381,7 @@ export default function App() {
       <div className="relative flex flex-col items-center gap-8 py-10 px-4 min-h-screen">
         <Header
           theme={theme}
+          banks={banks}
           bankId={bankId}
           onBankChange={setBankId}
           onThemeChange={setThemeId}
@@ -280,6 +408,38 @@ export default function App() {
           />
         </div>
 
+        {/* 模式切换 */}
+        <div className="w-full max-w-4xl flex flex-wrap items-center justify-center gap-2">
+          {MODES.map((m) => (
+            <button
+              key={m.id}
+              data-testid={`mode-${m.id}`}
+              onClick={() => {
+                sound.tap()
+                setMode(m.id)
+                startRound()
+              }}
+              title={m.hint}
+              className={`px-3.5 py-1.5 rounded-lg border text-xs transition-all active:scale-95 ${
+                mode === m.id ? `${theme.accent} bg-white/10` : `${theme.sub}`
+              } ${theme.border}`}
+            >
+              {m.label}
+            </button>
+          ))}
+          {mode === 'timed' && countdown !== null && (
+            <span
+              data-testid="countdown"
+              className={`ml-2 text-sm font-bold tabular-nums ${countdown <= 10 ? 'text-red-400' : theme.accent}`}
+            >
+              ⏱ {countdown}s
+            </span>
+          )}
+          {mode === 'spell' && (
+            <span className={`ml-2 text-[11px] ${theme.sub}`}>拼错可用 Backspace 删</span>
+          )}
+        </div>
+
         <div className="flex-1 w-full flex items-center justify-center py-4 relative">
           {milestone && (
             <div
@@ -297,18 +457,22 @@ export default function App() {
               errorFlash={errorFlash}
               wrongKey={wrongKey}
               upcoming={upcoming}
+              mode={mode}
             />
           ) : (
             <div className={theme.sub}>加载词库中…</div>
           )}
         </div>
 
+        {/* 虚拟键盘：高亮下一个该敲的键 */}
+        <KeyMap theme={theme} nextKey={nextKey} wrongKey={errorFlash ? wrongKey : null} />
+
         <footer className={`flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs ${theme.sub} opacity-70`}>
           <span className="flex items-center gap-1.5">
             <Terminal size={13} />
             别找输入框，直接在键盘上敲字母即可
           </span>
-          <span>敲错会被拦住，必须敲对当前字母</span>
+          <span>{mode === 'spell' ? '默写模式：拼错标红可退格' : '敲错会被拦住，必须敲对当前字母'}</span>
           <span>Enter 结算后重来</span>
         </footer>
 
@@ -319,13 +483,14 @@ export default function App() {
         <ResultOverlay
           theme={theme}
           stats={{
-            words: queue.length,
+            words: mode === 'timed' ? completedWords : queue.length,
             accuracy,
             wpm,
             bestCombo: stats.bestCombo,
             seconds: Math.round(elapsedMs / 1000),
             wrongCount: wrongItems.length,
           }}
+          mode={mode}
           todayCount={todayCount}
           onRestart={() => {
             sound.tap()

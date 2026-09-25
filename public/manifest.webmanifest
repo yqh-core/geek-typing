@@ -1,0 +1,27 @@
+{
+  "name": "Geek Typing · 极客打字背单词",
+  "short_name": "Geek Typing",
+  "description": "无输入框的打字背单词工具：2026 AI 核心词库、云原生词库、四六级雅托，敲对变绿、机械键盘音效、摸鱼 IDE 皮肤。",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b1120",
+  "theme_color": "#0b1120",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
