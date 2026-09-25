@@ -33,11 +33,28 @@ jobs:
       - name: Type check & build
         run: npm run build
 
-      # 只有推送到 main 分支才部署，PR 仅做构建校验
+      # 部署前先自检 Secret 是否注入到位，避免 wrangler 报出含义模糊的授权错误
+      - name: Verify Cloudflare secrets injected
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          missing=0
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "::error::Secret CLOUDFLARE_API_TOKEN 为空 —— 请在仓库 Settings → Secrets and variables → Actions 里重新添加"
+            missing=1
+          fi
+          if [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "::error::Secret CLOUDFLARE_ACCOUNT_ID 为空 —— 请在仓库 Settings → Secrets and variables → Actions 里重新添加"
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then exit 1; fi
+          echo "两个 Secret 均已注入"
+
+      # 只有推送到 main 才部署；PR 仅做构建校验
       - name: Publish to Cloudflare Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=geek-typing --branch=main
+          # 不带 --branch，确保发布到生产环境（https://geek-typing.pages.dev）
+          command: pages deploy dist --project-name=geek-typing --commit-dirty=true
