@@ -1,0 +1,7 @@
+# Cloudflare Pages 项目配置
+# 文档: https://developers.cloudflare.com/pages/platform/wrangler-integration/
+name = "geek-typing"
+compatibility_date = "2026-09-26"
+
+# 静态产物目录（Vite 默认输出到 dist）
+pages_build_output_dir = "dist"
