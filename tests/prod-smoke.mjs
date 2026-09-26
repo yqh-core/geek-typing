@@ -199,6 +199,9 @@ try {
   // B2 连续 reload 两次：第二次断网走缓存
   console.log('\n【B2】连续 reload：第二次断网走缓存')
   await page.reload({ waitUntil: 'load', timeout: 30000 })
+  // V3-P0a：默认页签为 Home，切到打字页签（纯前端操作）后再断言练习面板
+  await page.click('[data-testid="tab-typing"]', { timeout: 8000 })
+  await page.waitForTimeout(300)
   check('B2: reload #1 SW 接管下导航成功', (await page.locator('[data-testid="word"]').count()) >= 1)
   await context.setOffline(true)
   let offlineOk = true
@@ -210,8 +213,11 @@ try {
   }
   if (offlineOk) {
     check('B2: reload #2 断网走缓存成功（无 ERR_FAILED）', true)
+    // V3-P0a：断网 reload 落在 Home，切打字页签（纯前端操作）后断言练习面板
+    await page.click('[data-testid="tab-typing"]', { timeout: 8000 })
+    await page.waitForTimeout(300)
     const wordCount = await page.locator('[data-testid="word"]').count()
-    check('B2: 断网页面主 UI 完整（练习面板可见）', wordCount >= 1, `word 面板数=${wordCount}`)
+    check('B2: 断网页面主 UI 完整（切 typing 后练习面板可见）', wordCount >= 1, `word 面板数=${wordCount}`)
   }
   await context.setOffline(false)
 
@@ -253,6 +259,9 @@ try {
     check('B3: 升级后断网导航可用', false, String(e).split('\n')[0])
   }
   if (upgOfflineOk) {
+    // V3-P0a：断网 reload 落在 Home，切打字页签（纯前端操作）后断言 precache 完整
+    await page.click('[data-testid="tab-typing"]', { timeout: 8000 })
+    await page.waitForTimeout(300)
     check('B3: 升级后断网导航可用（precache 已重建）', (await page.locator('[data-testid="word"]').count()) >= 1)
   }
   await context.setOffline(false)
