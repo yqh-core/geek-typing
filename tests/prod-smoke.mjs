@@ -274,7 +274,16 @@ try {
 
 /* ---------- 总结 ---------- */
 console.log('\n【运行时报错】')
-const realErrors = consoleErrors.filter((e) => !e.includes('favicon'))
+// 仅把非网络层的 console error 算作真失败。
+// 排除项：
+//   - favicon：浏览器自发请求，与本应用无关；
+//   - net::ERR_FAILED：离线阶段（B2/B3 断网 reload）SW 走 network-first 失败时回退缓存，
+//     浏览器会记一条网络层失败；该错误在 flaky 代理环境下偶发且非代码缺陷，
+//     真正的离线可用性已由 B2/B3「断网走缓存成功」功能断言覆盖。
+//     真正的 JS 异常会以「Uncaught ...」形式进入 console error，不会被上述两项排除。
+const realErrors = consoleErrors.filter(
+  (e) => !e.includes('favicon') && !e.includes('net::ERR_FAILED'),
+)
 check('全程无 console / page 运行时错误', realErrors.length === 0, realErrors.slice(0, 2).join(' | '))
 
 console.log(`\n${'─'.repeat(54)}`)

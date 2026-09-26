@@ -1069,9 +1069,11 @@ async function run() {
 
   await mpage.goto(BASE, { waitUntil: 'networkidle' })
 
-  // 预热探针：后台轮询 SW 缓存，等手势/命令用例跑完后收取（与 idle 预热并行）
+  // 预热探针：后台轮询 SW 缓存，等手势/命令用例跑完后收取（与 idle 预热并行）。
+  // 预算 60×500ms=30s：生产环境 3 个懒加载 chunk（各 ~170KiB gzip）走 CF 边缘，
+  // 与并发 UI 用例抢带宽时偶尔 >18s，曾偶发 race 失败；本地 127.0.0.1 瞬时完成。
   const warmProbe = mpage.evaluate(async () => {
-    for (let i = 0; i < 36; i++) {
+    for (let i = 0; i < 60; i++) {
       try {
         const names = await caches.keys()
         if (names.includes('gt-shell-v2')) {
