@@ -609,6 +609,7 @@ export default function App() {
             sound.tap()
             startRound()
           }}
+          onOpenCommand={() => setCommandMode(true)}
         />
 
         {/* 页签切换：打字练习 / 背单词 */}

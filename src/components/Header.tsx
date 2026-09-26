@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Volume2, VolumeX, Shuffle, RotateCcw, Check, Plus } from 'lucide-react'
+import { Volume2, VolumeX, Shuffle, RotateCcw, Check, Plus, Terminal } from 'lucide-react'
 import { sound, type SoundTheme } from '../lib/sound'
 import { THEME_LIST } from '../lib/theme'
 import type { ThemeConfig, ThemeId } from '../lib/theme'
@@ -39,6 +39,8 @@ interface HeaderProps {
   reviewTotal: number
   onReviewRound: () => void
   onRestart: () => void
+  /** 打开命令面板（顶栏统一入口，与 Esc 同路径；移动端唤起软键盘） */
+  onOpenCommand: () => void
 }
 
 /**
@@ -70,6 +72,7 @@ export default function Header(props: HeaderProps) {
     reviewTotal,
     onReviewRound,
     onRestart,
+    onOpenCommand,
   } = props
 
   const t = useT()
@@ -305,6 +308,20 @@ export default function Header(props: HeaderProps) {
               </button>
             ))}
           </div>
+
+          {/* 命令面板入口：移动端的主要唤起方式（桌面 Esc 更快，按钮保留统一入口） */}
+          <button
+            data-testid="open-cmd"
+            onClick={() => {
+              sound.tap()
+              onOpenCommand()
+            }}
+            title={t('keymap.escHint')}
+            aria-label={t('keymap.escHint')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${theme.border} text-xs ${theme.sub} transition-all hover:opacity-80 active:scale-95`}
+          >
+            <Terminal size={13} />
+          </button>
 
           {/* 重开 */}
           <button

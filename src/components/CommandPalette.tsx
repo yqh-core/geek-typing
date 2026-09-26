@@ -300,7 +300,7 @@ export default function CommandPalette({
   return (
     <div
       data-testid="command-palette"
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-xl px-4"
+      className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-3 sm:bottom-6 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-full sm:max-w-xl sm:px-4"
     >
       {notice && (
         <div
@@ -348,7 +348,7 @@ export default function CommandPalette({
           autoComplete="off"
           autoCapitalize="off"
           style={{ caretColor: theme.accentHex }}
-          className="flex-1 bg-transparent outline-none border-none font-mono text-sm text-slate-100 placeholder:opacity-40"
+          className="flex-1 bg-transparent outline-none border-none font-mono text-base sm:text-sm text-slate-100 placeholder:opacity-40"
         />
       </div>
 

@@ -4,9 +4,8 @@
  * 独立于 tests/e2e.mjs（断网仿真会污染在线用例），勿并入主套件。
  *
  * 用法：
- *   1) npm run build
- *   2) npm run preview -- --host 127.0.0.1 --port 4173
- *   3) node tests/offline-audit.mjs
+ *   npm run test:offline      # 一键：自举 vite preview（4173 已占用则复用）
+ *   npm run test:prod         # 打生产 https://geek-typing.pages.dev（只读）
  *
  * 四态：
  *   态1 在线首访 → SW 注册并 active
@@ -19,8 +18,11 @@
 import { chromium } from 'playwright-core'
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { ensurePreviewServer, stopPreview } from './preview-server.mjs'
 
-const BASE = process.env.E2E_BASE ?? 'http://127.0.0.1:4173'
+const PROD_BASE = 'https://geek-typing.pages.dev'
+const IS_PROD = process.argv.includes('--prod')
+const BASE = process.env.E2E_BASE ?? (IS_PROD ? PROD_BASE : 'http://127.0.0.1:4173')
 const CACHE_NAME = 'gt-shell-v2'
 
 function findChrome() {
@@ -91,6 +93,14 @@ const swState = (page, timeoutMs = 15000) =>
       ]),
     timeoutMs,
   )
+
+// 自举 preview（--prod 时跳过，直接打生产）；脚本末尾统一 stopPreview
+let previewServer = null
+if (!IS_PROD) {
+  previewServer = await ensurePreviewServer()
+  // 兜底：任何异常退出路径（browser launch 失败等）也杀掉自举的 preview
+  process.on('exit', () => stopPreview(previewServer))
+}
 
 const executablePath = findChrome()
 if (!executablePath) {
@@ -246,4 +256,5 @@ writeFileSync(
 )
 console.log('📄 证据：tests/_evidence/offline-audit-result.json')
 
+stopPreview(previewServer)
 process.exit(failures === 0 ? 0 : 1)

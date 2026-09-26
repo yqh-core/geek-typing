@@ -2,16 +2,19 @@
  * Geek Typing 端到端自动化测试（v2：下拉导航 + 背单词 + 中英双语）
  *
  * 用法：
- *   1) npm run build && npm run preview -- --port 4173
- *   2) npm run test:e2e                 # 默认打 http://127.0.0.1:4173
- *      E2E_BASE=http://127.0.0.1:5173   # 也可以打 dev server
- *      CHROME_PATH=<chrome.exe>         # 手动指定浏览器
+ *   npm run test:e2e            # 一键：自举 vite preview（4173 已占用则复用）+ 全量用例
+ *   npm run test:e2e:prod       # 打生产 https://geek-typing.pages.dev（只读）
+ *   E2E_BASE=http://127.0.0.1:5173 node tests/e2e.mjs   # 也可以打 dev server
+ *   CHROME_PATH=<chrome.exe>                            # 手动指定浏览器
  */
 import { chromium } from 'playwright-core'
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { ensurePreviewServer, stopPreview } from './preview-server.mjs'
 
-const BASE = process.env.E2E_BASE ?? 'http://127.0.0.1:4173'
+const PROD_BASE = 'https://geek-typing.pages.dev'
+const IS_PROD = process.argv.includes('--prod')
+const BASE = process.env.E2E_BASE ?? (IS_PROD ? PROD_BASE : 'http://127.0.0.1:4173')
 
 function findChrome() {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH
@@ -87,7 +90,11 @@ async function run() {
   const page = await ctx.newPage()
 
   const consoleErrors = []
-  page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()))
+  const consoleWarns = []
+  page.on('console', (m) => {
+    if (m.type() === 'error') consoleErrors.push(m.text())
+    if (m.type() === 'warning') consoleWarns.push(m.text())
+  })
   page.on('pageerror', (e) => consoleErrors.push(String(e)))
 
   await page.goto(BASE, { waitUntil: 'networkidle' })
@@ -909,6 +916,291 @@ async function run() {
   await page.waitForTimeout(500)
   check('懒词库下 :review 拉出到期考研词', (await readWord(page)) === kyWrong, `首词=${await readWord(page)}`)
 
+  /* ---------- 13. 批8-A：艾宾浩斯 Jitter + Quota 熔断 ---------- */
+  console.log('\n【13】批8：Jitter 抗雪崩 + Quota 熔断')
+
+  // 14 节复习轮可能已结算出 ResultOverlay（z-30 遮罩拦截 UI 点击），Enter 重开解除
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(350)
+
+  // 13.1 recordWrong Jitter 窗口：背单词打「不认识」→ nextReviewAt ∈ t0+[0.85d, 1.15d]
+  await page.evaluate(() => localStorage.removeItem('gt.review.v1'))
+  await page.click('[data-testid="tab-memorize"]')
+  await page.waitForTimeout(400)
+  const t0 = Date.now()
+  await page.click('[data-testid="memorize-flip"]')
+  await page.waitForTimeout(300)
+  await page.click('[data-testid="memorize-unknown"]')
+  await page.waitForTimeout(450)
+  const driftW = await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('gt.review.v1') || '{}')
+    return Object.values(s)[0]?.nextReviewAt ?? 0
+  }) - t0
+  check(
+    'recordWrong Jitter：1d 档落在 [0.85d, 1.15d] 窗口',
+    driftW >= 0.85 * 864e5 && driftW <= 1.15 * 864e5,
+    `漂移=${(driftW / 864e5).toFixed(3)}d`,
+  )
+
+  // 13.2 recordCorrect Jitter 窗口：注入到期词 → :review 敲对 → 2d 档 ∈ t0+[1.8d, 2.2d]
+  await page.evaluate(() => localStorage.removeItem('gt.review.v1'))
+  const dueWord2 = 'zz-jitter-correct'
+  await page.evaluate((w) => {
+    localStorage.setItem(
+      'gt.review.v1',
+      JSON.stringify({
+        [w]: { wrongCount: 1, correctStreak: 0, lastWrongAt: Date.now() - 864e5, nextReviewAt: Date.now() - 1000, intervalIdx: 0 },
+      }),
+    )
+  }, dueWord2)
+  await page.click('[data-testid="tab-typing"]')
+  await page.waitForTimeout(200)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  await page.keyboard.type(':review', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(500)
+  check('复习轮首词为注入的到期词', (await readWord(page)) === dueWord2, `首词=${await readWord(page)}`)
+  const t1 = Date.now()
+  await typeWord(page, dueWord2)
+  await page.waitForTimeout(500)
+  const driftC = await page.evaluate((w) => {
+    const s = JSON.parse(localStorage.getItem('gt.review.v1') || '{}')
+    return s[w]?.nextReviewAt ?? 0
+  }, dueWord2) - t1
+  check(
+    'recordCorrect Jitter：2d 档落在 [1.8d, 2.2d] 窗口',
+    driftC >= 1.8 * 864e5 && driftC <= 2.2 * 864e5,
+    `漂移=${(driftC / 864e5).toFixed(3)}d`,
+  )
+
+  // 13.3 Quota 熔断：mock setItem 前两次对 gt.review.v1 抛 QuotaExceededError → 清洗后重试成功
+  // 13.2 复习敲对可能已结算出 ResultOverlay，先 Enter 重开解除遮罩
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(350)
+  await page.evaluate(() => localStorage.removeItem('gt.review.v1'))
+  await page.evaluate(() => {
+    const orig = Storage.prototype.setItem.bind(localStorage)
+    window.__origSetItem = orig
+    let calls = 0
+    Storage.prototype.setItem = function (k, v) {
+      if (k === 'gt.review.v1' && calls++ < 2) {
+        const e = new Error('mock: quota exceeded')
+        e.name = 'QuotaExceededError'
+        throw e
+      }
+      return orig(k, v)
+    }
+    // 预置 6 条既有错题：熔断清洗后总条目应减少
+    const seed = {}
+    for (let i = 0; i < 6; i++) {
+      seed[`quota-seed-${i}`] = { wrongCount: 1, correctStreak: 0, lastWrongAt: Date.now(), nextReviewAt: Date.now() + 864e5, intervalIdx: 0 }
+    }
+    orig('gt.review.v1', JSON.stringify(seed))
+  })
+  const errQ = consoleErrors.length
+  await page.click('[data-testid="tab-memorize"]')
+  await page.waitForTimeout(400)
+  await page.click('[data-testid="memorize-flip"]')
+  await page.waitForTimeout(300)
+  await page.click('[data-testid="memorize-unknown"]')
+  await page.waitForTimeout(600)
+  const qState = await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('gt.review.v1') || '{}')
+    return { total: Object.keys(s).length, hasNew: Object.keys(s).some((k) => !k.startsWith('quota-seed-')) }
+  })
+  check('Quota 熔断：清洗重试后条目最终写入', qState.hasNew && qState.total > 0, `total=${qState.total}`)
+  check('Quota 熔断：清洗发生（条目数 < 7）', qState.total < 7, `total=${qState.total}`)
+  check(
+    'Quota 熔断：无未捕获异常',
+    consoleErrors.length === errQ,
+    consoleErrors.slice(errQ).join(' | '),
+  )
+  check('Quota 熔断：console.warn 可观测清洗行为', consoleWarns.some((w) => w.includes('熔断清洗')))
+  await page.evaluate(() => {
+    Storage.prototype.setItem = window.__origSetItem
+  })
+
+  // 13.4 熔断放弃路径：setItem 永远抛 → 不抛出、内存态照常推进 UI
+  await page.evaluate(() => {
+    const orig = window.__origSetItem
+    Storage.prototype.setItem = function (k, v) {
+      if (k === 'gt.review.v1') {
+        const e = new Error('mock: quota always')
+        e.name = 'QuotaExceededError'
+        throw e
+      }
+      return orig(k, v)
+    }
+  })
+  const errQ2 = consoleErrors.length
+  await page.click('[data-testid="memorize-flip"]') // 13.3 打分后新卡未翻面，先翻面
+  await page.waitForTimeout(300)
+  const progQ0 = await page.textContent('[data-testid="memorize-progress"]')
+  await page.click('[data-testid="memorize-unknown"]')
+  await page.waitForTimeout(500)
+  const progQ1 = await page.textContent('[data-testid="memorize-progress"]')
+  check('Quota 全失败：UI 不受影响照常推进（内存态兜底）', progQ0 !== progQ1, `${progQ0.trim()} → ${progQ1.trim()}`)
+  check('Quota 全失败：无未捕获异常', consoleErrors.length === errQ2, consoleErrors.slice(errQ2).join(' | '))
+  check('Quota 全失败：放弃写入有 warn', consoleWarns.some((w) => w.includes('仍写入失败')))
+  await page.evaluate(() => {
+    Storage.prototype.setItem = window.__origSetItem
+  })
+  await page.click('[data-testid="tab-typing"]')
+  await page.waitForTimeout(200)
+
+  /* ---------- 14. 批8-B：移动端手势 + 命令面板唤起 + 预热探针 ---------- */
+  console.log('\n【14】批8：移动端手势 / 命令面板 / 预热')
+  const mctx = await browser.newContext({ viewport: { width: 375, height: 812 }, hasTouch: true })
+  const mpage = await mctx.newPage()
+  const mConsoleErrors = []
+  mpage.on('console', (m) => m.type() === 'error' && mConsoleErrors.push(m.text()))
+  mpage.on('pageerror', (e) => mConsoleErrors.push(String(e)))
+
+  await mpage.goto(BASE, { waitUntil: 'networkidle' })
+
+  // 预热探针：后台轮询 SW 缓存，等手势/命令用例跑完后收取（与 idle 预热并行）
+  const warmProbe = mpage.evaluate(async () => {
+    for (let i = 0; i < 36; i++) {
+      try {
+        const names = await caches.keys()
+        if (names.includes('gt-shell-v2')) {
+          const cache = await caches.open('gt-shell-v2')
+          const urls = (await cache.keys()).map((r) => r.url)
+          const hits = urls.filter((u) => /\/assets\/.*(ielts|kaoyan|toefl).*\.js/.test(u))
+          if (hits.length >= 3) return { ok: true, hits }
+        }
+      } catch {
+        /* SW 未就绪继续等 */
+      }
+      await new Promise((r) => setTimeout(r, 500))
+    }
+    return { ok: false, hits: [] }
+  })
+
+  await mpage.click('[data-testid="tab-memorize"]')
+  await mpage.waitForTimeout(700) // isTouch 探测 + 手势监听绑定
+
+  /** 派发 touch 序列（Chromium 支持 Touch/TouchEvent 构造器） */
+  const swipe = (dx, dy) =>
+    mpage.evaluate(([ddx, ddy]) => {
+      const el = document.querySelector('[data-testid="memorize-card"]')
+      const r = el.getBoundingClientRect()
+      const x = r.left + r.width / 2
+      const y = r.top + r.height / 2
+      const mk = (type, cx, cy) =>
+        new TouchEvent(type, {
+          touches: type === 'touchend' ? [] : [new Touch({ identifier: 1, target: el, clientX: cx, clientY: cy })],
+          bubbles: true,
+          cancelable: true,
+        })
+      el.dispatchEvent(mk('touchstart', x, y))
+      el.dispatchEvent(mk('touchmove', x + ddx / 2, y + ddy / 2))
+      el.dispatchEvent(mk('touchmove', x + ddx, y + ddy))
+      el.dispatchEvent(mk('touchend', x + ddx, y + ddy))
+    }, [dx, dy])
+
+  // 14.1 未翻面：点击（位移 < 12px）→ 翻面
+  await swipe(3, 2)
+  await mpage.waitForTimeout(300)
+  check(
+    '手势：未翻面点击卡片 → 翻面',
+    (await mpage.locator('[data-testid="memorize-translation"]').count()) === 1,
+  )
+  check(
+    '移动端提示：翻面态显示滑动手势文案',
+    ((await mpage.textContent('[data-testid="memorize-keyhint"]')) ?? '').includes('←'),
+  )
+
+  // 14.2 已翻面右滑 → 认识（推进，分母不变）
+  const pG0 = await mpage.textContent('[data-testid="memorize-progress"]')
+  await swipe(120, 0)
+  await mpage.waitForTimeout(650)
+  const pG1 = await mpage.textContent('[data-testid="memorize-progress"]')
+  check(
+    '手势：已翻面右滑 → 认识（进度推进）',
+    pG0 !== pG1 && (await mpage.locator('[data-testid="memorize-translation"]').count()) === 0,
+    `${pG0?.trim()} → ${pG1?.trim()}`,
+  )
+
+  // 14.3 已翻面左滑 → 不认识（队列追加 2 → 分母 +2）
+  await swipe(3, 2)
+  await mpage.waitForTimeout(300)
+  await swipe(-120, 0)
+  await mpage.waitForTimeout(650)
+  const pG2 = (await mpage.textContent('[data-testid="memorize-progress"]')) ?? ''
+  check('手势：左滑 → 不认识（队列追加 2）', pG2.includes('/22'), pG2.trim())
+
+  // 14.4 已翻面上滑 → 模糊（追加 1 → 分母 23）
+  await swipe(3, 2)
+  await mpage.waitForTimeout(300)
+  await swipe(0, -120)
+  await mpage.waitForTimeout(650)
+  const pG3 = (await mpage.textContent('[data-testid="memorize-progress"]')) ?? ''
+  check('手势：上滑 → 模糊（队列追加 1）', pG3.includes('/23'), pG3.trim())
+
+  // 14.5 已翻面下滑 → 无效回弹（不打分不翻面）
+  await swipe(3, 2)
+  await mpage.waitForTimeout(300)
+  const pG4a = await mpage.textContent('[data-testid="memorize-progress"]')
+  await swipe(0, 120)
+  await mpage.waitForTimeout(650)
+  check(
+    '手势：下滑无效（回弹不打分）',
+    pG4a === (await mpage.textContent('[data-testid="memorize-progress"]')) &&
+      (await mpage.locator('[data-testid="memorize-translation"]').count()) === 1,
+  )
+
+  // 14.6 未翻面左右滑 → 无效不翻面
+  await swipe(120, 0) // 右滑认识过掉当前卡（已翻面态）
+  await mpage.waitForTimeout(650)
+  await swipe(-120, 0) // 新卡未翻面，左滑无效
+  await mpage.waitForTimeout(400)
+  check(
+    '手势：未翻面左右滑无效（不翻面）',
+    (await mpage.locator('[data-testid="memorize-translation"]').count()) === 0,
+  )
+  check(
+    '移动端提示：未翻面态显示点击/上滑文案',
+    ((await mpage.textContent('[data-testid="memorize-keyhint"]')) ?? '').includes('上滑'),
+  )
+
+  // 14.7 命令态互斥：Esc 打开命令面板后手势不响应
+  await mpage.keyboard.press('Escape')
+  await mpage.waitForTimeout(350)
+  const pG5 = await mpage.textContent('[data-testid="memorize-progress"]')
+  await swipe(3, 2) // 命令态下 tap 不应翻面
+  await mpage.waitForTimeout(300)
+  check(
+    '手势：命令态下不响应（tap 不翻面）',
+    pG5 === (await mpage.textContent('[data-testid="memorize-progress"]')) &&
+      (await mpage.locator('[data-testid="memorize-translation"]').count()) === 0,
+  )
+
+  // 14.8 移动端命令面板：open-cmd 图标唤起 → :theme 生效
+  await mpage.keyboard.press('Escape')
+  await mpage.waitForTimeout(300)
+  await mpage.click('[data-testid="open-cmd"]')
+  await mpage.waitForTimeout(300)
+  check('移动端：open-cmd 打开命令面板', (await mpage.locator('[data-testid="command-palette"]').count()) === 1)
+  const fontSize = await mpage.evaluate(
+    () => parseFloat(getComputedStyle(document.querySelector('[data-testid="command-input"]')).fontSize),
+  )
+  check('移动端：命令输入框字号 ≥16px（防 iOS 聚焦缩放）', fontSize >= 16, `${fontSize}px`)
+  await mpage.keyboard.type(':theme ide', { delay: 25 })
+  await mpage.keyboard.press('Enter')
+  await mpage.waitForTimeout(450)
+  // memorize 页签下不渲染 PracticePanel，切到打字页验 IDE 主题真实渲染
+  await mpage.click('[data-testid="tab-typing"]')
+  await mpage.waitForTimeout(350)
+  check('移动端：:theme ide 生效', norm(await mpage.textContent('body')).includes('export const'))
+  check('手势/移动端：无 console error', mConsoleErrors.length === 0, mConsoleErrors.slice(0, 2).join(' | '))
+
+  // 14.9 预热探针：SW 缓存出现三大词库 chunk（与上面用例并行预热）
+  const warm = await warmProbe
+  check('预热探针：SW 缓存含 ielts/kaoyan/toefl chunk', warm.ok, warm.hits.map((u) => u.split('/').pop()).join(', '))
+
+  await mctx.close()
   await ctx.close()
   await browser.close()
 
@@ -920,10 +1212,18 @@ async function run() {
   console.log(`\n${'─'.repeat(54)}`)
   console.log(`共 ${results.length} 项，通过 ${results.length - failures}，失败 ${failures}`)
   console.log(`${'─'.repeat(54)}`)
-  if (failures > 0) process.exit(1)
+  // 用 exitCode 而非 process.exit：让外层 finally 有机会杀掉自举的 preview
+  if (failures > 0) process.exitCode = 1
 }
 
-run().catch((e) => {
+// 自举 preview（--prod 时跳过，直接打生产），全程 finally 保证杀干净
+let previewServer = null
+try {
+  if (!IS_PROD) previewServer = await ensurePreviewServer()
+  await run()
+} catch (e) {
   console.error('\n💥 测试脚本异常：', e)
-  process.exit(1)
-})
+  process.exitCode = 1
+} finally {
+  stopPreview(previewServer)
+}

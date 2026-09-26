@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Volume2, Check, Eye, RotateCcw, Award, Flame } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
 import type { WordBank } from '../data/wordBanks'
@@ -27,6 +27,9 @@ interface MemorizeProps {
 
 /** 每日新词计划：默认 20 个 */
 const DAILY_NEW = 20
+
+/** 手势触发阈值（px）：|位移| 超过才算滑动，否则视作点击 */
+const SWIPE_THRESHOLD = 60
 
 /**
  * 背单词卡片流：
@@ -143,6 +146,119 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done])
 
+  /* ---------- 移动端手势（原生 touch，不引库） ----------
+   * 未翻面：点击/上滑 → 翻面，左右滑无效回弹；
+   * 已翻面：右滑=认识、左滑=不认识、上滑=模糊，下滑无效回弹。
+   * touchmove 跟手（translate + ≤12deg rotate，纯 transform 合成层），
+   * 松手过阈值飞出后打分，未过阈值回弹。命令态（paused）不响应。 */
+  const cardRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef({ startX: 0, startY: 0, dx: 0, dy: 0, active: false })
+  /** 最近一次 touch 处理时刻：屏蔽其后的合成 click，防误翻下一张卡 */
+  const touchHandledAt = useRef(0)
+  // answer 每渲染重建，经 ref 取最新值，避免手势监听器无谓重绑
+  const answerRef = useRef(answer)
+  answerRef.current = answer
+  // 触摸能力探测：maxTouchPoints > 0 才绑手势（有触摸能力即可滑）；
+  // 提示文案按主指针类型（pointer: coarse）——触屏笔记本主指针仍是鼠标，保留键盘提示
+  const [isTouch] = useState(() => navigator.maxTouchPoints > 0)
+  const [coarsePointer] = useState(() => window.matchMedia('(pointer: coarse)').matches)
+
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el || !isTouch) return
+
+    const resetStyle = () => {
+      el.style.transition = ''
+      el.style.transform = ''
+      el.style.opacity = ''
+    }
+    /** 过阈值飞出：沿手势方向滑出卡片再淡出 */
+    const flyOut = (dirX: number, dirY: number) => {
+      el.style.transition = 'transform 0.22s ease-in, opacity 0.22s ease-in'
+      el.style.transform = `translate(${dirX * 120}%, ${dirY * 120}%) rotate(${dirX * 18}deg)`
+      el.style.opacity = '0'
+    }
+    /** 未过阈值回弹 */
+    const bounceBack = () => {
+      el.style.transition = 'transform 0.25s ease-out'
+      el.style.transform = 'translate(0px, 0px) rotate(0deg)'
+      window.setTimeout(resetStyle, 260)
+    }
+
+    const onStart = (e: TouchEvent) => {
+      if (paused || dragRef.current.active || e.touches.length !== 1) return
+      const t0 = e.touches[0]
+      dragRef.current = { startX: t0.clientX, startY: t0.clientY, dx: 0, dy: 0, active: true }
+      el.style.transition = 'none'
+    }
+    const onMove = (e: TouchEvent) => {
+      if (!dragRef.current.active) return
+      e.preventDefault() // touch-action:none 之外的滚动劫持兜底
+      const t0 = e.touches[0]
+      const dx = t0.clientX - dragRef.current.startX
+      const dy = t0.clientY - dragRef.current.startY
+      dragRef.current.dx = dx
+      dragRef.current.dy = dy
+      // 跟手：位移全跟随，rotate 随横向位移最多 ±12deg
+      const rot = Math.max(-12, Math.min(12, dx / 14))
+      el.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}deg)`
+    }
+    const onEnd = () => {
+      if (!dragRef.current.active) return
+      const { dx, dy } = dragRef.current
+      dragRef.current.active = false
+      touchHandledAt.current = Date.now()
+      const horizontal = Math.abs(dx) > Math.abs(dy)
+      const tapped = Math.abs(dx) < 12 && Math.abs(dy) < 12
+      const passedX = Math.abs(dx) >= SWIPE_THRESHOLD
+      const passedY = Math.abs(dy) >= SWIPE_THRESHOLD
+
+      if (!flipped) {
+        if (tapped || (!horizontal && passedY && dy < 0)) {
+          // 点击 或 上滑 → 翻面
+          sound.tap()
+          resetStyle()
+          setFlipped(true)
+          return
+        }
+        bounceBack() // 左右滑 / 下滑无效，回弹反馈
+        return
+      }
+
+      // 已翻面：以 |dx| vs |dy| 大者定方向，过 60px 阈值才打分
+      if (!passedX && !passedY) {
+        bounceBack()
+        return
+      }
+      let status: MemStatus | null = null
+      if (horizontal && passedX) status = dx > 0 ? 'known' : 'unknown'
+      else if (!horizontal && passedY && dy < 0) status = 'fuzzy'
+      if (!status) {
+        bounceBack() // 下滑无效
+        return
+      }
+      const dirX = status === 'unknown' ? -1 : status === 'known' ? 1 : 0
+      const dirY = status === 'fuzzy' ? -1 : 0
+      flyOut(dirX, dirY)
+      window.setTimeout(() => {
+        resetStyle()
+        answerRef.current(status!)
+      }, 230)
+    }
+
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: false })
+    el.addEventListener('touchend', onEnd)
+    el.addEventListener('touchcancel', onEnd)
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchend', onEnd)
+      el.removeEventListener('touchcancel', onEnd)
+    }
+    // item?.word：deck 异步填充后卡片才挂载（此前 cardRef 为 null），切词时重绑
+  }, [isTouch, paused, flipped, item?.word])
+
   /* ---------- 卡片翻面瞬间自动发音当前词（与 Space 翻面联动） ---------- */
   useEffect(() => {
     if (flipped && item) speak(item.word)
@@ -240,10 +356,18 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
         />
       </div>
 
-      {/* 正面：单词 + 发音 / 翻面：释义 */}
+      {/* 正面：单词 + 发音 / 翻面：释义。移动端 touch 手势见上方手势 effect */}
       <div
+        ref={cardRef}
         data-testid="memorize-card"
-        className={`${theme.card} border ${theme.border} rounded-2xl px-6 py-12 text-center shadow-2xl min-h-[16rem] flex flex-col items-center justify-center gap-4`}
+        onClick={() => {
+          // 触摸手势刚处理过则忽略合成 click；已翻面时点击不打分防误触
+          if (Date.now() - touchHandledAt.current < 600 || flipped) return
+          sound.tap()
+          setFlipped(true)
+        }}
+        style={{ touchAction: 'none' }}
+        className={`${theme.card} border ${theme.border} rounded-2xl px-6 py-12 text-center shadow-2xl min-h-[16rem] flex flex-col items-center justify-center gap-4 will-change-transform`}
       >
         {!flipped ? (
           <>
@@ -251,7 +375,10 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
             <div className="flex items-center gap-2">
               <button
                 data-testid="memorize-speak"
-                onClick={() => speak(item.word)}
+                onClick={(e) => {
+                  e.stopPropagation() // 点发音只朗读，不冒泡翻面
+                  speak(item.word)
+                }}
                 title={t('practice.speakTitle')}
                 aria-label={t('practice.speakTitle')}
                 className={`p-2 rounded-md border ${theme.border} hover:opacity-70 active:scale-95`}
@@ -260,7 +387,11 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
               </button>
               <button
                 data-testid="memorize-flip"
-                onClick={() => setFlipped(true)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  sound.tap()
+                  setFlipped(true)
+                }}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-lg border ${theme.border} text-xs font-semibold active:scale-95`}
               >
                 <Eye size={13} />
@@ -305,9 +436,13 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
         ))}
       </div>
 
-      {/* 键盘流提示 */}
+      {/* 手势/键盘流提示：主指针为触摸（手机/平板）显示滑动手势，鼠标设备保留键盘提示 */}
       <div data-testid="memorize-keyhint" className={`mt-3 text-center text-[11px] tracking-wide ${theme.sub} opacity-70`}>
-        {(flipped ? t('memorize.keyGrade') : t('memorize.keyFlip')) + ' · ' + t('memorize.keyReread')}
+        {coarsePointer
+          ? flipped
+            ? t('memorize.swipeGrade')
+            : t('memorize.swipeFlip')
+          : (flipped ? t('memorize.keyGrade') : t('memorize.keyFlip')) + ' · ' + t('memorize.keyReread')}
       </div>
     </div>
   )

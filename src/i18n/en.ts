@@ -178,5 +178,7 @@ export const en: Record<string, string> = {
   'memorize.keyFlip': 'Space to flip',
   'memorize.keyGrade': '1 Know · 2 Fuzzy · 3 Nope',
   'memorize.keyReread': 'K re-read',
+  'memorize.swipeFlip': 'Tap card or swipe up to flip',
+  'memorize.swipeGrade': '← Nope · Swipe up Fuzzy · Know →',
   'memorize.medal': 'Daily quest complete',
 }

@@ -179,5 +179,7 @@ export const zh: Record<string, string> = {
   'memorize.keyFlip': 'Space 翻面',
   'memorize.keyGrade': '1 认识 · 2 模糊 · 3 不认识',
   'memorize.keyReread': 'K 重读',
+  'memorize.swipeFlip': '点击卡片或上滑翻面',
+  'memorize.swipeGrade': '← 不认识 · 上滑模糊 · 认识 →',
   'memorize.medal': '今日修行完成',
 }

@@ -7,8 +7,13 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview",
+    "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
     "test:e2e": "node tests/e2e.mjs",
+    "test:offline": "node tests/offline-audit.mjs",
+    "test:prod": "node tests/offline-audit.mjs --prod",
+    "test:e2e:prod": "node tests/e2e.mjs --prod",
+    "test:smoke": "node tests/prod-smoke.mjs",
+    "stress:review": "node scripts/stress-review.mjs",
     "icons": "node scripts/gen-icons.mjs"
   },
   "dependencies": {
