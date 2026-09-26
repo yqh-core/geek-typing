@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0f0a">
+<title>打工人赛博防御力测试</title>
+<meta name="description" content="6 道毒舌情景题，测出你的打工人赛博防御力：摸鱼装忙、需求反杀、带薪如厕全项扫描。纯属娱乐，测完前往 Geek Typing 打字站提升战力。">
+<style>
+:root{
+  --bg:#0a0f0a; --panel2:#0e170f; --border:#173a22; --border-hi:#00ff88;
+  --green:#00ff88; --green-deep:#00c86a; --yellow:#ffd60a;
+  --text:#d2ead9; --muted:#6f8f7a; --dim:#41604d;
+  --mono:ui-monospace,'Cascadia Mono','SF Mono',Consolas,'Courier New',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+html,body{max-width:100%;overflow-x:hidden}
+body{
+  background:var(--bg);color:var(--text);font-family:var(--mono);
+  font-size:15px;line-height:1.65;min-height:100vh;-webkit-font-smoothing:antialiased;
+}
+/* CRT 扫描线 + 环境辉光（纯 CSS，无图片） */
+body::before{content:'';position:fixed;inset:0;z-index:30;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,255,136,.028) 0 1px,transparent 1px 3px)}
+body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(640px 420px at 50% -8%,rgba(0,255,136,.09),transparent 70%),
+    radial-gradient(520px 340px at 92% 108%,rgba(255,214,10,.05),transparent 70%)}
+.wrap{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:34px 18px 44px}
+.screen{display:none}
+.screen.active{display:block;animation:fadein .25s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ---- 开屏 ---- */
+.sys-line{font-size:11px;letter-spacing:2px;color:var(--dim);margin-bottom:12px}
+.title{font-size:23px;line-height:1.45;font-weight:700}
+.glow{color:var(--green);text-shadow:0 0 14px rgba(0,255,136,.55)}
+.cursor{color:var(--green);font-weight:400;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.desc{margin:16px 0 10px;font-size:14px}
+.meta{font-size:11px;color:var(--muted);margin-bottom:18px}
+.warn{font-size:12px;color:var(--yellow);border:1px dashed rgba(255,214,10,.45);
+  border-radius:4px;padding:9px 12px;margin-bottom:22px}
+
+/* ---- 按钮 ---- */
+.btn{display:block;width:100%;text-align:center;font-family:var(--mono);font-size:15px;
+  padding:13px 16px;border-radius:6px;cursor:pointer;border:1px solid var(--border-hi);
+  background:transparent;transition:background .15s,box-shadow .15s,color .15s,border-color .15s}
+.btn-primary{background:rgba(0,255,136,.10);color:var(--green);
+  text-shadow:0 0 10px rgba(0,255,136,.45);
+  box-shadow:0 0 18px rgba(0,255,136,.18),inset 0 0 14px rgba(0,255,136,.05)}
+.btn-primary:hover,.btn-primary:focus-visible{background:rgba(0,255,136,.18);
+  box-shadow:0 0 26px rgba(0,255,136,.3);outline:none}
+.btn-ghost{border-color:var(--border);color:var(--muted)}
+.btn-ghost:hover,.btn-ghost:focus-visible{border-color:var(--green-deep);color:var(--green);outline:none}
+
+/* ---- 答题 ---- */
+.quiz-head{display:flex;align-items:center;margin-bottom:16px}
+.q-idx{font-size:12px;color:var(--green);margin-right:12px;white-space:nowrap}
+.bar{flex:1;height:6px;background:#0e1a11;border:1px solid var(--border);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;
+  background:linear-gradient(90deg,var(--green-deep),var(--green));
+  box-shadow:0 0 8px rgba(0,255,136,.6);transition:width .35s ease}
+.q-text{font-size:17px;line-height:1.7;margin-bottom:18px}
+.opts .opt{display:block;width:100%;text-align:left;font-family:var(--mono);font-size:14px;
+  line-height:1.6;color:var(--text);background:var(--panel2);border:1px solid var(--border);
+  border-radius:6px;padding:12px 14px;margin-bottom:10px;cursor:pointer;overflow-wrap:anywhere;
+  transition:border-color .15s,box-shadow .15s,transform .06s}
+.opts .opt:hover,.opts .opt:focus-visible{border-color:var(--border-hi);
+  box-shadow:0 0 12px rgba(0,255,136,.22);outline:none}
+.opts .opt:active{transform:scale(.99)}
+.opt .k{color:var(--green);margin-right:8px;font-weight:700}
+.back{margin-top:4px;background:none;border:none;font-family:var(--mono);font-size:13px;
+  color:var(--muted);cursor:pointer;padding:6px 2px}
+.back:hover{color:var(--green)}
+
+/* ---- 结果卡（导图区域） ---- */
+#result-card{background:var(--bg);border:1px solid var(--border-hi);border-radius:8px;
+  padding:18px 16px 16px;box-shadow:0 0 26px rgba(0,255,136,.16);overflow-wrap:anywhere}
+.rc-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;
+  color:var(--dim);border-bottom:1px dashed var(--border);padding-bottom:10px}
+.rc-brand{color:var(--green);letter-spacing:1px}
+.rc-label{margin-top:16px;font-size:12px;letter-spacing:3px;color:var(--muted)}
+.rc-tier{margin-top:6px;font-size:26px;font-weight:700;color:var(--green);
+  text-shadow:0 0 16px rgba(0,255,136,.55)}
+.rc-score{margin-top:2px}
+#r-score{font-size:38px;font-weight:700;color:var(--yellow);text-shadow:0 0 14px rgba(255,214,10,.4)}
+.rc-unit{font-size:12px;color:var(--muted);margin-left:8px}
+.rc-bar{margin:10px 0 14px}
+.rc-comments p{font-size:13px;margin-bottom:8px}
+.rc-tip{margin-top:12px;padding:9px 12px;border-left:3px solid var(--yellow);
+  background:rgba(255,214,10,.07);color:#ffe98c;font-size:13px}
+.rc-cta{margin-top:16px;display:flex;align-items:center}
+.qr-ph{flex:none;width:58px;height:58px;border:1px dashed var(--dim);border-radius:4px;
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:9px;line-height:1.5;color:var(--dim)}
+.rc-cta-txt{margin-left:12px}
+.rc-cta-main{font-size:13px;color:var(--green)}
+.rc-cta-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.rc-foot{margin-top:14px;padding-top:10px;border-top:1px dashed var(--border);
+  font-size:10px;color:var(--dim);text-align:center;letter-spacing:1px}
+.result-actions{margin-top:16px}
+.row2{display:flex;margin-top:10px}
+.row2 .btn{flex:1}
+.row2 .btn + .btn{margin-left:10px}
+.foot{margin-top:30px;text-align:center;font-size:10px;color:var(--dim);letter-spacing:1px}
+
+/* ---- toast ---- */
+#toast{position:fixed;left:50%;bottom:30px;transform:translate(-50%,16px);z-index:99;
+  max-width:90vw;background:#0f1c12;border:1px solid var(--border-hi);color:var(--green);
+  font-size:13px;padding:10px 16px;border-radius:6px;box-shadow:0 0 16px rgba(0,255,136,.25);
+  opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (min-width:768px){
+  .wrap{padding-top:9vh;padding-bottom:9vh}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 开屏 -->
+  <section class="screen active" id="screen-intro">
+    <p class="sys-line">GEEK-TYPING SYS://DEFENSE.SCAN v2.6</p>
+    <h1 class="title">打工人<span class="glow">赛博防御力</span>测试<span class="cursor">_</span></h1>
+    <p class="desc">6 道毒舌情景题，全项扫描你的摸鱼防御体系：<br>装忙话术 / 需求反杀 / 带薪如厕 / Code Review 反击。</p>
+    <p class="meta">题量 6 · 预计 60s · 消耗摸鱼额度 3 分钟</p>
+    <p class="warn">⚠ 本测试纯属娱乐，如有雷同，你确实该摸鱼了</p>
+    <button type="button" class="btn btn-primary" id="btn-start">开始检测</button>
+  </section>
+
+  <!-- 答题 -->
+  <section class="screen" id="screen-quiz">
+    <div class="quiz-head">
+      <span class="q-idx" id="q-idx">Q1/6</span>
+      <div class="bar"><i id="q-bar"></i></div>
+    </div>
+    <h2 class="q-text" id="q-text"></h2>
+    <div class="opts" id="q-opts"></div>
+    <button type="button" class="back" id="btn-back">← 上一题</button>
+  </section>
+
+  <!-- 结果 -->
+  <section class="screen" id="screen-result">
+    <div id="result-card">
+      <div class="rc-head"><span>&gt; DEFENSE.SCAN 完成_</span><span class="rc-brand">geek-typing</span></div>
+      <p class="rc-label">打工人赛博防御力报告</p>
+      <div class="rc-tier" id="r-tier"></div>
+      <div class="rc-score"><span id="r-score">0</span><span class="rc-unit">/ 100 防御力</span></div>
+      <div class="bar rc-bar"><i id="r-bar"></i></div>
+      <div class="rc-comments" id="r-comments"></div>
+      <p class="rc-tip" id="r-tip"></p>
+      <div class="rc-cta">
+        <div class="qr-ph">二维码<br>占位</div>
+        <div class="rc-cta-txt">
+          <p class="rc-cta-main">扫码或访问打字站提升战力</p>
+          <p class="rc-cta-sub">Geek Typing · 极客打字背单词</p>
+        </div>
+      </div>
+      <p class="rc-foot">geek-typing · 打工人赛博防御力测试 · 纯属娱乐</p>
+    </div>
+    <div class="result-actions">
+      <a class="btn btn-primary" href="../">立刻前往提升赛博战力 →</a>
+      <div class="row2">
+        <button type="button" class="btn btn-ghost" id="btn-retry">重新测试</button>
+        <button type="button" class="btn btn-ghost" id="btn-save">保存战力报告图</button>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">Geek Typing · 打字即修炼</p>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script>
+/* ================================================================
+ * 题库（题目可在此直接替换）
+ * - 每题 4 个选项；s 为分值（0~3），总分 0~18，映射防御力 0~100
+ * - 增删题目后无需改动其他逻辑，进度与计分自动适配
+ * ================================================================ */
+const QUESTIONS = [
+  {
+    q: '周五下午 17:47，领导在群里 @你：「在吗？说个事。」你的第一反应是——',
+    opts: [
+      { t: '秒回「在的您说」，心跳直接拉到 180', s: 0 },
+      { t: '深呼吸三次，再回复「在的，您说」', s: 1 },
+      { t: '回「刚在开会」，争取 30 分钟战术缓冲', s: 2 },
+      { t: '已读不回，周一再说，周末神圣不可侵犯', s: 3 },
+    ],
+  },
+  {
+    q: '产品经理第 8 次改需求，这次把上周刚删的功能又要了回来。你——',
+    opts: [
+      { t: '血压拉满，当场打开 IDE 含泪重写', s: 0 },
+      { t: '回「好的收到」，然后在工位沉默十分钟', s: 1 },
+      { t: '甩出修改记录：「这是你们上周亲手删的」', s: 2 },
+      { t: '淡定回「好的，排下迭代」，让需求在排期里自然风干', s: 3 },
+    ],
+  },
+  {
+    q: '你的代码被 code review 打回，评论只有一句：「为什么不用设计模式？」你——',
+    opts: [
+      { t: '连夜自学 23 种设计模式，第二天重构到天亮', s: 0 },
+      { t: '回「好的我改」，顺手也 review 了一下 reviewer', s: 1 },
+      { t: '回「综合复杂度与维护成本，此处不建议引入」，黑话反杀', s: 2 },
+      { t: '回「好的」，然后什么都不改，静等自动合并', s: 3 },
+    ],
+  },
+  {
+    q: '你单次带薪如厕（含手机）的平均时长是——',
+    opts: [
+      { t: '5 分钟，手机都不带，卷王实锤', s: 0 },
+      { t: '10-15 分钟，刚好刷完当日热点', s: 1 },
+      { t: '20-30 分钟，一局排位从容打完', s: 2 },
+      { t: '需要随身携带充电器，工位同事一度以为你失踪了', s: 3 },
+    ],
+  },
+  {
+    q: '摸鱼正酣，领导突然走近你的工位。你的装忙话术是——',
+    opts: [
+      { t: '手忙脚乱切屏，结果把请假系统关了', s: 0 },
+      { t: '0.5 秒切到 Excel，眼神专注得像在核对财报', s: 1 },
+      { t: '不用切：键盘上常年挂着满屏滚动日志，此刻正在「编译」', s: 2 },
+      { t: '根本不切屏，抬头说「在查线上 bug」，反正没人敢验证', s: 3 },
+    ],
+  },
+  {
+    q: '领导：「这个需求很简单，加个按钮而已，明天上线。」你——',
+    opts: [
+      { t: '「好的」，然后默默通宵', s: 0 },
+      { t: '「我先评估下工作量」，评估完还是今晚做', s: 1 },
+      { t: '回「涉及联调、回归与灰度发布，预计三个工作日」，流程话术糊脸', s: 2 },
+      { t: '「可以，需求文档发我」，用文档反杀，需求原地去世', s: 3 },
+    ],
+  },
+];
+
+/* ================================================================
+ * 结果档位（文案可在此直接替换）
+ * - 从高到低排列：防御力百分比 >= min 即命中该档
+ * ================================================================ */
+const RESULTS = [
+  {
+    min: 89, name: '带薪摸鱼·赛博佛祖',
+    comments: [
+      '需求改与不改，你都在；领导在与不在，你也都在——在带薪如厕的隔间里。',
+      '群里 @你，你从容回应；review 打回，你顺手回敬。你不是在防御，你已无需防御。',
+      '万物皆可排期，诸事皆能下迭代。恭喜，你就是传说中的赛博佛祖。',
+    ],
+    tip: '佛祖也要保持手感，去打字站打两局，顺便渡一渡新来的炮灰。',
+  },
+  {
+    min: 73, name: '防御力拉满卷王',
+    comments: [
+      '你的防御体系已接近军用级别：排期话术信手拈来，需求文档反杀满级。',
+      '领导说「很简单明天上线」，你一句「需求文档发我」，需求当场失去生命体征。',
+      '唯一的隐患是：段位太高，小心被任命为组长。',
+    ],
+    tip: '高手的对手只有自己，去打字站把键速也一起拉满。',
+  },
+  {
+    min: 56, name: '带薪躺平中阶',
+    comments: [
+      '装忙话术已成体系，黑话浓度达标，普通的 review 意见很难击穿你的防线。',
+      '带薪如厕一局排位从容打完，工位气场稳定输出。',
+      '但领导 @你 的瞬间，你还是会漏跳半拍——这半拍，就是你与佛祖的距离。',
+    ],
+    tip: '战力尚有余量，去打字站刷两局，把最后的破绽补上。',
+  },
+  {
+    min: 34, name: '摸鱼青铜',
+    comments: [
+      '你已掌握初级装忙技巧，但动作生硬，隔着两个工位就能被识破。',
+      '切屏手速有了，心跳没跟上：领导一走近，你把请假系统给关了。',
+      '摸鱼全靠运气，加班全凭实力。',
+    ],
+    tip: '系统已为你匹配【打字特训】，先把手速练到比心跳快。',
+  },
+  {
+    min: 0, name: '赛博炮灰',
+    comments: [
+      '检测到你的「代码防御力」不足，系统已发布紧急预警。',
+      '领导一句「在吗」就能让你瞬间上线，需求改到第 8 版你照单全收，年终奖没涨，血压一路新高。',
+      '你不是在上班，你是在职场的枪林弹雨里裸奔。',
+    ],
+    tip: '系统已为你自动匹配【打字特训站】，立刻前往提升赛博战力。',
+  },
+];
+
+/* ==================== 以下为交互逻辑，一般无需改动 ==================== */
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const KEYS = ['A', 'B', 'C', 'D'];
+  const TOTAL_MAX = QUESTIONS.length * 3;
+  let idx = 0;
+  const answers = [];
+  let curTier = null;
+  let toastTimer = null;
+
+  function show(id) {
+    ['screen-intro', 'screen-quiz', 'screen-result'].forEach((s) =>
+      $(s).classList.toggle('active', s === id)
+    );
+    window.scrollTo(0, 0);
+  }
+
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  function renderQ() {
+    const q = QUESTIONS[idx];
+    $('q-idx').textContent = 'Q' + (idx + 1) + '/' + QUESTIONS.length;
+    $('q-bar').style.width = (((idx + 1) / QUESTIONS.length) * 100) + '%';
+    $('q-text').textContent = q.q;
+    const box = $('q-opts');
+    box.innerHTML = '';
+    q.opts.forEach((o, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'opt';
+      const k = document.createElement('span');
+      k.className = 'k';
+      k.textContent = KEYS[i];
+      b.appendChild(k);
+      b.appendChild(document.createTextNode(o.t));
+      b.addEventListener('click', () => pick(o.s));
+      box.appendChild(b);
+    });
+    $('btn-back').style.visibility = idx === 0 ? 'hidden' : 'visible';
+  }
+
+  function pick(s) {
+    answers[idx] = s;
+    if (idx < QUESTIONS.length - 1) {
+      idx++;
+      renderQ();
+    } else {
+      showResult();
+    }
+  }
+
+  function showResult() {
+    const total = answers.reduce((a, b) => a + b, 0);
+    const pct = Math.max(0, Math.min(100, Math.round((total / TOTAL_MAX) * 100)));
+    curTier = RESULTS.find((r) => pct >= r.min) || RESULTS[RESULTS.length - 1];
+    $('r-tier').textContent = curTier.name;
+    const box = $('r-comments');
+    box.innerHTML = '';
+    curTier.comments.forEach((c) => {
+      const p = document.createElement('p');
+      p.textContent = '> ' + c;
+      box.appendChild(p);
+    });
+    $('r-tip').textContent = curTier.tip;
+    $('r-bar').style.width = '0%';
+    $('r-score').textContent = String(pct);
+    show('screen-result');
+    setTimeout(() => { $('r-bar').style.width = pct + '%'; }, 80);
+  }
+
+  function restart() {
+    idx = 0;
+    answers.length = 0;
+    renderQ();
+    show('screen-quiz');
+  }
+
+  /* ---- html2canvas 懒加载：首次点击「保存战力报告图」时才请求 CDN，
+         加载失败/超时不影响答题流程，仅降级为截图提示 ---- */
+  let h2cPromise = null;
+  function loadH2C() {
+    if (window.html2canvas) return Promise.resolve();
+    if (h2cPromise) return h2cPromise;
+    h2cPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+      s.onload = () => resolve();
+      s.onerror = () => { h2cPromise = null; reject(new Error('CDN_FAIL')); };
+      document.head.appendChild(s);
+      setTimeout(() => reject(new Error('CDN_TIMEOUT')), 12000);
+    });
+    return h2cPromise;
+  }
+
+  $('btn-start').addEventListener('click', restart);
+  $('btn-retry').addEventListener('click', restart);
+  $('btn-back').addEventListener('click', () => { if (idx > 0) { idx--; renderQ(); } });
+
+  $('btn-save').addEventListener('click', () => {
+    const btn = $('btn-save');
+    if (btn.disabled || !curTier) return;
+    btn.disabled = true;
+    const old = btn.textContent;
+    btn.textContent = '生成中…';
+    loadH2C()
+      .then(() => window.html2canvas($('result-card'), {
+        scale: 2, backgroundColor: '#0a0f0a', logging: false, useCORS: true,
+      }))
+      .then((canvas) => new Promise((resolve, reject) => {
+        if (!canvas || !canvas.toBlob) return reject(new Error('CANVAS_FAIL'));
+        canvas.toBlob((blob) => {
+          if (!blob) return reject(new Error('BLOB_FAIL'));
+          const a = document.createElement('a');
+          const url = URL.createObjectURL(blob);
+          a.href = url;
+          a.download = '赛博防御力报告_' + curTier.name + '.png';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 4000);
+          toast('战力报告已生成，正在下载');
+          resolve();
+        }, 'image/png');
+      }))
+      .catch(() => toast('导出失败，长按屏幕截图保存'))
+      .then(() => { btn.disabled = false; btn.textContent = old; });
+  });
+})();
+</script>
+</body>
+</html>
