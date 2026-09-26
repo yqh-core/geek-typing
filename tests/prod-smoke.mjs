@@ -66,7 +66,8 @@ function localFingerprints() {
   const html = readFileSync(join('dist', 'index.html'), 'utf8')
   const bundle = html.match(/\/assets\/index-[^"]+\.js/)?.[0] ?? null
   const assets = readdirSync(join('dist', 'assets'))
-  const lazyChunks = assets.filter((f) => /^(kaoyan|toefl)-.+\.js$/.test(f)).map((f) => `/assets/${f}`)
+  // V4-P0：大词库 chunk 从模块名(kaoyan-*.js 等)变为 ?raw JSON 命名 words-*.js（共 3 个）
+  const lazyChunks = assets.filter((f) => /^words-.+\.js$/.test(f)).map((f) => `/assets/${f}`)
   return { bundle, lazyChunks }
 }
 
