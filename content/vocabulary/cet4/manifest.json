@@ -1,0 +1,35 @@
+{
+  "id": "bank:cet4",
+  "type": "vocabulary",
+  "version": "1.0.0",
+  "title": "四级 CET-4",
+  "titleEn": "四级 CET-4",
+  "description": "大学英语四级高频核心词",
+  "descriptionEn": "大学英语四级高频核心词",
+  "language": "en",
+  "exam": "CET-4",
+  "tags": [
+    "cet",
+    "vocabulary"
+  ],
+  "icon": "GraduationCap",
+  "features": {
+    "phonetic": true,
+    "definition": true
+  },
+  "stats": {
+    "items": 84,
+    "phonetic": 84,
+    "definition": 84
+  },
+  "source": {
+    "origin": "ECDICT",
+    "license": "MIT",
+    "importedAt": "2026-09-26",
+    "checksum": "sha256:4081f01156cc3edb"
+  },
+  "offline": {
+    "supported": true,
+    "policy": "inline"
+  }
+}

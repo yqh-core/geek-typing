@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { LangProvider } from './i18n'
+import { warmUpVocabulary } from './core/content/registry'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -44,7 +45,9 @@ if (import.meta.env.PROD) {
           /* 无 SW 环境直接预热（模块缓存仍生效） */
         }
       }
-      Promise.allSettled([import('./data/ielts'), import('./data/kaoyan'), import('./data/toefl')]).catch(() => {})
+      // V4-P0：预热改经 registry（与 wordBanks.load 同一动态 import 模块 → 同一 chunk），
+      // 预拉 ielts/kaoyan/toefl 三个大库，SW fetch handler 顺手 put 进缓存
+      void warmUpVocabulary()
     }
     window.addEventListener('load', () => {
       const ric = (window as { requestIdleCallback?: typeof requestIdleCallback }).requestIdleCallback

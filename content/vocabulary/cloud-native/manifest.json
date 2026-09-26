@@ -1,0 +1,36 @@
+{
+  "id": "bank:cloud-native",
+  "type": "vocabulary",
+  "version": "1.0.0",
+  "title": "云原生 K8s 词库",
+  "titleEn": "云原生 K8s 词库",
+  "description": "Kubernetes 与容器生态",
+  "descriptionEn": "Kubernetes 与容器生态",
+  "language": "en",
+  "exam": null,
+  "tags": [
+    "cloud",
+    "devops",
+    "vocabulary"
+  ],
+  "icon": "Boxes",
+  "features": {
+    "phonetic": false,
+    "definition": false
+  },
+  "stats": {
+    "items": 30,
+    "phonetic": 0,
+    "definition": 0
+  },
+  "source": {
+    "origin": "curated in-repo (云原生词库)",
+    "license": "UNLICENSED",
+    "importedAt": "2026-09-26",
+    "checksum": "sha256:cddaa3d05eea3df2"
+  },
+  "offline": {
+    "supported": true,
+    "policy": "inline"
+  }
+}

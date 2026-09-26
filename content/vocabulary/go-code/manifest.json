@@ -1,0 +1,36 @@
+{
+  "id": "bank:go-code",
+  "type": "vocabulary",
+  "version": "1.0.0",
+  "title": "Go 骨架代码",
+  "titleEn": "Go Skeletons",
+  "description": "Go 标志性骨架代码行，配合代码模式练习（大小写敏感）",
+  "descriptionEn": "Iconic Go skeleton lines — pair with Code mode (case-sensitive)",
+  "language": "en",
+  "exam": null,
+  "tags": [
+    "code",
+    "golang",
+    "vocabulary"
+  ],
+  "icon": "Code",
+  "features": {
+    "phonetic": false,
+    "definition": false
+  },
+  "stats": {
+    "items": 50,
+    "phonetic": 0,
+    "definition": 0
+  },
+  "source": {
+    "origin": "curated in-repo (Go 代码词库)",
+    "license": "UNLICENSED",
+    "importedAt": "2026-09-26",
+    "checksum": "sha256:6b22c0d902eeb109"
+  },
+  "offline": {
+    "supported": true,
+    "policy": "inline"
+  }
+}

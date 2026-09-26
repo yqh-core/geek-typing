@@ -1077,7 +1077,9 @@ async function run() {
         if (names.includes('gt-shell-v2')) {
           const cache = await caches.open('gt-shell-v2')
           const urls = (await cache.keys()).map((r) => r.url)
-          const hits = urls.filter((u) => /\/assets\/.*(ielts|kaoyan|toefl).*\.js/.test(u))
+          // V4-P0：大词库 chunk 从模块名(ielts-*.js)变为 ?raw JSON 命名(words-*.js)，
+          // 懒加载 words chunk 当前即三大词库，按前缀计数
+          const hits = urls.filter((u) => /\/assets\/words-.*\.js/.test(u))
           if (hits.length >= 3) return { ok: true, hits }
         }
       } catch {

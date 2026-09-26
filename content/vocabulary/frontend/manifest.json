@@ -1,0 +1,35 @@
+{
+  "id": "bank:frontend",
+  "type": "vocabulary",
+  "version": "1.0.0",
+  "title": "前端工程化词库",
+  "titleEn": "前端工程化词库",
+  "description": "React / 构建工具高频词",
+  "descriptionEn": "React / 构建工具高频词",
+  "language": "en",
+  "exam": null,
+  "tags": [
+    "frontend",
+    "vocabulary"
+  ],
+  "icon": "Code2",
+  "features": {
+    "phonetic": false,
+    "definition": false
+  },
+  "stats": {
+    "items": 20,
+    "phonetic": 0,
+    "definition": 0
+  },
+  "source": {
+    "origin": "curated in-repo (前端词库)",
+    "license": "UNLICENSED",
+    "importedAt": "2026-09-26",
+    "checksum": "sha256:ae689a1658435952"
+  },
+  "offline": {
+    "supported": true,
+    "policy": "inline"
+  }
+}

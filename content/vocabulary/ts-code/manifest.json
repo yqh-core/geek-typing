@@ -1,0 +1,36 @@
+{
+  "id": "bank:ts-code",
+  "type": "vocabulary",
+  "version": "1.0.0",
+  "title": "TS 骨架代码",
+  "titleEn": "TS Skeletons",
+  "description": "TypeScript / React 高频骨架代码行，配合代码模式练习（大小写敏感）",
+  "descriptionEn": "Common TypeScript/React skeleton lines — pair with Code mode (case-sensitive)",
+  "language": "en",
+  "exam": null,
+  "tags": [
+    "code",
+    "typescript",
+    "vocabulary"
+  ],
+  "icon": "Code",
+  "features": {
+    "phonetic": false,
+    "definition": false
+  },
+  "stats": {
+    "items": 50,
+    "phonetic": 0,
+    "definition": 0
+  },
+  "source": {
+    "origin": "curated in-repo (TS 代码词库)",
+    "license": "UNLICENSED",
+    "importedAt": "2026-09-26",
+    "checksum": "sha256:9f34b063a8523022"
+  },
+  "offline": {
+    "supported": true,
+    "policy": "inline"
+  }
+}

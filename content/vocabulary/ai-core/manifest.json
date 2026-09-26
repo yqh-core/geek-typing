@@ -1,0 +1,36 @@
+{
+  "id": "bank:ai-core",
+  "type": "vocabulary",
+  "version": "1.0.0",
+  "title": "2026 AI 核心词库",
+  "titleEn": "2026 AI 核心词库",
+  "description": "大模型 / AI 工程师高频词汇",
+  "descriptionEn": "大模型 / AI 工程师高频词汇",
+  "language": "en",
+  "exam": null,
+  "tags": [
+    "ai",
+    "llm",
+    "vocabulary"
+  ],
+  "icon": "Sparkles",
+  "features": {
+    "phonetic": false,
+    "definition": false
+  },
+  "stats": {
+    "items": 43,
+    "phonetic": 0,
+    "definition": 0
+  },
+  "source": {
+    "origin": "curated in-repo (2026 AI 核心词库)",
+    "license": "UNLICENSED",
+    "importedAt": "2026-09-26",
+    "checksum": "sha256:f3b2be1049d6ee7a"
+  },
+  "offline": {
+    "supported": true,
+    "policy": "inline"
+  }
+}

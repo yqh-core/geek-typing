@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# e2e 截图证据不入库（offline-audit-result.json 除外）
+tests/_evidence/*.png

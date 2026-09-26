@@ -13,8 +13,11 @@
     "test:prod": "node tests/offline-audit.mjs --prod",
     "test:e2e:prod": "node tests/e2e.mjs --prod",
     "test:smoke": "node tests/prod-smoke.mjs",
-    "stress:review": "node scripts/stress-review.mjs",
-    "icons": "node scripts/gen-icons.mjs"
+ "stress:review": "node scripts/stress-review.mjs",
+ "icons": "node scripts/gen-icons.mjs",
+ "content:validate": "node scripts/content/validate.mjs",
+ "content:check": "node scripts/content/validate.mjs",
+ "content:list": "node scripts/content/list.mjs"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",
