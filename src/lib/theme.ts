@@ -19,6 +19,8 @@ export interface ThemeConfig {
   caret: string
   /** 强调色文字 */
   accent: string
+  /** 强调色原始色值（confetti / caretColor 等需要真实颜色的场景） */
+  accentHex: string
   /** 强调色药丸 */
   pill: string
   /** 错误底色 */
@@ -39,6 +41,7 @@ export const THEMES: Record<ThemeId, ThemeConfig> = {
     correct: 'text-emerald-400',
     caret: 'bg-emerald-400',
     accent: 'text-emerald-400',
+    accentHex: '#34d399',
     pill: 'bg-slate-800/80 text-emerald-400 border-slate-700',
     wrongBg: 'bg-red-500/20',
   },
@@ -53,6 +56,7 @@ export const THEMES: Record<ThemeId, ThemeConfig> = {
     correct: 'text-[#4ec9b0]',
     caret: 'bg-[#569cd6]',
     accent: 'text-[#569cd6]',
+    accentHex: '#569cd6',
     pill: 'bg-[#252526] text-[#4ec9b0] border-[#333]',
     wrongBg: 'bg-[#f14c4c25]',
     ideStyle: true,
@@ -68,6 +72,7 @@ export const THEMES: Record<ThemeId, ThemeConfig> = {
     correct: 'text-[#0f7b4f]',
     caret: 'bg-[#1f2328]',
     accent: 'text-[#0f7b4f]',
+    accentHex: '#0f7b4f',
     pill: 'bg-[#efece3] text-[#0f7b4f] border-[#ddd9cd]',
     wrongBg: 'bg-[#dc262622]',
   },

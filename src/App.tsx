@@ -6,6 +6,7 @@ import ResultOverlay from './components/ResultOverlay'
 import StreakBar from './components/StreakBar'
 import KeyMap from './components/KeyMap'
 import Memorize from './components/Memorize'
+import CommandPalette from './components/CommandPalette'
 import { DEFAULT_BANK_ID, WORD_BANKS, type WordBank, type WordItem } from './data/wordBanks'
 import { sound, type SoundTheme } from './lib/sound'
 import { THEMES, type ThemeId } from './lib/theme'
@@ -22,7 +23,7 @@ import {
   type Analytics,
 } from './lib/analytics'
 import { speak, warmSpeech } from './lib/speech'
-import { getTodayCount, loadHistory, recordSeconds, recordWord, type History } from './lib/streak'
+import { getStreakDays, getTodayCount, loadHistory, recordSeconds, recordWord, type History } from './lib/streak'
 import { Terminal } from 'lucide-react'
 import { useT } from './i18n'
 
@@ -73,6 +74,8 @@ export default function App() {
   const [mode, setMode] = useState<PracticeModeId>(() => readStorage('gt.mode', 'classic'))
   const [running, setRunning] = useState(false)
   const [countdown, setCountdown] = useState<number | null>(null)
+  /** 命令态：Esc 切换，打开时打字引擎与背单词键盘流都让位 */
+  const [commandMode, setCommandMode] = useState(false)
 
   const [queue, setQueue] = useState<WordItem[]>([])
   const [wordIndex, setWordIndex] = useState(0)
@@ -265,6 +268,35 @@ export default function App() {
     return () => window.clearInterval(timer)
   }, [finished, wordIndex, typed])
 
+  /* ---------------- Esc 全局切换：打字态 ↔ 命令态 ---------------- */
+  const closePalette = useCallback(() => {
+    setCommandMode(false)
+    // 焦点归还页面（输入框卸载后 activeElement 可能残留）
+    const el = document.activeElement as HTMLElement | null
+    el?.blur()
+  }, [])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (commandMode) {
+        // 捕获阶段拦截，避免下拉等其它 Esc 处理器再次响应
+        e.preventDefault()
+        e.stopPropagation()
+        closePalette()
+        return
+      }
+      // 已有下拉打开时让它们自己处理 Esc，不抢
+      if (document.querySelector('[data-testid^="dropdown-"][aria-expanded="true"]')) return
+      // 焦点在表单元素里时不劫持 Esc
+      const ae = document.activeElement
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT')) return
+      setCommandMode(true)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [commandMode, closePalette])
+
   /* ---------------- 核心：全局键盘监听 ---------------- */
   const current = queue[wordIndex]
   const targetLower = (current?.word ?? '').toLowerCase()
@@ -279,6 +311,8 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 命令态下打字引擎完全让位，键全给命令行
+      if (commandMode) return
       // 背单词页签下禁用全局打字引擎，避免按键触发练习
       if (tab !== 'typing') return
       if (e.ctrlKey || e.metaKey || e.altKey) return
@@ -425,7 +459,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [typed, wordIndex, queue, targetLower, current, finished, startRound, mode, advance, finishRound, tab])
+  }, [typed, wordIndex, queue, targetLower, current, finished, startRound, mode, advance, finishRound, tab, commandMode])
 
   useEffect(() => {
     return () => {
@@ -546,7 +580,7 @@ export default function App() {
             </div>
           )}
           {tab === 'memorize' ? (
-            <Memorize theme={theme} bank={bank} />
+            <Memorize theme={theme} bank={bank} paused={commandMode} streakDays={getStreakDays(history)} />
           ) : current ? (
             <PracticePanel
               theme={theme}
@@ -569,6 +603,12 @@ export default function App() {
         {tab === 'typing' && <KeyMap theme={theme} nextKey={nextKey} wrongKey={errorFlash ? wrongKey : null} />}
 
         {tab === 'typing' && (
+          <div data-testid="esc-hint" className={`text-[11px] tracking-widest uppercase ${theme.sub} opacity-60 -mt-4`}>
+            {t('keymap.escHint')}
+          </div>
+        )}
+
+        {tab === 'typing' && (
           <footer className={`flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs ${theme.sub} opacity-70`}>
             <span className="flex items-center gap-1.5">
               <Terminal size={13} />
@@ -581,6 +621,32 @@ export default function App() {
 
         <StreakBar theme={theme} history={history} todayCount={todayCount} />
       </div>
+
+      {commandMode && (
+        <CommandPalette
+          theme={theme}
+          banks={banks}
+          bankId={bankId}
+          onBankChange={setBankId}
+          onModeChange={(id) => {
+            setMode(id)
+            startRound()
+          }}
+          onThemeChange={setThemeId}
+          soundEnabled={soundEnabled}
+          onSoundToggle={() => setSoundEnabled((v) => !v)}
+          soundTheme={soundTheme}
+          onSoundThemeChange={setSoundTheme}
+          shuffled={shuffled}
+          onShuffleToggle={() => setShuffled((v) => !v)}
+          onTabChange={(tb) => {
+            sound.tap()
+            setTab(tb)
+          }}
+          onRestart={() => startRound()}
+          onClose={closePalette}
+        />
+      )}
 
       {tab === 'typing' && finished && (
         <ResultOverlay

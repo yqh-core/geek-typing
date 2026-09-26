@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { RotateCcw, Sparkles, BookMarked, Flame, Timer } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
 import { DAILY_GOAL } from '../lib/streak'
 import type { PracticeModeId } from '../lib/modes'
+import { celebrate } from '../lib/confetti'
 import { useT, useLang } from '../i18n'
 
 interface ResultProps {
@@ -32,6 +34,13 @@ export default function ResultOverlay({
 }: ResultProps) {
   const t = useT()
   const { lang } = useLang()
+
+  // 高分解算彩带：正确率 ≥ 90 或最高连击 ≥ 20 时两侧喷射
+  useEffect(() => {
+    if (stats.accuracy >= 90 || stats.bestCombo >= 20) celebrate([theme.accentHex])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const items = [
     { label: t('result.words'), value: String(stats.words) },
     { label: t('result.accuracy'), value: `${stats.accuracy}%` },

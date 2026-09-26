@@ -351,6 +351,174 @@ async function run() {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   check('移动端无横向溢出', overflow <= 2, `溢出=${overflow}px`)
 
+  /* ---------- 11.5 命令面板 ---------- */
+  console.log('\n【11.5】命令面板（Esc + : 命令）')
+  await page.setViewportSize({ width: 1360, height: 1000 })
+  await page.waitForTimeout(300)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(250)
+  check('Esc 打开命令面板', (await page.locator('[data-testid="command-palette"]').count()) === 1)
+  await page.keyboard.type('hello', { delay: 30 })
+  const cmdTyped = await page.inputValue('[data-testid="command-input"]')
+  check('命令态打字引擎不吞键（字母进输入框）', cmdTyped === 'hello', `输入=${cmdTyped}`)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(250)
+  check('Esc 关闭命令面板', (await page.locator('[data-testid="command-palette"]').count()) === 0)
+
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':typing', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(300)
+  check(':typing 跳回打字页签', (await page.locator('[data-testid="word"]').count()) === 1)
+
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':help', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(200)
+  const helpText = norm(await page.textContent('[data-testid="command-palette"]'))
+  check(
+    ':help 列出全部命令',
+    [':bank', ':mode', ':theme', ':sound', ':shuffle', ':memorize', ':typing', ':q'].every((c) => helpText.includes(c)),
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':theme ide', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(350)
+  check(
+    ':theme ide 主题切换生效',
+    (await page.locator('[data-testid="command-palette"]').count()) === 0 &&
+      norm(await page.textContent('body')).includes('export const'),
+  )
+
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':mode spell', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(350)
+  await page.click('[data-testid="dropdown-practice"]')
+  await page.waitForTimeout(200)
+  check(
+    ':mode spell 生效（mode-spell 存在 + 默写提示出现）',
+    (await page.locator('[data-testid="mode-spell"]').count()) === 1 &&
+      norm(await page.textContent('body')).includes('拼错了可以用 Backspace'),
+  )
+  await page.keyboard.press('Escape') // 关下拉（下拉打开时 Esc 不得顺带开命令面板）
+  await page.waitForTimeout(200)
+  check(
+    '下拉打开时 Esc 不误开命令面板',
+    (await page.locator('[data-testid="command-palette"]').count()) === 0 &&
+      (await page.locator('[data-testid="mode-spell"]').count()) === 0,
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':mode classic', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(350)
+
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':bank', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(200)
+  const bankList = norm(await page.textContent('[data-testid="command-palette"]'))
+  check(
+    ':bank 列出全部词库',
+    ['ai-core', 'cloud-native', 'frontend', 'cet4', 'cet6', 'ielts'].every((id) => bankList.includes(id)),
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':bank 2', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(350)
+  check(':bank 2 切到云原生词库', norm(await page.textContent('body')).includes('云原生 K8s 词库'))
+
+  // :q 重开本轮：先敲 1 个正确字母，重启后归零
+  const qw = await readWord(page)
+  await page.keyboard.press(qw[0])
+  await page.waitForTimeout(250)
+  check('预置：已敲对 1 个字母', (await page.locator('[data-state="correct"]').count()) === 1)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':q', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  check(':q 重开本轮（进度归零）', (await page.locator('[data-state="correct"]').count()) === 0)
+
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':nope', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(200)
+  check('未知命令红字提示', (await page.locator('[data-testid="command-error"]').count()) === 1)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+
+  /* ---------- 11.6 背单词键盘流 ---------- */
+  console.log('\n【11.6】背单词键盘流（Space / 1 / 2 / 3 / Enter）')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':memorize', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  check(':memorize 跳背单词页签', (await page.locator('[data-testid="memorize-card"]').count()) === 1)
+  await page.keyboard.press('Space')
+  await page.waitForTimeout(200)
+  check('Space 翻面显示释义', (await page.locator('[data-testid="memorize-translation"]').count()) === 1)
+  check(
+    '翻面后按键提示切换为打分',
+    norm(await page.textContent('[data-testid="memorize-keyhint"]')).includes('1'),
+  )
+  await page.keyboard.press('3') // 不认识 → 队尾追加 2
+  await page.waitForTimeout(200)
+  const kProg1 = await page.textContent('[data-testid="memorize-progress"]')
+  check('按 3 打分推进且追加 2 次', kProg1?.includes('1/22'), kProg1?.trim() ?? '')
+  await page.keyboard.press('Space')
+  await page.waitForTimeout(150)
+  await page.keyboard.press('1') // 认识
+  await page.waitForTimeout(200)
+  const kProg2 = await page.textContent('[data-testid="memorize-progress"]')
+  check('按 1 认识推进', kProg2?.includes('2/22'), kProg2?.trim() ?? '')
+  await page.keyboard.press('Space')
+  await page.waitForTimeout(150)
+  await page.keyboard.press('2') // 模糊 → 追加 1
+  await page.waitForTimeout(200)
+  const kProg3 = await page.textContent('[data-testid="memorize-progress"]')
+  check('按 2 模糊推进且追加 1 次', kProg3?.includes('3/23'), kProg3?.trim() ?? '')
+  // 键盘清完剩余卡片
+  let kSettled = false
+  for (let i = 0; i < 60; i++) {
+    if ((await page.locator('[data-testid="memorize-again"]').count()) > 0) {
+      kSettled = true
+      break
+    }
+    if ((await page.locator('[data-testid="memorize-translation"]').count()) === 0) {
+      await page.keyboard.press('Space')
+      await page.waitForTimeout(90)
+    }
+    await page.keyboard.press('1')
+    await page.waitForTimeout(90)
+  }
+  check('纯键盘清完整组出现结算卡', kSettled)
+  check(
+    '勋章横幅渲染（今日修行完成 + 打卡天数）',
+    norm(await page.textContent('body')).includes('今日修行完成') &&
+      (await page.locator('[data-testid="memorize-medal"]').count()) === 1,
+  )
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  check('Enter 再来一组', (await page.locator('[data-testid="memorize-card"]').count()) === 1)
+  await page.click('[data-testid="tab-typing"]')
+  await page.waitForTimeout(200)
+
   await ctx.close()
   await browser.close()
 

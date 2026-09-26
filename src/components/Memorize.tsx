@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Volume2, Check, Eye, RotateCcw, Sparkles } from 'lucide-react'
+import { Volume2, Check, Eye, RotateCcw, Award, Flame } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
 import type { WordBank } from '../data/wordBanks'
 import { speak } from '../lib/speech'
 import { sound } from '../lib/sound'
+import { celebrate } from '../lib/confetti'
 import {
   getMemorizeStats,
   loadMemorize,
@@ -17,6 +18,10 @@ interface MemorizeProps {
   theme: ThemeConfig
   /** 与打字模块共享的当前词库 */
   bank: WordBank
+  /** 命令态打开时键盘流让位 */
+  paused?: boolean
+  /** 连续打卡天数（勋章卡展示用） */
+  streakDays?: number
 }
 
 /** 每日新词计划：默认 20 个 */
@@ -27,7 +32,7 @@ const DAILY_NEW = 20
  * 正面 = 单词 + 发音；翻面 = 释义；三键调度：unknown 追加 2 次、fuzzy 1 次、known 完成。
  * 进度存 localStorage，刷新不丢。
  */
-export default function Memorize({ theme, bank }: MemorizeProps) {
+export default function Memorize({ theme, bank, paused = false, streakDays = 0 }: MemorizeProps) {
   const t = useT()
 
   /** memorize 全量进度（本组件内自持，跨词库共享） */
@@ -85,6 +90,46 @@ export default function Memorize({ theme, bank }: MemorizeProps) {
   const totalInDeck = deck.length
   const progress = totalInDeck > 0 ? Math.min(cursor, totalInDeck) : 0
 
+  /* ---------- 键盘流：Space 翻面 / 1·2·3 打分 / 结算后 Enter 重来 ---------- */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (paused) return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      // 焦点在输入框里时不接管
+      const ae = document.activeElement
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return
+
+      if (done) {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          sound.tap()
+          nextBatch()
+        }
+        return
+      }
+      if (!item) return
+      if (e.key === ' ' && !flipped) {
+        e.preventDefault() // 防止滚动页面 / 触发聚焦按钮
+        sound.tap()
+        setFlipped(true)
+        return
+      }
+      if (flipped && (e.key === '1' || e.key === '2' || e.key === '3')) {
+        e.preventDefault()
+        sound.tap()
+        answer(e.key === '1' ? 'known' : e.key === '2' ? 'fuzzy' : 'unknown')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
+  /* ---------- 结算彩带：整组完成必触发 ---------- */
+  useEffect(() => {
+    if (done) celebrate([theme.accentHex])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done])
+
   /* ---------- 词库为空 ---------- */
   if (bank.words.length === 0) {
     return <div className={`text-sm ${theme.sub}`}>{t('memorize.emptyBank')}</div>
@@ -95,7 +140,14 @@ export default function Memorize({ theme, bank }: MemorizeProps) {
     const noFresh = freshWords.length === 0
     return (
       <div className={`w-full max-w-md mx-auto ${theme.card} border ${theme.border} rounded-2xl p-8 text-center shadow-2xl`}>
-        <Sparkles size={28} className={`mx-auto mb-3 ${theme.accent}`} />
+        {/* 勋章横幅 */}
+        <div
+          data-testid="memorize-medal"
+          className={`mx-auto mb-5 w-fit flex items-center gap-2 px-5 py-2 rounded-full border-2 ${theme.border} ${theme.accent} shadow-lg`}
+        >
+          <Award size={18} />
+          <span className="text-sm font-bold tracking-widest">{t('memorize.medal')}</span>
+        </div>
         <h2 className={`text-lg font-bold mb-1 ${theme.accent}`}>{t('memorize.done')}</h2>
         {noFresh && <p className={`text-xs mb-4 ${theme.sub}`}>{t('memorize.allDone')}</p>}
         <div className="grid grid-cols-3 gap-3 my-6">
@@ -109,6 +161,12 @@ export default function Memorize({ theme, bank }: MemorizeProps) {
               <div className="text-xl font-bold tabular-nums mt-0.5">{it.value}</div>
             </div>
           ))}
+        </div>
+        <div className={`flex items-center justify-center gap-1.5 mb-6 text-sm ${theme.sub}`}>
+          <Flame size={14} className={theme.accent} />
+          <span>
+            {t('streak.title')} <b className={`tabular-nums ${theme.accent}`}>{streakDays}</b> {t('streak.dayUnit')}
+          </span>
         </div>
         <button
           data-testid="memorize-again"
@@ -226,6 +284,11 @@ export default function Memorize({ theme, bank }: MemorizeProps) {
             {b.label}
           </button>
         ))}
+      </div>
+
+      {/* 键盘流提示 */}
+      <div data-testid="memorize-keyhint" className={`mt-3 text-center text-[11px] tracking-wide ${theme.sub} opacity-70`}>
+        {flipped ? t('memorize.keyGrade') : t('memorize.keyFlip')}
       </div>
     </div>
   )

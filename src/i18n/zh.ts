@@ -96,6 +96,12 @@ export const zh: Record<string, string> = {
 
   /* 虚拟键盘 */
   'keymap.hint': '请用标准指法敲击',
+  'keymap.escHint': 'Esc 命令面板',
+
+  /* 命令面板 */
+  'cmd.placeholder': '输入命令，:help 查看全部',
+  'cmd.unknown': '未知命令，:help 查看全部',
+  'cmd.bankNotFound': '词库不存在',
 
   /* 连击里程碑 */
   'milestone.combo': '连击！手感来了',
@@ -147,4 +153,7 @@ export const zh: Record<string, string> = {
   'memorize.emptyBank': '当前词库为空',
   'memorize.allDone': '本库新词已全部学完',
   'memorize.definition': '释义',
+  'memorize.keyFlip': 'Space 翻面',
+  'memorize.keyGrade': '1 认识 · 2 模糊 · 3 不认识',
+  'memorize.medal': '今日修行完成',
 }

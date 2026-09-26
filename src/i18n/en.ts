@@ -95,6 +95,12 @@ export const en: Record<string, string> = {
 
   /* Virtual keyboard */
   'keymap.hint': 'Use standard touch typing',
+  'keymap.escHint': 'Esc — command palette',
+
+  /* Command palette */
+  'cmd.placeholder': 'Type a command — :help for all',
+  'cmd.unknown': "Unknown command — :help, obviously",
+  'cmd.bankNotFound': 'No such bank',
 
   /* Combo milestone */
   'milestone.combo': 'combo streak! You are on fire',
@@ -146,4 +152,7 @@ export const en: Record<string, string> = {
   'memorize.emptyBank': 'This bank is empty',
   'memorize.allDone': 'All new words in this bank are learned',
   'memorize.definition': 'Definition',
+  'memorize.keyFlip': 'Space to flip',
+  'memorize.keyGrade': '1 Know · 2 Fuzzy · 3 Nope',
+  'memorize.medal': 'Daily quest complete',
 }
