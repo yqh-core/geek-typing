@@ -1,14 +1,20 @@
-import { CET4, CET6, IELTS_TOEFL } from './englishBanks'
+import { CET4, CET6 } from './englishBanks'
+import { IELTS } from './ielts'
 
 export interface WordItem {
   word: string
   translation: string
+  /** 英文释义（ECDICT 提供，雅思词库有） */
+  definition?: string
 }
 
 export interface WordBank {
   id: string
   name: string
   description: string
+  /** 英文词库名（en 语言模式下优先显示） */
+  nameEn?: string
+  descriptionEn?: string
   icon: string
   words: WordItem[]
 }
@@ -156,10 +162,12 @@ export const WORD_BANKS: WordBank[] = [
   },
   {
     id: 'ielts',
-    name: '雅思 / 托福',
-    description: '留学考试学术核心词',
+    name: '雅思核心 IELTS',
+    nameEn: 'IELTS Core',
+    description: 'ECDICT 雅思核心 3000 词（按词频排序）',
+    descriptionEn: 'IELTS core 3000 words from ECDICT (by frequency)',
     icon: 'Globe',
-    words: IELTS_TOEFL,
+    words: IELTS,
   },
 ]
 

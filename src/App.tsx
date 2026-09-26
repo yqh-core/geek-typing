@@ -5,10 +5,11 @@ import PracticePanel from './components/PracticePanel'
 import ResultOverlay from './components/ResultOverlay'
 import StreakBar from './components/StreakBar'
 import KeyMap from './components/KeyMap'
+import Memorize from './components/Memorize'
 import { DEFAULT_BANK_ID, WORD_BANKS, type WordBank, type WordItem } from './data/wordBanks'
 import { sound, type SoundTheme } from './lib/sound'
 import { THEMES, type ThemeId } from './lib/theme'
-import { MODES, getMode, type PracticeModeId } from './lib/modes'
+import { getMode, type PracticeModeId } from './lib/modes'
 import { loadCustomBanks, type CustomBank } from './lib/customBanks'
 import {
   loadAnalytics,
@@ -20,10 +21,13 @@ import {
   weakLetters,
   type Analytics,
 } from './lib/analytics'
-import { speak, speechSupported, warmSpeech } from './lib/speech'
-import StatsPanel from './components/StatsPanel'
+import { speak, warmSpeech } from './lib/speech'
 import { getTodayCount, loadHistory, recordSeconds, recordWord, type History } from './lib/streak'
 import { Terminal } from 'lucide-react'
+import { useT } from './i18n'
+
+/** 顶部两个页签 */
+type TabId = 'typing' | 'memorize'
 
 /** 每一轮练习的词数 */
 const CHAPTER_SIZE = 20
@@ -59,6 +63,8 @@ function writeStorage(key: string, value: unknown) {
 }
 
 export default function App() {
+  const t = useT()
+  const [tab, setTab] = useState<TabId>('typing')
   const [bankId, setBankId] = useState<string>(() => readStorage('gt.bank', DEFAULT_BANK_ID))
   const [themeId, setThemeId] = useState<ThemeId>(() => readStorage('gt.theme', 'matrix'))
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => readStorage('gt.sound', true))
@@ -263,15 +269,18 @@ export default function App() {
   const current = queue[wordIndex]
   const targetLower = (current?.word ?? '').toLowerCase()
 
-  // 换词时自动发音（拼写模式默认发音，或手动开启自动发音）
+  // 换词时自动发音（拼写模式默认发音，或手动开启自动发音；仅打字页签生效）
   useEffect(() => {
+    if (tab !== 'typing') return
     if (!current) return
     if (mode === 'spell' || autoSpeak) speak(current.word)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.word, wordIndex, mode, autoSpeak])
+  }, [current?.word, wordIndex, mode, autoSpeak, tab])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 背单词页签下禁用全局打字引擎，避免按键触发练习
+      if (tab !== 'typing') return
       if (e.ctrlKey || e.metaKey || e.altKey) return
 
       if (e.key === 'Enter' && finished) {
@@ -416,7 +425,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [typed, wordIndex, queue, targetLower, current, finished, startRound, mode, advance, finishRound])
+  }, [typed, wordIndex, queue, targetLower, current, finished, startRound, mode, advance, finishRound, tab])
 
   useEffect(() => {
     return () => {
@@ -461,92 +470,89 @@ export default function App() {
           onSoundThemeChange={setSoundTheme}
           shuffled={shuffled}
           onShuffleToggle={() => setShuffled((v) => !v)}
+          autoSpeak={autoSpeak}
+          onAutoSpeakToggle={() => setAutoSpeak((v) => !v)}
+          currentMode={mode}
+          onModeChange={(id) => {
+            setMode(id)
+            startRound()
+          }}
+          analytics={analytics}
+          onWeakPractice={startWeakRound}
+          onReviewWord={reviewSingleWord}
+          onReset={() => setAnalytics(resetAnalytics())}
           onRestart={() => {
             sound.tap()
             startRound()
           }}
         />
 
-        <div className="w-full max-w-4xl">
-          <StatsBar
-            accent={theme.accent}
-            progress={{ current: Math.min(wordIndex + 1, queue.length), total: queue.length }}
-            accuracy={`${accuracy}%`}
-            wpm={String(wpm)}
-            combo={stats.combo}
-            percent={percent}
-          />
-        </div>
-
-        {/* 模式切换 */}
-        <div className="w-full max-w-4xl flex flex-wrap items-center justify-center gap-2">
-          {MODES.map((m) => (
+        {/* 页签切换：打字练习 / 背单词 */}
+        <div className={`flex items-center p-1 rounded-xl border ${theme.border} gap-1`}>
+          {(
+            [
+              { id: 'typing', label: t('tab.typing') },
+              { id: 'memorize', label: t('tab.memorize') },
+            ] as { id: TabId; label: string }[]
+          ).map((tb) => (
             <button
-              key={m.id}
-              data-testid={`mode-${m.id}`}
+              key={tb.id}
+              data-testid={`tab-${tb.id}`}
               onClick={() => {
                 sound.tap()
-                setMode(m.id)
-                startRound()
+                setTab(tb.id)
               }}
-              title={m.hint}
-              className={`px-3.5 py-1.5 rounded-lg border text-xs transition-all active:scale-95 ${
-                mode === m.id ? `${theme.accent} bg-white/10` : `${theme.sub}`
-              } ${theme.border}`}
+              className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-all active:scale-95 ${
+                tab === tb.id ? `${theme.accent} bg-white/10` : theme.sub
+              }`}
             >
-              {m.label}
+              {tb.label}
             </button>
           ))}
-          {mode === 'timed' && countdown !== null && (
-            <span
-              data-testid="countdown"
-              className={`ml-2 text-sm font-bold tabular-nums ${countdown <= 10 ? 'text-red-400' : theme.accent}`}
-            >
-              ⏱ {countdown}s
-            </span>
-          )}
-          {mode === 'spell' && (
-            <span className={`ml-2 text-[11px] ${theme.sub}`}>拼错可用 Backspace 删</span>
-          )}
-          <div className="ml-auto flex items-center gap-2">
-            {speechSupported() && (
-              <button
-                data-testid="toggle-autospeak"
-                onClick={() => {
-                  sound.tap()
-                  setAutoSpeak((v) => !v)
-                }}
-                title="换词时自动朗读单词"
-                className={`px-3 py-1.5 rounded-lg border text-xs ${theme.border} ${
-                  autoSpeak ? theme.accent : theme.sub
-                }`}
-              >
-                {autoSpeak ? '🔊 自动发音' : '🔇 自动发音'}
-              </button>
-            )}
-            <StatsPanel
-              theme={theme}
-              analytics={analytics}
-              onWeakPractice={startWeakRound}
-              onReviewWord={reviewSingleWord}
-              onReset={() => setAnalytics(resetAnalytics())}
-            />
-          </div>
         </div>
 
+        {tab === 'typing' && (
+          <div className="w-full max-w-4xl">
+            <StatsBar
+              accent={theme.accent}
+              progress={{ current: Math.min(wordIndex + 1, queue.length), total: queue.length }}
+              accuracy={`${accuracy}%`}
+              wpm={String(wpm)}
+              combo={stats.combo}
+              percent={percent}
+            />
+          </div>
+        )}
+
+        {/* 限时模式倒计时（原模式行保留项） */}
+        {tab === 'typing' && mode === 'timed' && countdown !== null && (
+          <span
+            data-testid="countdown"
+            className={`text-sm font-bold tabular-nums ${countdown <= 10 ? 'text-red-400' : theme.accent}`}
+          >
+            ⏱ {countdown}s
+          </span>
+        )}
+        {tab === 'typing' && mode === 'spell' && (
+          <span className={`text-[11px] ${theme.sub}`}>{t('practice.spellFix')}</span>
+        )}
+
         <div className="flex-1 w-full flex items-center justify-center py-4 relative">
-          {milestone && (
+          {tab === 'typing' && milestone && (
             <div
               className={`pointer-events-none absolute top-0 z-20 px-5 py-2 rounded-full border ${theme.border} ${theme.card} ${theme.accent} text-sm font-bold animate-popIn shadow-2xl`}
             >
-              🔥 {milestone} 连击！手感来了
+              🔥 {milestone} {t('milestone.combo')}
             </div>
           )}
-          {current ? (
+          {tab === 'memorize' ? (
+            <Memorize theme={theme} bank={bank} />
+          ) : current ? (
             <PracticePanel
               theme={theme}
               word={current.word}
               translation={current.translation}
+              definition={current.definition}
               typed={typed}
               errorFlash={errorFlash}
               wrongKey={wrongKey}
@@ -555,26 +561,28 @@ export default function App() {
               onSpeak={() => speak(current.word)}
             />
           ) : (
-            <div className={theme.sub}>加载词库中…</div>
+            <div className={theme.sub}>{t('footer.loading')}</div>
           )}
         </div>
 
-        {/* 虚拟键盘：高亮下一个该敲的键 */}
-        <KeyMap theme={theme} nextKey={nextKey} wrongKey={errorFlash ? wrongKey : null} />
+        {/* 虚拟键盘：高亮下一个该敲的键（仅打字页签） */}
+        {tab === 'typing' && <KeyMap theme={theme} nextKey={nextKey} wrongKey={errorFlash ? wrongKey : null} />}
 
-        <footer className={`flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs ${theme.sub} opacity-70`}>
-          <span className="flex items-center gap-1.5">
-            <Terminal size={13} />
-            别找输入框，直接在键盘上敲字母即可
-          </span>
-          <span>{mode === 'spell' ? '默写模式：拼错标红可退格' : '敲错会被拦住，必须敲对当前字母'}</span>
-          <span>Enter 结算后重来</span>
-        </footer>
+        {tab === 'typing' && (
+          <footer className={`flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs ${theme.sub} opacity-70`}>
+            <span className="flex items-center gap-1.5">
+              <Terminal size={13} />
+              {t('footer.hint1')}
+            </span>
+            <span>{mode === 'spell' ? t('footer.hintSpell') : t('footer.hintClassic')}</span>
+            <span>{t('footer.hint3')}</span>
+          </footer>
+        )}
 
         <StreakBar theme={theme} history={history} todayCount={todayCount} />
       </div>
 
-      {finished && (
+      {tab === 'typing' && finished && (
         <ResultOverlay
           theme={theme}
           stats={{

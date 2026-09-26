@@ -1,6 +1,7 @@
 import { Flame } from 'lucide-react'
 import { DAILY_GOAL, getStreakDays, getRecentDays, type History } from '../lib/streak'
 import type { ThemeConfig } from '../lib/theme'
+import { useT } from '../i18n'
 
 interface StreakBarProps {
   theme: ThemeConfig
@@ -26,6 +27,7 @@ const LEVEL_CLASS = [
 ]
 
 export default function StreakBar({ theme, history, todayCount }: StreakBarProps) {
+  const t = useT()
   const streak = getStreakDays(history)
   const recent = getRecentDays(history, 14)
   const percent = Math.min(100, Math.round((todayCount / DAILY_GOAL) * 100))
@@ -35,12 +37,14 @@ export default function StreakBar({ theme, history, todayCount }: StreakBarProps
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Flame size={15} className={theme.accent} />
-          <span className="text-sm font-semibold">连续打卡 {streak} 天</span>
+          <span className="text-sm font-semibold">
+            {t('streak.title')} {streak} {t('streak.dayUnit')}
+          </span>
           <span className={`text-xs ${theme.sub}`}>
-            今日 {todayCount} / {DAILY_GOAL} 词（{percent}%）
+            {t('streak.today')} {todayCount} / {DAILY_GOAL} {t('streak.wordsUnit')}（{percent}%）
           </span>
         </div>
-        <span className={`text-[11px] ${theme.sub}`}>数据保存在本机 localStorage</span>
+        <span className={`text-[11px] ${theme.sub}`}>{t('streak.localOnly')}</span>
       </div>
 
       {/* 目标进度条 */}

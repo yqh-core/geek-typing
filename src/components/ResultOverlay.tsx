@@ -1,7 +1,8 @@
 import { RotateCcw, Sparkles, BookMarked, Flame, Timer } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
 import { DAILY_GOAL } from '../lib/streak'
-import { getMode, type PracticeModeId } from '../lib/modes'
+import type { PracticeModeId } from '../lib/modes'
+import { useT, useLang } from '../i18n'
 
 interface ResultProps {
   theme: ThemeConfig
@@ -29,12 +30,14 @@ export default function ResultOverlay({
   onReview,
   reviewAvailable,
 }: ResultProps) {
+  const t = useT()
+  const { lang } = useLang()
   const items = [
-    { label: '完成词数', value: String(stats.words) },
-    { label: '正确率', value: `${stats.accuracy}%` },
-    { label: '速度', value: `${stats.wpm} WPM` },
-    { label: '最高连击', value: `x${stats.bestCombo}` },
-    { label: '用时', value: `${stats.seconds}s` },
+    { label: t('result.words'), value: String(stats.words) },
+    { label: t('result.accuracy'), value: `${stats.accuracy}%` },
+    { label: t('result.speed'), value: `${stats.wpm} WPM` },
+    { label: t('result.bestCombo'), value: `x${stats.bestCombo}` },
+    { label: t('result.seconds'), value: `${stats.seconds}s` },
   ]
 
   return (
@@ -47,9 +50,9 @@ export default function ResultOverlay({
             <Sparkles size={18} className={theme.accent} />
           )}
           <h2 className={`text-lg font-bold tracking-wider ${theme.accent}`}>
-            {mode === 'timed' ? 'Time Up' : 'Round Complete'}
+            {mode === 'timed' ? t('result.timeUp') : t('result.complete')}
           </h2>
-          <span className={`text-[11px] ${theme.sub}`}>{getMode(mode).label}</span>
+          <span className={`text-[11px] ${theme.sub}`}>{t(`mode.${mode}`)}</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-7">
@@ -66,10 +69,15 @@ export default function ResultOverlay({
         >
           <Flame size={14} className={theme.accent} />
           <span>
-            今日累计 <span className="font-bold tabular-nums">{todayCount}</span> / {DAILY_GOAL} 词
+            {t('result.today')} <span className="font-bold tabular-nums">{todayCount}</span> / {DAILY_GOAL}{' '}
+            {t('result.wordsUnit')}
           </span>
           <span className={`text-xs ${theme.sub}`}>
-            {todayCount >= DAILY_GOAL ? '今日目标已达成 🎉' : `还差 ${Math.max(0, DAILY_GOAL - todayCount)} 词达标`}
+            {todayCount >= DAILY_GOAL
+              ? t('result.goalDone')
+              : lang === 'en'
+                ? `${Math.max(0, DAILY_GOAL - todayCount)} ${t('result.goalLeft')}`
+                : `${t('result.goalLeft')} ${Math.max(0, DAILY_GOAL - todayCount)} ${t('result.goalLeftUnit')}`}
           </span>
         </div>
 
@@ -79,7 +87,7 @@ export default function ResultOverlay({
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border ${theme.border} text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-95`}
           >
             <RotateCcw size={14} />
-            再来一轮
+            {t('result.restart')}
           </button>
           <button
             onClick={onReview}
@@ -87,11 +95,11 @@ export default function ResultOverlay({
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border ${theme.border} text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:hover:scale-100`}
           >
             <BookMarked size={14} />
-            {reviewAvailable ? `复习错词 (${stats.wrongCount})` : '没有错词，完美'}
+            {reviewAvailable ? `${t('result.review')} (${stats.wrongCount})` : t('result.perfect')}
           </button>
         </div>
 
-        <p className={`mt-5 text-center text-xs ${theme.sub}`}>按 Enter 直接开始下一轮</p>
+        <p className={`mt-5 text-center text-xs ${theme.sub}`}>{t('result.enterHint')}</p>
       </div>
     </div>
   )

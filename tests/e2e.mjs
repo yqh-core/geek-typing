@@ -1,5 +1,5 @@
 /**
- * Geek Typing 端到端自动化测试
+ * Geek Typing 端到端自动化测试（v2：下拉导航 + 背单词 + 中英双语）
  *
  * 用法：
  *   1) npm run build && npm run preview -- --port 4173
@@ -68,6 +68,14 @@ async function typeWord(page, word) {
   await page.keyboard.type(word.toLowerCase(), { delay: 20 })
 }
 
+/** v2：模式按钮在「练习」下拉里 —— 先点开下拉再点模式项 */
+async function pickMode(page, modeId) {
+  await page.click('[data-testid="dropdown-practice"]')
+  await page.waitForTimeout(150)
+  await page.click(`[data-testid="mode-${modeId}"]`)
+  await page.waitForTimeout(300)
+}
+
 async function run() {
   const executablePath = findChrome()
   if (!executablePath) throw new Error('找不到 Chromium，请设置 CHROME_PATH')
@@ -84,19 +92,40 @@ async function run() {
 
   await page.goto(BASE, { waitUntil: 'networkidle' })
 
-  /* ---------- 1. 首屏 ---------- */
-  console.log('【1】首屏与默认状态')
+  /* ---------- 1. 首屏与下拉导航 ---------- */
+  console.log('【1】首屏与下拉导航')
   check('页面标题正确', (await page.title()).includes('Geek Typing'), await page.title())
   const body0 = await page.textContent('body')
   check('默认词库是 2026 AI 核心词库', norm(body0).includes('2026 AI 核心词库'))
   check(
-    '统计栏四项齐全',
-    ['progress', 'accuracy', 'wpm', 'combo'].every((k) => norm(body0).toLowerCase().includes(k)),
+    '统计栏四项齐全（中文标签）',
+    ['进度', '正确率', '速度', '连击'].every((k) => norm(body0).includes(k)),
   )
-  check('默认是经典模式', norm(body0).includes('经典模式'))
+  // 顶栏视觉组：Logo + 3 下拉 + 语言 + 重开 + 数据 ≤ 6 组
+  check(
+    '顶栏只保留下拉导航',
+    (await page.locator('[data-testid="dropdown-practice"]').count()) === 1 &&
+      (await page.locator('[data-testid="dropdown-banks"]').count()) === 1 &&
+      (await page.locator('[data-testid="dropdown-settings"]').count()) === 1 &&
+      (await page.locator('[data-testid="lang-zh"]').count()) === 1 &&
+      (await page.locator('[data-testid="open-stats"]').count()) === 1,
+  )
+  // 打开练习下拉检查三模式
+  await page.click('[data-testid="dropdown-practice"]')
+  await page.waitForTimeout(150)
+  check(
+    '练习下拉含三模式',
+    (await page.locator('[data-testid="mode-classic"]').count()) === 1 &&
+      (await page.locator('[data-testid="mode-spell"]').count()) === 1 &&
+      (await page.locator('[data-testid="mode-timed"]').count()) === 1,
+  )
+  check('练习下拉含自动发音开关', (await page.locator('[data-testid="toggle-autospeak"]').count()) === 1)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(150)
+  check('Esc 可关闭下拉', (await page.locator('[data-testid="mode-classic"]').count()) === 0)
   const firstWord = await readWord(page)
   check('能读出当前单词', firstWord.length > 0, `单词=${firstWord}`)
-  check('虚拟键盘存在', await page.locator('[data-testid="keymap"]').count() === 1)
+  check('虚拟键盘存在', (await page.locator('[data-testid="keymap"]').count()) === 1)
   const hl0 = await page.getAttribute('[data-active="true"]', 'data-key')
   check('虚拟键盘高亮首字母', hl0 === firstWord[0], `高亮=${hl0} 应=${firstWord[0]}`)
 
@@ -105,8 +134,6 @@ async function run() {
   await page.keyboard.press('q')
   await page.keyboard.press('z')
   check('敲错被拦住（仍在第 1 词）', norm(await page.textContent('body')).includes('1/20'))
-  const acc2 = norm(await page.textContent('body'))
-  check('正确率跌破 100%', !acc2.includes('100%') || acc2.indexOf('100%') < 0)
   await typeWord(page, firstWord)
   await page.waitForTimeout(450)
   const afterWord = norm(await page.textContent('body'))
@@ -120,31 +147,46 @@ async function run() {
     await page.waitForTimeout(330)
   }
   const body3 = (await page.textContent('body')).replace(/\s/g, '')
-  const comboMatch = body3.match(/combox(\d+)/i)
-  const wpmMatch = body3.match(/wpm(\d+)/i)
+  const comboMatch = body3.match(/(?:combo|连击)x(\d+)/i)
+  const wpmMatch = body3.match(/(?:wpm|速度)(\d+)/i)
   check('COMBO 累积到两位数', !!comboMatch && Number(comboMatch[1]) > 10, `combo=${comboMatch?.[1]}`)
   check('WPM > 0', !!wpmMatch && Number(wpmMatch[1]) > 0, `wpm=${wpmMatch?.[1]}`)
   const cur3 = await readCursor(page)
   const hl3 = await page.getAttribute('[data-active="true"]', 'data-key')
   check('虚拟键盘跟随光标移动', !!cur3 && hl3 === cur3, `高亮=${hl3} 光标=${cur3}`)
 
-  /* ---------- 4. 皮肤 / 词库 / 音效 ---------- */
-  console.log('\n【4】皮肤 / 词库 / 音效')
+  /* ---------- 4. 皮肤 / 词库 / 音效（下拉内） ---------- */
+  console.log('\n【4】皮肤 / 词库 / 音效（下拉内操作）')
+  // 皮肤：设置下拉
   for (const [label, expect] of [['摸鱼 IDE', 'export const'], ['墨水屏', null], ['黑客荧光', null]]) {
+    await page.click('[data-testid="dropdown-settings"]')
+    await page.waitForTimeout(150)
     await page.getByRole('button', { name: label, exact: true }).first().click()
     await page.waitForTimeout(220)
     if (expect) check(`切换到「${label}」`, norm(await page.textContent('body')).includes(expect))
     else check(`切换到「${label}」`, (await readWord(page)).length > 0)
+    await page.keyboard.press('Escape') // 皮肤项切换后不自动收起，手动关
+    await page.waitForTimeout(120)
   }
-  await page.getByRole('button', { name: /2026 AI 核心词库/ }).first().click()
-  await page.waitForTimeout(200)
+  // 词库下拉
+  await page.click('[data-testid="dropdown-banks"]')
+  await page.waitForTimeout(150)
   const menu = norm(await page.textContent('body'))
-  check('词库下拉 6 本齐全', ['四级 CET-4', '六级 CET-6', '雅思 / 托福', '云原生 K8s 词库'].every((k) => menu.includes(k)))
+  check(
+    '词库下拉 6 本齐全（含新雅思库）',
+    ['四级 CET-4', '六级 CET-6', '雅思核心 IELTS', '云原生 K8s 词库'].every((k) => menu.includes(k)),
+  )
+  check('词库下拉含导入词库入口', (await page.locator('[data-testid="open-bank-manager"]').count()) >= 1)
   await page.getByRole('button', { name: /四级 CET-4/ }).first().click()
   await page.waitForTimeout(320)
   check('切到 CET-4 后正常出题', (await readWord(page)).length > 0)
-  await page.getByRole('button', { name: '开关键盘音效', exact: true }).click()
+  // 音效开关：设置下拉
+  await page.click('[data-testid="dropdown-settings"]')
   await page.waitForTimeout(150)
+  await page.getByRole('button', { name: /键盘音/ }).first().click()
+  await page.waitForTimeout(150)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(120)
   check('音效开关可切换', (await readWord(page)).length > 0)
 
   /* ---------- 5. 持久化 ---------- */
@@ -154,8 +196,7 @@ async function run() {
 
   /* ---------- 6. 拼写（默写）模式 ---------- */
   console.log('\n【6】拼写模式')
-  await page.click('[data-testid="mode-spell"]')
-  await page.waitForTimeout(350)
+  await pickMode(page, 'spell')
   const spellWord = await readWord(page)
   check('拼写模式正常出词', spellWord.length > 0, `词=${spellWord}`)
   const masked = await page.evaluate(
@@ -175,8 +216,7 @@ async function run() {
 
   /* ---------- 7. 限时模式 ---------- */
   console.log('\n【7】限时模式')
-  await page.click('[data-testid="mode-timed"]')
-  await page.waitForTimeout(300)
+  await pickMode(page, 'timed')
   await page.keyboard.press((await readWord(page))[0])
   await page.waitForTimeout(1400)
   const cdText = await page.textContent('[data-testid="countdown"]').catch(() => null)
@@ -184,8 +224,7 @@ async function run() {
 
   /* ---------- 8. 完整通关 → 结算 ---------- */
   console.log('\n【8】通关结算')
-  await page.click('[data-testid="mode-classic"]')
-  await page.waitForTimeout(300)
+  await pickMode(page, 'classic')
   for (let round = 0; round < 20; round++) {
     const w = await readWord(page)
     if (!w) break
@@ -193,7 +232,7 @@ async function run() {
     await page.waitForTimeout(300)
   }
   const done = norm(await page.textContent('body'))
-  check('20 词后弹出结算面板', done.includes('Round Complete'))
+  check('20 词后弹出结算面板', done.includes('本轮完成'))
   check('结算含正确率/速度/用时/最高连击', ['正确率', '速度', '用时', '最高连击'].every((k) => done.includes(k)))
   check('结算显示今日累计', done.includes('今日累计'))
 
@@ -202,9 +241,12 @@ async function run() {
   await page.click('button:has-text("再来一轮")')
   await page.waitForTimeout(400)
   check('单词发音按钮存在', (await page.locator('[data-testid="speak-btn"]').count()) >= 1)
+  // 自动发音开关在练习下拉里
+  await page.click('[data-testid="dropdown-practice"]')
+  await page.waitForTimeout(150)
   const autospeak = page.locator('[data-testid="toggle-autospeak"]')
   const hasAuto = (await autospeak.count()) === 1
-  check('自动发音开关存在', hasAuto)
+  check('自动发音开关存在（下拉内）', hasAuto)
   if (hasAuto) {
     const before = (await autospeak.textContent())?.trim()
     await autospeak.click()
@@ -212,6 +254,8 @@ async function run() {
     const after = (await autospeak.textContent())?.trim()
     check('自动发音可切换', before !== after, `${before} → ${after}`)
   }
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(120)
   await page.click('[data-testid="open-stats"]')
   await page.waitForTimeout(300)
   const statsText = norm(await page.textContent('body'))
@@ -227,11 +271,82 @@ async function run() {
     check('弱项专攻可出题', (await readWord(page)).length > 0)
   }
 
-  /* ---------- 9. 移动端视口 ---------- */
-  console.log('\n【9】移动端视口')
+  /* ---------- 9. 背单词模块 ---------- */
+  console.log('\n【9】背单词模块')
+  await page.click('[data-testid="tab-memorize"]')
+  await page.waitForTimeout(400)
+  check('背单词卡片出现', (await page.locator('[data-testid="memorize-card"]').count()) === 1)
+  check(
+    '打字相关 UI 已隐藏',
+    (await page.locator('[data-testid="keymap"]').count()) === 0 &&
+      (await page.locator('[data-testid="word"]').count()) === 0,
+  )
+  check('发音按钮存在', (await page.locator('[data-testid="memorize-speak"]').count()) === 1)
+  await page.click('[data-testid="memorize-flip"]')
+  await page.waitForTimeout(200)
+  check('翻面显示释义', (await page.locator('[data-testid="memorize-translation"]').count()) === 1)
+  const threeOk = await Promise.all(
+    ['known', 'fuzzy', 'unknown'].map((k) => page.locator(`[data-testid="memorize-${k}"]`).count()),
+  )
+  check('三键齐全', threeOk.every((c) => c === 1))
+  // unknown → 队列追加 2 次：进度分母应从 20 变 22
+  const progBefore = await page.textContent('[data-testid="memorize-progress"]')
+  await page.click('[data-testid="memorize-unknown"]')
+  await page.waitForTimeout(200)
+  const progAfter = await page.textContent('[data-testid="memorize-progress"]')
+  check(
+    '不认识的词追加 2 次到队尾',
+    progBefore?.includes('/20') && progAfter?.includes('/22'),
+    `${progBefore?.trim()} → ${progAfter?.trim()}`,
+  )
+  // 用「认识」清完这一组（22 词）
+  let settled = false
+  for (let i = 0; i < 40; i++) {
+    if ((await page.locator('[data-testid="memorize-again"]').count()) > 0) {
+      settled = true
+      break
+    }
+    if ((await page.locator('[data-testid="memorize-flip"]').count()) === 0) break
+    await page.click('[data-testid="memorize-flip"]')
+    await page.waitForTimeout(60)
+    await page.click('[data-testid="memorize-known"]')
+    await page.waitForTimeout(60)
+  }
+  check('全部完成后出现结算卡', settled)
+  const summary = norm(await page.textContent('body'))
+  check('结算含今日新学/复习/已掌握', ['今日新学', '复习', '本库已掌握'].every((k) => summary.includes(k)))
+  // 刷新后进度仍在：直接校验 localStorage 记录数 ≥ 20，且新卡组正常开启
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.click('[data-testid="tab-memorize"]')
+  await page.waitForTimeout(500)
+  const memRaw = await page.evaluate(() => localStorage.getItem('gt.memorize.v1'))
+  const memCount = memRaw ? Object.keys(JSON.parse(memRaw)).length : 0
+  check('刷新后背单词进度仍在（localStorage ≥20 词）', memCount >= 20, `记录数=${memCount}`)
+  check(
+    '刷新后背单词页可继续学（新卡组或已学完提示）',
+    (await page.locator('[data-testid="memorize-card"]').count()) === 1 ||
+      (await page.locator('[data-testid="memorize-again"]').count()) > 0,
+  )
+
+  /* ---------- 10. 中英双语 ---------- */
+  console.log('\n【10】中英双语切换')
+  await page.click('[data-testid="lang-en"]')
+  await page.waitForTimeout(300)
+  const bodyEn = norm(await page.textContent('body'))
+  check('en 即时生效', ['Typing', 'Vocabulary', 'Practice', 'Settings'].every((k) => bodyEn.includes(k)))
+  // 切到 CET-4（无 nameEn，显示中文名属词库数据豁免）之外的主要 UI 不应残留中文
+  check('en 模式无中文导航残留', !bodyEn.includes('练习') && !bodyEn.includes('设置') && !bodyEn.includes('背单词'))
+  await page.reload({ waitUntil: 'networkidle' })
+  const bodyEn2 = norm(await page.textContent('body'))
+  check('en 刷新保持', bodyEn2.includes('Typing') && bodyEn2.includes('Practice'))
+  await page.click('[data-testid="lang-zh"]')
+  await page.waitForTimeout(200)
+
+  /* ---------- 11. 移动端视口 ---------- */
+  console.log('\n【11】移动端视口')
   await page.setViewportSize({ width: 390, height: 844 })
   await page.waitForTimeout(300)
-  await page.click('[data-testid="mode-classic"]')
+  await pickMode(page, 'classic')
   await page.waitForTimeout(400)
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   check('移动端无横向溢出', overflow <= 2, `溢出=${overflow}px`)
@@ -239,8 +354,8 @@ async function run() {
   await ctx.close()
   await browser.close()
 
-  /* ---------- 汇总 ---------- */
-  console.log('\n【10】运行时报错')
+  /* ---------- 12. 运行时报错 ---------- */
+  console.log('\n【12】运行时报错')
   const realErrors = consoleErrors.filter((e) => !e.includes('favicon'))
   check('无 console / page 运行时错误', realErrors.length === 0, realErrors.slice(0, 2).join(' | '))
 

@@ -1,5 +1,6 @@
 import { Volume2 } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
+import { useT, useLang } from '../i18n'
 
 export type PracticeMode = 'classic' | 'spell' | 'timed'
 
@@ -7,6 +8,8 @@ interface PracticePanelProps {
   theme: ThemeConfig
   word: string
   translation: string
+  /** 英文释义（en 模式下优先于 translation 显示） */
+  definition?: string
   typed: string
   errorFlash: boolean
   wrongKey: string | null
@@ -77,6 +80,7 @@ export default function PracticePanel({
   theme,
   word,
   translation,
+  definition,
   typed,
   errorFlash,
   wrongKey,
@@ -84,6 +88,10 @@ export default function PracticePanel({
   mode,
   onSpeak,
 }: PracticePanelProps) {
+  const t = useT()
+  const { lang } = useLang()
+  // en 模式且词带英文释义 → 显示释义，否则显示中文翻译
+  const meaning = lang === 'en' && definition ? definition : translation
   const lower = word.toLowerCase()
 
   /* ---------- 摸鱼 IDE 皮肤：伪装成 VS Code ---------- */
@@ -116,7 +124,7 @@ export default function PracticePanel({
               </div>
               <div className="pr-6 text-[13px] leading-7 whitespace-pre">
                 <div className="text-[#6a9955]">{'/**'}</div>
-                <div className="text-[#6a9955]">{` * @summary ${translation}`}</div>
+                <div className="text-[#6a9955]">{` * @summary ${meaning}`}</div>
                 <div className="text-[#6a9955]">{' */'}</div>
                 <div>
                   <span className="text-[#569cd6]">export const </span>
@@ -133,7 +141,7 @@ export default function PracticePanel({
                   <span className={errorFlash ? 'text-[#f14c4c]' : 'text-[#4ec9b0]'}>
                     {errorFlash
                       ? `SyntaxError: unexpected token '${wrongKey ?? '?'}'`
-                      : '在键盘上敲出来，别人以为你在疯狂写代码'}
+                      : t('practice.ideIdle')}
                   </span>
                 </div>
               </div>
@@ -156,14 +164,14 @@ export default function PracticePanel({
     >
       <div className={`text-lg mb-8 ${theme.sub} flex items-center justify-center gap-2`}>
         <span className="opacity-50">[ </span>
-        {translation}
+        {meaning}
         <span className="opacity-50"> ]</span>
         {onSpeak && (
           <button
             data-testid="speak-btn"
             onClick={onSpeak}
-            title="朗读这个单词"
-            aria-label="朗读这个单词"
+            title={t('practice.speakTitle')}
+            aria-label={t('practice.speakTitle')}
             className={`ml-1 p-1.5 rounded-md border ${theme.border} hover:opacity-70 active:scale-95`}
           >
             <Volume2 size={14} />
@@ -178,12 +186,13 @@ export default function PracticePanel({
       <div className="h-5">
         {errorFlash && wrongKey && mode !== 'spell' && (
           <span className="text-xs text-red-400 animate-popIn">
-            敲错了：<span className="line-through">{wrongKey}</span> ，请敲下一个正确的字母
+            {t('practice.typeError')}：<span className="line-through">{wrongKey}</span>
+            {t('practice.typeErrorHint')}
           </span>
         )}
         {mode === 'spell' && (
           <span className="text-xs opacity-60">
-            {typed.length > 0 ? '拼错了可以用 Backspace 删除重来' : '默写模式：只看中文把单词拼出来'}
+            {typed.length > 0 ? t('practice.spellFix') : t('practice.spellIntro')}
           </span>
         )}
       </div>

@@ -1,4 +1,5 @@
 import type { ThemeConfig } from '../lib/theme'
+import { useT } from '../i18n'
 
 /** 标准指法分区：0=左手小指 … 7=右手小指 */
 const ROWS: string[][] = [
@@ -41,6 +42,7 @@ interface KeyMapProps {
 }
 
 export default function KeyMap({ theme, nextKey, wrongKey, compact }: KeyMapProps) {
+  const t = useT()
   return (
     <div className={`select-none w-full max-w-full px-2 ${compact ? 'opacity-80' : ''}`} data-testid="keymap" aria-hidden="true">
       <div className="flex flex-col items-center gap-1 sm:gap-1.5">
@@ -75,7 +77,7 @@ export default function KeyMap({ theme, nextKey, wrongKey, compact }: KeyMapProp
             })}
           </div>
         ))}
-        <div className="text-[11px] tracking-widest uppercase opacity-50 mt-1">请用标准指法敲击</div>
+        <div className="text-[11px] tracking-widest uppercase opacity-50 mt-1">{t('keymap.hint')}</div>
       </div>
     </div>
   )
