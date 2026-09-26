@@ -22,7 +22,15 @@ import type { ContentRef } from '../../content/model/content'
 
 export type LearningStatus = 'new' | 'learning' | 'reviewing' | 'mastered'
 
-/** 一条学习记录：以 ContentRef（contentId + 可选 contentVersion）为主键 */
+/**
+ * 一条学习记录：主键 = contentId（4 段式，含 namespace 消歧跨包同词）。
+ *
+ * ⚠️ 学习记录定位内容快照 = **contentId + contentVersion + contentChecksum 三元组**
+ *   （三者均继承自 ContentRef，此处不再重复定义 —— 重复存快照字段会引入
+ *    「两个真相」的一致性问题，快照比对请走 model/snapshot.ts 的 isSameSnapshot）。
+ *   三者缺一不可：只记 contentVersion 会在「不同内容恰好同 version」时误判为同一快照；
+ *   只记 checksum 无法区分是哪个实体的这份内容。
+ */
 export interface LearningItem extends ContentRef {
   status: LearningStatus
   /** 掌握度 0..1（跨内容类型统一口径，SRS 排期据此计算） */

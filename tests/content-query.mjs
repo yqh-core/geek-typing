@@ -42,6 +42,11 @@ const manifestTotal = pkgDirs.reduce((sum, id) => {
 
 console.log('\n【1】registry 契约')
 ok('注册 10 个 vocabulary 包', pkgDirs.length === 10, pkgDirs.join(','))
+/* 全库词条数基准（CONTENT_CONTRACT.md §11 I-16 依赖本条守护）：
+ * 词数变化必须被显式注意到 —— 增删词是内容产品行为，不该静默发生。
+ * 变更时请同步更新 CONTENT_CONTRACT.md 的基准数与本节期望值。 */
+const BASELINE_ITEMS = 9346
+ok('全库 Σitems = 契约基准（词数变化必须显式确认）', manifestTotal === BASELINE_ITEMS, `${manifestTotal} vs ${BASELINE_ITEMS}`)
 ok('getPackage 支持裸 id', registry.getPackage('ielts')?.localId === 'ielts')
 ok(
   'getPackage 支持 4 段式 ContentId',
@@ -237,6 +242,35 @@ await idx.ensureIndex(['ielts'])
 ok('ensureIndex(["ielts"]) 只建目标包', idx.getIndexStats().packages === 1 && idx.getIndexStats().entries === ieltsManifest.stats.items)
 ok('查询在部分索引下仍可用', (await cq.count({ type: 'word' })) === manifestTotal)
 
+// V4.1-P0.6：索引访问封装（finder）—— 与内部表逐条比对，证明封装只换入口、没换语义
+await idx.ensureIndex()
+const cet4Items = registry.getPackage('cet4').manifest.stats.items
+const finderPkg = idx.findByPackage('cet4')
+ok(
+  'findByPackage("cet4") 与 byPackage 表一致',
+  finderPkg.length === (index.byPackage.get('cet4') ?? []).length && finderPkg.length === cet4Items,
+  `${finderPkg.length} vs ${cet4Items}`,
+)
+ok(
+  'idsByPackage("cet4") 与 byPackage 表逐 id 一致',
+  idx.idsByPackage('cet4').join('|') === (index.byPackage.get('cet4') ?? []).join('|'),
+)
+ok(
+  'findById(id) 命中同一对象（与 byId 引用相等）',
+  idx.findById(sample.id) === index.byId.get(sample.id) && idx.findById(sample.id)?.id === sample.id,
+  sample.id,
+)
+ok('findById 未知 id 返回 null', idx.findById('content:word:nope:zzz') === null)
+ok('findByWord 与 byWord 表一致', idx.findByWord(wordKey).length === (index.byWord.get(wordKey) ?? []).length, wordKey)
+ok('findByWord 未知词形返回空数组', idx.findByWord('zzzznotaword').length === 0)
+ok(
+  'findByNamespace("ecdict-cet4") 命中 cet4 全包',
+  idx.findByNamespace('ecdict-cet4').length === cet4Items && idx.findByNamespace('ecdict-cet4').every((h) => h.packageLocalId === 'cet4'),
+  `${idx.findByNamespace('ecdict-cet4').length}`,
+)
+ok('findByNamespace 未知 namespace 返回空数组', idx.findByNamespace('nope-ns').length === 0)
+ok('findByTag("code") 与 byTag 表一致', idx.findByTag('code').length === (index.byTag.get('code') ?? []).length, `${idx.findByTag('code').length}`)
+
 console.log('\n【10】id 自洽性（生成侧 vs 寻址侧大小写口径）')
 console.log('   —— V4.1-P0.5 独立复核实测捕获：id 生成保留原词形大小写，若 get 用 lowercase 反查，')
 console.log('      9346 条里 93 条会「search 查得到、get 取不回」（go-code 41/50、ts-code 34/50）')
@@ -262,6 +296,234 @@ if (oxford.length > 0) {
   ok('大写词条按自身 id 命中（Oxford）', (await q.contentQuery.get(oxford[0].id))?.word === 'Oxford', oxford[0].id)
   ok('lowercase id 走兜底仍可命中（兼容历史/手写 id）', !!(await q.contentQuery.get('content:word:ecdict-ielts:oxford')))
 }
+
+console.log('\n【11】Query Scope（首页 / 搜索页 / 词库页 / Detail / 收藏页共用一套作用域）')
+const scopeIelts = await cq.search({ query: 'abandon', scope: { type: 'word', packageId: 'ielts' }, pageSize: 50 })
+const flatIelts = await cq.search({ query: 'abandon', packageId: 'ielts', pageSize: 50 })
+ok(
+  'scope{type,packageId} 与平铺 packageId 结果一致',
+  idOf(scopeIelts) === idOf(flatIelts) && flatIelts.length > 0,
+  `${flatIelts.length} 条：${flatIelts.map((h) => h.packageLocalId).join(',')}`,
+)
+const nsRows = await cq.list({ scope: { namespace: 'ecdict-ielts' }, pageSize: 100000 })
+ok(
+  "scope.namespace:'ecdict-ielts' 只命中 ielts",
+  nsRows.length === ieltsManifest.stats.items && nsRows.every((h) => h.packageLocalId === 'ielts'),
+  `${nsRows.length} 条`,
+)
+const codeRows = await cq.list({ scope: { tags: ['code'] }, pageSize: 100000 })
+ok(
+  "scope.tags:['code'] 命中 ts-code + go-code = 100",
+  codeRows.length === 100 && codeRows.every((h) => h.packageLocalId === 'ts-code' || h.packageLocalId === 'go-code'),
+  `${codeRows.length} 条 / ${[...new Set(codeRows.map((h) => h.packageLocalId))].join(',')}`,
+)
+const overrideRows = await cq.list({ scope: { packageId: 'ielts' }, packageId: 'cet4', pageSize: 100000 })
+ok(
+  '平铺参数覆盖 scope（packageId:cet4 胜出）',
+  overrideRows.length === cet4Items && overrideRows.every((h) => h.packageLocalId === 'cet4'),
+  `${overrideRows.length} 条 / ${[...new Set(overrideRows.map((h) => h.packageLocalId))].join(',')}`,
+)
+ok("count({scope:{namespace:'curated-ai-core'}}) = 43", (await cq.count({ scope: { namespace: 'curated-ai-core' } })) === 43)
+ok('空 scope 视为全库（缺省 = 无过滤）', (await cq.count({ scope: {} })) === manifestTotal, `${manifestTotal}`)
+ok(
+  'scope 未知包返回空',
+  (await cq.list({ scope: { packageId: 'nope' }, pageSize: 10 })).length === 0 && (await cq.count({ scope: { namespace: 'nope-ns' } })) === 0,
+)
+
+console.log('\n【12】Search Sort 契约（deterministic ⇒ 翻页不重不漏）')
+const nw = (s) => idx.normalizeWord(s)
+const sortedAsc = await cq.list({ packageId: 'ielts', pageSize: 1000, sort: 'word' })
+// 排序 key 是 normalizeWord（NFC+lowercase+空白折叠），不是原始字符串：
+// ielts 含 Oxford / Australian 等专有名词，直接比原始串会被 ASCII 大小写（'Z'<'a'）干扰。
+let ascOk = true
+for (let i = 0; i < 19; i++) if (nw(sortedAsc[i].word) > nw(sortedAsc[i + 1].word)) ascOk = false
+ok(
+  'sort:"word" 前 20 条按词形非降序',
+  ascOk,
+  sortedAsc.slice(0, 5).map((h) => h.word).join(','),
+)
+let rawOk = true
+for (let i = 0; i < 19; i++) if (sortedAsc[i].word > sortedAsc[i + 1].word) rawOk = false
+ok('sort:"word" 前 20 条原始词形亦非降序（该区间无大小写混排）', rawOk)
+const sortedAsc2 = await cq.list({ packageId: 'ielts', pageSize: 1000, sort: 'word' })
+ok('deterministic：同一 query 连续两次 id 序列完全相同', idOf(sortedAsc) === idOf(sortedAsc2), `${sortedAsc.length} 条`)
+const paged = []
+for (let p = 1; p <= 10; p++) paged.push(...(await cq.list({ packageId: 'ielts', page: p, pageSize: 10, sort: 'word' })))
+ok(
+  '分页不重不漏：page1..10 拼接 === pageSize:1000 一次取回的前 100 条',
+  idOf(paged) === idOf(sortedAsc.slice(0, 100)) && new Set(paged.map((h) => h.id)).size === 100,
+)
+const rel = await cq.search({ query: 'abandon', pageSize: 50 })
+const relExact = rel.filter((h) => nw(h.word) === 'abandon').length
+ok(
+  '默认 sort 为 relevance：精确命中排在最前且不与其它组混排',
+  rel.length > 0 && nw(rel[0].word) === 'abandon' &&
+    rel.slice(0, relExact).every((h) => nw(h.word) === 'abandon') &&
+    rel.slice(relExact).every((h) => nw(h.word) !== 'abandon'),
+  `${relExact} 条精确命中 / 共 ${rel.length} 条`,
+)
+const rel2 = await cq.search({ query: 'abandon', pageSize: 50, sort: 'relevance' })
+ok('sort:"relevance" 显式与默认一致', idOf(rel) === idOf(rel2))
+const upd1 = await cq.list({ packageId: 'cet4', pageSize: 100000, sort: 'updated' })
+const upd2 = await cq.list({ packageId: 'cet4', pageSize: 100000, sort: 'updated' })
+ok(
+  'sort:"updated" 不报错、条数正确、顺序 deterministic（当前退化为包内数据顺序）',
+  upd1.length === cet4Items && idOf(upd1) === idOf(upd2),
+  `${upd1.length} 条`,
+)
+const descRows = await cq.list({ packageId: 'ielts', pageSize: 1000, sort: { field: 'word', order: 'desc' } })
+let descOk = true
+for (let i = 0; i < 19; i++) if (nw(descRows[i].word) < nw(descRows[i + 1].word)) descOk = false
+ok(
+  "sort:{field:'word',order:'desc'} 降序生效",
+  descOk && descRows.length === sortedAsc.length,
+  descRows.slice(0, 5).map((h) => h.word).join(','),
+)
+const descRows2 = await cq.list({ packageId: 'ielts', pageSize: 1000, sort: { field: 'word', order: 'desc' } })
+const descAll = await cq.list({ packageId: 'ielts', pageSize: 100000, sort: { field: 'word', order: 'desc' } })
+const ascAll = await cq.list({ packageId: 'ielts', pageSize: 100000, sort: 'word' })
+ok(
+  'desc 顺序同样 deterministic，且与 asc 命中同一集合（翻页不漏项）',
+  idOf(descRows) === idOf(descRows2) &&
+    new Set([...descAll, ...ascAll].map((h) => h.id)).size === ascAll.length &&
+    ascAll.length === ieltsManifest.stats.items,
+  `${ascAll.length} 条双向一致`,
+)
+const updDesc = await cq.list({ packageId: 'cet4', pageSize: 100000, sort: { field: 'updated', order: 'desc' } })
+ok(
+  "sort:{field:'updated',order:'desc'} 不报错且条数不变",
+  updDesc.length === cet4Items && idOf(updDesc) === idOf(await cq.list({ packageId: 'cet4', pageSize: 100000, sort: { field: 'updated', order: 'desc' } })),
+  `${updDesc.length} 条`,
+)
+
+console.log('\n【13】ContentSnapshot 契约（V4.1-P0.6：哪个实体的哪个快照）')
+const snap = await server.ssrLoadModule('/src/core/content/model/snapshot.ts')
+
+/* 13.1 snapshotOf：字段齐全 */
+const s1 = snap.snapshotOf('content:vocabulary:ecdict-cet4:cet4', {
+  version: 7,
+  checksum: 'sha256:aaa',
+  publishedAt: '2026-09-26',
+})
+ok(
+  'snapshotOf 字段齐全（contentId/contentVersion/checksum/publishedAt 对得上）',
+  s1.contentId === 'content:vocabulary:ecdict-cet4:cet4' &&
+    s1.contentVersion === 7 &&
+    s1.checksum === 'sha256:aaa' &&
+    s1.publishedAt === '2026-09-26',
+  JSON.stringify(s1),
+)
+ok('snapshotOf 带出 schemaVersion', s1.schemaVersion === model.SCHEMA_VERSION, `schemaVersion=${s1.schemaVersion}`)
+
+/* 13.2 省略 publishedAt ⇒ 键不存在（区分「显式省略」与「值为 undefined」） */
+const s2 = snap.snapshotOf('content:vocabulary:ecdict-cet4:cet4', { version: 1, checksum: 'sha256:bbb' })
+ok('snapshotOf 省略 publishedAt 时结果不含该键', 'publishedAt' in s2 === false, Object.keys(s2).join(','))
+const s2b = snap.snapshotOf('content:vocabulary:ecdict-cet4:cet4', { version: 1, checksum: 'sha256:bbb', publishedAt: undefined })
+ok('snapshotOf publishedAt 显式 undefined 时同样不含该键', 'publishedAt' in s2b === false)
+
+/* 13.3 schemaVersion 省略时取当前常量 */
+ok('schemaVersion 省略时取 SCHEMA_VERSION 常量', s2.schemaVersion === model.SCHEMA_VERSION)
+ok(
+  'schemaVersion 为正整数且两次省略调用结果相同',
+  Number.isInteger(s2.schemaVersion) && s2.schemaVersion > 0 && s1.schemaVersion === s2.schemaVersion,
+  `${s2.schemaVersion}`,
+)
+const s3 = snap.snapshotOf('content:vocabulary:ecdict-cet4:cet4', { version: 7, checksum: 'sha256:aaa' }, 99)
+ok('schemaVersion 可显式指定（覆盖常量）', s3.schemaVersion === 99)
+
+/* 13.4 isSameSnapshot：必须 contentId + contentVersion + checksum 三者全等 */
+ok('isSameSnapshot 同一对象 → true', snap.isSameSnapshot(s1, s1) === true)
+const s1Clone = snap.snapshotOf('content:vocabulary:ecdict-cet4:cet4', {
+  version: 7,
+  checksum: 'sha256:aaa',
+  publishedAt: '2026-09-26',
+})
+ok('isSameSnapshot 内容完全相同的两份 → true', snap.isSameSnapshot(s1, s1Clone) === true)
+ok(
+  'isSameSnapshot checksum 不同 → false',
+  snap.isSameSnapshot(s1, snap.snapshotOf(s1.contentId, { version: 7, checksum: 'sha256:zzz' })) === false,
+)
+ok(
+  'isSameSnapshot contentVersion 不同 → false',
+  snap.isSameSnapshot(s1, snap.snapshotOf(s1.contentId, { version: 8, checksum: 'sha256:aaa' })) === false,
+)
+ok(
+  'isSameSnapshot contentId 不同 → false',
+  snap.isSameSnapshot(s1, snap.snapshotOf('content:vocabulary:ecdict-ielts:ielts', { version: 7, checksum: 'sha256:aaa' })) === false,
+)
+// 安全边界：version + checksum 全同但 contentId 不同（不同实体的「第 7 代」），不能误判为同一份
+const other7 = snap.snapshotOf('content:vocabulary:ecdict-ielts:ielts', { version: 7, checksum: 'sha256:aaa' })
+ok(
+  'isSameSnapshot 仅 version+checksum 同但 contentId 不同 → false（不能只比 version/checksum）',
+  other7.contentVersion === s1.contentVersion &&
+    other7.checksum === s1.checksum &&
+    snap.isSameSnapshot(s1, other7) === false,
+)
+ok(
+  'isSameSnapshot 任一侧为 null/undefined → false（宁可重学也不误判相同）',
+  snap.isSameSnapshot(s1, null) === false &&
+    snap.isSameSnapshot(null, s1) === false &&
+    snap.isSameSnapshot(s1, undefined) === false &&
+    snap.isSameSnapshot(undefined, s1) === false &&
+    snap.isSameSnapshot(null, null) === false,
+)
+
+/* 13.5 findRevision：同一 checksum 出现多次时以最近一次发布为准（本次修复点） */
+const hist = [
+  { revision: 1, version: 1, checksum: 'sha256:X', publishedAt: '2026-01-01' },
+  { revision: 2, version: 2, checksum: 'sha256:Y', publishedAt: '2026-01-02' },
+  { revision: 3, version: 1, checksum: 'sha256:X', publishedAt: '2026-01-01' },
+]
+const hitX = snap.findRevision(hist, 'sha256:X')
+ok(
+  'findRevision 同一 checksum 出现两次 → 返回 revision 最大的那条（倒序扫描）',
+  hitX !== null && hitX.revision === 3 && hitX.version === 1,
+  hitX ? JSON.stringify(hitX) : 'null',
+)
+ok(
+  'findRevision 结果与正序第一条不同（证明口径不再是「首条命中」）',
+  hitX !== null && hitX.revision !== hist[0].revision,
+  `倒序=${hitX?.revision} / 正序=${hist[0].revision}`,
+)
+ok(
+  'findRevision 多条 history 中命中唯一 checksum 的条目',
+  snap.findRevision(hist, 'sha256:Y')?.revision === 2 && snap.findRevision(hist, 'sha256:Y')?.version === 2,
+)
+const one = [{ revision: 5, version: 5, checksum: 'sha256:Z' }]
+ok('findRevision 单条正常命中', snap.findRevision(one, 'sha256:Z')?.revision === 5)
+ok('findRevision 空 history → null', snap.findRevision([], 'sha256:X') === null)
+ok('findRevision 非数组 history → null', snap.findRevision(null, 'sha256:X') === null && snap.findRevision(undefined, 'sha256:X') === null)
+ok('findRevision 无匹配 → null', snap.findRevision(hist, 'sha256:NONE') === null)
+ok('findRevision 空字符串 checksum → null', snap.findRevision(hist, '') === null && snap.findRevision(hist, undefined) === null)
+
+/* 13.6 口径验证：落地 manifest 自洽（findRevision(history, checksum) 应还原出 manifest 的三元组） */
+const cet4Manifest = JSON.parse(readFileSync(resolve(root, 'content/vocabulary/cet4/manifest.json'), 'utf8'))
+ok(
+  'cet4 manifest 已写入版本三元组（读不到即 FAIL，不跳过）',
+  Number.isInteger(cet4Manifest.contentRevision) &&
+    Number.isInteger(cet4Manifest.contentVersion) &&
+    typeof cet4Manifest.contentChecksum === 'string' &&
+    cet4Manifest.contentChecksum.length > 0 &&
+    Array.isArray(cet4Manifest.contentHistory) &&
+    cet4Manifest.contentHistory.length > 0,
+  `revision=${cet4Manifest.contentRevision} version=${cet4Manifest.contentVersion}`,
+)
+const cet4Hit = snap.findRevision(cet4Manifest.contentHistory, cet4Manifest.contentChecksum)
+ok(
+  'findRevision(cet4 history, contentChecksum).version === manifest.contentVersion',
+  cet4Hit !== null && cet4Hit.version === cet4Manifest.contentVersion,
+  cet4Hit ? `${cet4Hit.version} vs ${cet4Manifest.contentVersion}` : 'null',
+)
+ok(
+  'findRevision(cet4 history, contentChecksum).revision === manifest.contentRevision',
+  cet4Hit !== null && cet4Hit.revision === cet4Manifest.contentRevision,
+  cet4Hit ? `${cet4Hit.revision} vs ${cet4Manifest.contentRevision}` : 'null',
+)
+ok(
+  'cet4 contentHistory 按 revision 升序追加（findRevision 倒序扫描的前提）',
+  cet4Manifest.contentHistory.every((e, i, arr) => i === 0 || arr[i - 1].revision <= e.revision),
+  cet4Manifest.contentHistory.map((e) => e.revision).join(','),
+)
 
 await server.close()
 

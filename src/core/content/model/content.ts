@@ -165,5 +165,28 @@ export interface ContentVersioned {
  */
 export interface ContentRef {
   contentId: string
+  /** 对外学习契约版本：同一 checksum 复用同一 version（回滚即回到历史 version） */
   contentVersion?: number
+  /**
+   * 规范化内容指纹（canonical SHA-256）。
+   * version 与 checksum 互补而非冗余：version 是**对外契约号**（不同实体可共用同一个 3），
+   * checksum 是**内容指纹**（唯一确定这份内容）。回滚场景下靠 checksum 才能识别
+   * 「这是历史内容」，而 version 回到历史值只是结果、不足以自证。
+   */
+  contentChecksum?: string
 }
+
+/**
+ * 内容身份的最小充分描述：revision（递增审计号）+ checksum（内容指纹）。
+ * 与 ContentRef 的区别：ContentRef 定位「实体」，ContentVersionRef 定位「内容本身」——
+ * 它不含 contentId，因此可跨实体复用（例如校验「这两个包装的是不是同一份源数据」）。
+ */
+export interface ContentVersionRef {
+  /** 单调递增审计号：每次内容构建都 +1（审计用，回滚也不回头） */
+  revision: number
+  /** 规范化内容指纹（canonical SHA-256） */
+  checksum: string
+}
+
+/** 快照相关类型在此 re-export，上层只需 import 一处（model/content）。 */
+export type { ContentSnapshot, ContentVersionInfo, ContentRevisionEntry } from './snapshot'

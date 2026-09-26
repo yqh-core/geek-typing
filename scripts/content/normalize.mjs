@@ -26,12 +26,18 @@
  *         仅格式差异不 exit 1，提示加 --write。
  * 幂等：规范化函数 f(f(x)) === f(x)，跑两次结果一致。
  *
+ * ⚠️ 落盘必须与 checksum 计算同源：--write 一律用 canonical.mjs 的 canonicalFile()
+ *   （canonicalize + 尾随换行），与 content:build / content:validate 的
+ *   sha256Canonical 是同一份序列化实现。否则「改了哪里」与「算出来多少」会分叉，
+ *   checksum 又会随排版漂移 —— 那正是本轮要修的问题。
+ *
  * 用法：node scripts/content/normalize.mjs [包id...] [--write]
  *      不给包 id = 全部包；默认干跑，--write 才回写 words.json。
  */
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { canonicalFile } from './canonical.mjs'
 
 const ROOT = path.resolve(process.cwd())
 const VOCAB_DIR = path.join(ROOT, 'content', 'vocabulary')
@@ -157,7 +163,7 @@ async function main() {
     if (dirtyItems) dirty++
 
     if (write && dirtyItems) {
-      await writeFile(file, JSON.stringify(next), 'utf8') // 与现有 words.json 同为紧凑单行格式（无尾随换行）
+      await writeFile(file, canonicalFile(next), 'utf8') // 紧凑单行 + 尾随换行，与 sha256Canonical 同源
       written++
     }
   }

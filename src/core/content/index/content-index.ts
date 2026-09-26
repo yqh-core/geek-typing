@@ -16,6 +16,11 @@ import { getPackage, getVocabularyPackages, loadPackage } from '../registry'
 import { makeContentId, parseContentId } from '../model/content'
 import type { WordHit } from '../query/content-query'
 
+/**
+ * ContentIndex —— **internal**：索引的物理结构（当前四张 Map）。
+ * 仅观测 / 测试 / 调试可直接读；业务代码（含 Query 层）一律走下面的 finder，
+ * 否则「索引内部换成 Trie / 索引落到 Worker」那天要改的调用点会散落全站。
+ */
 export interface ContentIndex {
   /** ContentId → 词条（全量正排表，get() 与结果物化走这里） */
   byId: Map<string, WordHit>
@@ -164,4 +169,63 @@ export function invalidateIndex(packageId?: string): void {
 /** 索引规模（观测用：packages=已建包数，entries=已索引词条数） */
 export function getIndexStats(): { packages: number; entries: number } {
   return { packages: built.size, entries: index.byId.size }
+}
+
+/* ---------------- 索引访问封装（finder）—— 业务层访问索引的唯一入口 ----------------
+ *
+ * 写死的原则：**Query 层与任何业务代码只能通过 finder 访问索引**。
+ *
+ * 为什么必须有这一层：ContentIndex 现在是四张 Map，明天可能是 Trie / FST / SQLite /
+ * IndexedDB / 跑在 Worker 里的倒排表（甚至远端搜索 API 的异步 getter）。如果调用点
+ * 到处写 `idx.byWord.get(x)` / `idx.byId.get(id)`，换实现时要改的地方就散落在每个
+ * 业务文件里，且**总有一处漏改 → 静默丢数据**（最难查的一类缺陷）。封成 finder 后，
+ * 内部结构怎么换都只改本文件，Query 层零改动。
+ *
+ * 语义（与内部 byX 表严格一致，切换实现时不得改变）：
+ *  - 命中顺序 = 索引顺序 = 包内词条数据顺序（分页 / 排序契约依赖这个稳定性）；
+ *  - 未命中返回 []（findById 返回 null），调用方不必判空；
+ *  - 返回的是新数组，调用方改它不会污染索引；
+ *  - finder 是**同步**的：调用方需先 await ensureIndex() 覆盖目标包，
+ *    未建索引的包表现为「查不到」（与 old 行为一致，不会返回半截数据）。
+ */
+/** id[] → WordHit[]（保持索引顺序，跳过已失效的悬空 id） */
+function materialize(ids: string[] | undefined): WordHit[] {
+  const out: WordHit[] = []
+  for (const id of ids ?? []) {
+    const hit = index.byId.get(id)
+    if (hit) out.push(hit)
+  }
+  return out
+}
+
+/** 按 ContentId 取单条；未命中 / 未建索引返回 null */
+export function findById(id: string): WordHit | null {
+  return index.byId.get(id) ?? null
+}
+
+/** 按归一化词形取全部命中（跨包同词各占一条）；key 必须经 normalizeWord 处理 */
+export function findByWord(normalizedWord: string): WordHit[] {
+  return materialize(index.byWord.get(normalizedWord))
+}
+
+/** 包内全部词条（裸 localId，如 'cet4'） */
+export function findByPackage(packageLocalId: string): WordHit[] {
+  return materialize(index.byPackage.get(packageLocalId))
+}
+
+/** tag 命中的全部词条（当前 tag 取包 manifest.tags；词级 tag 接入后由索引侧扩展） */
+export function findByTag(tag: string): WordHit[] {
+  return materialize(index.byTag.get(tag))
+}
+
+/** 按包 namespace（如 'ecdict-ielts'）取全部词条；namespace 每包唯一 ⇒ 最多命中一个包 */
+export function findByNamespace(namespace: string): WordHit[] {
+  const pkg = getVocabularyPackages().find((p) => parseContentId(p.manifest.id)?.namespace === namespace)
+  return pkg ? findByPackage(pkg.localId) : []
+}
+
+/** 包内词条 id 列表（只要 id 不要实体时用，省掉物化成本） */
+export function idsByPackage(packageLocalId: string): string[] {
+  const arr = index.byPackage.get(packageLocalId)
+  return arr ? [...arr] : []
 }

@@ -12,7 +12,7 @@
  *  8. 包 id 全局唯一（同一 ContentId 不得被两个包占用）
  *  9. namespace 每包唯一（词级 ContentId 全局唯一的充要条件，见代码内注释）
  * 10. schemaVersion 存在且 === SCHEMA_VERSION（结构版本，由 content:build 写入）
- * 11. contentVersion 存在且为正整数（内容版本，由 content:build 按 checksum 变化自增）
+ * 11. contentVersion 存在且为正整数（对外学习契约版本，同一 checksum 复用同一 version）
  * 12. Duplicate Detection（分级，见代码内注释）：
  *     (a) 包内 duplicate localId —— 第 4 项已覆盖，此处只回显，不重复报错
  *     (b) 包内 duplicate normalized word（大小写/空白差异撞车）
@@ -21,13 +21,22 @@
  *     (e) invalid / orphan relation —— 仅当 relations.json 存在时校验，否则打印跳过
  *     (f) broken asset —— 仅当 manifest.assets 存在时校验，否则打印跳过
  *     (g) orphan learning record —— 运行时检查，由 Learning 层负责，脚本不校验
+ * 13. packageId 存在且 === 目录名（一词三表：manifest.packageId / 目录 / ContentId 第 4 段）
+ * 14. namespace 存在，且与从 manifest.id 解析出的第 3 段严格相等（两者必须同源；
+ *     「每包唯一」由第 9 项兜底）
+ * 15. contentChecksum === sha256Canonical(words)（**必须走 canonical**，不得用文件原文
+ *     或 JSON.stringify 直算，否则文件排版一变就误判漂移）
+ * 16. contentRevision / contentVersion 均为正整数；contentHistory 中存在
+ *     checksum === contentChecksum 的条目，且该条目 version === contentVersion、
+ *     revision <= contentRevision（回滚场景：version 回到历史值，revision 只增不减）
+ * 17. build 存在且 toolVersion 非空、builtAt 为合法时间、sourceChecksum === contentChecksum
  *
  * 用法：node scripts/content/validate.mjs   → 全绿 exit 0，任一 FAIL exit 1
  */
 import { readdir, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { createHash } from 'node:crypto'
 import path from 'node:path'
+import { sha256Canonical } from './canonical.mjs'
 
 const ROOT = path.resolve(process.cwd())
 const VOCAB_DIR = path.join(ROOT, 'content', 'vocabulary')
@@ -82,6 +91,9 @@ async function main() {
       words = JSON.parse(await readFile(path.join(dir, 'words.json'), 'utf8'))
     } catch (e) { fail(`words.json 不可解析：${e.message}`); continue }
 
+    // 内容指纹（第 6/15 项共用）：必须走 canonical —— 只取决于数据语义，与文件排版无关
+    const canonicalSum = sha256Canonical(words)
+
     // 2. 必填字段
     const missing = REQUIRED_FIELDS.filter((f) => manifest[f] === undefined)
     if (missing.length === 0) ok('必填字段完整')
@@ -102,11 +114,10 @@ async function main() {
     if (manifest.stats?.items === words.length) ok(`stats.items 与实际一致（${words.length}）`)
     else fail(`stats.items=${manifest.stats?.items} ≠ 实际 ${words.length} → 运行 npm run content:build 同步`)
 
-    // 6. checksum（完整 SHA-256）
-    const actual = 'sha256:' + createHash('sha256').update(JSON.stringify(words)).digest('hex')
+    // 6. checksum（第 6 项 = 来源原始数据指纹，走 canonical 序列化而非文件原文）
     const sources = manifest.sources ?? []
     if (sources.length === 0) fail('sources 为空（V4.1 起为数组，至少一条来源）')
-    else if (sources.every((s) => s.checksum === actual)) ok('checksum 一致（完整 SHA-256）')
+    else if (sources.every((s) => s.checksum === canonicalSum)) ok('checksum 一致（canonical SHA-256）')
     else fail('checksum 漂移：sources[].checksum 与 words.json 不符 → 运行 npm run content:build')
 
     // 7. License 门禁（结构化 + 外部来源须有 SPDX）
@@ -138,6 +149,19 @@ async function main() {
     else if (seenNs.has(ns)) fail(`namespace "${ns}" 与包 ${seenNs.get(ns)} 重复：词级 ContentId 将撞车，namespace 必须每包唯一`)
     else { seenNs.set(ns, id); ok(`namespace 唯一（${ns}）`) }
 
+    // 13. packageId —— 必须与目录名同名（UI / 持久化 / 目录三处指的是同一个包）
+    if (manifest.packageId === id) ok(`packageId=${manifest.packageId}（与目录名一致）`)
+    else fail(`packageId 应等于目录名 "${id}"，实际 ${manifest.packageId ?? '缺失'} → 运行 npm run content:build`)
+
+    // 14. namespace —— 必须与 manifest.id 第 3 段同源（build 是从最终 ContentId 反解写入的）
+    if (typeof manifest.namespace !== 'string' || !manifest.namespace) {
+      fail(`namespace 缺失或非法（${manifest.namespace ?? 'undefined'}）→ 运行 npm run content:build`)
+    } else if (!ns) {
+      // 第 9 项已判 FAIL，此处不重复计数
+    } else if (manifest.namespace !== ns) {
+      fail(`namespace="${manifest.namespace}" ≠ id 解析出的 "${ns}"：两者必须同源 → 运行 npm run content:build`)
+    } else ok(`namespace 与 id 同源（${manifest.namespace}）`)
+
     totalWords += words.length
 
     // 10. schemaVersion —— 结构版本，由 content:build 写入，改结构才递增
@@ -147,6 +171,41 @@ async function main() {
     // 11. contentVersion —— 内容版本，正整数，由 content:build 按 checksum 变化自增
     if (Number.isInteger(manifest.contentVersion) && manifest.contentVersion > 0) ok(`contentVersion=${manifest.contentVersion}`)
     else fail(`contentVersion 必须为正整数，实际 ${manifest.contentVersion ?? '缺失'} → 运行 npm run content:build`)
+
+    // 15. contentChecksum —— 入库内容的 canonical 指纹（与文件排版无关）
+    if (manifest.contentChecksum === canonicalSum) ok(`contentChecksum 一致（${canonicalSum.slice(7, 15)}…）`)
+    else fail(`contentChecksum 漂移：manifest=${manifest.contentChecksum ?? '缺失'} ≠ 实际 ${canonicalSum} → 运行 npm run content:build`)
+
+    // 16. 版本三元组自洽：revision / version 正整数，且能在 contentHistory 里找到
+    //     checksum 命中的那条记录（取最近一条，与 build 的复用口径一致）。
+    //     回滚场景：version 回到历史值 ⇒ 允许 revision > 命中条目的 revision（审计号只增不减）。
+    const rev = manifest.contentRevision
+    const ver = manifest.contentVersion
+    const revOk = Number.isInteger(rev) && rev > 0
+    const verOk = Number.isInteger(ver) && ver > 0
+    if (!revOk) fail(`contentRevision 必须为正整数，实际 ${rev ?? '缺失'} → 运行 npm run content:build`)
+    if (!verOk) fail(`contentVersion 必须为正整数，实际 ${ver ?? '缺失'} → 运行 npm run content:build`)
+    const history = Array.isArray(manifest.contentHistory) ? manifest.contentHistory : []
+    if (history.length === 0) {
+      fail('contentHistory 缺失或为空 → 运行 npm run content:build')
+    } else {
+      const hitEntry = [...history].reverse().find((e) => e?.checksum === manifest.contentChecksum)
+      if (!hitEntry) fail(`contentHistory 中不存在 checksum === contentChecksum 的条目 → 运行 npm run content:build`)
+      else if (hitEntry.version !== ver) fail(`contentHistory 命中条目 version=${hitEntry.version} ≠ contentVersion=${ver} → 运行 npm run content:build`)
+      else if (!(Number.isInteger(hitEntry.revision) && hitEntry.revision > 0 && hitEntry.revision <= rev)) fail(`contentHistory 命中条目 revision=${hitEntry.revision} 应 ≤ contentRevision=${rev}`)
+      else if (revOk && verOk) ok(`版本三元组自洽（revision=${rev} version=${ver} history=${history.length} 条，命中 revision=${hitEntry.revision}）`)
+    }
+
+    // 17. build 溯源：谁、什么时候、用哪份源数据产出了这份 manifest
+    const b = manifest.build
+    if (!b || typeof b !== 'object') fail(`build 字段缺失（应为 {toolVersion,builtAt,sourceChecksum}）→ 运行 npm run content:build`)
+    else {
+      let buildOk = true
+      if (typeof b.toolVersion !== 'string' || !b.toolVersion) { fail('build.toolVersion 缺失或为空'); buildOk = false }
+      if (typeof b.builtAt !== 'string' || !b.builtAt || Number.isNaN(Date.parse(b.builtAt))) { fail(`build.builtAt 不是合法时间：${b.builtAt ?? '缺失'}`); buildOk = false }
+      if (b.sourceChecksum !== manifest.contentChecksum) { fail(`build.sourceChecksum(${b.sourceChecksum ?? '缺失'}) ≠ contentChecksum(${manifest.contentChecksum ?? '缺失'})`); buildOk = false }
+      if (buildOk) ok(`build 溯源完整（${b.toolVersion} @ ${b.builtAt}）`)
+    }
 
     // 12. Duplicate Detection —— 按「可判定性」分级：能判的判死，判不了的如实说跳过，
     //     绝不用「假装通过」凑绿。

@@ -9,14 +9,17 @@
  * 内容数据的唯一定义源是 content/<type>/<id>/{manifest,words}.json；本文件不承载数据。
  * stats/checksum 一律由 content:build 从数据自动派生，不人工维护。
  */
-import type { ContentSource, ContentType } from './model/content'
+import type { ContentSource, ContentType, ContentRevisionEntry } from './model/content'
 
 export type { ContentType, ContentSource, ContentLicense, ParsedContentId } from './model/content'
 export { makeContentId, parseContentId, wordId } from './model/content'
 export type { WordContent, WordPayload } from './model/vocabulary'
 export type { ContentRelation, RelationType } from './relation/relation'
 
-/** 内容包清单（content/vocabulary/<id>/manifest.json）。
+/** 内容包清单（content/vocabulary/<id>/manifest.json）—— Package 的「身份证」：
+ *  由 content:build 自动生成，含「它是谁（packageId/namespace/id）」+「它当前是哪个快照
+ *  （contentVersion/contentChecksum/contentRevision）」+「它怎么来的（sources/build）」，
+ *  因此每个 Package 都是可审计、可复现的数据产品。
  *  音频/大文件资源一律存远程 URL（CDN/R2/GitHub Release），本体不进 git 仓库。 */
 export interface PackageManifest {
   /** ContentId：content:vocabulary:<namespace>:<id>（<namespace> 消歧同名不同源） */
@@ -42,11 +45,34 @@ export interface PackageManifest {
   sources: ContentSource[]
   /** 离线策略：inline=随主包 / lazy=空闲预热 / runtime=访问时缓存 / on-demand=手动下载 */
   offline: { supported: boolean; policy: 'inline' | 'lazy' | 'runtime' | 'on-demand' }
-  /** 内容版本（由 content:build 自动派生）：内容变更时 +1，绝不进 ContentId。
-   *  与 schemaVersion（结构版本）是两个维度，学习记录记的是 contentVersion。 */
-  contentVersion?: number
+  /** 包裸 id（= content/vocabulary/<packageId> 目录名），与 UI/持久化键一致 */
+  packageId: string
+  /** ContentId 第 3 段：每包唯一 = `${来源族}-${包 id}`（ecdict-ielts / curated-ai-core），
+   *  跨包同词靠它消歧，见 model/content.ts 的 namespace 唯一性契约 */
+  namespace: string
+  /** 对外学习契约版本（由 content:build 派生）：同一 checksum 复用同一 version，
+   *  回滚即回到历史 version。学习记录记的是它，绝不进 ContentId。
+   *  与 schemaVersion（结构版本）是两个维度。 */
+  contentVersion: number
+  /** 单调递增修订号（由 content:build 派生）：每次内容构建都 +1，审计用，回滚也不回头。
+   *  ⚠️ 它只回答「这个包被构建过多少次」，不参与任何相等性判断 —— 判断内容身份请用 contentChecksum。 */
+  contentRevision: number
+  /**
+   * 规范化内容的 canonical SHA-256（contentChecksum）。
+   * ⚠️ 与 `sources[].checksum` 语义不同，别混用：
+   *   contentChecksum      = **规范化后入库内容**的指纹（归一化/排序/字段裁剪之后算的）
+   *   sources[].checksum   = **来源原始数据**的指纹（下载到的原始文件算的）
+   *   两者在规范化管线有输出时必然不同；混用会导致「源数据没变但内容变了」被漏判。
+   */
+  contentChecksum: string
+  /** 该内容快照的发布时间（ISO date） */
+  contentPublishedAt: string
+  /** 修订历史：按 revision 升序，用于回滚时把 checksum 还原成 (revision, version) */
+  contentHistory: ContentRevisionEntry[]
+  /** 构建溯源：让每个 Package 成为可审计、可复现的数据产品 */
+  build: { toolVersion: string; builtAt: string; sourceChecksum: string }
   /** 结构版本（由 content:build 写入，常量 SCHEMA_VERSION）：schema 破坏性变更才递增 */
-  schemaVersion?: number
+  schemaVersion: number
   /** Import Pipeline 的规范化开关：代码词库须 stripHtml=false，
    *  否则 `type Handler<T>` / `<div />` 会被当成 HTML 标签删掉，词表被破坏。 */
   normalize?: { stripHtml?: boolean }
