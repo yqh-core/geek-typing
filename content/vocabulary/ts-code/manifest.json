@@ -1,5 +1,5 @@
 {
-  "id": "bank:ts-code",
+  "id": "content:vocabulary:curated-ts-code:ts-code",
   "type": "vocabulary",
   "version": "1.0.0",
   "title": "TS 骨架代码",
@@ -23,14 +23,20 @@
     "phonetic": 0,
     "definition": 0
   },
-  "source": {
-    "origin": "curated in-repo (TS 代码词库)",
-    "license": "UNLICENSED",
-    "importedAt": "2026-09-26",
-    "checksum": "sha256:9f34b063a8523022"
-  },
   "offline": {
     "supported": true,
     "policy": "inline"
-  }
+  },
+  "sources": [
+    {
+      "origin": "curated in-repo (TS 代码词库)",
+      "license": {
+        "name": "Proprietary (self-curated)",
+        "attributionRequired": false,
+        "commercialUse": true
+      },
+      "importedAt": "2026-09-26",
+      "checksum": "sha256:9f34b063a8523022cdb7f2756f7ea7d0cc83ca4e0e6c74c13a75007530d0ad59"
+    }
+  ]
 }

@@ -1,5 +1,5 @@
 {
-  "id": "bank:cloud-native",
+  "id": "content:vocabulary:curated-cloud-native:cloud-native",
   "type": "vocabulary",
   "version": "1.0.0",
   "title": "云原生 K8s 词库",
@@ -23,14 +23,20 @@
     "phonetic": 0,
     "definition": 0
   },
-  "source": {
-    "origin": "curated in-repo (云原生词库)",
-    "license": "UNLICENSED",
-    "importedAt": "2026-09-26",
-    "checksum": "sha256:cddaa3d05eea3df2"
-  },
   "offline": {
     "supported": true,
     "policy": "inline"
-  }
+  },
+  "sources": [
+    {
+      "origin": "curated in-repo (云原生词库)",
+      "license": {
+        "name": "Proprietary (self-curated)",
+        "attributionRequired": false,
+        "commercialUse": true
+      },
+      "importedAt": "2026-09-26",
+      "checksum": "sha256:cddaa3d05eea3df2c04200830df8b12506835b47641af732fc0b35d36a51ad7e"
+    }
+  ]
 }

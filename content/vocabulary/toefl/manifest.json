@@ -1,5 +1,5 @@
 {
-  "id": "bank:toefl",
+  "id": "content:vocabulary:ecdict-toefl:toefl",
   "type": "vocabulary",
   "version": "1.0.0",
   "title": "托福核心",
@@ -22,14 +22,22 @@
     "phonetic": 2943,
     "definition": 2992
   },
-  "source": {
-    "origin": "ECDICT",
-    "license": "MIT",
-    "importedAt": "2026-09-26",
-    "checksum": "sha256:5167516b393552d0"
-  },
   "offline": {
     "supported": true,
     "policy": "lazy"
-  }
+  },
+  "sources": [
+    {
+      "origin": "ECDICT",
+      "license": {
+        "spdx": "MIT",
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT",
+        "attributionRequired": false,
+        "commercialUse": true
+      },
+      "importedAt": "2026-09-26",
+      "checksum": "sha256:5167516b393552d0fbf4f8d9bc8cc1079f15e3c9a1ab2d7bb4aad2fa4f4a726e"
+    }
+  ]
 }

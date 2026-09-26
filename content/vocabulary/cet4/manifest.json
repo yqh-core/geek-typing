@@ -1,5 +1,5 @@
 {
-  "id": "bank:cet4",
+  "id": "content:vocabulary:ecdict-cet4:cet4",
   "type": "vocabulary",
   "version": "1.0.0",
   "title": "四级 CET-4",
@@ -22,14 +22,22 @@
     "phonetic": 84,
     "definition": 84
   },
-  "source": {
-    "origin": "ECDICT",
-    "license": "MIT",
-    "importedAt": "2026-09-26",
-    "checksum": "sha256:4081f01156cc3edb"
-  },
   "offline": {
     "supported": true,
     "policy": "inline"
-  }
+  },
+  "sources": [
+    {
+      "origin": "ECDICT",
+      "license": {
+        "spdx": "MIT",
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT",
+        "attributionRequired": false,
+        "commercialUse": true
+      },
+      "importedAt": "2026-09-26",
+      "checksum": "sha256:4081f01156cc3edb11113d8ae5695fb7646ad8e57ca9be77af67b053062717f3"
+    }
+  ]
 }

@@ -1,5 +1,5 @@
 {
-  "id": "bank:go-code",
+  "id": "content:vocabulary:curated-go-code:go-code",
   "type": "vocabulary",
   "version": "1.0.0",
   "title": "Go 骨架代码",
@@ -23,14 +23,20 @@
     "phonetic": 0,
     "definition": 0
   },
-  "source": {
-    "origin": "curated in-repo (Go 代码词库)",
-    "license": "UNLICENSED",
-    "importedAt": "2026-09-26",
-    "checksum": "sha256:6b22c0d902eeb109"
-  },
   "offline": {
     "supported": true,
     "policy": "inline"
-  }
+  },
+  "sources": [
+    {
+      "origin": "curated in-repo (Go 代码词库)",
+      "license": {
+        "name": "Proprietary (self-curated)",
+        "attributionRequired": false,
+        "commercialUse": true
+      },
+      "importedAt": "2026-09-26",
+      "checksum": "sha256:6b22c0d902eeb109e7ed9b8a0cdbcaf43c5ff7adda6e8924a8d765ff752e3955"
+    }
+  ]
 }

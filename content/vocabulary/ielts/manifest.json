@@ -1,5 +1,5 @@
 {
-  "id": "bank:ielts",
+  "id": "content:vocabulary:ecdict-ielts:ielts",
   "type": "vocabulary",
   "version": "1.0.0",
   "title": "雅思核心 IELTS",
@@ -22,14 +22,22 @@
     "phonetic": 2986,
     "definition": 2999
   },
-  "source": {
-    "origin": "ECDICT",
-    "license": "MIT",
-    "importedAt": "2026-09-26",
-    "checksum": "sha256:32d8457fd1ec89b5"
-  },
   "offline": {
     "supported": true,
     "policy": "lazy"
-  }
+  },
+  "sources": [
+    {
+      "origin": "ECDICT",
+      "license": {
+        "spdx": "MIT",
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT",
+        "attributionRequired": false,
+        "commercialUse": true
+      },
+      "importedAt": "2026-09-26",
+      "checksum": "sha256:32d8457fd1ec89b5612958631e9711fbb29acc5f2acc785f5f66c80e74020c3f"
+    }
+  ]
 }

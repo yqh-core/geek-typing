@@ -1,5 +1,5 @@
 {
-  "id": "bank:frontend",
+  "id": "content:vocabulary:curated-frontend:frontend",
   "type": "vocabulary",
   "version": "1.0.0",
   "title": "前端工程化词库",
@@ -22,14 +22,20 @@
     "phonetic": 0,
     "definition": 0
   },
-  "source": {
-    "origin": "curated in-repo (前端词库)",
-    "license": "UNLICENSED",
-    "importedAt": "2026-09-26",
-    "checksum": "sha256:ae689a1658435952"
-  },
   "offline": {
     "supported": true,
     "policy": "inline"
-  }
+  },
+  "sources": [
+    {
+      "origin": "curated in-repo (前端词库)",
+      "license": {
+        "name": "Proprietary (self-curated)",
+        "attributionRequired": false,
+        "commercialUse": true
+      },
+      "importedAt": "2026-09-26",
+      "checksum": "sha256:ae689a16584359525729262318b13a8120b5973cf1d8104a24fe8e03eacce126"
+    }
+  ]
 }

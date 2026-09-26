@@ -1,21 +1,27 @@
-/* V4.1 · Content Registry —— 全站内容统一注册表。
+/* V4.1 · Content Registry —— 全站内容统一注册表（V4-P0 由 WORD_BANKS 模式泛化而来）。
  *
- * 由 V3 的 WORD_BANKS 注册模式泛化而来（V4-P0）：
- *  - manifest 静态声明（构建期可校验，content:validate 门禁）；
- *  - 小库（ai-core/cloud-native/frontend/cet4/cet6）inline：随主包同步可用（与 V3 行为一致）；
- *  - 大库（ielts/kaoyan/toefl）lazy：动态 import 独立 chunk，SW 空闲期预热（main.tsx）；
- *  - 词条以 `?raw` 导入 + 运行时 JSON.parse，避免 tsc 对大 JSON 做字面量类型推断。
+ * 原则：
+ *  - UI 永远不感知内容来自 JSON / TS / GitHub / CDN / IndexedDB —— 只经本文件与 query 层；
+ *  - 小库（curated + CET）inline 同步可用；三大库（ielts/kaoyan/toefl）lazy 动态 chunk，
+ *    SW 空闲期预热（main.tsx → warmUpVocabulary）；
+ *  - 词条以 `?raw` 导入 + 运行时 JSON.parse，规避 tsc 对大 JSON 的字面量类型推断；
+ *  - 加载结果单份缓存（loadPackage），兼容层与查询层共享，不重复占用内存。
+ *
  * 新增内容包：content/vocabulary/<id>/ 放 manifest.json + words.json → 本文件登记 →
- * content:validate 校验。listening/reading 等类型上线时在此扩展类型槽位。
+ * content:validate 校验 → content:build 自动同步 stats/checksum。
  */
-import type { PackageManifest, WordItem, ContentType } from './schema'
+import type { PackageManifest, WordPayload } from './schema'
+import { parseContentId } from './model/content'
+import type { ContentRelation } from './relation/relation'
 
 export interface VocabularyPackage {
   manifest: PackageManifest
+  /** ContentId 的第 4 段（裸词库 id），与 UI/持久化键一致 */
+  localId: string
   /** inline 策略：词条同步可用 */
-  words?: WordItem[]
-  /** lazy 策略：词条异步加载器（模块级缓存由 wordBanks.bankCache 承担） */
-  load?: () => Promise<WordItem[]>
+  words?: WordPayload[]
+  /** lazy 策略：词条异步加载器 */
+  load?: () => Promise<WordPayload[]>
 }
 
 /* ---------------- manifest（?raw + parse，规避 resolveJsonModule） ---------------- */
@@ -41,7 +47,7 @@ import cet6Words from '../../../content/vocabulary/cet6/words.json?raw'
 import tsCodeWords from '../../../content/vocabulary/ts-code/words.json?raw'
 import goCodeWords from '../../../content/vocabulary/go-code/words.json?raw'
 
-const parseWords = (raw: string): WordItem[] => JSON.parse(raw) as WordItem[]
+const parseWords = (raw: string): WordPayload[] => JSON.parse(raw) as WordPayload[]
 
 /* ---------------- lazy 大库词条（动态 import，独立 chunk） ---------------- */
 const loadIelts = async () => parseWords((await import('../../../content/vocabulary/ielts/words.json?raw')).default)
@@ -49,45 +55,87 @@ const loadKaoyan = async () => parseWords((await import('../../../content/vocabu
 const loadToefl = async () => parseWords((await import('../../../content/vocabulary/toefl/words.json?raw')).default)
 
 /* ---------------- 注册表（vocabulary 槽位；其余类型上线时扩展） ---------------- */
-/** key = 裸词库 id（与 UI/持久化一致，manifest.id 为 `bank:<裸id>`） */
-const vocabularyPackages: Record<string, VocabularyPackage> = {
-  'ai-core': { manifest: parseManifest(aiCoreManifest), words: parseWords(aiCoreWords) },
-  'cloud-native': { manifest: parseManifest(cloudNativeManifest), words: parseWords(cloudNativeWords) },
-  frontend: { manifest: parseManifest(frontendManifest), words: parseWords(frontendWords) },
-  cet4: { manifest: parseManifest(cet4Manifest), words: parseWords(cet4Words) },
-  cet6: { manifest: parseManifest(cet6Manifest), words: parseWords(cet6Words) },
-  ielts: { manifest: parseManifest(ieltsManifest), load: loadIelts },
-  kaoyan: { manifest: parseManifest(kaoyanManifest), load: loadKaoyan },
-  toefl: { manifest: parseManifest(toeflManifest), load: loadToefl },
-  'ts-code': { manifest: parseManifest(tsCodeManifest), words: parseWords(tsCodeWords) },
-  'go-code': { manifest: parseManifest(goCodeManifest), words: parseWords(goCodeWords) },
-}
+const packages: VocabularyPackage[] = [
+  { manifest: parseManifest(aiCoreManifest), localId: 'ai-core', words: parseWords(aiCoreWords) },
+  { manifest: parseManifest(cloudNativeManifest), localId: 'cloud-native', words: parseWords(cloudNativeWords) },
+  { manifest: parseManifest(frontendManifest), localId: 'frontend', words: parseWords(frontendWords) },
+  { manifest: parseManifest(cet4Manifest), localId: 'cet4', words: parseWords(cet4Words) },
+  { manifest: parseManifest(cet6Manifest), localId: 'cet6', words: parseWords(cet6Words) },
+  { manifest: parseManifest(ieltsManifest), localId: 'ielts', load: loadIelts },
+  { manifest: parseManifest(kaoyanManifest), localId: 'kaoyan', load: loadKaoyan },
+  { manifest: parseManifest(toeflManifest), localId: 'toefl', load: loadToefl },
+  { manifest: parseManifest(tsCodeManifest), localId: 'ts-code', words: parseWords(tsCodeWords) },
+  { manifest: parseManifest(goCodeManifest), localId: 'go-code', words: parseWords(goCodeWords) },
+]
 
-/* ---------------- 查询 / Capability API ---------------- */
+const byLocalId = new Map(packages.map((p) => [p.localId, p]))
+const byManifestId = new Map(packages.map((p) => [p.manifest.id, p]))
+
+/** 包级加载缓存（单份数据，兼容层与查询层共享） */
+const loadedCache = new Map<string, WordPayload[]>()
+
+/* ---------------- 查询 API ---------------- */
 
 /** 全部 vocabulary 包（按注册序，即 UI 下拉序） */
 export function getVocabularyPackages(): VocabularyPackage[] {
-  return Object.values(vocabularyPackages)
+  return packages
 }
 
-/** 按裸 id 取包 */
-export function getVocabularyPackage(id: string): VocabularyPackage | undefined {
-  return vocabularyPackages[id]
+/** 按裸 id（ai-core / ielts ...）取包 */
+export function getVocabularyPackage(localId: string): VocabularyPackage | undefined {
+  return byLocalId.get(localId)
+}
+
+/** 按包 id（裸 id 或 4 段式 ContentId）取包 */
+export function getPackage(id: string): VocabularyPackage | undefined {
+  return byManifestId.get(id) ?? byLocalId.get(id) ?? byLocalId.get(parseContentId(id)?.localId ?? '')
+}
+
+/** 加载包内词条（inline 直接返回，lazy 走动态 import 并缓存） */
+export async function loadPackage(id: string): Promise<WordPayload[]> {
+  const pkg = getPackage(id)
+  if (!pkg) return []
+  const hit = loadedCache.get(pkg.localId)
+  if (hit) return hit
+  const words = pkg.words ?? (pkg.load ? await pkg.load() : [])
+  loadedCache.set(pkg.localId, words)
+  return words
+}
+
+/** ContentId → 单条内容（当前仅 word 类型可解析；其余类型待内容接入后扩展） */
+export async function getContent<T = WordPayload>(contentId: string): Promise<T | null> {
+  const parsed = parseContentId(contentId)
+  if (!parsed) return null
+  if (parsed.type === 'word') {
+    // 词条的 namespace 即包所在 namespace：在对应 namespace 的包内按词形查找
+    const pkgs = packages.filter((p) => parseContentId(p.manifest.id)?.namespace === parsed.namespace)
+    for (const p of pkgs) {
+      const words = await loadPackage(p.localId)
+      const hit = words.find((w) => w.word.toLowerCase() === parsed.localId.toLowerCase())
+      if (hit) return hit as T
+    }
+    return null
+  }
+  return null
+}
+
+/** 按类型列出内容包清单（listening 等类型当前为空数组） */
+export function listContent(type: string): PackageManifest[] {
+  if (type !== 'vocabulary') return []
+  return packages.map((p) => p.manifest)
+}
+
+/** 关系查询：当前无 relations.json，恒为空数组（关系模型已就位，接入内容即产出） */
+export function getRelations(_contentId: string): ContentRelation[] {
+  return []
 }
 
 /** Capability 查询：业务代码用它替代 if (bank === 'xxx') 分支 */
-export function hasFeature(pkg: VocabularyPackage, feature: string): boolean {
-  return pkg.manifest.features[feature] === true
+export function hasFeature(packageId: string, feature: string): boolean {
+  return getPackage(packageId)?.manifest.features[feature] === true
 }
 
-/** 按内容类型列出 manifest（listening 等类型上线前恒为空数组） */
-export function listManifests(type: ContentType): PackageManifest[] {
-  if (type !== 'vocabulary') return []
-  return getVocabularyPackages().map((p) => p.manifest)
-}
-
-/** SW 空闲期预热（main.tsx 调用）：预拉 3 个 lazy 大库 chunk，经 SW fetch handler 入缓存，
- *  保证首访用户首次离线也能切换大词库。与 wordBanks.load 同一模块路径 → 同一 chunk。 */
+/** SW 空闲期预热（main.tsx）：预拉三大库 chunk 入 SW 缓存，保证首次离线可切大词库 */
 export function warmUpVocabulary(): Promise<unknown> {
   return Promise.allSettled([loadIelts(), loadKaoyan(), loadToefl()]).catch(() => {})
 }

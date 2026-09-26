@@ -1,5 +1,5 @@
 {
-  "id": "bank:cet6",
+  "id": "content:vocabulary:ecdict-cet6:cet6",
   "type": "vocabulary",
   "version": "1.0.0",
   "title": "六级 CET-6",
@@ -22,14 +22,22 @@
     "phonetic": 69,
     "definition": 69
   },
-  "source": {
-    "origin": "ECDICT",
-    "license": "MIT",
-    "importedAt": "2026-09-26",
-    "checksum": "sha256:6fabb465d6c46bbc"
-  },
   "offline": {
     "supported": true,
     "policy": "inline"
-  }
+  },
+  "sources": [
+    {
+      "origin": "ECDICT",
+      "license": {
+        "spdx": "MIT",
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT",
+        "attributionRequired": false,
+        "commercialUse": true
+      },
+      "importedAt": "2026-09-26",
+      "checksum": "sha256:6fabb465d6c46bbc89ddb4b9c972f657980b0626bbc1973c18570e3a7ead0a3c"
+    }
+  ]
 }

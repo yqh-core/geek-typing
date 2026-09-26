@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
     "test:e2e": "node tests/e2e.mjs",
+    "test:content": "node tests/content-query.mjs",
     "test:offline": "node tests/offline-audit.mjs",
     "test:prod": "node tests/offline-audit.mjs --prod",
     "test:e2e:prod": "node tests/e2e.mjs --prod",
@@ -17,6 +18,7 @@
  "icons": "node scripts/gen-icons.mjs",
  "content:validate": "node scripts/content/validate.mjs",
  "content:check": "node scripts/content/validate.mjs",
+ "content:build": "node scripts/content/build.mjs",
  "content:list": "node scripts/content/list.mjs"
   },
   "dependencies": {

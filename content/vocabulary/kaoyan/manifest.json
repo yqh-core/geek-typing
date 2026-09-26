@@ -1,5 +1,5 @@
 {
-  "id": "bank:kaoyan",
+  "id": "content:vocabulary:ecdict-kaoyan:kaoyan",
   "type": "vocabulary",
   "version": "1.0.0",
   "title": "考研核心",
@@ -22,14 +22,22 @@
     "phonetic": 2994,
     "definition": 3000
   },
-  "source": {
-    "origin": "ECDICT",
-    "license": "MIT",
-    "importedAt": "2026-09-26",
-    "checksum": "sha256:dd84f40f820196ad"
-  },
   "offline": {
     "supported": true,
     "policy": "lazy"
-  }
+  },
+  "sources": [
+    {
+      "origin": "ECDICT",
+      "license": {
+        "spdx": "MIT",
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT",
+        "attributionRequired": false,
+        "commercialUse": true
+      },
+      "importedAt": "2026-09-26",
+      "checksum": "sha256:dd84f40f820196ad537fd2b5c6c8d56b15992557eee01854d565c364e0e6ef8e"
+    }
+  ]
 }
