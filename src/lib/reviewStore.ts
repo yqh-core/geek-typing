@@ -93,9 +93,12 @@ export function recordCorrect(word: string): ReviewStore {
   return next
 }
 
-/** 已到期、且仍存在于有效词集合中的词 */
-export function dueWords(validWords: string[], now = Date.now()): string[] {
+/** 已到期、且仍存在于有效词集合中的词；validWords 缺省时不过滤（存储里的词本身即历史上练过的词） */
+export function dueWords(validWords?: string[], now = Date.now()): string[] {
   const store = loadReview()
+  if (!validWords) {
+    return Object.keys(store).filter((w) => store[w]?.nextReviewAt <= now)
+  }
   const valid = new Set(validWords)
   return Object.keys(store).filter((w) => valid.has(w) && store[w]?.nextReviewAt <= now)
 }

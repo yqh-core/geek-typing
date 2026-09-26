@@ -194,7 +194,7 @@ export default function Header(props: HeaderProps) {
                     {lang === 'en' ? b.nameEn ?? b.name : b.name}
                   </span>
                   <span className={`block text-[11px] ${theme.sub}`}>
-                    {b.words.length} {t('bank.wordsUnit')}
+                    {b.count ?? b.words.length} {t('bank.wordsUnit')}
                   </span>
                 </span>
                 {b.id === bankId && <Check size={13} className="shrink-0" />}

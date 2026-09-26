@@ -173,8 +173,8 @@ async function run() {
   await page.waitForTimeout(150)
   const menu = norm(await page.textContent('body'))
   check(
-    '词库下拉 6 本齐全（含新雅思库）',
-    ['四级 CET-4', '六级 CET-6', '雅思核心 IELTS', '云原生 K8s 词库'].every((k) => menu.includes(k)),
+    '词库下拉 8 本齐全（含考研/托福库）',
+    ['四级 CET-4', '六级 CET-6', '雅思核心 IELTS', '考研核心', '托福核心', '云原生 K8s 词库'].every((k) => menu.includes(k)),
   )
   check('词库下拉含导入词库入口', (await page.locator('[data-testid="open-bank-manager"]').count()) >= 1)
   await page.getByRole('button', { name: /四级 CET-4/ }).first().click()
@@ -429,7 +429,7 @@ async function run() {
   const bankList = norm(await page.textContent('[data-testid="command-palette"]'))
   check(
     ':bank 列出全部词库',
-    ['ai-core', 'cloud-native', 'frontend', 'cet4', 'cet6', 'ielts'].every((id) => bankList.includes(id)),
+    ['ai-core', 'cloud-native', 'frontend', 'cet4', 'cet6', 'ielts', 'kaoyan', 'toefl'].every((id) => bankList.includes(id)),
   )
   await page.keyboard.press('Escape')
   await page.waitForTimeout(200)
@@ -843,6 +843,71 @@ async function run() {
     !(gradWord in review3),
     `剩余=${JSON.stringify(Object.keys(review3))}`,
   )
+
+  /* ---------- 15. 批6：考研/托福词库（懒加载分包）---------- */
+  console.log('\n【15】考研/托福词库（懒加载分包）')
+
+  // 关闭 14.5 遗留的结算弹窗（finished 态 Enter 重开一轮）
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+
+  // 15.1 词库下拉条目与词数（懒加载词库显示 count 元数据）
+  await page.click('[data-testid="dropdown-banks"]')
+  await page.waitForTimeout(200)
+  const btnTexts = await page.evaluate(() => [...document.querySelectorAll('button')].map((b) => b.textContent ?? ''))
+  check('下拉含考研条目且词数 3000', btnTexts.some((t) => t.includes('考研核心') && t.includes('3000')))
+  check('下拉含托福条目且词数 3000', btnTexts.some((t) => t.includes('托福核心') && t.includes('3000')))
+  await page.keyboard.press('Escape') // 关下拉（下拉展开时 Esc 归下拉处理，不误开面板）
+  await page.waitForTimeout(150)
+
+  // 15.2 切考研词库：命令切换 → 加载 → 出词 → 打字推进
+  await page.keyboard.press('Escape') // 开命令面板
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':bank kaoyan', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(600)
+  check(':bank kaoyan 切到考研词库', norm(await page.textContent('body')).includes('考研核心'))
+  const kyWord1 = await readWord(page)
+  check('考研词库懒加载后正常出词', kyWord1.length > 0, `词=${kyWord1}`)
+  await typeWord(page, kyWord1)
+  await page.waitForTimeout(450)
+  const kyWord2 = await readWord(page)
+  check('考研词库打字推进到下一词', kyWord2.length > 0 && kyWord2 !== kyWord1, `下一词=${kyWord2}`)
+
+  // 15.3 错题复习在懒词库下工作：敲错考研词入库 → 注入到期 → :review 拉出
+  await page.evaluate(() => localStorage.removeItem('gt.review.v1'))
+  await page.waitForTimeout(150)
+  const kyWrong = await readWord(page)
+  await page.keyboard.press(kyWrong[0] === 'z' ? 'x' : 'z') // 故意敲错
+  await page.waitForTimeout(150)
+  await typeWord(page, kyWrong)
+  await page.waitForTimeout(500)
+  const kyReview = JSON.parse((await page.evaluate(() => localStorage.getItem('gt.review.v1'))) || '{}')
+  check('考研词敲错入库（懒词库下错题本可用）', kyReview[kyWrong]?.wrongCount === 1, JSON.stringify(kyReview[kyWrong] ?? null))
+  await page.evaluate((word) => {
+    const now = Date.now()
+    localStorage.setItem(
+      'gt.review.v1',
+      JSON.stringify({
+        [word]: {
+          wrongCount: 1,
+          correctStreak: 0,
+          lastWrongAt: now - 2 * 864e5,
+          nextReviewAt: now - 864e5,
+          intervalIdx: 0,
+        },
+      }),
+    )
+  }, kyWrong)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(800) // 等懒加载词库 chunk 拉取 + bankWords 就位
+  for (let i = 0; i < 10 && (await readWord(page)).length === 0; i++) await page.waitForTimeout(200)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':review', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(500)
+  check('懒词库下 :review 拉出到期考研词', (await readWord(page)) === kyWrong, `首词=${await readWord(page)}`)
 
   await ctx.close()
   await browser.close()

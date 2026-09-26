@@ -7,7 +7,15 @@ import StreakBar from './components/StreakBar'
 import KeyMap from './components/KeyMap'
 import Memorize from './components/Memorize'
 import CommandPalette from './components/CommandPalette'
-import { DEFAULT_BANK_ID, WORD_BANKS, type WordBank, type WordItem } from './data/wordBanks'
+import {
+  DEFAULT_BANK_ID,
+  WORD_BANKS,
+  allLoadedWords,
+  bankWordsOf,
+  ensureBankWords,
+  type WordBank,
+  type WordItem,
+} from './data/wordBanks'
 import { sound, type SoundTheme } from './lib/sound'
 import { THEMES, type ThemeId } from './lib/theme'
 import { getMode, type PracticeModeId } from './lib/modes'
@@ -132,12 +140,37 @@ export default function App() {
     [banks, bankId],
   )
 
+  /** 当前词库已解析词条：小词库同步；懒加载词库在下方 effect 异步填充（模块级缓存兜底） */
+  const [bankWords, setBankWords] = useState<WordItem[]>([])
+  useEffect(() => {
+    const ready = bankWordsOf(bank)
+    if (ready.length > 0) {
+      setBankWords(ready)
+      return
+    }
+    // 懒加载词库且未缓存：清空占位进入「加载词库中」态
+    setBankWords([])
+    let alive = true
+    ensureBankWords(bank)
+      .then((w) => {
+        if (alive) setBankWords(w)
+      })
+      .catch((e) => {
+        // 断网首次切到未加载过的大词库：chunk 拉取失败，保持加载态（词库数据无法凭空获得）
+        console.warn(`词库 ${bank.id} 加载失败`, e)
+      })
+    return () => {
+      alive = false
+    }
+  }, [bank])
+
   /* ---------------- 错题本（艾宾浩斯）派生数据 ---------------- */
   const reviewDue = useMemo(() => {
     void reviewVersion
-    return dueWords(banks.flatMap((b) => b.words).map((w) => w.word))
+    // 存储里的词本身即历史上练过的词（懒词库下无法依赖全词库展开），不再做词库过滤
+    return dueWords()
     // 切页签时也刷新一次：背单词页的三键打分不在本组件内打点
-  }, [banks, reviewVersion, tab])
+  }, [reviewVersion, tab])
   const reviewTotal = useMemo(() => {
     void reviewVersion
     return Object.keys(loadReview()).length
@@ -146,7 +179,7 @@ export default function App() {
   /* ---------------- 生成一轮练习队列 ---------------- */
   const buildQueue = useCallback(
     (source?: WordItem[]) => {
-      const base = source && source.length > 0 ? source : bank.words
+      const base = source && source.length > 0 ? source : bankWords
       const arr = [...base]
       if (shuffled) {
         for (let i = arr.length - 1; i > 0; i--) {
@@ -156,7 +189,7 @@ export default function App() {
       }
       return arr.slice(0, CHAPTER_SIZE)
     },
-    [bank, shuffled],
+    [bankWords, shuffled],
   )
 
   const startRound = useCallback(
@@ -186,29 +219,29 @@ export default function App() {
       return
     }
     const set = new Set(letters)
-    const candidates = bank.words.filter((w) => w.word.toLowerCase().split('').some((c) => set.has(c)))
+    const candidates = bankWords.filter((w) => w.word.toLowerCase().split('').some((c) => set.has(c)))
     const map = new Map(candidates.map((w) => [w.word, w]))
     const ranked = rankByWeakness(candidates.map((w) => w.word), letters)
     const picked = ranked.map((w) => map.get(w)).filter((w): w is WordItem => !!w)
     startRound(picked.length > 0 ? picked : undefined)
-  }, [analytics, bank, startRound])
+  }, [analytics, bankWords, startRound])
 
   /** 单挑一个错词反复练 */
   const reviewSingleWord = useCallback(
     (word: string) => {
-      const item = bank.words.find((w) => w.word.toLowerCase() === word.toLowerCase())
+      const item = bankWords.find((w) => w.word.toLowerCase() === word.toLowerCase())
       if (item) startRound(Array.from({ length: 10 }, () => item))
     },
-    [bank, startRound],
+    [bankWords, startRound],
   )
 
   /** 错题复习轮：拉出全部到期词开一轮；无到期返回 false（由入口提示） */
   const startReviewRound = useCallback((): boolean => {
-    const all = banks.flatMap((b) => b.words)
-    const due = dueWords(all.map((w) => w.word))
+    const due = dueWords()
     if (due.length === 0) return false
-    const map = new Map(all.map((w) => [w.word, w]))
-    const items = due.map((w) => map.get(w)).filter((w): w is WordItem => !!w)
+    const map = new Map(allLoadedWords(banks).map((w) => [w.word, w]))
+    // 已加载词库中找不到的（如词库 chunk 未加载）给占位词条，保证复习轮不断链
+    const items = due.map((w) => map.get(w) ?? { word: w, translation: '' })
     setTab('typing')
     startRound(items)
     return true
@@ -527,8 +560,8 @@ export default function App() {
   const upcoming = queue.slice(wordIndex + 1, wordIndex + 4)
 
   const wrongItems = useMemo(
-    () => banks.flatMap((b) => b.words).filter((w) => wrongWords.includes(w.word.toLowerCase())),
-    [banks, wrongWords],
+    () => queue.filter((w) => wrongWords.includes(w.word.toLowerCase())),
+    [queue, wrongWords],
   )
 
   const todayCount = getTodayCount(history)
@@ -637,7 +670,7 @@ export default function App() {
             </div>
           )}
           {tab === 'memorize' ? (
-            <Memorize theme={theme} bank={bank} paused={commandMode} streakDays={getStreakDays(history)} />
+            <Memorize theme={theme} bank={{ ...bank, words: bankWords }} paused={commandMode} streakDays={getStreakDays(history)} />
           ) : current ? (
             <PracticePanel
               theme={theme}
