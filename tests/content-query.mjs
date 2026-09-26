@@ -67,7 +67,14 @@ ok(
   JSON.stringify(model.parseContentId('content:word:ecdict-ielts:abandon')) ===
     JSON.stringify({ type: 'word', namespace: 'ecdict-ielts', localId: 'abandon' }),
 )
-ok('wordId 生成 4 段式', model.wordId('ecdict-ielts', 'Abandon') === 'content:word:ecdict-ielts:abandon')
+ok(
+  'wordId 保留原词形（与 buildHits 同源，禁止在 id 侧 lowercase）',
+  model.wordId('ecdict-ielts', 'Abandon') === 'content:word:ecdict-ielts:Abandon',
+)
+ok(
+  'wordId 与 buildHits 生成口径一致（大写词不分歧）',
+  model.wordId('curated-ts-code', 'const') === 'content:word:curated-ts-code:const',
+)
 ok('非法 ContentId 解析为 null', model.parseContentId('ielts') === null)
 // 关键契约：namespace 每包唯一 —— 这是词级 ContentId 全局唯一的充要条件
 const namespaces = pkgDirs.map((id) => model.parseContentId(registry.getPackage(id).manifest.id)?.namespace)

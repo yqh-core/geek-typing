@@ -66,8 +66,19 @@ export function parseContentId(id: string): ParsedContentId | null {
   return { type: m[1] as ContentType, namespace: m[2], localId: m[3] }
 }
 
-/** 词条级 ContentId 的构造/解析快捷方式 */
-export const wordId = (namespace: string, lemma: string) => makeContentId('word', namespace, lemma.toLowerCase())
+/**
+ * 词条级 ContentId 的构造快捷方式。
+ *
+ * ⚠️ 口径铁律（V4.1-P0.6.1 钉死）：lemma **保留原词形**，一字不 lowercase。
+ * 生成侧（`buildHits`，content-index.ts）与寻址侧（`findById`）都必须逐字符同源，
+ * 否则 `Oxford` / `Marxist` / `const [a, setA]` 这类大写词会生成出与索引**不同的 id**，
+ * 出现「search 查得到、get 取不回」—— 这正是契约 §9.3.5 记录过的事故同源问题。
+ * lowercase 只允许出现在**检索 key**（`normalizeWord`）里，不允许进 id。
+ *
+ * 历史上本函数内部做了 lowercase，已被判定为 bug（对外导出却产出与系统不兼容的 id），
+ * 2026-09-27 统一为保留原词形，与 `buildHits` 同源。
+ */
+export const wordId = (namespace: string, lemma: string) => makeContentId('word', namespace, lemma)
 
 /** 所有内容的顶层契约：任何类型内容都应可给出稳定 id 与类型 */
 export interface ContentItem {
@@ -120,7 +131,8 @@ export const SCHEMA_VERSION = 4
  * 顺序固定：NFC 归一 → trim → 内部连续空白折叠为单个空格 → 删除控制字符 → `:` `/` 替换为 `-`。
  *
  * ⚠️ **不做 lowercase**：大小写是 vocabulary 侧的语义决策，由调用方决定
- * （code 词库区分大小写）；wordId() 内部会自行 lowercase。本函数只管「稳定」，不管「语义」。
+ * （code 词库区分大小写）。本函数只管「稳定」，不管「语义」；词条 ContentId 的 lemma
+ * 也按此原则保留原词形（见 `wordId` / 契约 §2.2 C-6）。
  */
 export function normalizeLocalId(raw: string): string {
   return raw

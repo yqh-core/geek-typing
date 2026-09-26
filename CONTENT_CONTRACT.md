@@ -32,6 +32,20 @@
 >
 > 配套文档：`content/README.md`（操作手册 / 踩坑史 / CLI），本文件（规范 / 冻结边界）。
 > 两者冲突时**以本文件为准**，并立即修 README。
+>
+> ### 📌 变更记录：V4.1-P0.6.1（additive amendment，2026-09-26）
+>
+> 本版是 P0.6 冻结之后的**追加修订（只收口，不新增架构）**：只做**增补**与**事实订正**，
+> **未改变 P0.6 已冻结的任何一条语义**（C-1~C-5、I-1~I-18、§1~§9 全部原样保留）。
+>
+> | 节 | 本轮动作 |
+> |---|---|
+> | §2.2 | 新增 **C-6**：词条 ContentId 的 lemma 保留原词形（id 侧禁止 lowercase） |
+> | §10 L-6 | **事实订正**：Learning 运行时键不是 `bankId + word`，而是**裸 `word`**；补量化数字与不可逆信息损失 |
+> | §10 L-7 | **事实订正**：补 P1 UI 边界实测（`?raw` 单点 / 17 处直读词数组 / Query·Catalog 零调用 / `hasFeature` 零调用） |
+> | §11 | 新增 **I-19**（id 侧禁止 lowercase）、**I-20**（首屏体积不随词库增长） |
+> | §12 | **新增**：P1 UI Contract（防腐层） |
+> | §13 | **新增**：Content Loading Strategy（产品级约束 + 五条可验收阈值） |
 
 ---
 
@@ -50,6 +64,8 @@
 | 9 | Catalog / ContentIndex / ContentQuery 三层职责与 API |
 | 10 | 已知限制（冻结时必须一起接受） |
 | 11 | 不变式清单（可直接写成断言） |
+| 12 | P1 UI Contract（防腐层） |
+| 13 | Content Loading Strategy（产品级约束） |
 
 ---
 
@@ -105,6 +121,33 @@ content:audio:curated-ielts:listening-test-01  音频（规划）
 | C-3 | `namespace` 匹配 `[a-z0-9-]+` | 同上，正则第 2 段 |
 | C-4 | **版本信息绝不进 ContentId**（不拼 `.v2`、不拼 checksum） | 否则每次修订换主键 |
 | C-5 | 非法 id 时 `parseContentId` 返回 `null`，**不抛异常** | 调用方自己决定 fallback，不打断 UI |
+| **C-6**（P0.6.1 新增） | 词条 ContentId 的 lemma **保留原词形**（一字不改） | 见下方「C-6 裁定」 |
+
+### 2.3 C-6 裁定：id 侧保留原词形，lowercase 只允许出现在检索 key
+
+> **C-6：词条 ContentId 的 lemma 保留原词形（一字不改）。**
+>
+> 理由：生成侧（`buildHits`）与寻址侧（`findById`）必须**逐字符同源**，
+> 否则出现「search 查得到、get 取不回」。
+> lowercase 只允许出现在**检索 key**（`normalizeWord`）里，**不允许出现在 id 里**。
+
+背景（这是一个已被实测捕获的潜伏缺陷，不是理论风险）：
+
+- `src/core/content/index/content-index.ts:61` 的 `buildHits()` 是**真正的 id 生成出口**，用的是**原词形**；
+- `src/core/content/model/content.ts:70` 的 `wordId()` 内部曾自行 **lowercase**，与 `buildHits()` 不同源；
+- 两者对全库 **93 条含大写词**（`Oxford`、`Marxist`、`const [a, setA]`）会生成**不同的 ContentId**；
+- `wordId()` 在生产代码里**零调用**，但它经 `src/core/content/schema.ts:15` **对外 public 导出** ——
+  P1 接线时谁用了它，这 93 条词的学习记录就**永远对不上索引**。
+
+结论：
+
+| 位置 | 口径 |
+|---|---|
+| id 生成 / 寻址（`buildHits` / `wordId` / `findById`） | **原词形，逐字符同源** |
+| 检索 key（`normalizeWord` / duplicate detection / search 匹配） | 可以 lowercase |
+
+> ⚠️ 本条与 §3.5 的旧表述「`wordId()` 内部自行 lowercase」冲突 ——
+> **以 C-6 为准**：`wordId()` 与 `buildHits()` 现已统一为保留原词形。
 
 ---
 
@@ -151,7 +194,8 @@ IELTS / CET-4 / TOEFL 各有 `abandon` —— **这是正确的数据**，消歧
 NFC 归一 → trim → 连续空白折叠为单空格 → 删除控制字符 → `:` `/` 替换为 `-`
 ```
 
-- **不做 lowercase**：大小写是 vocabulary / code 词库的语义决策，由调用方决定（`wordId()` 内部自行 lowercase）。
+- **不做 lowercase**：大小写是 vocabulary / code 词库的语义决策。`normalizeLocalId()` 本身不改大小写；
+  `wordId()` 与 `buildHits()` 必须**同源、保留原词形**（见 C-6），lowercase 只允许出现在**检索 key**（`normalizeWord`）里。
 - `isStableLocalId(id)` 判据：非空 + 幂等 + 不含 `:` `/` + 不含控制字符。
 
 **localId 稳定性契约**：一旦随内容包发布即为该实体的**永久主键**。
@@ -553,14 +597,45 @@ rank `0` = 精确词形 > `1` = 前缀 > `2` = 释义/翻译命中。**组内**�
 | L-3 | **`relations.json` / `assets/` 尚无数据** | 门禁相应项打印「跳过」，不伪造通过 | P3 接入时必须同步补门禁断言 |
 | L-4 | **近似重复只在 for-review 层** | car / automobile 这类语义近义**不做自动处理**，绝不自动删除任何词 | 只生成候选供人工 review |
 | L-5 | **AssetManifest 未做** | `assets/manifest.json`（checksum / mime / bytes / duration / language / source / license / storage）尚未建模 | 推到 P3 |
-| L-6 | **Learning 层未迁移**：`src/core/learning/model/learning-item.ts` 的 `LearningItem extends ContentRef` 已就位，但**运行时**学习记录仍是 `bankId + word` 键 | 残留位置实测：`src/App.tsx`、`src/components/Header.tsx`、`src/components/CommandPalette.tsx`、`src/data/wordBanks.ts`（⚠️ 注意：没有 `src/core/review/` 目录，别按旧说法去那里找） | P1.5 迁移到 ContentId |
-| L-7 | **UI 尚未接 Query Layer 与 Catalog**：现有组件（HomePanel / PracticePanel / ReviewPanel / CommandPalette …）仍直读词表 | `getCatalog()` / `contentQuery.*` 已可用但零 UI 调用 | P1 直接接线，**不造新抽象 / 新目录 / 新 Repository / 新 Service** |
+| L-6 | **Learning 层未迁移**（P0.6.1 事实订正）：**运行时学习记录的键是裸 `word`，连包的信息都没有** —— 不是旧表述的 `bankId + word`。四层口径还各不相同（见下表） | 量化：全库 9346 词中**跨包同名词 2323 个**（同一词形出现在 ≥2 个包）、原词形**含大写 93 条**；**全仓不存在任何 `bankId + word` 拼接** | P1.5 迁移到 ContentId；迁移**存在不可逆信息损失**，按下方归属规则执行 |
+| L-7 | **UI 尚未接 Query Layer 与 Catalog**：现有组件（HomePanel / PracticePanel / ReviewPanel / CommandPalette …）仍直读词表 | 实测：`?raw` 词表导入**全站只在 `src/core/content/registry.ts` 一处**（比旧描述好，UI 组件零直连）；但 UI 有 **17 处**直接持有词数组做操作；`contentQuery.*` / `getCatalog()` 在 UI 中调用数 **= 0**；`hasFeature()`（registry.ts:134）调用数 **= 0** | P1 直接接线，**不造新抽象 / 新目录 / 新 Repository / 新 Service**；边界见 §12 |
+
+### 10.1 L-6 明细：四层 Learning 运行时键的真实口径
+
+| key | 位置 | 每条记录的键 |
+|---|---|---|
+| `gt.review.v1` | `src/lib/reviewStore.ts:27`（写于 `:67` / `:88`） | **裸 `word`（原词形）**；`ReviewStore = Record<string, ReviewEntry>`（`:22`） |
+| `gt.memorize.v1` | `src/lib/memorizeStore.ts:16`（写于 `:36`） | **裸 `word`（原词形）**；`MemStore = Record<string, MemRecord>`（`:14`） |
+| `gt.analytics.v1` | `src/lib/analytics.ts:6`（写于 `:47`） | `.words` 子表键 = **`word.toLowerCase()`**（`:73`）—— 与前两层**口径还不一样** |
+| `gt.customBanks.v1` | `src/lib/customBanks.ts:3` | 数组不是 map，词**没有 ContentId**；包 id 形如 `custom-<base36>`（`:28`） |
+
+#### 🔴 不可逆信息损失（P1.5 必须知情）
+
+旧学习记录**没有记包**，因此 2323 个跨包同名词**无法确定归属**。这不是实现难度问题，是**数据本身不存在** —— 迁移只能 best-effort：
+
+| 情形 | 规则 |
+|---|---|
+| 该词形在全库**唯一命中** 1 个包 | ✅ **确定归属**，直接迁到该包 namespace 下的 ContentId |
+| 命中 **≥2 个包** | ⚠️ best-effort 挂到用户当前 `gt.bank`，**并且必须在 UI 明示**（不许静默处理） |
+| **0 命中**（词已从词库移除） | 保留为 **orphan** 记录，**不许静默丢弃**（丢弃 = 用户学习历史凭空消失） |
+
+P1.5 开工前必须先在契约层确认这三档的 UI 表达方式，不允许在迁移脚本里偷偷选一档。
+
+#### 🔴 契约漏洞：`gt.customBanks.v1` 没有 ContentId / namespace
+
+自定义词库的词**没有 ContentId**，包 id 形如 `custom-<base36>`。
+若把自定义词库登记进 registry，会**违反 I-3「namespace 两两不同」**（`custom-<base36>` 的 namespace 规则未定义）。
+
+本轮**未在契约中给出最终规则**（属于新增语义，需走 §0 变更流程），只把问题钉在这里：
+P1/P1.5 若要让自定义词库进入 Content 体系，**必须先在契约里规定 `custom-<id>` namespace 规则**，
+否则 I-3 与 I-12（词级 ContentId 全局唯一）会同时被打穿。
 
 ---
 
 ## 11. 不变式清单（Invariants）
 
-这些已经被 `content:validate`（17 项 × 10 包）与 `test:content`（**148** 项）覆盖。
+这些已经被 `content:validate`（**20** 项 × 10 包）、`test:content`（**148** 项）
+以及构建后门禁 `check:bundle`（主 chunk 体积 / 预热预算）覆盖。
 任何一条被打破 ⇒ CI 必须红。
 
 | ID | 不变式 | 守护者 |
@@ -583,6 +658,183 @@ rank `0` = 精确词形 > `1` = 前缀 > `2` = 释义/翻译命中。**组内**�
 | I-16 | 全库 10 包 Σ items = 基准数（当前 **9346**），变更需显式更新 | test:content【1】`全库 Σitems = 契约基准` |
 | I-17 | `canonicalize` 对「同内容不同排版」输出一致，且**不重排数组** | canonical.selfCheck + test:content |
 | I-18 | `findRevision` 与 `content:build` 回滚同口径（取 revision 最大的匹配条目） | test:content【13】 |
+| **I-19**（P0.6.1） | **词条 ContentId 的 lemma 保留原词形**（`wordId` 与 `buildHits` 同源，**禁止在 id 侧 lowercase**） | `test:content` |
+| **I-20**（P0.6.1） | **首屏体积不随词库增长**（主 chunk ≤ **420 KiB raw / 135 KiB gzip**；`offline.policy==='inline'` 的包 **Σ词 ≤ 1000 且 Σ words.json ≤ 64 KiB**） | `check:bundle` + `content:validate` 第 **19 / 21** 项 |
+
+---
+
+## 12. P1 UI Contract（防腐层）
+
+> **这不是新增代码层，也不是新的 Framework —— 它是一条边界原则。**
+> P1 接线时**不得**为此新建目录 / Repository / Service / hook 层；
+> 本节只是把「UI 页面能用什么、不能碰什么」钉死。
+
+### 12.1 UI 只允许使用三类 API
+
+| 类别 | API |
+|---|---|
+| **Catalog API** | `getCatalog()` / `getPackageCatalog(localId)` |
+| **Query API** | `contentQuery.search(opts)` / `contentQuery.list(opts)` / `contentQuery.get(contentId)` / `contentQuery.count(opts)` |
+| **现有 Learning API** | 维持现状，不在 P1 重写 |
+
+除这三类之外，UI 不得再开辟第四条访问 Content 的路径。
+
+### 12.2 ❌ 禁止
+
+| 禁止项 | 说明 |
+|---|---|
+| `import words.json` | **不论**是 `?raw` 还是经 `wordBanks` 转手，UI 一律不得直接引用词表文件 |
+| 对词表数组做 `filter` / `map` / `sort` / `slice` | 这是 Query API 的职责；UI 自己做 = 分页 / 排序契约（S-1~S-3）当场失效 |
+| 包名分支 `packageId === 'ielts'` / `bankId === 'cet4'` | 每加一个包就要改一次 UI，且必然漏改 |
+
+> ✅ 好消息（实测）：**硬编码包名分支当前 = 0 处**，这一条目前是干净的，P1 只需保持。
+
+### 12.3 ✅ 替代写法：按能力判断，不按包名
+
+```ts
+// ❌ 禁止
+if (packageId === 'ielts') { showPhonetic() }
+
+// ✅ 正确
+if (hasFeature(packageId, 'phonetic')) { showPhonetic() }
+```
+
+⚠️ 实测 `hasFeature()`（`src/core/content/registry.ts:134`）当前**调用数 = 0** ——
+契约要求的替代方案**还没接上**。P1 必须把它接上，而不是继续用别的判断方式。
+已知需要用 `features` + `hasFeature()` 替换掉的位置：
+`src/App.tsx:388` / `:396` / `:734` —— 这三处现在是**按用户开关 `gt.mode === 'code'`** 决定
+大小写敏感 / 是否朗读，属于**包能力**，应由 manifest `features` 声明 + `hasFeature()` 判断。
+
+### 12.4 唯一白名单：`types.Clear`（棘轮下降）
+
+当前存量代码**暂时允许**保留 `types.Clear` 这一类直读词数组的写法 —— 理由是
+**要保护 165 项 e2e 资产**，一次性清干净风险过大。
+
+但白名单不是免死金牌，而是**棘轮（ratchet）**：
+
+- 当前计数 = **基线**，由 `tests/ui-contract.mjs` 落盘锁定；
+- **只许降，不许升** —— 任何让计数增加的 PR 直接 CI 红；
+- 每次改动 UI 文件时顺手降一点，直到归零后删除白名单。
+
+### 12.5 与 §13 的关系
+
+**懒加载边界属于 §13，UI 不得破坏它。**
+具体地说：UI 若在页面初始化时同步 `import` 任何 `words.json`、或把 lazy 包强制拉进主 chunk，
+就是在破坏「首屏体积不随词库增长」（I-20）—— 由 `check:bundle` 直接判红。
+
+### 12.6 实测基线（P0.6.1，供 P1 对照）
+
+| 项 | 实测 |
+|---|---|
+| `?raw` 词表导入位置 | **全站仅 `src/core/content/registry.ts` 一处**（UI 组件零直连） |
+| UI 直读词数组处数 | **17 处**（`src/App.tsx:191-199/231/232/241/251/253/569/572`、`src/components/ReviewPanel.tsx:46/47/50-55`、`src/components/Memorize.tsx:52-57/68/96/269`） |
+| `contentQuery.*` / `getCatalog()` UI 调用数 | **0** |
+| 硬编码包名分支 | **0 处** |
+| `hasFeature()` 调用数 | **0** |
+
+🔴 **最危险的一类（迁移时必须优先处理）**：
+`src/App.tsx:253` 与 `src/components/ReviewPanel.tsx:47` 用了
+`map.get(w) ?? { word: w, translation: '' }` **占位兜底** —— 取不到就**静默显示空释义**，
+页面不报错、不空转，只是「悄悄少了一个词的释义」。这类缺陷在迁移期不可能靠肉眼发现。
+
+---
+
+## 13. Content Loading Strategy（产品级约束）
+
+> **这一节是产品约束，不是性能建议。**
+> 「用户加了 5 个大词库之后首屏变慢」不是优化项，是**违约**。
+
+### 13.1 核心模型
+
+```
+Package = manifest.json（永远轻、常驻、O(包数)）  +  words.json（按需加载）
+⇒ 首屏体积不随词库增长
+```
+
+manifest 只装元数据，**与词数无关**（实测单包 1.25–1.40 KiB，3000 词包与 20 词包一样大）。
+因此：**包变多 ⇒ 主 chunk 只按包数线性增长；词变多 ⇒ 只要走 lazy，主 chunk 不动。**
+
+### 13.2 当前实测（node zlib gzip level 9，与 vite 构建日志交叉核对）
+
+| 项 | 实测值 |
+|---|---|
+| 首屏必须下载（index.html + 主 chunk + CSS，**不含 words chunk**） | **406.09 KiB raw / 125.21 KiB gzip** |
+| 主 chunk `index-Cawl4_-q.js` | **381.06 KiB raw / 118.89 KiB gzip** |
+| 3 个 lazy chunk | 464.04 / 471.22 / 471.76 KiB raw；163.12 / 166.96 / 166.95 KiB gzip |
+| 10 个 manifest 总计 | **13.08 KiB raw / 2.21 KiB gzip**（单包 **1.25–1.40 KiB**，**与词数无关**） |
+
+包分布：7 个 inline（`ai-core` / `cloud-native` / `frontend` / `cet4` / `cet6` / `ts-code` / `go-code`，
+共 **346 词 / 37.15 KiB**）、3 个 lazy（`ielts` / `kaoyan` / `toefl`，各 **3000 词 / 约 471 KiB**）。
+
+### 13.3 对照实验（硬证据：inline 是 1:1 全额传导，不是「大约」）
+
+临时把 lazy 的 **kaoyan 改成 inline** 再 build（已还原）：
+
+| 项 | 前 | 后 | 增量 |
+|---|---|---|---|
+| 主 chunk raw | 381.06 KiB | 852.97 KiB | **+471.92 KiB（+123.8%）** |
+| 主 chunk gzip | 118.89 KiB | 285.30 KiB | **+166.41 KiB（+140.0%）** |
+| words chunk 数 | 3 | 2 | −1 |
+
+- 增量与 kaoyan `words.json` 的 **471.70 KiB** 呈**字节级 1:1.0005 全额传导** —— 词表一字节不落地进主 chunk；
+- rolldown **当场报 `INEFFECTIVE_DYNAMIC_IMPORT` 警告**（见 13.6）。
+
+第二组实验（把 7 个 inline 包词表临时清空再 build）：主 chunk 390.20 → 353.10 kB，
+gzip 123.07 → 107.90 kB ⇒ **7 个 inline 词表占主 chunk 37.10 kB raw / 15.17 kB gzip**。
+
+### 13.4 未来推算
+
+**加 5 个大包（GRE 12000 / Oxford 30000 / Cambridge 20000 / 自建 5000 / TOEFL 10000 = 77000 词）全部 lazy：**
+
+- 词数 **×9.2**；
+- 主 chunk raw 只 **+6.55 KiB（+1.7%）**、gzip 只 **+1.11 KiB（+0.9%）**；
+- ⇒ **主 chunk 是 O(包数) 而非 O(词数)**，本节约束成立。
+
+**反之任一大包做成 inline 的外推**（实测系数 **157.3 KiB/千词 raw、55.5 KiB/千词 gzip**）：
+
+| 包 | 主 chunk gzip 变成 |
+|---|---|
+| 自建 5000 词 | 397 KiB（**×3.3**） |
+| GRE 12000 词 | 785 KiB（**×5.9**） |
+| Oxford 30000 词 | **1854 KiB（×13.4）** |
+
+### 13.5 五条可验收阈值
+
+| # | 断言 | 阈值 | 当前实测 | 余量 |
+|---|---|---|---|---|
+| 18 | manifest 体积：单包 < **8 KiB**，全库 < **40 KiB** | 8 / 40 KiB | 最大 **1.40** / 总 **13.08 KiB** | 不红（**5.7× / 3.1×**） |
+| 19 | inline 预算：`offline.policy==='inline'` 的包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB** | 1000 词 / 64 KiB | **346 词 / 37.15 KiB** | 不红 |
+| 20 | 策略一致性：manifest 的 `offline.policy` 必须与 `registry.ts` 实际加载方式一致（`words:` ↔ inline，`load:` ↔ lazy） | 10/10 | **10/10** | 不红 |
+| 21 | 主 chunk 体积：raw ≤ **420 KiB** 且 gzip ≤ **135 KiB** | 420 / 135 KiB | **381.06 / 118.89 KiB** | 不红（**10.2% / 12.0%**） |
+| 22 | 预热预算：被 `warmUpVocabulary` 列入的包 gzip 总量 ≤ **600 KiB** | 600 KiB | **497.03 KiB** | 不红（余量仅 **17%**，最紧） |
+
+第 **18 / 19 / 20** 项由 `content:validate` 守护（门禁从 17 项扩到 **20** 项）；
+第 **21 / 22** 项是**构建后检查**，由 `check:bundle` 守护，**不属于 `content:validate`**。
+
+> **第 21 条阈值的设计意图**（别误读）：它是为**抓 inline 误用**设计的，**不是抓 lazy 增长**。
+> - 加 5 个 lazy 包 ⇒ 主 chunk 只到 **387.6 KiB**，**仍在阈值内**（正确行为，不该红）；
+> - inline 一个 **500 词的小包** ⇒ **+78 KiB**，**立刻撞线**（错误行为，必须红）。
+>
+> 所以第 21 条红了，第一反应应该是「谁把词表做成 inline 了」，而不是「词太多了」。
+
+### 13.6 免费检测信号
+
+构建器自带的 `INEFFECTIVE_DYNAMIC_IMPORT` 警告 = **有人把一个本该 lazy 的包写成了 static import**。
+它在本轮对照实验中**当场触发**，零成本。**看到这条警告必须当缺陷处理，不许忽略。**
+
+### 13.7 🔴 已知限制 / 待办：预热预算是最薄弱的一环
+
+`warmUpVocabulary()`（`src/core/content/registry.ts:139-141`）当前**硬编码全量预热 3 个 lazy 包
+= 497.03 KiB gzip**，且有两个方向相反的失效模式：
+
+- **加包时不会自动加入** ⇒ 漏预热 ⇒ **首次离线切库失败**（用户离线状态下切到新包直接打不开）；
+- **手动加入又没有上限** ⇒ 流量**随包数线性膨胀**（现在 3 个包就已吃掉 600 KiB 预算的 83%）。
+
+**本轮未解决**（只做收口，不改架构）。记录待办：
+
+> 在新增 GRE / Oxford 之前，必须先把 `warmUpVocabulary()` 从「全量 `allSettled`」改成
+> **「按需 + 限量」**（例如只预热当前包 + 最近使用的 N 个包，或按 600 KiB 预算截断）。
+> 否则包一多，必然二选一地踩中上面两个坑。
 
 ---
 
@@ -593,7 +845,23 @@ rank `0` = 精确词形 > `1` = 前缀 > `2` = 释义/翻译命中。**组内**�
 | V4.1-P0 | Content Model / Query Layer / Relation / ContentId 4 段式 | 2026-09 |
 | V4.1-P0.5 | Catalog / Index / Asset Model / Normalize+Duplicate Detection / 统一 Query API | 2026-09-26 |
 | **V4.1-P0.6** | contentChecksum（canonical）/ ContentSnapshot / Manifest 完整化 / Query Scope / Search Sort 契约 / Canonical JSON / 本文 —— **契约冻结** | 2026-09-26 |
+| **V4.1-P0.6.1** | **只收口**：C-6（id 侧保留原词形）/ L-6·L-7 事实订正 / §12 P1 UI Contract / §13 Content Loading Strategy + 五条阈值 / I-19·I-20 —— **additive amendment，未改变 P0.6 任何已冻结语义** | 2026-09-26 |
 
-冻结之后进入 **P1：词汇产品化**（Catalog → Package Explorer → Search → Word List → Word Detail → Start Learning）。
+---
+
+## 下一步
+
+**P0.6.1 已完成收口**：Content 契约在 P0.6 冻结之后，本轮只补齐了影响 P1 的边界
+（id 大小写裁定、Learning 迁移的信息损失、UI 防腐层、加载策略产品级约束），
+**没有新增架构、没有重构**。
+
+下一步进入 **P1：词汇产品化**（Catalog → Package Explorer → Search → Word List → Word Detail → Start Learning）。
 P1 的原则是**少做**：不造新的抽象 / 目录 / Framework / Repository / Service，
 直接把已经存在的 Query Layer 接到 UI 上，让用户真正看到「词库 → 搜索 → 单词 → 学习」。
+
+### 🔒 P1 的一句话原则（用户原话，照此执行）
+
+> **「现在千万不要再优化 ContentIndex、不要再设计 Repository、不要再拆 Service、不要再增加 Framework。」**
+
+P1 要做的只有一件事：**接线**。任何「顺手优化一下 ContentIndex / 抽个 Repository 出来会更干净」
+的冲动，都是在给 Content 契约制造新的漂移点。

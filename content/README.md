@@ -1,7 +1,11 @@
-# Content Layer —— 内容层契约（V4.1-P0.6）
+# Content Layer —— 内容层契约（V4.1-P0.6.1）
 
 本目录是 **Content 层**的唯一数据根目录。它只描述「内容是什么」，
 **不随任何用户改变**：导入新词库、新增内容类型，都不得污染用户学习记录。
+
+> **本文件是操作手册**（怎么用 / 踩坑史 / CLI）。
+> 「什么不可变」写在根目录的 `CONTENT_CONTRACT.md`，**两者冲突以契约为准**并立即修本文件。
+> V4.1-P0.6.1 是 P0.6 冻结后的**追加收口**（只增补与订正，未改变 P0.6 任何已冻结语义）。
 
 ## 本轮（V4.1-P0.6 · Foundation / Contract Hardening）做了什么
 
@@ -16,10 +20,20 @@ P0.6 不新增功能，只把地基钉死 —— 7 件事，全部已落地并�
 | 4 | Query Scope —— 页面级作用域统一描述，不再各页各拼一套过滤条件 | `resolveScope()` |
 | 5 | Search Sort 契约 —— 排序在分页之前、tie-break 唯一 ⇒ 翻页不重不漏 | `sortRows()` / `paginate()` |
 | 6 | Canonical JSON —— 序列化与指纹收敛到唯一实现，与文件排版无关 | `scripts/content/canonical.mjs` |
-| 7 | `CONTENT_CONTRACT.md` —— 契约外置成独立文档 | 见第 16 节 |
+| 7 | `CONTENT_CONTRACT.md` —— 契约外置成独立文档 | 见第 17 节 |
 
 > **⚠️ P0.6 之后 Content 契约冻结。** 从 P1 起，Content 层不再因为「UI 方便」而改形状；
-> 确需变更走第 16 节的流程。
+> 确需变更走第 17 节的流程。
+
+### 追加：V4.1-P0.6.1（只收口，不新增架构）
+
+| # | 事项 | 落点 |
+|---|---|---|
+| 1 | **C-6**：词条 ContentId 的 lemma **保留原词形**（id 侧禁止 lowercase，`wordId` 与 `buildHits` 同源） | 契约 §2.3 / I-19 |
+| 2 | **L-6 事实订正**：Learning 运行时键是**裸 `word`**（不是 `bankId + word`），四层口径还各不相同 | 契约 §10.1 |
+| 3 | **L-7 事实订正**：`?raw` 全站只在 registry 一处；UI 17 处直读词数组；Query/Catalog/`hasFeature` UI 调用数均为 0 | 契约 §10 / §12.6 |
+| 4 | **§12 P1 UI Contract（防腐层）**：UI 只用 Catalog / Query / 现有 Learning 三类 API | 契约 §12 |
+| 5 | **§13 Content Loading Strategy**：Package = 轻 manifest（常驻）+ 按需 words.json ⇒ 首屏体积不随词库增长 | 契约 §13、本文件第 15 节 |
 
 ---
 
@@ -452,15 +466,15 @@ Raw → Normalize → Validate → Build → Index → Manifest → Content Regi
 2) 写骨架     manifest.json 只写展示字段
 3) 规范化     npm run content:normalize -- <id> --write
 4) 派生       npm run content:build      # id / packageId / namespace / stats / checksum / 版本三元组 / history / build
-5) 门禁       npm run content:validate   # 17 项
+5) 门禁       npm run content:validate   # 20 项（含第 18/19/20 项：manifest 体积 / inline 预算 / 策略一致性）
 6) 登记       src/core/content/registry.ts 的 packages 数组
-              （大库 ≥1000 词用 load: () => import(...?raw) 走 lazy chunk + 加入 warmUpVocabulary）
-7) 验证       npm run test:content（契约）/ npm run test:e2e（UI 回归）
+              ⚠️ 词数 > 1000 或 words.json > 64 KiB ⇒ **必须 lazy**，见第 15 节「新增大包固定流程」
+7) 验证       npm run test:content（契约）/ npm run check:bundle（体积）/ npm run test:e2e（UI 回归）
 ```
 
 新包不得复用既有 namespace（门禁第 9 项直接 FAIL）。
 
-## 13. 门禁清单（content:validate，17 项）
+## 13. 门禁清单（content:validate，20 项）
 
 1. `manifest.json` / `words.json` 存在且 JSON 合法（不可解析直接 FAIL 并跳过该包）
 2. manifest 必填字段完整：`id type version title description language tags icon features stats sources offline`
@@ -481,6 +495,13 @@ Raw → Normalize → Validate → Build → Index → Manifest → Content Regi
     `checksum === contentChecksum` 的条目（取最近一条），其 `version === contentVersion`、
     `1 ≤ revision ≤ contentRevision`（回滚场景：version 回到历史值，revision 只增不减）
 17. `build` 存在且 `toolVersion` 非空字符串、`builtAt` 可被 `Date.parse`、`sourceChecksum === contentChecksum`
+18. **manifest 体积**：单包 < **8 KiB**、全库 < **40 KiB**（当前实测：最大 1.40 KiB、总计 13.08 KiB）
+19. **inline 预算**：`offline.policy === 'inline'` 的包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB**（当前实测：346 词 / 37.15 KiB）
+20. **策略一致性**：manifest 的 `offline.policy` 必须与 `registry.ts` 实际加载方式一致 —— `words:` ↔ inline，`load:` ↔ lazy（当前 10/10）
+
+> ⚠️ 第 18 / 19 / 20 项是 P0.6.1 新增的（门禁 17 → **20** 项）。
+> 另有**两条构建后检查不属于 `content:validate`**：主 chunk 体积（≤ 420 KiB raw / 135 KiB gzip）
+> 与预热预算（`warmUpVocabulary` 列入的包 gzip ≤ 600 KiB），由 `npm run check:bundle` 守护。
 
 Duplicate Detection 分级（按「可判定性」分级：能判的判死，判不了的如实说跳过，**绝不用"假装通过"凑绿**）：
 
@@ -500,21 +521,106 @@ Duplicate Detection 分级（按「可判定性」分级：能判的判死，判
 |---|---|
 | `npm run content:normalize` | Raw→Normalize（默认干跑，`--write` 落盘，`[包id...]` 限定） |
 | `npm run content:build` | 派生 stats / checksum / schemaVersion / 版本三元组 / history / build（幂等） |
-| `npm run content:validate`（= `content:check`） | **17 项**门禁；全绿 exit 0，任一 FAIL exit 1 |
+| `npm run content:validate`（= `content:check`） | **20 项**门禁；全绿 exit 0，任一 FAIL exit 1 |
 | `npm run content:list` | 包清单（`--json` 结构化） |
-| `npm run test:content` | 查询层 / Catalog / Index / ContentId / Scope / Sort 契约测试 |
+| `npm run test:content` | 查询层 / Catalog / Index / ContentId / Scope / Sort 契约测试（含 I-19：id 侧禁止 lowercase） |
+| `npm run check:bundle` | **构建产物体积门禁**：主 chunk raw ≤ 420 KiB / gzip ≤ 135 KiB；`warmUpVocabulary` 预热 gzip ≤ 600 KiB（对应契约第 21 / 22 项，属于构建后检查） |
+| `npm run test:ui` | **P1 UI Contract 棘轮检查**（P1 落地时随 `tests/ui-contract.mjs` 接入，当前未实现）：UI 直读词数组（白名单 `types.Clear`）计数**只许降不许升**，基线在该文件锁定 |
 | `node scripts/content/canonical.mjs` | Canonical JSON 自检（幂等 + 数组不重排 + 指纹与排版无关），无 npm script 包装 |
 
-## 15. 路线图
+## 15. Content Loading Strategy（打包策略 —— 产品级约束）
+
+> 这是**产品约束，不是性能建议**：「用户加了 5 个大词库之后首屏变慢」属于**违约**。
+
+### 15.1 一句话模型
+
+```
+Package = manifest.json（永远轻、常驻、O(包数)）  +  words.json（按需加载）
+⇒ 首屏体积不随词库增长
+```
+
+manifest 只装元数据、**与词数无关**（实测单包 1.25–1.40 KiB，3000 词包与 20 词包一样大）。
+所以：**包变多 ⇒ 主 chunk 按包数线性增长；词变多 ⇒ 只要走 lazy，主 chunk 不动。**
+
+### 15.2 当前实测（node zlib gzip level 9，与 vite 构建日志交叉核对）
+
+| 项 | 实测值 |
+|---|---|
+| 首屏必须下载（index.html + 主 chunk + CSS，**不含 words chunk**） | **406.09 KiB raw / 125.21 KiB gzip** |
+| 主 chunk `index-Cawl4_-q.js` | **381.06 KiB raw / 118.89 KiB gzip** |
+| 3 个 lazy chunk | 464.04 / 471.22 / 471.76 KiB raw；163.12 / 166.96 / 166.95 KiB gzip |
+| 10 个 manifest 总计 | **13.08 KiB raw / 2.21 KiB gzip**（单包 **1.25–1.40 KiB**） |
+
+包分布：**7 个 inline**（`ai-core` / `cloud-native` / `frontend` / `cet4` / `cet6` / `ts-code` / `go-code`，
+共 **346 词 / 37.15 KiB**）+ **3 个 lazy**（`ielts` / `kaoyan` / `toefl`，各 **3000 词 / 约 471 KiB**）。
+
+### 15.3 为什么 inline 是禁区（对照实验硬证据）
+
+把 lazy 的 **kaoyan 临时改成 inline** 再 build（已还原）：
+
+| 项 | 前 | 后 | 增量 |
+|---|---|---|---|
+| 主 chunk raw | 381.06 KiB | 852.97 KiB | **+471.92 KiB（+123.8%）** |
+| 主 chunk gzip | 118.89 KiB | 285.30 KiB | **+166.41 KiB（+140.0%）** |
+| words chunk 数 | 3 | 2 | −1 |
+
+增量与 kaoyan `words.json` 的 **471.70 KiB** 呈**字节级 1:1.0005 全额传导** —— 词表一字节不落地进主 chunk。
+
+反向实验（清空 7 个 inline 包词表再 build）：主 chunk 390.20 → 353.10 kB、gzip 123.07 → 107.90 kB
+⇒ **7 个 inline 词表占主 chunk 37.10 kB raw / 15.17 kB gzip**。
+
+外推：任一大包做成 inline（系数 **157.3 KiB/千词 raw、55.5 KiB/千词 gzip**）——
+自建 5000 词 → gzip **397 KiB（×3.3）**；GRE 12000 词 → **785 KiB（×5.9）**；
+Oxford 30000 词 → **1854 KiB（×13.4）**。
+
+反之**全部 lazy** 地加 5 个大包（GRE 12000 / Oxford 30000 / Cambridge 20000 / 自建 5000 / TOEFL 10000 = 77000 词）：
+词数 **×9.2**，主 chunk raw 只 **+6.55 KiB（+1.7%）**、gzip 只 **+1.11 KiB（+0.9%）** ⇒ 约束成立。
+
+### 15.4 五条阈值（写进门禁，红了不许合）
+
+| # | 断言 | 阈值 | 当前实测 | 余量 | 守护者 |
+|---|---|---|---|---|---|
+| 18 | manifest 体积：单包 < **8 KiB**，全库 < **40 KiB** | 8 / 40 KiB | 最大 1.40 / 总 13.08 KiB | 不红（5.7× / 3.1×） | `content:validate` |
+| 19 | inline 预算：inline 包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB** | 1000 词 / 64 KiB | 346 词 / 37.15 KiB | 不红 | `content:validate` |
+| 20 | 策略一致性：`offline.policy` 与 `registry.ts` 实际加载方式一致（`words:` ↔ inline，`load:` ↔ lazy） | 10/10 | 10/10 | 不红 | `content:validate` |
+| 21 | 主 chunk 体积：raw ≤ **420 KiB**、gzip ≤ **135 KiB** | 420 / 135 KiB | 381.06 / 118.89 KiB | 不红（10.2% / 12.0%） | `check:bundle` |
+| 22 | 预热预算：`warmUpVocabulary` 列入的包 gzip 总量 ≤ **600 KiB** | 600 KiB | 497.03 KiB | 不红（余量仅 **17%**） | `check:bundle` |
+
+> **第 21 条是抓 inline 误用的，不是抓 lazy 增长的**：
+> 加 5 个 lazy 包只到 **387.6 KiB**（阈值内，不该红）；inline 一个 **500 词小包 +78 KiB**（立刻撞线，必须红）。
+> 所以第 21 条红了，先问「谁把词表做成 inline 了」，而不是「词是不是太多了」。
+
+### 15.5 新增大包时的固定流程
+
+```
+1) 决定 policy：词数 > 1000 或 words.json > 64 KiB ⇒ 必须 lazy
+2) registry.ts 用 load: () => import('...?raw')，不要用 words:
+3) 若走 lazy，评估是否加入 warmUpVocabulary（注意 600 KiB 预热预算）
+4) 跑 npm run check:bundle 确认主 chunk 未越界
+5) 跑 npm run content:validate（第 18 / 19 / 20 项）
+```
+
+### 15.6 踩坑与已知限制
+
+- **免费检测信号**：构建器自带的 `INEFFECTIVE_DYNAMIC_IMPORT` 警告 = 有人把本该 lazy 的包写成了
+  static import。本轮对照实验中它**当场触发**。**看到必须当缺陷处理，不许忽略。**
+- 🔴 **预热预算是最薄弱的一环（本轮未解决，属待办）**：
+  `warmUpVocabulary()`（`src/core/content/registry.ts:139-141`）当前硬编码全量预热 3 个 lazy 包
+  = **497.03 KiB gzip**，已吃掉 600 KiB 预算的 83%。加包时它**不会自动加入**（漏预热 ⇒ 首次离线切库失败），
+  手动加入又**没有上限**（流量随包数线性膨胀）。
+  在新增 GRE / Oxford 之前，必须先把它从「全量 `allSettled`」改成「按需 + 限量」。
+- **UI 不得破坏懒加载边界**（见契约 §12.5）：页面初始化时同步 `import` 任何 `words.json`、
+  或把 lazy 包强制拉进主 chunk，都会被 `check:bundle` 判红。
+
+## 16. 路线图
 
 | 阶段 | 一句话 |
 |---|---|
-| **P0.6**（已完成） | Foundation / Contract Hardening：内容契约与检索契约钉死，见文首 7 件事 |
-| **P1 词汇产品化** | Catalog → Package Explorer → Search → Word List → Word Detail → Start Learning，把已有的 Query Layer 接到 UI 上 |
-| **P1.5 Learning 层迁移** | 现有 `src/core/review/*` 仍是 `bankId + word` 键 → 迁到 `contentId`（+ version/checksum） |
-| **P2 Learning 产品化** | 复习 / 掌握度 / 计划等真正的学习功能产品化 |
-| **P3 内容类型扩展** | Topic / Audio / Reading 接入 + AssetManifest |
-| **P4 Learning Graph** | 基于 Content Relation + 学习状态的关系图 |
+| **P0.6.1**（本轮收口） | 只钉边界不新增架构：C-6（id 保留原词形）/ L-6·L-7 事实订正 / §12 P1 UI Contract / §13 Content Loading Strategy + 五条阈值 |
+| **P1 词汇产品化** | Catalog → Package Explorer → Search → Word List → Word Detail → Start Learning，把已有的 Query Layer 接到 UI 上（守 §12 防腐层，不破坏 §13 懒加载边界） |
+| **P1.5 Learning ContentId 迁移** | 运行时键从**裸 `word`** 迁到 `contentId`（+ version/checksum）；**存在不可逆信息损失**（2323 个跨包同名词无法定归属），按契约 §10.1 三档规则执行 |
+| **P2 内容规模化 / 导入体系** | 大词库批量接入（GRE / Oxford / Cambridge…），全部走 lazy；先解决 `warmUpVocabulary` 预热预算 |
+| **P3 Audio / Reading / Asset** | Topic / Audio / Reading 接入 + AssetManifest |
 
 **P1 的硬原则：不再造新的抽象 / 目录 / Framework / Repository / Service。**
 Catalog、Index、Query、Scope、Sort 都已经就位，P1 的工作是**接线** ——

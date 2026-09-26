@@ -30,6 +30,14 @@
  *     checksum === contentChecksum 的条目，且该条目 version === contentVersion、
  *     revision <= contentRevision（回滚场景：version 回到历史值，revision 只增不减）
  * 17. build 存在且 toolVersion 非空、builtAt 为合法时间、sourceChecksum === contentChecksum
+ * 18. manifest 体积：单包 < 8 KiB 且全库 < 40 KiB（manifest 常驻主 chunk，必须永远「轻」；
+ *     包数增长时只允许 O(包数) 线性小步涨，不允许随词数涨）
+ * 19. inline 预算：policy=inline 的包 Σ stats.items ≤ 1000 且 Σ words.json ≤ 64 KiB
+ *     （实测 inline 词 1:1 全额传导进主 chunk：kaoyan 改 inline ⇒ 主 chunk +471.92 KiB，
+ *      与 words.json 471.70 KiB 比值 1:1.0005，故 inline 是首屏体积的直通车，必须限量）
+ * 20. 策略一致性：manifest.offline.policy 必须与 registry.ts 里该包的实际加载方式一致
+ *     （inline ⇔ 静态 import 走 words:；lazy ⇔ 动态 import 走 load:）。未知策略只提示跳过，
+ *     不伪造通过
  *
  * 用法：node scripts/content/validate.mjs   → 全绿 exit 0，任一 FAIL exit 1
  */
@@ -40,6 +48,44 @@ import { sha256Canonical } from './canonical.mjs'
 
 const ROOT = path.resolve(process.cwd())
 const VOCAB_DIR = path.join(ROOT, 'content', 'vocabulary')
+/** 第 20 项比对对象：包的「实际加载方式」只在这里定义，Node 跑不了 TS，只能扫文本 */
+const REGISTRY_TS = path.join(ROOT, 'src', 'core', 'content', 'registry.ts')
+
+/* —— 第 18/19 项阈值：Package = manifest（永远轻、常驻）+ words（按需） —— */
+/** 单包 manifest 字节上限。实测最大 1.40 KiB（ts-code），8 KiB 是「永远轻」的硬边界 */
+const MANIFEST_MAX_BYTES = 8 * 1024
+/** 全库 manifest 字节总和上限。实测 10 包 13.08 KiB；阈值按 40 包规模预留 */
+const MANIFEST_TOTAL_MAX_BYTES = 40 * 1024
+/** inline 包词条数上限。实测 7 包 346 词 */
+const INLINE_MAX_ITEMS = 1000
+/** inline 包 words.json 字节上限。实测 7 包 36.17 KiB */
+const INLINE_MAX_BYTES = 64 * 1024
+/** 已知可判定的策略；其余（runtime / on-demand 等）只提示跳过，不判通过也不判失败 */
+const KNOWN_POLICIES = new Set(['inline', 'lazy'])
+
+const kib = (b) => (b / 1024).toFixed(2)
+
+/**
+ * 第 20 项：从 registry.ts 文本里解析某个包的实际加载方式。
+ * 先定位 `localId: '<id>'`，再在该注册对象块内找 `words:`（静态 import ⇒ inline）或
+ * `load:`（动态 import ⇒ lazy）。
+ * 注意：registry 里可能存在「已声明但未被注册项使用」的 `<id>Words` 静态 import（死代码），
+ * 只扫 import 段会把 lazy 包误判成 inline，故必须以注册对象块为准。
+ */
+function registryLoadMode(src, id) {
+  const esc = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp(`\\{[^{}]*localId:\\s*['"\`]${esc}['"\`][^{}]*\\}`, 'g')
+  const hits = [...src.matchAll(re)]
+  if (hits.length === 0) return { mode: 'missing' }
+  if (hits.length > 1) return { mode: 'ambiguous', count: hits.length }
+  const block = hits[0][0]
+  const hasWords = /\bwords\s*:/.test(block)
+  const hasLoad = /\bload\s*:/.test(block)
+  if (hasWords && hasLoad) return { mode: 'conflict' }
+  if (hasWords) return { mode: 'inline' }
+  if (hasLoad) return { mode: 'lazy' }
+  return { mode: 'unknown' }
+}
 
 const REQUIRED_FIELDS = ['id', 'type', 'version', 'title', 'description', 'language', 'tags', 'icon', 'features', 'stats', 'sources', 'offline']
 
@@ -75,6 +121,15 @@ async function main() {
     } catch { /* 主循环会 FAIL，这里跳过 */ }
   }
 
+  // 第 20 项：registry.ts 只读一次（Node 无法 import TS）
+  const registrySrc = existsSync(REGISTRY_TS) ? await readFile(REGISTRY_TS, 'utf8') : null
+  if (registrySrc === null) fail(`registry.ts 不存在或不可读：${REGISTRY_TS}（第 20 项无法判定）`)
+
+  // 第 18/19/20 项聚合容器（跨包结论，循环结束后统一判定）
+  const manifestSizes = [] // { id, bytes }
+  const inlinePkgs = [] // { id, items, bytes }
+  const policyList = [] // { id, policy }
+
   const seenIds = new Map()
   const seenNs = new Map()
   const globalIds = new Map() // `${namespace}|${normalized word}` → Set<包 id>（12c 跨包兜底）
@@ -90,6 +145,16 @@ async function main() {
     try {
       words = JSON.parse(await readFile(path.join(dir, 'words.json'), 'utf8'))
     } catch (e) { fail(`words.json 不可解析：${e.message}`); continue }
+
+    // 18. manifest 体积取样（UTF-8 文件字节数，不是 JSON.stringify 长度）
+    manifestSizes.push({ id, bytes: (await readFile(path.join(dir, 'manifest.json'))).length })
+
+    // 19. inline 预算取样：只有 inline 包的 words 会 1:1 全额进主 chunk，lazy 包不占首屏
+    const policy = manifest.offline?.policy
+    policyList.push({ id, policy })
+    if (policy === 'inline') {
+      inlinePkgs.push({ id, items: manifest.stats?.items ?? 0, bytes: (await readFile(path.join(dir, 'words.json'))).length })
+    }
 
     // 内容指纹（第 6/15 项共用）：必须走 canonical —— 只取决于数据语义，与文件排版无关
     const canonicalSum = sha256Canonical(words)
@@ -291,6 +356,69 @@ async function main() {
     .map(([k, packs]) => `${k.split('|')[1]}（${[...packs].join(' ↔ ')}）`)
   if (crossDups.length > 0) fail(`跨包 duplicate ContentId ${crossDups.length} 处：${crossDups.slice(0, 5).join('；')}`)
   else ok(`跨包无 duplicate ContentId（全库 ${totalWords} 词扫描，namespace 唯一 ⇒ 兜底回归）`)
+
+  /* ===== 18. manifest 体积 =====
+   * manifest 常驻主 chunk（registry 静态 import），是「包数」的函数而不是「词数」的函数。
+   * 词库从 43 词涨到 3000 词时 manifest 只该多几十字节；越过 8 KiB 说明有人把词表/释义
+   * 之类的重数据塞进了 manifest —— 那会 1:1 推高首屏。 */
+  {
+    const total = manifestSizes.reduce((a, s) => a + s.bytes, 0)
+    const biggest = manifestSizes.reduce((a, s) => (a === null || s.bytes > a.bytes ? s : a), null)
+    const over = manifestSizes.filter((s) => s.bytes >= MANIFEST_MAX_BYTES)
+    if (over.length > 0) {
+      fail(`manifest 单包体积越界 ${over.length} 个（须 < ${MANIFEST_MAX_BYTES} B）：${over.map((s) => `${s.id} ${s.bytes} B（${kib(s.bytes)} KiB）`).join('；')}`)
+    } else if (total >= MANIFEST_TOTAL_MAX_BYTES) {
+      fail(`manifest 全库体积越界：${total} B（${kib(total)} KiB）≥ ${MANIFEST_TOTAL_MAX_BYTES} B（${MANIFEST_TOTAL_MAX_BYTES / 1024} KiB）⇒ manifest 常驻主 chunk，总和膨胀直接推高首屏`)
+    } else {
+      ok(`manifest 体积（最大 ${kib(biggest.bytes)} KiB「${biggest.id}」，全库 ${kib(total)} KiB < ${MANIFEST_MAX_BYTES / 1024}/${MANIFEST_TOTAL_MAX_BYTES / 1024} KiB）`)
+    }
+  }
+
+  /* ===== 19. inline 预算 =====
+   * inline 包的 words.json 被静态 import 进主 chunk，实测传导比 1:1.0005（kaoyan 改 inline
+   * ⇒ 主 chunk raw +471.92 KiB / gzip +166.41 KiB）。词库增长必须走 lazy，不能靠加 inline。 */
+  {
+    const items = inlinePkgs.reduce((a, p) => a + p.items, 0)
+    const bytes = inlinePkgs.reduce((a, p) => a + p.bytes, 0)
+    const ids = inlinePkgs.map((p) => `${p.id}(${p.items}词/${kib(p.bytes)}KiB)`).join(', ')
+    const limit = `${INLINE_MAX_ITEMS} 词 / ${INLINE_MAX_BYTES / 1024} KiB`
+    if (items > INLINE_MAX_ITEMS) {
+      fail(`inline 词条数越界：${items} > ${INLINE_MAX_ITEMS}（${ids}）⇒ inline 词 1:1 进主 chunk，请改为 lazy`)
+    } else if (bytes > INLINE_MAX_BYTES) {
+      fail(`inline words 体积越界：${bytes} B（${kib(bytes)} KiB）> ${INLINE_MAX_BYTES} B（${INLINE_MAX_BYTES / 1024} KiB）（${ids}）⇒ 请改为 lazy`)
+    } else {
+      ok(`inline 预算（${inlinePkgs.length} 包：${ids} | Σ ${items} 词 / ${kib(bytes)} KiB ≤ ${limit}）`)
+    }
+  }
+
+  /* ===== 20. 策略一致性：manifest.offline.policy ↔ registry 实际加载方式 =====
+   * 两边任一处改漏都会静默破坏首屏体积契约：manifest 说 lazy、registry 却静态 import
+   * ⇒ 大词库悄悄进主 chunk；反之则首屏该有的词库变成异步缺口。 */
+  {
+    const skipped = []
+    let consistent = 0
+    let policyFails = 0
+    for (const { id, policy } of policyList) {
+      if (!KNOWN_POLICIES.has(policy)) { skipped.push(`${id}（policy=${policy ?? '缺失'}）`); continue }
+      if (registrySrc === null) { policyFails++; continue } // 第 20 项前置已 FAIL，此处不重复报错
+      const r = registryLoadMode(registrySrc, id)
+      if (r.mode === policy) { consistent++; continue }
+      policyFails++
+      if (r.mode === 'missing') fail(`策略不一致：${id} manifest policy=${policy}，但 registry.ts 中找不到 localId: '${id}' 的注册项`)
+      else if (r.mode === 'ambiguous') fail(`策略不一致：${id} 在 registry.ts 中匹配到 ${r.count} 个注册项，无法判定实际加载方式`)
+      else if (r.mode === 'conflict') fail(`策略不一致：${id} 在 registry.ts 中同时存在 words: 与 load:，无法判定实际加载方式`)
+      else if (r.mode === 'unknown') fail(`策略不一致：${id} manifest policy=${policy}，但 registry.ts 注册项里既无 words: 也无 load:`)
+      else fail(`策略不一致：${id} manifest policy=${policy}，registry.ts 实际为 ${r.mode}（${r.mode === 'inline' ? '静态 import ⇒ 进主 chunk' : '动态 import ⇒ 独立 chunk'}）：两边须同改`)
+    }
+    if (skipped.length > 0) {
+      console.log(`  · 策略一致性跳过 ${skipped.length} 包（未知策略，不判通过也不判失败）：${skipped.join('；')}`)
+    }
+    if (policyFails === 0) {
+      const nInline = policyList.filter((p) => p.policy === 'inline').length
+      const nLazy = policyList.filter((p) => p.policy === 'lazy').length
+      ok(`策略一致性（manifest ↔ registry）：${consistent} 包一致（inline ${nInline} / lazy ${nLazy}${skipped.length ? `，跳过 ${skipped.length}` : ''}）`)
+    }
+  }
 
   if (fails > 0) { console.error(`\n[content:validate] FAIL：${fails} 项`); process.exit(1) }
   console.log(`\n[content:validate] PASS：${ids.length} 包全部通过`)
