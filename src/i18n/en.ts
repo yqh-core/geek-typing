@@ -21,6 +21,8 @@ export const en: Record<string, string> = {
   'mode.classicHint': 'Type the shown word — typos are blocked',
   'mode.spellHint': 'Only the meaning is shown, spell it yourself',
   'mode.timedHint': 'Type as many words as you can in one minute',
+  'mode.code': 'Code',
+  'mode.codeHint': 'Type real code lines case-sensitively to build symbol-key muscle memory',
 
   /* Auto speak */
   'toggle.autospeak': 'Auto speak',
@@ -92,6 +94,7 @@ export const en: Record<string, string> = {
   'practice.spellIntro': 'Spelling mode: build the word from its meaning',
   'practice.speakTitle': 'Read this word aloud',
   'practice.ideIdle': "Type on your keyboard — looks like you're coding",
+  'practice.codeHint': 'Case-sensitive · spaces shown as ·',
 
   /* Virtual keyboard */
   'keymap.hint': 'Use standard touch typing',
@@ -154,5 +157,6 @@ export const en: Record<string, string> = {
   'memorize.definition': 'Definition',
   'memorize.keyFlip': 'Space to flip',
   'memorize.keyGrade': '1 Know · 2 Fuzzy · 3 Nope',
+  'memorize.keyReread': 'K re-read',
   'memorize.medal': 'Daily quest complete',
 }

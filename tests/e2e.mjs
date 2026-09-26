@@ -380,7 +380,7 @@ async function run() {
   const helpText = norm(await page.textContent('[data-testid="command-palette"]'))
   check(
     ':help 列出全部命令',
-    [':bank', ':mode', ':theme', ':sound', ':shuffle', ':memorize', ':typing', ':q'].every((c) => helpText.includes(c)),
+    [':bank', ':mode', ':voice', ':theme', ':sound', ':shuffle', ':memorize', ':typing', ':q'].every((c) => helpText.includes(c)),
   )
   await page.keyboard.press('Escape')
   await page.waitForTimeout(200)
@@ -518,6 +518,133 @@ async function run() {
   check('Enter 再来一组', (await page.locator('[data-testid="memorize-card"]').count()) === 1)
   await page.click('[data-testid="tab-typing"]')
   await page.waitForTimeout(200)
+
+  /* ---------- 13. 批3：代码模式（:mode code）与发音增强 ---------- */
+  console.log('\n【13】代码模式与发音增强')
+
+  // 13.1 :voice 切换 + 持久化
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':voice en-GB', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(300)
+  check(
+    ':voice en-GB 切换生效（localStorage gt.voice）',
+    (await page.evaluate(() => localStorage.getItem('gt.voice'))) === 'en-GB',
+  )
+  await page.reload({ waitUntil: 'networkidle' })
+  check(
+    '刷新后 voice 偏好保持 en-GB',
+    (await page.evaluate(() => localStorage.getItem('gt.voice'))) === 'en-GB',
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':voice zz', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(200)
+  check(':voice 非法参数红字提示', (await page.locator('[data-testid="command-error"]').count()) === 1)
+  await page.keyboard.press('Escape') // 关闭 :voice 的面板
+  await page.waitForTimeout(200)
+
+  // 13.2 切代码模式 + 代码词库（先关乱序，让首行可预期）
+  await page.keyboard.press('Escape') // 重新打开命令面板
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':mode code', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(350)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':shuffle off', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(350)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':bank ts-code', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  check(':bank ts-code 切到 TS 骨架代码', norm(await page.textContent('body')).includes('TS 骨架代码'))
+  await page.click('[data-testid="dropdown-practice"]')
+  await page.waitForTimeout(150)
+  check('练习下拉含 mode-code 项', (await page.locator('[data-testid="mode-code"]').count()) === 1)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  check(
+    '下拉打开时 Esc 不误开命令面板',
+    (await page.locator('[data-testid="command-palette"]').count()) === 0,
+  )
+
+  // 13.3 代码行输入：大小写 / 空格 / 符号 + 大小写敲错拦截
+  const codeLine = await readWord(page)
+  check(
+    '代码行原样渲染（首行 = useState 骨架行）',
+    codeLine === 'const [state, setState] = useState(initialState);',
+    `行=${codeLine}`,
+  )
+  check('code 模式隐藏发音按钮', (await page.locator('[data-testid="speak-btn"]').count()) === 0)
+  const prefix = codeLine.slice(0, 10)
+  await page.keyboard.type(prefix, { delay: 30 })
+  await page.waitForTimeout(250)
+  check(
+    '代码前缀输入推进（大小写敏感命中 10 字符）',
+    (await page.locator('[data-state="correct"]').count()) === prefix.length,
+  )
+  check(
+    '未敲空格渲染为弱灰 ·',
+    await page.evaluate(() =>
+      [...document.querySelectorAll('[data-testid="word"] [data-letter]')].some(
+        (s) => s.getAttribute('data-letter') === ' ' && s.textContent === '·',
+      ),
+    ),
+  )
+  // 大小写敲错：光标处为小写 t，敲大写 T 应被拦截（严格纠错：typed 不增长、光标不动、错误提示行标出 T）
+  const codeCursor = await readCursor(page)
+  check('光标落在小写字母 t', codeCursor === 't', `光标=${codeCursor}`)
+  await page.keyboard.press('T')
+  await page.waitForTimeout(120)
+  check(
+    '大写 T 敲错被拦（正确数不变、光标不动）',
+    (await page.locator('[data-state="correct"]').count()) === prefix.length &&
+      (await readCursor(page)) === 't',
+  )
+  await page.keyboard.press('t')
+  await page.waitForTimeout(150)
+  // 敲完剩余部分（含大写 S、空格、符号 [ ] ( ) ;）
+  await page.keyboard.type(codeLine.slice(11), { delay: 15 })
+  await page.waitForTimeout(450)
+  check('代码行敲完自动切下一行', norm(await page.textContent('body')).includes('2/20'))
+
+  // 13.4 背单词 K 重读 + 翻面自动发音
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':memorize', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  check('背单词卡片出现', (await page.locator('[data-testid="memorize-card"]').count()) === 1)
+  check(
+    '按键提示含「K 重读」',
+    norm(await page.textContent('[data-testid="memorize-keyhint"]')).includes('K'),
+  )
+  await page.keyboard.press('k')
+  await page.waitForTimeout(250)
+  check('K 键重读无报错（卡片仍在）', (await page.locator('[data-testid="memorize-card"]').count()) === 1)
+  await page.keyboard.press('Space')
+  await page.waitForTimeout(250)
+  check(
+    'Space 翻面显示释义（翻面自动发音不报错）',
+    (await page.locator('[data-testid="memorize-translation"]').count()) === 1,
+  )
+
+  // 13.5 回打字页签：code 模式保持，发音按钮仍隐藏
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':typing', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(300)
+  check(
+    ':typing 回打字页签，code 模式发音按钮仍隐藏',
+    (await page.locator('[data-testid="word"]').count()) === 1 &&
+      (await page.locator('[data-testid="speak-btn"]').count()) === 0,
+  )
 
   await ctx.close()
   await browser.close()

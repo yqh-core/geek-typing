@@ -1,5 +1,7 @@
 import { CET4, CET6 } from './englishBanks'
 import { IELTS } from './ielts'
+import { TS_CODE } from './code/ts'
+import { GO_CODE } from './code/go'
 
 export interface WordItem {
   word: string
@@ -168,6 +170,24 @@ export const WORD_BANKS: WordBank[] = [
     descriptionEn: 'IELTS core 3000 words from ECDICT (by frequency)',
     icon: 'Globe',
     words: IELTS,
+  },
+  {
+    id: 'ts-code',
+    name: 'TS 骨架代码',
+    nameEn: 'TS Skeletons',
+    description: 'TypeScript / React 高频骨架代码行，配合代码模式练习（大小写敏感）',
+    descriptionEn: 'Common TypeScript/React skeleton lines — pair with Code mode (case-sensitive)',
+    icon: 'Code',
+    words: TS_CODE,
+  },
+  {
+    id: 'go-code',
+    name: 'Go 骨架代码',
+    nameEn: 'Go Skeletons',
+    description: 'Go 标志性骨架代码行，配合代码模式练习（大小写敏感）',
+    descriptionEn: 'Iconic Go skeleton lines — pair with Code mode (case-sensitive)',
+    icon: 'Code',
+    words: GO_CODE,
   },
 ]
 

@@ -108,6 +108,12 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
         return
       }
       if (!item) return
+      // K 重读当前词（命令态已由 paused 拦截）
+      if (e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        speak(item.word)
+        return
+      }
       if (e.key === ' ' && !flipped) {
         e.preventDefault() // 防止滚动页面 / 触发聚焦按钮
         sound.tap()
@@ -129,6 +135,12 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
     if (done) celebrate([theme.accentHex])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done])
+
+  /* ---------- 卡片翻面瞬间自动发音当前词（与 Space 翻面联动） ---------- */
+  useEffect(() => {
+    if (flipped && item) speak(item.word)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flipped, item?.word])
 
   /* ---------- 词库为空 ---------- */
   if (bank.words.length === 0) {
@@ -288,7 +300,7 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
 
       {/* 键盘流提示 */}
       <div data-testid="memorize-keyhint" className={`mt-3 text-center text-[11px] tracking-wide ${theme.sub} opacity-70`}>
-        {flipped ? t('memorize.keyGrade') : t('memorize.keyFlip')}
+        {(flipped ? t('memorize.keyGrade') : t('memorize.keyFlip')) + ' · ' + t('memorize.keyReread')}
       </div>
     </div>
   )

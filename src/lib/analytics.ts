@@ -55,10 +55,10 @@ export function resetAnalytics(): Analytics {
   return EMPTY
 }
 
-/** 记录一次击键 */
+/** 记录一次击键（只统计纯字母，code 模式的符号键不进字母弱项） */
 export function recordKey(a: Analytics, letter: string, ok: boolean): Analytics {
   const key = letter.toLowerCase()
-  if (!/^[a-z'-]$/.test(key)) return a
+  if (!/^[a-z]$/.test(key)) return a
   const prev = a.letters[key] ?? { hit: 0, miss: 0 }
   return {
     ...a,

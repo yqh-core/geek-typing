@@ -8,6 +8,7 @@ import type { ThemeConfig, ThemeId } from '../lib/theme'
 import type { SoundTheme } from '../lib/sound'
 import type { PracticeModeId } from '../lib/modes'
 import type { WordBank } from '../data/wordBanks'
+import { getVoicePref, setVoicePref } from '../lib/speech'
 import { sound } from '../lib/sound'
 import { useT, useLang } from '../i18n'
 
@@ -33,7 +34,8 @@ interface CommandPaletteProps {
 const HELP: Record<'zh' | 'en', string[]> = {
   zh: [
     ':bank [序号|id]  —  切换词库',
-    ':mode classic|spell|timed',
+    ':mode classic|spell|timed|code',
+    ':voice en-US|en-GB',
     ':theme matrix|ide|ink',
     ':sound on|off',
     ':soundtheme mech|thock|8bit',
@@ -44,7 +46,8 @@ const HELP: Record<'zh' | 'en', string[]> = {
   ],
   en: [
     ':bank [n|id]  —  switch bank',
-    ':mode classic|spell|timed',
+    ':mode classic|spell|timed|code',
+    ':voice en-US|en-GB',
     ':theme matrix|ide|ink',
     ':sound on|off',
     ':soundtheme mech|thock|8bit',
@@ -134,10 +137,20 @@ export default function CommandPalette({
         return
       }
       case 'mode':
-        if (arg === 'classic' || arg === 'spell' || arg === 'timed') {
+        if (arg === 'classic' || arg === 'spell' || arg === 'timed' || arg === 'code') {
           ok(() => onModeChange(arg))
         } else {
-          fail(':mode classic|spell|timed')
+          fail(':mode classic|spell|timed|code')
+        }
+        return
+      case 'voice':
+        if (arg === 'en-us' || arg === 'en-gb') {
+          // arg 已被小写化，这里还原成规范的偏好写法
+          const want = arg === 'en-gb' ? 'en-GB' : 'en-US'
+          if (want !== getVoicePref()) ok(() => setVoicePref(want))
+          else onClose()
+        } else {
+          fail(':voice en-US|en-GB')
         }
         return
       case 'theme':

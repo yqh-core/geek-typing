@@ -300,10 +300,14 @@ export default function App() {
   /* ---------------- 核心：全局键盘监听 ---------------- */
   const current = queue[wordIndex]
   const targetLower = (current?.word ?? '').toLowerCase()
+  // code 模式大小写敏感：target 用原文比较；其余模式保持小写比较
+  const target = mode === 'code' ? (current?.word ?? '') : targetLower
 
   // 换词时自动发音（拼写模式默认发音，或手动开启自动发音；仅打字页签生效）
+  // code 模式朗读代码行无意义，禁用自动发音
   useEffect(() => {
     if (tab !== 'typing') return
+    if (mode === 'code') return
     if (!current) return
     if (mode === 'spell' || autoSpeak) speak(current.word)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -344,7 +348,8 @@ export default function App() {
         setRunning(true)
       }
 
-      const key = e.key.toLowerCase()
+      // code 模式保持按键原文（大小写敏感）；其余模式统一小写比较
+      const key = mode === 'code' ? e.key : e.key.toLowerCase()
 
       /* ================= 拼写（默写）模式：允许自由输入 ================= */
       if (mode === 'spell') {
@@ -401,11 +406,11 @@ export default function App() {
         return
       }
 
-      /* ================= 经典 / 限时模式：严格纠错 ================= */
+      /* ================= 经典 / 限时 / 代码模式：严格纠错 ================= */
       const next = typed + key
 
-      // ✅ 敲对了
-      if (targetLower.startsWith(next)) {
+      // ✅ 敲对了（code 模式为原文比较，大小写敏感）
+      if (target.startsWith(next)) {
         const nextCombo = statsRef.current.combo + 1
         sound.correct()
         setTyped(next)
@@ -428,7 +433,7 @@ export default function App() {
         }
 
         // 整个单词敲完
-        if (next === targetLower) {
+        if (next === target) {
           lockRef.current = true
           sound.complete()
           setHistory(recordWord())
@@ -459,7 +464,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [typed, wordIndex, queue, targetLower, current, finished, startRound, mode, advance, finishRound, tab, commandMode])
+  }, [typed, wordIndex, queue, targetLower, target, current, finished, startRound, mode, advance, finishRound, tab, commandMode])
 
   useEffect(() => {
     return () => {
@@ -592,7 +597,7 @@ export default function App() {
               wrongKey={wrongKey}
               upcoming={upcoming}
               mode={mode}
-              onSpeak={() => speak(current.word)}
+              onSpeak={mode === 'code' ? undefined : () => speak(current.word)}
             />
           ) : (
             <div className={theme.sub}>{t('footer.loading')}</div>

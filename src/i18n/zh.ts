@@ -22,6 +22,8 @@ export const zh: Record<string, string> = {
   'mode.classicHint': '看词打字，敲对变绿、敲错被拦住',
   'mode.spellHint': '只给中文释义，考你自己拼出来',
   'mode.timedHint': '一分钟内尽量多打，练速度',
+  'mode.code': '代码模式',
+  'mode.codeHint': '大小写敏感练真实代码行，强化符号键肌肉记忆',
 
   /* 自动发音 */
   'toggle.autospeak': '自动发音',
@@ -93,6 +95,7 @@ export const zh: Record<string, string> = {
   'practice.spellIntro': '默写模式：只看中文把单词拼出来',
   'practice.speakTitle': '朗读这个单词',
   'practice.ideIdle': '在键盘上敲出来，别人以为你在疯狂写代码',
+  'practice.codeHint': '大小写敏感 · 空格以 · 标示',
 
   /* 虚拟键盘 */
   'keymap.hint': '请用标准指法敲击',
@@ -155,5 +158,6 @@ export const zh: Record<string, string> = {
   'memorize.definition': '释义',
   'memorize.keyFlip': 'Space 翻面',
   'memorize.keyGrade': '1 认识 · 2 模糊 · 3 不认识',
+  'memorize.keyReread': 'K 重读',
   'memorize.medal': '今日修行完成',
 }
