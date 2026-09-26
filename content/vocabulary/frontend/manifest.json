@@ -1,4 +1,6 @@
 {
+  "schemaVersion": 4,
+  "contentVersion": 1,
   "id": "content:vocabulary:curated-frontend:frontend",
   "type": "vocabulary",
   "version": "1.0.0",

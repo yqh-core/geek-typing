@@ -1,7 +1,7 @@
 {
   "base": "http://127.0.0.1:4173",
   "cacheName": "gt-shell-v2",
-  "time": "2026-09-26T12:17:08.035Z",
+  "time": "2026-09-26T13:28:26.573Z",
   "passed": true,
   "failures": 0,
   "results": [
@@ -48,12 +48,12 @@
     {
       "name": "态2: 可读出当前单词",
       "ok": true,
-      "detail": "单词=heuristic"
+      "detail": "单词=generalize"
     },
     {
       "name": "态2: 断网下敲正确字母光标前进",
       "ok": true,
-      "detail": "h → r"
+      "detail": "g → e"
     },
     {
       "name": "态3: 背单词卡片出现",

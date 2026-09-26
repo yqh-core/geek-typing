@@ -42,6 +42,14 @@ export interface PackageManifest {
   sources: ContentSource[]
   /** 离线策略：inline=随主包 / lazy=空闲预热 / runtime=访问时缓存 / on-demand=手动下载 */
   offline: { supported: boolean; policy: 'inline' | 'lazy' | 'runtime' | 'on-demand' }
+  /** 内容版本（由 content:build 自动派生）：内容变更时 +1，绝不进 ContentId。
+   *  与 schemaVersion（结构版本）是两个维度，学习记录记的是 contentVersion。 */
+  contentVersion?: number
+  /** 结构版本（由 content:build 写入，常量 SCHEMA_VERSION）：schema 破坏性变更才递增 */
+  schemaVersion?: number
+  /** Import Pipeline 的规范化开关：代码词库须 stripHtml=false，
+   *  否则 `type Handler<T>` / `<div />` 会被当成 HTML 标签删掉，词表被破坏。 */
+  normalize?: { stripHtml?: boolean }
 }
 
 /** 词条载荷（与 V3 WordItem 形状一致；V4.1 起定义在 model/vocabulary）。

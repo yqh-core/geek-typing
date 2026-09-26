@@ -1,4 +1,6 @@
 {
+  "schemaVersion": 4,
+  "contentVersion": 2,
   "id": "content:vocabulary:ecdict-toefl:toefl",
   "type": "vocabulary",
   "version": "1.0.0",
@@ -37,7 +39,7 @@
         "commercialUse": true
       },
       "importedAt": "2026-09-26",
-      "checksum": "sha256:5167516b393552d0fbf4f8d9bc8cc1079f15e3c9a1ab2d7bb4aad2fa4f4a726e"
+      "checksum": "sha256:dc14ba4771cccc774d94ded491e3b4971605559065a583993f1f39e8f3ff0888"
     }
   ]
 }

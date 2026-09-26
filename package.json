@@ -19,6 +19,7 @@
  "content:validate": "node scripts/content/validate.mjs",
  "content:check": "node scripts/content/validate.mjs",
  "content:build": "node scripts/content/build.mjs",
+ "content:normalize": "node scripts/content/normalize.mjs",
  "content:list": "node scripts/content/list.mjs"
   },
   "dependencies": {

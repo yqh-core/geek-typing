@@ -1,4 +1,6 @@
 {
+  "schemaVersion": 4,
+  "contentVersion": 2,
   "id": "content:vocabulary:ecdict-ielts:ielts",
   "type": "vocabulary",
   "version": "1.0.0",
@@ -37,7 +39,7 @@
         "commercialUse": true
       },
       "importedAt": "2026-09-26",
-      "checksum": "sha256:32d8457fd1ec89b5612958631e9711fbb29acc5f2acc785f5f66c80e74020c3f"
+      "checksum": "sha256:2f2bd585a798f36f06f4c8e4232162090fab60e23e76379a58ea3493df7a6e89"
     }
   ]
 }

@@ -1,4 +1,6 @@
 {
+  "schemaVersion": 4,
+  "contentVersion": 1,
   "id": "content:vocabulary:ecdict-cet6:cet6",
   "type": "vocabulary",
   "version": "1.0.0",

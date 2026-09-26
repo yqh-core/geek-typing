@@ -1,4 +1,6 @@
 {
+  "schemaVersion": 4,
+  "contentVersion": 2,
   "id": "content:vocabulary:ecdict-kaoyan:kaoyan",
   "type": "vocabulary",
   "version": "1.0.0",
@@ -37,7 +39,7 @@
         "commercialUse": true
       },
       "importedAt": "2026-09-26",
-      "checksum": "sha256:dd84f40f820196ad537fd2b5c6c8d56b15992557eee01854d565c364e0e6ef8e"
+      "checksum": "sha256:f6635a780af40152daa9b3cdb68102fb5b7663e936fca302d322a4e57719c1d1"
     }
   ]
 }

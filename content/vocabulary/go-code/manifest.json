@@ -1,4 +1,6 @@
 {
+  "schemaVersion": 4,
+  "contentVersion": 1,
   "id": "content:vocabulary:curated-go-code:go-code",
   "type": "vocabulary",
   "version": "1.0.0",
@@ -26,6 +28,9 @@
   "offline": {
     "supported": true,
     "policy": "inline"
+  },
+  "normalize": {
+    "stripHtml": false
   },
   "sources": [
     {
