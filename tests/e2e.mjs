@@ -79,6 +79,12 @@ async function pickMode(page, modeId) {
   await page.waitForTimeout(300)
 }
 
+/** V3-P0a：默认页签是 Home（今日推荐），打字类用例先切到 typing 页签 */
+async function gotoTyping(page) {
+  await page.click('[data-testid="tab-typing"]')
+  await page.waitForTimeout(200)
+}
+
 async function run() {
   const executablePath = findChrome()
   if (!executablePath) throw new Error('找不到 Chromium，请设置 CHROME_PATH')
@@ -98,6 +104,7 @@ async function run() {
   page.on('pageerror', (e) => consoleErrors.push(String(e)))
 
   await page.goto(BASE, { waitUntil: 'networkidle' })
+  await gotoTyping(page) // V3-P0a：默认落 Home，打字类用例先切 typing
 
   /* ---------- 1. 首屏与下拉导航 ---------- */
   console.log('【1】首屏与下拉导航')
@@ -199,6 +206,7 @@ async function run() {
   /* ---------- 5. 持久化 ---------- */
   console.log('\n【5】本地持久化')
   await page.reload({ waitUntil: 'networkidle' })
+  await gotoTyping(page) // V3-P0a：reload 后落 Home
   check('刷新后仍是 CET-4', norm(await page.textContent('body')).includes('四级 CET-4'))
 
   /* ---------- 6. 拼写（默写）模式 ---------- */
@@ -544,6 +552,7 @@ async function run() {
     '刷新后 voice 偏好保持 en-GB',
     (await page.evaluate(() => localStorage.getItem('gt.voice'))) === 'en-GB',
   )
+  await gotoTyping(page) // V3-P0a：reload 后落 Home，后续代码行用例需要打字面板
   await page.keyboard.press('Escape')
   await page.waitForTimeout(200)
   await page.keyboard.type(':voice zz', { delay: 25 })
@@ -908,6 +917,7 @@ async function run() {
   }, kyWrong)
   await page.reload({ waitUntil: 'networkidle' })
   await page.waitForTimeout(800) // 等懒加载词库 chunk 拉取 + bankWords 就位
+  await gotoTyping(page) // V3-P0a：reload 后落 Home，readWord 需要打字面板
   for (let i = 0; i < 10 && (await readWord(page)).length === 0; i++) await page.waitForTimeout(200)
   await page.keyboard.press('Escape')
   await page.waitForTimeout(200)
@@ -1201,6 +1211,220 @@ async function run() {
   check('预热探针：SW 缓存含 ielts/kaoyan/toefl chunk', warm.ok, warm.hits.map((u) => u.split('/').pop()).join(', '))
 
   await mctx.close()
+
+  /* ---------- 16. V3-P0a：五页签 IA + Today's Practice + Review/Progress ---------- */
+  console.log('\n【16】V3-P0a：五页签 IA / 今日推荐 / Review / Progress')
+  const errP0a = consoleErrors.length
+
+  // 预置：清错题本/分析，词库切 CET-4（同步词库，便于断言音标与单挑）
+  await page.evaluate(() => {
+    localStorage.removeItem('gt.review.v1')
+    localStorage.removeItem('gt.analytics.v1')
+    localStorage.setItem('gt.bank', JSON.stringify('cet4'))
+  })
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const tabIdsAll = ['home', 'typing', 'memorize', 'review', 'progress']
+  let tabsAllThere = true
+  for (const id of tabIdsAll) {
+    if ((await page.locator(`[data-testid="tab-${id}"]`).count()) !== 1) tabsAllThere = false
+  }
+  check(
+    '默认进入 Home（HomePanel 渲染、打字面板不渲染、页签栏 5 项齐全）',
+    (await page.locator('[data-testid="home-panel"]').count()) === 1 &&
+      (await page.locator('[data-testid="word"]').count()) === 0 &&
+      tabsAllThere,
+  )
+
+  // 16.1 Daily Goal + streak：预置今天 30 词、近 3 天连续打卡
+  await page.evaluate(() => {
+    const pad = (n) => String(n).padStart(2, '0')
+    const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    const h = {}
+    for (let i = 1; i <= 2; i++) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      h[keyOf(d)] = { date: keyOf(d), words: 50, seconds: 300 }
+    }
+    const today = new Date()
+    h[keyOf(today)] = { date: keyOf(today), words: 30, seconds: 200 }
+    localStorage.setItem('gt.streak.v1', JSON.stringify(h))
+  })
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const goalStyle = await page.getAttribute('[data-testid="home-goal-bar"]', 'style')
+  check(
+    'Daily Goal 进度条渲染（30/50 → 60%）+ streak 3 天',
+    !!goalStyle && goalStyle.includes('60%') &&
+      norm(await page.textContent('[data-testid="home-streak"]')).includes('3'),
+    `style=${goalStyle}`,
+  )
+
+  // 16.2 复习卡两态 + 点击开复习轮
+  await page.evaluate(() => localStorage.removeItem('gt.review.v1'))
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  check(
+    '复习卡空态（空态文案 + 无开始按钮）',
+    (await page.locator('[data-testid="home-review-empty"]').count()) === 1 &&
+      (await page.locator('[data-testid="home-review-start"]').count()) === 0,
+  )
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'gt.review.v1',
+      JSON.stringify({
+        abandon: { wrongCount: 2, correctStreak: 0, lastWrongAt: Date.now() - 2 * 864e5, nextReviewAt: Date.now() - 864e5, intervalIdx: 0 },
+      }),
+    )
+  })
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const reviewCard = norm(await page.textContent('[data-testid="home-review-card"]'))
+  check(
+    '复习卡有态（1 个单词到期 + abandon 预览）',
+    reviewCard.includes('1 个单词到期') && reviewCard.includes('abandon'),
+    reviewCard.slice(0, 60),
+  )
+  await page.click('[data-testid="home-review-start"]')
+  await page.waitForTimeout(500)
+  check('复习卡点击开复习轮（首词=到期词 abandon）', (await readWord(page)) === 'abandon')
+  await page.click('[data-testid="tab-home"]')
+  await page.waitForTimeout(300)
+
+  // 16.3 弱项卡两态 + 点击专攻
+  await page.evaluate(() => localStorage.removeItem('gt.analytics.v1'))
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  check('弱项卡空态（暂无弱项数据）', (await page.locator('[data-testid="home-weak-empty"]').count()) === 1)
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'gt.analytics.v1',
+      JSON.stringify({
+        letters: { q: { hit: 1, miss: 9 }, z: { hit: 2, miss: 5 } },
+        words: { abandon: { done: 3, wrong: 2 } },
+        totalKeys: 17,
+        totalCorrect: 3,
+        totalWords: 1,
+        bestWpm: 20,
+      }),
+    )
+  })
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const weakCard = norm(await page.textContent('[data-testid="home-weak-card"]'))
+  check('弱项卡展示 top 弱字母（q 90%）', weakCard.includes('q') && weakCard.includes('90%'), weakCard.slice(0, 60))
+  await page.click('[data-testid="home-weak-start"]')
+  await page.waitForTimeout(600)
+  const weakW = await readWord(page)
+  check('弱项专攻点击开轮出词', weakW.length > 0, `词=${weakW}`)
+  await page.click('[data-testid="tab-home"]')
+  await page.waitForTimeout(300)
+
+  // 16.4 新词卡：当前词库名 + 词数 + 一键开轮
+  const newCard = norm(await page.textContent('[data-testid="home-new-card"]'))
+  await page.click('[data-testid="home-new-start"]')
+  await page.waitForTimeout(500)
+  check(
+    '新词卡（四级 CET-4 · 84 词）并可一键开轮',
+    newCard.includes('四级 CET-4') && newCard.includes('84') && (await readWord(page)).length > 0,
+    newCard.slice(0, 60),
+  )
+
+  // 16.5 Review 页：统计 / 分布 / 徽章（intervalIdx=0 与 =3 各一词）/ 详情 / 单挑
+  await page.evaluate(() => {
+    const now = Date.now()
+    localStorage.setItem(
+      'gt.review.v1',
+      JSON.stringify({
+        abandon: { wrongCount: 3, correctStreak: 0, lastWrongAt: now - 864e5, nextReviewAt: now - 3600e3, intervalIdx: 0 },
+        absolute: { wrongCount: 1, correctStreak: 3, lastWrongAt: now - 6 * 864e5, nextReviewAt: now - 60e3, intervalIdx: 3 },
+      }),
+    )
+  })
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  await page.click('[data-testid="tab-review"]')
+  await page.waitForTimeout(400)
+  check(
+    'Review 统计：错题总数 2 / 今日到期 2',
+    (await page.textContent('[data-testid="review-stat-total"]'))?.trim() === '2' &&
+      (await page.textContent('[data-testid="review-stat-due"]'))?.trim() === '2',
+  )
+  const distTxt = norm(await page.textContent('[data-testid="review-dist"]'))
+  check(
+    '掌握分布渲染 + 徽章两态（struggling / strong）',
+    distTxt.includes('挣扎中') &&
+      distTxt.includes('巩固') &&
+      (await page.locator('[data-testid="review-item-abandon"] [data-badge="struggling"]').count()) === 1 &&
+      (await page.locator('[data-testid="review-item-absolute"] [data-badge="strong"]').count()) === 1,
+    distTxt.slice(0, 60),
+  )
+  await page.click('[data-testid="review-item-abandon"] [data-testid="review-item-detail"]')
+  await page.waitForTimeout(250)
+  const detailTxt = norm(await page.textContent('[data-testid="review-item-abandon"] [data-testid="review-detail"]'))
+  check(
+    '词条详情展开（音标 + 释义 + 个人进度 + 下次复习）',
+    (await page.locator('[data-testid="review-item-abandon"] [data-testid="review-detail-phonetic"]').count()) === 1 &&
+      detailTxt.includes('放弃') &&
+      detailTxt.includes('×3') &&
+      detailTxt.includes('下次复习'),
+    detailTxt.slice(0, 80),
+  )
+  await page.click('[data-testid="review-item-absolute"] [data-testid="review-item-drill"]')
+  await page.waitForTimeout(500)
+  check('单挑按钮开轮（切到打字页、首词=absolute）', (await readWord(page)) === 'absolute')
+
+  // 16.6 Review 页置顶「开始复习」主按钮
+  await page.click('[data-testid="tab-review"]')
+  await page.waitForTimeout(300)
+  const startBtnThere = (await page.locator('[data-testid="review-start-btn"]').count()) === 1
+  await page.click('[data-testid="review-start-btn"]')
+  await page.waitForTimeout(500)
+  const dueFirst = await readWord(page)
+  check(
+    'Review 置顶「开始复习」主按钮开轮（首词=到期词）',
+    startBtnThere && (dueFirst === 'abandon' || dueFirst === 'absolute'),
+    `按钮=${startBtnThere} 首词=${dueFirst}`,
+  )
+
+  // 16.7 Progress 页：热力图 / 累计统计 / 弱项列表
+  await page.click('[data-testid="tab-progress"]')
+  await page.waitForTimeout(400)
+  const progressStats = norm(await page.textContent('[data-testid="progress-stats"]'))
+  check(
+    'Progress 热力图 14 格 + 累计统计卡',
+    (await page.locator('[data-testid="progress-heatmap"] > div').count()) === 14 &&
+      progressStats.includes('累计击键') &&
+      (await page.locator('[data-testid="progress-stat-streak"]').count()) === 1,
+  )
+  check(
+    'Progress 弱字母/错词列表渲染',
+    norm(await page.textContent('[data-testid="progress-weak-letters"]')).includes('q') &&
+      norm(await page.textContent('[data-testid="progress-wrong-words"]')).includes('abandon'),
+  )
+
+  // 16.8 命令面板 :home / :progress 跳页
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(250)
+  await page.keyboard.type(':home', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  const homeOk = (await page.locator('[data-testid="home-panel"]').count()) === 1
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(250)
+  await page.keyboard.type(':progress', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  check(
+    ':home / :progress 命令跳页',
+    homeOk && (await page.locator('[data-testid="progress-panel"]').count()) === 1,
+  )
+  check(
+    'V3-P0a 章节：无 console / page 运行时错误',
+    consoleErrors.length === errP0a,
+    consoleErrors.slice(errP0a).join(' | '),
+  )
+
   await ctx.close()
   await browser.close()
 

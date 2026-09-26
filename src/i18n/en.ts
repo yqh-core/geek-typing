@@ -4,6 +4,7 @@
 export const en: Record<string, string> = {
   /* Header / nav */
   'app.subtitle': 'Type words like code',
+  'app.tagline': 'Practice English. Type better. Remember more.',
   'nav.practice': 'Practice',
   'nav.banks': 'Banks',
   'nav.settings': 'Settings',
@@ -11,8 +12,11 @@ export const en: Record<string, string> = {
   'nav.importBank': 'Import banks…',
 
   /* Tabs */
+  'tab.home': 'Today',
   'tab.typing': 'Typing',
   'tab.memorize': 'Vocabulary',
+  'tab.review': 'Review',
+  'tab.progress': 'Progress',
 
   /* Practice modes */
   'mode.classic': 'Classic',
@@ -104,7 +108,7 @@ export const en: Record<string, string> = {
   'cmd.placeholder': 'Type a command — :help for all',
   'cmd.unknown': "Unknown command — :help, obviously",
   'cmd.bankNotFound': 'No such bank',
-  'cmd.desc.review': 'Review due mistakes (Ebbinghaus)',
+  'cmd.desc.review': 'Review due mistakes (Ebbinghaus), or go to Review tab',
   'cmd.desc.bank': 'Switch bank: :bank n|id',
   'cmd.desc.mode': 'Set mode: :mode classic|spell|timed|code',
   'cmd.desc.voice': 'Accent: :voice en-US|en-GB',
@@ -114,6 +118,8 @@ export const en: Record<string, string> = {
   'cmd.desc.shuffle': 'Shuffle: :shuffle on|off',
   'cmd.desc.memorize': 'Go to vocabulary tab',
   'cmd.desc.typing': 'Go to typing tab',
+  'cmd.desc.home': "Go to Today's Practice (home)",
+  'cmd.desc.progress': 'Go to progress tab',
   'cmd.desc.q': 'Restart round',
   'cmd.desc.help': 'List all commands',
 
@@ -124,6 +130,47 @@ export const en: Record<string, string> = {
   'review.statsTotal': 'Total mistakes',
   'review.statsDue': 'Due today',
   'review.start': 'Start review round',
+
+  /* Review center (V3-P0a) */
+  'review.panelTitle': 'Review Center',
+  'review.masteryDist': 'Mastery distribution',
+  'review.upcomingTitle': 'Upcoming (by next review)',
+  'review.nextReview': 'Next review',
+  'review.statDone': 'done',
+  'review.statWrong': 'wrong',
+  'review.wrongCountLabel': 'Wrong times',
+  'review.correctStreakLabel': 'Correct streak',
+  'review.practiceWord': 'Practice this word',
+  'review.drill': 'Drill',
+  'review.detail': 'Detail',
+  'review.empty': 'No mistakes yet — wrong words join the review plan automatically',
+
+  /* Mastery levels (V3-P0a) */
+  'mastery.struggling': 'Struggling',
+  'mastery.learning': 'Learning',
+  'mastery.familiar': 'Familiar',
+  'mastery.strong': 'Strong',
+
+  /* Home (V3-P0a) */
+  'home.title': "Today's Practice",
+  'home.goal': 'Daily goal',
+  'home.goalDone': 'Goal reached 🎉',
+  'home.reviewTitle': 'Review due',
+  'home.dueCount': 'words due',
+  'home.startReview': 'Start review',
+  'home.reviewEmpty': 'No due mistakes — keep it up!',
+  'home.weakTitle': 'Weak spots',
+  'home.startWeak': 'Drill weak spots',
+  'home.weakEmpty': 'No weak spots yet — type a few rounds first',
+  'home.newTitle': 'New words',
+  'home.startNew': 'Start practice',
+
+  /* Progress (V3-P0a) */
+  'progress.title': 'Progress',
+  'progress.heatmap': 'Last 14 days',
+  'progress.stats': 'Lifetime stats',
+  'progress.weakLetters': 'Top 5 weak keys',
+  'progress.wrongWordsTop': 'Top 5 wrong words',
 
   /* Combo milestone */
   'milestone.combo': 'combo streak! You are on fire',

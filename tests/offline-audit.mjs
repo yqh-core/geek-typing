@@ -137,7 +137,11 @@ try {
     check('态1.5: SW 接管后在线 reload 成功', false, String(e).split('\n')[0])
   }
   if (reloadOnlineOk) {
-    check('态1.5: SW 接管后在线 reload 成功', (await page.locator('[data-testid="word"]').count()) >= 1)
+    // V3-P0a：默认页签为 Home，先断言落点，再切打字页签验证练习面板
+    check('态1.5: reload 后落在 Home（推荐首页渲染）', (await page.locator('[data-testid="home-panel"]').count()) >= 1)
+    await page.click('[data-testid="tab-typing"]', { timeout: 8000 })
+    await page.waitForTimeout(300)
+    check('态1.5: SW 接管后在线 reload 成功（切 typing 后练习面板可见）', (await page.locator('[data-testid="word"]').count()) >= 1)
   }
 
   /* ---------- 态2 断网 reload ---------- */
@@ -152,6 +156,11 @@ try {
   }
   if (reloadOk) {
     check('态2: 断网导航 reload 成功（无 ERR_FAILED）', true)
+    // V3-P0a：断网 reload 后落在 Home（推荐首页渲染，非空白错误页）
+    check('态2: 断网 reload 后落在 Home（推荐首页渲染）', (await page.locator('[data-testid="home-panel"]').count()) >= 1)
+    // 切到打字页签（纯前端操作，断网可用）后执行原打字核心断言
+    await page.click('[data-testid="tab-typing"]', { timeout: 8000 })
+    await page.waitForTimeout(300)
     const wordCount = await page.locator('[data-testid="word"]').count()
     check('态2: 主 UI 渲染（练习单词面板可见）', wordCount >= 1, `word 面板数=${wordCount}`)
     const body = (await page.textContent('body').catch(() => '')) ?? ''

@@ -14,6 +14,7 @@ import type { WordBank } from '../data/wordBanks'
 import { getVoicePref, setVoicePref } from '../lib/speech'
 import { sound } from '../lib/sound'
 import { useT, useLang } from '../i18n'
+import type { TabId } from '../App'
 
 interface CommandPaletteProps {
   theme: ThemeConfig
@@ -28,7 +29,7 @@ interface CommandPaletteProps {
   onSoundThemeChange: (t: SoundTheme) => void
   shuffled: boolean
   onShuffleToggle: () => void
-  onTabChange: (tab: 'typing' | 'memorize') => void
+  onTabChange: (tab: TabId) => void
   onRestart: () => void
   /** 错题复习轮：返回是否成功开轮（无到期时由面板提示） */
   onReviewRound: () => boolean
@@ -52,6 +53,8 @@ const COMMANDS: Cmd[] = [
   { name: 'shuffle', withArg: true },
   { name: 'memorize' },
   { name: 'typing' },
+  { name: 'home' },
+  { name: 'progress' },
   { name: 'q' },
   { name: 'help' },
 ]
@@ -59,7 +62,7 @@ const COMMANDS: Cmd[] = [
 /** 命令速查（双语，:help 用，en 模式下不残留中文） */
 const HELP: Record<'zh' | 'en', string[]> = {
   zh: [
-    ':review  —  错题复习（艾宾浩斯到期词）',
+    ':review  —  错题复习（艾宾浩斯到期词，或前往 Review 页签）',
     ':bank [序号|id]  —  切换词库',
     ':mode classic|spell|timed|code',
     ':voice en-US|en-GB',
@@ -68,11 +71,12 @@ const HELP: Record<'zh' | 'en', string[]> = {
     ':soundtheme mech|thock|8bit',
     ':shuffle on|off',
     ':memorize / :typing',
+    ':home / :progress  —  跳转页签',
     ':q  —  重开本轮',
     ':help',
   ],
   en: [
-    ':review  —  review due mistakes (Ebbinghaus)',
+    ':review  —  review due mistakes (Ebbinghaus), or go to Review tab',
     ':bank [n|id]  —  switch bank',
     ':mode classic|spell|timed|code',
     ':voice en-US|en-GB',
@@ -81,6 +85,7 @@ const HELP: Record<'zh' | 'en', string[]> = {
     ':soundtheme mech|thock|8bit',
     ':shuffle on|off',
     ':memorize / :typing',
+    ':home / :progress  —  jump to tab',
     ':q  —  restart round',
     ':help',
   ],
@@ -251,6 +256,12 @@ export default function CommandPalette({
         return
       case 'typing':
         ok(() => onTabChange('typing'))
+        return
+      case 'home':
+        ok(() => onTabChange('home'))
+        return
+      case 'progress':
+        ok(() => onTabChange('progress'))
         return
       case 'q':
         ok(onRestart)

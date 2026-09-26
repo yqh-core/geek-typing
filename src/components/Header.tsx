@@ -91,12 +91,12 @@ export default function Header(props: HeaderProps) {
   return (
     <header className="w-full max-w-4xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Logo */}
+        {/* Logo + tagline（移动端隐藏标语） */}
         <div className="flex items-center gap-2">
-          <span className={`text-lg font-bold tracking-[0.2em] ${theme.accent}`}>
-            GEEK&nbsp;TYPING
-          </span>
-          <span className={`hidden sm:inline text-[11px] ${theme.sub}`}>· {t('app.subtitle')}</span>
+          <div className="flex flex-col leading-tight">
+            <span className={`text-lg font-bold tracking-[0.2em] ${theme.accent}`}>GEEK&nbsp;TYPING</span>
+            <span className={`hidden sm:block text-[11px] ${theme.sub} opacity-80`}>{t('app.tagline')}</span>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

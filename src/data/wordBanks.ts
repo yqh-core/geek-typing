@@ -5,6 +5,8 @@ import { GO_CODE } from './code/go'
 export interface WordItem {
   word: string
   translation: string
+  /** 音标（ECDICT phonetic 原样字符串，由生成脚本注入；code 词库无音标） */
+  phonetic?: string
   /** 英文释义（ECDICT 提供，雅思词库有） */
   definition?: string
 }

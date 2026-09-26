@@ -1,13 +1,15 @@
 /**
- * 从 ECDICT CSV 参数化生成词库（目前支持考研 / 托福）
+ * 从 ECDICT CSV 参数化生成词库（雅思 / 考研 / 托福）
  *
  * 数据源：skywind3000/ECDICT（MIT License）仓库根目录 ecdict.csv
  * 逻辑：tag 含指定 token 的词 → 按 frq（zipf 词频，缺失排后）降序 → 取前 LIMIT
  *       word 只留 /^[a-zA-Z-]+$/，translation 取首行截 40 字符，definition 取首行截 160 字符
+ *       phonetic 原样保留（V3-P0a 起），空 / '' 则省略该字段
  * 产物为脚本生成，不要手工编辑。
  *
  * 用法：
  *   node scripts/build-bank.mjs scan [csv路径]          # 打印 tag token 分布（探测用）
+ *   node scripts/build-bank.mjs ielts  [csv路径]        # 生成 src/data/ielts.ts
  *   node scripts/build-bank.mjs kaoyan [csv路径]        # 生成 src/data/kaoyan.ts
  *   node scripts/build-bank.mjs toefl  [csv路径]        # 生成 src/data/toefl.ts
  */
@@ -24,6 +26,15 @@ const LIMIT = 3000
 
 /** 各词库配置：tagTokens 按 ECDICT 实际 tag token 匹配（小写、按空白分词） */
 const BANKS = {
+  ielts: {
+    tagTokens: ['ielts'],
+    // 头注释显示与历史 build-ielts.mjs 产物保持一致（tag 大写 IELTS / 重新生成入口）
+    tagLabel: 'IELTS',
+    regen: 'node scripts/build-ielts.mjs',
+    exportName: 'IELTS',
+    title: '雅思核心词库',
+    outFile: 'ielts.ts',
+  },
   kaoyan: {
     tagTokens: ['ky', 'kaoyan'], // ECDICT 考研 tag 为 ky（兼容 kaoyan 写法）
     exportName: 'KAoyan',
@@ -75,6 +86,13 @@ function firstLine(raw) {
   return raw.split('\\n')[0].split('\n')[0].trim()
 }
 
+/** phonetic 清洗：原样字符串，空 / '' 返回 ''（写行时省略该字段） */
+function cleanPhonetic(raw) {
+  const p = (raw ?? '').trim()
+  if (!p || p === "''") return ''
+  return p
+}
+
 async function main() {
   const rl = createInterface({ input: createReadStream(CSV_PATH, 'utf8'), crlfDelay: Infinity })
 
@@ -114,6 +132,8 @@ async function main() {
       word,
       translation: firstLine(get('translation')).slice(0, 40),
       definition: firstLine(get('definition')).slice(0, 160),
+      // phonetic 原样保留；空 / ''（ECDICT 无音标占位）则省略字段
+      phonetic: cleanPhonetic(get('phonetic')),
       frq: Number.parseFloat(get('frq')) || 0,
     })
   }
@@ -131,17 +151,17 @@ async function main() {
   const picked = rows.slice(0, LIMIT)
 
   const body = picked
-    .map(
-      (r) =>
-        `  { word: ${JSON.stringify(r.word)}, translation: ${JSON.stringify(r.translation)}, definition: ${JSON.stringify(r.definition)} },`,
-    )
+    .map((r) => {
+      const ph = r.phonetic ? ` phonetic: ${JSON.stringify(r.phonetic)},` : ''
+      return `  { word: ${JSON.stringify(r.word)},${ph} translation: ${JSON.stringify(r.translation)}, definition: ${JSON.stringify(r.definition)} },`
+    })
     .join('\n')
 
   const ts = `/**
  * ${conf.title}（脚本生成，勿手工编辑）
  * 来源：ECDICT (https://github.com/skywind3000/ECDICT) MIT License
- * 规则：tag 含 ${conf.tagTokens.join('/')} 的词，按 frq 词频降序取前 ${picked.length}
- * 重新生成：node scripts/build-bank.mjs ${MODE}
+ * 规则：tag 含 ${conf.tagLabel ?? conf.tagTokens.join('/')} 的词，按 frq 词频降序取前 ${picked.length}
+ * 重新生成：${conf.regen ?? `node scripts/build-bank.mjs ${MODE}`}
  */
 import type { WordItem } from './wordBanks'
 

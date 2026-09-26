@@ -4,6 +4,8 @@
  * 数据源：skywind3000/ECDICT（MIT License）仓库根目录 ecdict.csv
  * 逻辑：筛选 tag 含 "IELTS" 的词 → 按 frq（zipf 词频，缺失排后）降序 → 取前 3000
  * 产物为脚本生成，不要手工编辑。
+ * 注意（V3-P0a）：ielts.ts 的 phonetic 字段由 scripts/build-bank.mjs ielts 提供；
+ * 直接重跑本脚本会丢掉音标列，请改用 `node scripts/build-bank.mjs ielts`。
  *
  * 用法：node scripts/build-ielts.mjs [csv路径]
  */

@@ -5,6 +5,7 @@
 export const zh: Record<string, string> = {
   /* 顶栏 / 导航 */
   'app.subtitle': '敲代码一样背单词',
+  'app.tagline': '练英语，敲更快，记得牢。',
   'nav.practice': '练习',
   'nav.banks': '词库',
   'nav.settings': '设置',
@@ -12,8 +13,11 @@ export const zh: Record<string, string> = {
   'nav.importBank': '导入词库…',
 
   /* Tab 切换 */
+  'tab.home': '今日',
   'tab.typing': '打字练习',
   'tab.memorize': '背单词',
+  'tab.review': '复习',
+  'tab.progress': '进度',
 
   /* 练习模式 */
   'mode.classic': '经典模式',
@@ -105,7 +109,7 @@ export const zh: Record<string, string> = {
   'cmd.placeholder': '输入命令，:help 查看全部',
   'cmd.unknown': '未知命令，:help 查看全部',
   'cmd.bankNotFound': '词库不存在',
-  'cmd.desc.review': '错题复习：拉出艾宾浩斯到期错词',
+  'cmd.desc.review': '错题复习：开艾宾浩斯到期轮，或前往 Review 页签',
   'cmd.desc.bank': '切换词库：:bank 序号|id',
   'cmd.desc.mode': '练习模式：:mode classic|spell|timed|code',
   'cmd.desc.voice': '口音切换：:voice en-US|en-GB',
@@ -115,6 +119,8 @@ export const zh: Record<string, string> = {
   'cmd.desc.shuffle': '乱序开关：:shuffle on|off',
   'cmd.desc.memorize': '切到背单词页签',
   'cmd.desc.typing': '切到打字练习页签',
+  'cmd.desc.home': '回到今日练习首页',
+  'cmd.desc.progress': '查看学习进度页',
   'cmd.desc.q': '重开本轮',
   'cmd.desc.help': '列出全部命令',
 
@@ -125,6 +131,47 @@ export const zh: Record<string, string> = {
   'review.statsTotal': '错题总数',
   'review.statsDue': '今日到期',
   'review.start': '开始错题复习',
+
+  /* 复习中心（V3-P0a） */
+  'review.panelTitle': '复习中心',
+  'review.masteryDist': '掌握分布',
+  'review.upcomingTitle': '待复习（按下次时间）',
+  'review.nextReview': '下次复习',
+  'review.statDone': '练过',
+  'review.statWrong': '敲错',
+  'review.wrongCountLabel': '累计敲错',
+  'review.correctStreakLabel': '连续答对',
+  'review.practiceWord': '练习这个词',
+  'review.drill': '单挑',
+  'review.detail': '详情',
+  'review.empty': '错题本还是空的，敲错的单词会自动进入复习计划',
+
+  /* 掌握度四级（V3-P0a） */
+  'mastery.struggling': '挣扎中',
+  'mastery.learning': '入门',
+  'mastery.familiar': '熟悉',
+  'mastery.strong': '巩固',
+
+  /* 今日推荐首页（V3-P0a） */
+  'home.title': '今日练习',
+  'home.goal': '今日目标',
+  'home.goalDone': '已达标 🎉',
+  'home.reviewTitle': '到期复习',
+  'home.dueCount': '个单词到期',
+  'home.startReview': '开始复习',
+  'home.reviewEmpty': '暂无到期错题，保持住！',
+  'home.weakTitle': '弱项专攻',
+  'home.startWeak': '弱项专攻',
+  'home.weakEmpty': '暂无弱项数据，先敲几轮',
+  'home.newTitle': '新词练习',
+  'home.startNew': '开始练习',
+
+  /* 进度页（V3-P0a） */
+  'progress.title': '学习进度',
+  'progress.heatmap': '近 14 天',
+  'progress.stats': '累计统计',
+  'progress.weakLetters': '弱字母 Top 5',
+  'progress.wrongWordsTop': '错词 Top 5',
 
   /* 连击里程碑 */
   'milestone.combo': '连击！手感来了',

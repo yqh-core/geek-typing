@@ -6,6 +6,9 @@ import ResultOverlay from './components/ResultOverlay'
 import StreakBar from './components/StreakBar'
 import KeyMap from './components/KeyMap'
 import Memorize from './components/Memorize'
+import HomePanel from './components/HomePanel'
+import ReviewPanel from './components/ReviewPanel'
+import ProgressPanel from './components/ProgressPanel'
 import CommandPalette from './components/CommandPalette'
 import {
   DEFAULT_BANK_ID,
@@ -33,11 +36,12 @@ import {
 import { speak, warmSpeech } from './lib/speech'
 import { getStreakDays, getTodayCount, loadHistory, recordSeconds, recordWord, type History } from './lib/streak'
 import { dueWords, loadReview, recordCorrect, recordWrong } from './lib/reviewStore'
+import { buildRecommendation } from './lib/recommend'
 import { Terminal } from 'lucide-react'
-import { useT } from './i18n'
+import { useT, useLang } from './i18n'
 
-/** 顶部两个页签 */
-type TabId = 'typing' | 'memorize'
+/** 页签：推荐首页 / 打字 / 背单词 / 复习 / 进度（V3-P0a 五页签 IA） */
+export type TabId = 'home' | 'typing' | 'memorize' | 'review' | 'progress'
 
 /** 每一轮练习的词数 */
 const CHAPTER_SIZE = 20
@@ -74,7 +78,9 @@ function writeStorage(key: string, value: unknown) {
 
 export default function App() {
   const t = useT()
-  const [tab, setTab] = useState<TabId>('typing')
+  const { lang } = useLang()
+  // V3-P0a：默认落在 Today's Practice 推荐首页
+  const [tab, setTab] = useState<TabId>('home')
   const [bankId, setBankId] = useState<string>(() => readStorage('gt.bank', DEFAULT_BANK_ID))
   const [themeId, setThemeId] = useState<ThemeId>(() => readStorage('gt.theme', 'matrix'))
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => readStorage('gt.sound', true))
@@ -175,6 +181,9 @@ export default function App() {
     void reviewVersion
     return Object.keys(loadReview()).length
   }, [reviewVersion, tab])
+
+  /** Today's Practice 推荐快照：错题本变化（或切回页签）时重建 */
+  const recommendation = useMemo(() => buildRecommendation(), [reviewVersion, tab])
 
   /* ---------------- 生成一轮练习队列 ---------------- */
   const buildQueue = useCallback(
@@ -612,12 +621,15 @@ export default function App() {
           onOpenCommand={() => setCommandMode(true)}
         />
 
-        {/* 页签切换：打字练习 / 背单词 */}
-        <div className={`flex items-center p-1 rounded-xl border ${theme.border} gap-1`}>
+        {/* 页签切换：今日 / 打字 / 背单词 / 复习 / 进度 */}
+        <div className={`flex items-center p-1 rounded-xl border ${theme.border} gap-1 flex-wrap`}>
           {(
             [
+              { id: 'home', label: t('tab.home') },
               { id: 'typing', label: t('tab.typing') },
               { id: 'memorize', label: t('tab.memorize') },
+              { id: 'review', label: t('tab.review') },
+              { id: 'progress', label: t('tab.progress') },
             ] as { id: TabId; label: string }[]
           ).map((tb) => (
             <button
@@ -670,7 +682,43 @@ export default function App() {
               🔥 {milestone} {t('milestone.combo')}
             </div>
           )}
-          {tab === 'memorize' ? (
+          {tab === 'home' ? (
+            <HomePanel
+              theme={theme}
+              recommendation={recommendation}
+              bankName={lang === 'en' ? bank?.nameEn ?? bank?.name ?? '' : bank?.name ?? ''}
+              bankCount={bank?.count ?? bank?.words.length ?? 0}
+              onReviewRound={() => {
+                sound.tap()
+                startReviewRound()
+              }}
+              onWeakRound={() => {
+                setTab('typing')
+                startWeakRound()
+              }}
+              onNewRound={() => {
+                setTab('typing')
+                startRound()
+              }}
+            />
+          ) : tab === 'review' ? (
+            <ReviewPanel
+              theme={theme}
+              banks={banks}
+              reviewVersion={reviewVersion}
+              analytics={analytics}
+              onReviewRound={() => {
+                sound.tap()
+                startReviewRound()
+              }}
+              onReviewWord={(word) => {
+                setTab('typing')
+                reviewSingleWord(word)
+              }}
+            />
+          ) : tab === 'progress' ? (
+            <ProgressPanel theme={theme} history={history} analytics={analytics} streakDays={getStreakDays(history)} />
+          ) : tab === 'memorize' ? (
             <Memorize theme={theme} bank={{ ...bank, words: bankWords }} paused={commandMode} streakDays={getStreakDays(history)} />
           ) : current ? (
             <PracticePanel
@@ -730,7 +778,7 @@ export default function App() {
           onSoundThemeChange={setSoundTheme}
           shuffled={shuffled}
           onShuffleToggle={() => setShuffled((v) => !v)}
-          onTabChange={(tb) => {
+          onTabChange={(tb: TabId) => {
             sound.tap()
             setTab(tb)
           }}
