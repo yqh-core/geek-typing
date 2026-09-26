@@ -12,6 +12,7 @@ import {
   type MemStatus,
   type MemStore,
 } from '../lib/memorizeStore'
+import { loadReview, recordCorrect, recordWrong } from '../lib/reviewStore'
 import { useT } from '../i18n'
 
 interface MemorizeProps {
@@ -64,10 +65,16 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
   const item = bank.words.find((w) => w.word === deck[cursor])
   const done = deck.length > 0 && cursor >= deck.length
 
-  /** 三键调度：unknown → 追加 2 次，fuzzy → 1 次，known → 完成 */
+  /** 三键调度：unknown → 追加 2 次，fuzzy → 1 次，known → 完成；同时驱动词级错题本 */
   const answer = (status: MemStatus) => {
     if (!item) return
     setStore((s) => recordMemorize(s, item.word, status))
+    // 错题本：不熟/不认识 → 记错（1 天后到期）；认识 → 若已是复习词则推进间隔
+    if (status === 'unknown' || status === 'fuzzy') {
+      recordWrong(item.word)
+    } else if (loadReview()[item.word]) {
+      recordCorrect(item.word)
+    }
     const extra = status === 'unknown' ? 2 : status === 'fuzzy' ? 1 : 0
     if (extra > 0) setDeck((d) => [...d, ...Array.from({ length: extra }, () => item.word)])
     setFlipped(false)

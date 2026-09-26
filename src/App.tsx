@@ -24,6 +24,7 @@ import {
 } from './lib/analytics'
 import { speak, warmSpeech } from './lib/speech'
 import { getStreakDays, getTodayCount, loadHistory, recordSeconds, recordWord, type History } from './lib/streak'
+import { dueWords, loadReview, recordCorrect, recordWrong } from './lib/reviewStore'
 import { Terminal } from 'lucide-react'
 import { useT } from './i18n'
 
@@ -94,6 +95,10 @@ export default function App() {
   const [analytics, setAnalytics] = useState<Analytics>(() => loadAnalytics())
   const [autoSpeak, setAutoSpeak] = useState<boolean>(() => readStorage('gt.autoSpeak', false))
 
+  /** 错题本版本号：recordWrong/recordCorrect 后自增，驱动到期数等派生数据刷新 */
+  const [reviewVersion, setReviewVersion] = useState(0)
+  const bumpReview = useCallback(() => setReviewVersion((v) => v + 1), [])
+
   const startedRef = useRef<number | null>(null)
   const lockRef = useRef(false)
   const milestoneTimer = useRef<number | null>(null)
@@ -126,6 +131,17 @@ export default function App() {
     () => banks.find((b) => b.id === bankId) ?? banks[0],
     [banks, bankId],
   )
+
+  /* ---------------- 错题本（艾宾浩斯）派生数据 ---------------- */
+  const reviewDue = useMemo(() => {
+    void reviewVersion
+    return dueWords(banks.flatMap((b) => b.words).map((w) => w.word))
+    // 切页签时也刷新一次：背单词页的三键打分不在本组件内打点
+  }, [banks, reviewVersion, tab])
+  const reviewTotal = useMemo(() => {
+    void reviewVersion
+    return Object.keys(loadReview()).length
+  }, [reviewVersion, tab])
 
   /* ---------------- 生成一轮练习队列 ---------------- */
   const buildQueue = useCallback(
@@ -184,6 +200,32 @@ export default function App() {
       if (item) startRound(Array.from({ length: 10 }, () => item))
     },
     [bank, startRound],
+  )
+
+  /** 错题复习轮：拉出全部到期词开一轮；无到期返回 false（由入口提示） */
+  const startReviewRound = useCallback((): boolean => {
+    const all = banks.flatMap((b) => b.words)
+    const due = dueWords(all.map((w) => w.word))
+    if (due.length === 0) return false
+    const map = new Map(all.map((w) => [w.word, w]))
+    const items = due.map((w) => map.get(w)).filter((w): w is WordItem => !!w)
+    setTab('typing')
+    startRound(items)
+    return true
+  }, [banks, startRound])
+
+  /** 整词完成时打点错题本：本轮敲错的词记错，复习中的词敲对则推进间隔 */
+  const settleReview = useCallback(
+    (word: string, missed: boolean) => {
+      if (missed) {
+        recordWrong(word)
+        bumpReview()
+      } else if (loadReview()[word]) {
+        recordCorrect(word)
+        bumpReview()
+      }
+    },
+    [bumpReview],
   )
 
   /** 当前瞬时 WPM */
@@ -397,6 +439,8 @@ export default function App() {
           sound.complete()
           setHistory(recordWord())
           setAnalytics((a) => recordWordDone(a, current.word, true, currentWpm()))
+          // 错题本：该词本轮敲错过 → 记错；否则若在复习中 → 推进间隔
+          settleReview(current.word, wrongWords.includes(targetLower))
           window.setTimeout(() => {
             lockRef.current = false
             setTyped('')
@@ -438,6 +482,8 @@ export default function App() {
           sound.complete()
           setHistory(recordWord())
           setAnalytics((a) => recordWordDone(a, current.word, statsRef.current.errors === 0, currentWpm()))
+          // 错题本：该词本轮敲错过（classic/code 与 spell 同口径）→ 记错；否则若在复习中 → 推进间隔
+          settleReview(current.word, wrongWords.includes(targetLower))
           window.setTimeout(() => {
             lockRef.current = false
             setTyped('')
@@ -464,7 +510,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [typed, wordIndex, queue, targetLower, target, current, finished, startRound, mode, advance, finishRound, tab, commandMode])
+  }, [typed, wordIndex, queue, targetLower, target, current, finished, startRound, mode, advance, finishRound, tab, commandMode, wrongWords, settleReview])
 
   useEffect(() => {
     return () => {
@@ -520,6 +566,12 @@ export default function App() {
           onWeakPractice={startWeakRound}
           onReviewWord={reviewSingleWord}
           onReset={() => setAnalytics(resetAnalytics())}
+          dueCount={reviewDue.length}
+          reviewTotal={reviewTotal}
+          onReviewRound={() => {
+            sound.tap()
+            startReviewRound()
+          }}
           onRestart={() => {
             sound.tap()
             startRound()
@@ -649,6 +701,7 @@ export default function App() {
             setTab(tb)
           }}
           onRestart={() => startRound()}
+          onReviewRound={startReviewRound}
           onClose={closePalette}
         />
       )}

@@ -104,6 +104,26 @@ export const en: Record<string, string> = {
   'cmd.placeholder': 'Type a command — :help for all',
   'cmd.unknown': "Unknown command — :help, obviously",
   'cmd.bankNotFound': 'No such bank',
+  'cmd.desc.review': 'Review due mistakes (Ebbinghaus)',
+  'cmd.desc.bank': 'Switch bank: :bank n|id',
+  'cmd.desc.mode': 'Set mode: :mode classic|spell|timed|code',
+  'cmd.desc.voice': 'Accent: :voice en-US|en-GB',
+  'cmd.desc.theme': 'Theme: :theme matrix|ide|ink',
+  'cmd.desc.sound': 'Key sound: :sound on|off',
+  'cmd.desc.soundtheme': 'Sound pack: :soundtheme mech|thock|8bit',
+  'cmd.desc.shuffle': 'Shuffle: :shuffle on|off',
+  'cmd.desc.memorize': 'Go to vocabulary tab',
+  'cmd.desc.typing': 'Go to typing tab',
+  'cmd.desc.q': 'Restart round',
+  'cmd.desc.help': 'List all commands',
+
+  /* Mistake review (Ebbinghaus) */
+  'review.label': 'Review due',
+  'review.dueUnit': 'due',
+  'review.noDue': 'No due mistakes — keep it up!',
+  'review.statsTotal': 'Total mistakes',
+  'review.statsDue': 'Due today',
+  'review.start': 'Start review round',
 
   /* Combo milestone */
   'milestone.combo': 'combo streak! You are on fire',

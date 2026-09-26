@@ -34,6 +34,10 @@ interface HeaderProps {
   onWeakPractice: () => void
   onReviewWord: (word: string) => void
   onReset: () => void
+  /** 错题复习（艾宾浩斯）：到期数 / 错题总数 / 开复习轮 */
+  dueCount: number
+  reviewTotal: number
+  onReviewRound: () => void
   onRestart: () => void
 }
 
@@ -62,6 +66,9 @@ export default function Header(props: HeaderProps) {
     onWeakPractice,
     onReviewWord,
     onReset,
+    dueCount,
+    reviewTotal,
+    onReviewRound,
     onRestart,
   } = props
 
@@ -134,6 +141,27 @@ export default function Header(props: HeaderProps) {
                 {autoSpeak && <Check size={13} />}
               </button>
             )}
+            {/* 错题复习（艾宾浩斯）：到期数徽标，n=0 置灰不可点 */}
+            <div className={`border-t ${theme.border} my-1`} />
+            <button
+              data-testid="menu-review"
+              disabled={dueCount === 0}
+              onClick={() => {
+                sound.tap()
+                setOpenId(null)
+                onReviewRound()
+              }}
+              title={t('review.label')}
+              className={`${itemBtn(false)} ${dueCount === 0 ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              <span className="text-xs">{t('review.label')}</span>
+              <span
+                data-testid="review-due-badge"
+                className={`text-[11px] tabular-nums ${dueCount > 0 ? theme.accent : theme.sub}`}
+              >
+                {lang === 'en' ? `(${dueCount})` : `（${dueCount} ${t('review.dueUnit')}）`}
+              </span>
+            </button>
           </Dropdown>
 
           {/* 词库下拉：内置 + 自定义 + 导入入口 */}
@@ -295,6 +323,9 @@ export default function Header(props: HeaderProps) {
               onWeakPractice={onWeakPractice}
               onReviewWord={onReviewWord}
               onReset={onReset}
+              dueCount={dueCount}
+              reviewTotal={reviewTotal}
+              onReviewRound={onReviewRound}
             />
           </div>
         </div>

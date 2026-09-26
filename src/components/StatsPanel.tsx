@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BarChart3, X, RotateCcw, Crosshair, Trash2 } from 'lucide-react'
+import { BarChart3, X, RotateCcw, Crosshair, Trash2, BookOpenCheck } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
 import {
   accuracyOf,
@@ -8,7 +8,7 @@ import {
   wrongWords,
   type Analytics,
 } from '../lib/analytics'
-import { useT } from '../i18n'
+import { useT, useLang } from '../i18n'
 
 interface StatsPanelProps {
   theme: ThemeConfig
@@ -16,6 +16,10 @@ interface StatsPanelProps {
   onWeakPractice: () => void
   onReviewWord: (word: string) => void
   onReset: () => void
+  /** 错题复习（艾宾浩斯）：到期数 / 错题总数 / 开复习轮 */
+  dueCount: number
+  reviewTotal: number
+  onReviewRound: () => void
 }
 
 export default function StatsPanel({
@@ -24,8 +28,12 @@ export default function StatsPanel({
   onWeakPractice,
   onReviewWord,
   onReset,
+  dueCount,
+  reviewTotal,
+  onReviewRound,
 }: StatsPanelProps) {
   const t = useT()
+  const { lang } = useLang()
   const [open, setOpen] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
 
@@ -68,6 +76,46 @@ export default function StatsPanel({
                   <div className="text-xl font-bold tabular-nums">{it.value}</div>
                 </div>
               ))}
+            </div>
+
+            {/* 错题复习（艾宾浩斯）：错题总数 / 今日到期 */}
+            <div className="mb-6" data-testid="review-stats">
+              <div className="text-sm font-semibold mb-3">{t('review.label')}</div>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className={`rounded-xl border ${theme.border} px-3 py-3`}>
+                  <div className="text-[11px]">{t('review.statsTotal')}</div>
+                  <div data-testid="review-total" className="text-xl font-bold tabular-nums">
+                    {reviewTotal}
+                  </div>
+                </div>
+                <div className={`rounded-xl border ${theme.border} px-3 py-3`}>
+                  <div className="text-[11px]">{t('review.statsDue')}</div>
+                  <div data-testid="review-due" className="text-xl font-bold tabular-nums">
+                    {dueCount}
+                  </div>
+                </div>
+              </div>
+              <button
+                data-testid="review-due-btn"
+                disabled={dueCount === 0}
+                onClick={() => {
+                  setOpen(false)
+                  onReviewRound()
+                }}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold active:scale-95 ${
+                  dueCount > 0
+                    ? 'border-emerald-500/50 text-emerald-400'
+                    : `border-white/10 opacity-40 cursor-not-allowed ${theme.sub}`
+                }`}
+              >
+                <BookOpenCheck size={13} />
+                {t('review.start')}
+                {dueCount > 0 && (
+                  <span className="tabular-nums opacity-70">
+                    {lang === 'en' ? `(${dueCount})` : `（${dueCount} ${t('review.dueUnit')}）`}
+                  </span>
+                )}
+              </button>
             </div>
 
             {/* 易错字母 */}

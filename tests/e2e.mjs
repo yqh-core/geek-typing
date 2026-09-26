@@ -646,6 +646,204 @@ async function run() {
       (await page.locator('[data-testid="speak-btn"]').count()) === 0,
   )
 
+  /* ---------- 14. 批4：错题本（艾宾浩斯）+ 命令面板模糊匹配 ---------- */
+  console.log('\n【14】错题本 + 命令面板模糊匹配')
+
+  // 14.1 模糊匹配：常显列表 / 过滤 / ↑↓ / Tab / Enter
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':voice en-US', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(300) // voice 归位为 en-US，便于 14.1 末尾断言真实切换
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':memorize', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  check('预置：跳到背单词页签', (await page.locator('[data-testid="memorize-card"]').count()) === 1)
+
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':t', { delay: 25 })
+  await page.waitForTimeout(200)
+  check(
+    '打开面板即常显列表，:t 过滤命中 theme/typing/soundtheme',
+    (await page.locator('[data-testid="command-item-theme"]').count()) === 1 &&
+      (await page.locator('[data-testid="command-item-typing"]').count()) === 1 &&
+      (await page.locator('[data-testid="command-item-soundtheme"]').count()) === 1,
+  )
+  check(':t 不命中 bank 等无关命令', (await page.locator('[data-testid="command-item-bank"]').count()) === 0)
+  check(
+    '前缀命中排前面（默认选中 theme）',
+    (await page.getAttribute('[data-testid="command-item-theme"]', 'data-selected')) === 'true',
+  )
+  await page.keyboard.press('ArrowDown')
+  await page.waitForTimeout(120)
+  check(
+    '↓ 移动选中到 typing',
+    (await page.getAttribute('[data-testid="command-item-typing"]', 'data-selected')) === 'true',
+  )
+  await page.keyboard.press('Tab')
+  await page.waitForTimeout(120)
+  check('Tab 补全命令名进输入框', (await page.inputValue('[data-testid="command-input"]')) === ':typing')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(350)
+  check('Enter 执行选中命令（跳打字页签）', (await page.locator('[data-testid="word"]').count()) === 1)
+
+  // 带参命令：部分输入回车 = 补全「命令名+空格」，不误执行
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':vo', { delay: 25 })
+  await page.waitForTimeout(150)
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(150)
+  check(
+    ':vo 回车补全 :voice+空格（不误执行、面板仍在）',
+    (await page.inputValue('[data-testid="command-input"]')) === ':voice ' &&
+      (await page.locator('[data-testid="command-palette"]').count()) === 1,
+  )
+  await page.keyboard.type('en-GB', { delay: 20 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(300)
+  check('补全后继续输参数执行生效', (await page.evaluate(() => localStorage.getItem('gt.voice'))) === 'en-GB')
+
+  // 14.2 错题入库：classic 敲错一个字母再敲对 → gt.review.v1 出现条目
+  await page.evaluate(() => localStorage.removeItem('gt.review.v1')) // 清掉前面用例的敲错记录，保证断言精确
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':mode classic', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(350)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':bank cet4', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(450)
+  const wrongTarget = await readWord(page)
+  check('预置：classic 出词', wrongTarget.length > 0, `词=${wrongTarget}`)
+  await page.keyboard.press(wrongTarget[0] === 'z' ? 'x' : 'z') // 故意敲错
+  await page.waitForTimeout(150)
+  await typeWord(page, wrongTarget) // 敲对完成整词
+  await page.waitForTimeout(500)
+  const review1 = JSON.parse((await page.evaluate(() => localStorage.getItem('gt.review.v1'))) || '{}')
+  check(
+    '敲错的词入库（wrongCount=1、间隔归 0、明天到期）',
+    review1[wrongTarget]?.wrongCount === 1 &&
+      review1[wrongTarget]?.intervalIdx === 0 &&
+      review1[wrongTarget]?.nextReviewAt > Date.now(),
+    JSON.stringify(review1[wrongTarget] ?? null),
+  )
+  await page.click('[data-testid="dropdown-practice"]')
+  await page.waitForTimeout(150)
+  check(
+    '练习下拉含错题复习项，无到期时置灰',
+    (await page.locator('[data-testid="menu-review"]').count()) === 1 &&
+      (await page.locator('[data-testid="menu-review"]').isDisabled()) === true,
+  )
+  await page.keyboard.press('Escape') // 关下拉（不误开命令面板）
+  await page.waitForTimeout(120)
+
+  // 14.3 到期判定：注入 yesterday 到期的词 → StatsPanel 到期 1 → :review 拉出
+  const dueWord = await readWord(page)
+  await page.evaluate((word) => {
+    const now = Date.now()
+    localStorage.setItem(
+      'gt.review.v1',
+      JSON.stringify({
+        [word]: {
+          wrongCount: 1,
+          correctStreak: 0,
+          lastWrongAt: now - 2 * 864e5,
+          nextReviewAt: now - 864e5,
+          intervalIdx: 0,
+        },
+      }),
+    )
+  }, dueWord)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.click('[data-testid="open-stats"]')
+  await page.waitForTimeout(300)
+  check(
+    'StatsPanel 错题统计：总数 1 / 今日到期 1',
+    (await page.textContent('[data-testid="review-total"]'))?.trim() === '1' &&
+      (await page.textContent('[data-testid="review-due"]'))?.trim() === '1',
+  )
+  check(
+    'StatsPanel 含开始错题复习按钮',
+    (await page.locator('[data-testid="review-due-btn"]').count()) === 1 &&
+      (await page.locator('[data-testid="review-due-btn"]').isDisabled()) === false,
+  )
+  await page.click('[aria-label="关闭"]')
+  await page.waitForTimeout(200)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':review', { delay: 25 })
+  await page.waitForTimeout(150)
+  check(':review 出现在命令列表', (await page.locator('[data-testid="command-item-review"]').count()) === 1)
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(500)
+  check(':review 开复习轮且首词即到期词', (await readWord(page)) === dueWord, `首词=${await readWord(page)}`)
+
+  // 14.4 复习推进：到期词全对敲完 → intervalIdx 推进、明天+2 天后到期
+  await typeWord(page, dueWord)
+  await page.waitForTimeout(500)
+  const review2 = JSON.parse((await page.evaluate(() => localStorage.getItem('gt.review.v1'))) || '{}')
+  check(
+    '复习全对间隔推进（intervalIdx 0→1、nextReviewAt 顺延）',
+    review2[dueWord]?.intervalIdx === 1 &&
+      review2[dueWord]?.correctStreak === 1 &&
+      review2[dueWord]?.nextReviewAt > Date.now() + 864e5,
+    JSON.stringify(review2[dueWord] ?? null),
+  )
+  // 未到期：:review 提示「没有到期的错题」且不开轮
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':review', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(300)
+  check(
+    '无到期时 :review 提示不开轮',
+    (await page.locator('[data-testid="command-notice"]').count()) === 1 &&
+      norm(await page.textContent('[data-testid="command-notice"]')).includes('没有到期的错题'),
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+
+  // 14.5 毕业移除：走完 15 天最后一档再对 → 条目移除
+  const gradWord = await readWord(page) // reload 后轮内任意词均可作为毕业候选
+  await page.evaluate((word) => {
+    const now = Date.now()
+    localStorage.setItem(
+      'gt.review.v1',
+      JSON.stringify({
+        [word]: {
+          wrongCount: 2,
+          correctStreak: 4,
+          lastWrongAt: now - 16 * 864e5,
+          nextReviewAt: now - 864e5,
+          intervalIdx: 4,
+        },
+      }),
+    )
+  }, gradWord)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.type(':review', { delay: 25 })
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(500)
+  check('毕业候选被拉进复习轮', (await readWord(page)) === gradWord)
+  await typeWord(page, gradWord)
+  await page.waitForTimeout(500)
+  const review3 = JSON.parse((await page.evaluate(() => localStorage.getItem('gt.review.v1'))) || '{}')
+  check(
+    '走完 15 天间隔毕业移除条目',
+    !(gradWord in review3),
+    `剩余=${JSON.stringify(Object.keys(review3))}`,
+  )
+
   await ctx.close()
   await browser.close()
 

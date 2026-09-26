@@ -105,6 +105,26 @@ export const zh: Record<string, string> = {
   'cmd.placeholder': '输入命令，:help 查看全部',
   'cmd.unknown': '未知命令，:help 查看全部',
   'cmd.bankNotFound': '词库不存在',
+  'cmd.desc.review': '错题复习：拉出艾宾浩斯到期错词',
+  'cmd.desc.bank': '切换词库：:bank 序号|id',
+  'cmd.desc.mode': '练习模式：:mode classic|spell|timed|code',
+  'cmd.desc.voice': '口音切换：:voice en-US|en-GB',
+  'cmd.desc.theme': '主题：:theme matrix|ide|ink',
+  'cmd.desc.sound': '键盘音开关：:sound on|off',
+  'cmd.desc.soundtheme': '音效包：:soundtheme mech|thock|8bit',
+  'cmd.desc.shuffle': '乱序开关：:shuffle on|off',
+  'cmd.desc.memorize': '切到背单词页签',
+  'cmd.desc.typing': '切到打字练习页签',
+  'cmd.desc.q': '重开本轮',
+  'cmd.desc.help': '列出全部命令',
+
+  /* 错题复习（艾宾浩斯） */
+  'review.label': '错题复习',
+  'review.dueUnit': '个到期',
+  'review.noDue': '没有到期的错题，先去练',
+  'review.statsTotal': '错题总数',
+  'review.statsDue': '今日到期',
+  'review.start': '开始错题复习',
 
   /* 连击里程碑 */
   'milestone.combo': '连击！手感来了',
