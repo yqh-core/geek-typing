@@ -26,6 +26,15 @@ function findChrome() {
       if (existsSync(exe)) candidates.unshift(exe)
     }
   }
+  // Playwright 下载的 Chromium（CI / Linux / macOS）
+  const pwRoot = process.env.PLAYWRIGHT_BROWSERS_PATH ?? join(process.env.HOME ?? '', '.cache', 'ms-playwright')
+  if (existsSync(pwRoot)) {
+    for (const dir of readdirSync(pwRoot)) {
+      if (!dir.startsWith('chromium')) continue
+      const exe = join(pwRoot, dir, 'chrome-linux', 'chrome')
+      if (existsSync(exe)) candidates.unshift(exe)
+    }
+  }
   return candidates.find((p) => existsSync(p))
 }
 
@@ -188,11 +197,41 @@ async function run() {
   check('结算含正确率/速度/用时/最高连击', ['正确率', '速度', '用时', '最高连击'].every((k) => done.includes(k)))
   check('结算显示今日累计', done.includes('今日累计'))
 
+  /* ---------- 8.5 发音 / 数据分析 ---------- */
+  console.log('\n【8.5】发音与数据分析')
+  await page.click('button:has-text("再来一轮")')
+  await page.waitForTimeout(400)
+  check('单词发音按钮存在', (await page.locator('[data-testid="speak-btn"]').count()) >= 1)
+  const autospeak = page.locator('[data-testid="toggle-autospeak"]')
+  const hasAuto = (await autospeak.count()) === 1
+  check('自动发音开关存在', hasAuto)
+  if (hasAuto) {
+    const before = (await autospeak.textContent())?.trim()
+    await autospeak.click()
+    await page.waitForTimeout(150)
+    const after = (await autospeak.textContent())?.trim()
+    check('自动发音可切换', before !== after, `${before} → ${after}`)
+  }
+  await page.click('[data-testid="open-stats"]')
+  await page.waitForTimeout(300)
+  const statsText = norm(await page.textContent('body'))
+  check('数据面板可打开', statsText.includes('学习数据分析'))
+  check('数据面板显示累计击键/总正确率', statsText.includes('累计击键') && statsText.includes('总正确率'))
+  check('数据面板含易错键模块', statsText.includes('最常敲错的键'))
+  const weakBtn = page.locator('[data-testid="weak-practice"]')
+  const hasWeak = (await weakBtn.count()) >= 1
+  check('弱项专攻按钮存在', hasWeak)
+  if (hasWeak) {
+    await weakBtn.click()
+    await page.waitForTimeout(400)
+    check('弱项专攻可出题', (await readWord(page)).length > 0)
+  }
+
   /* ---------- 9. 移动端视口 ---------- */
   console.log('\n【9】移动端视口')
   await page.setViewportSize({ width: 390, height: 844 })
   await page.waitForTimeout(300)
-  await page.click('button:has-text("再来一轮")')
+  await page.click('[data-testid="mode-classic"]')
   await page.waitForTimeout(400)
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   check('移动端无横向溢出', overflow <= 2, `溢出=${overflow}px`)

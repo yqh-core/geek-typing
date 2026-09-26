@@ -1,3 +1,4 @@
+import { Volume2 } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
 
 export type PracticeMode = 'classic' | 'spell' | 'timed'
@@ -11,6 +12,7 @@ interface PracticePanelProps {
   wrongKey: string | null
   upcoming: { word: string; translation: string }[]
   mode: PracticeMode
+  onSpeak?: () => void
 }
 
 interface LettersProps {
@@ -80,6 +82,7 @@ export default function PracticePanel({
   wrongKey,
   upcoming,
   mode,
+  onSpeak,
 }: PracticePanelProps) {
   const lower = word.toLowerCase()
 
@@ -151,10 +154,21 @@ export default function PracticePanel({
     <div
       className={`w-full max-w-2xl mx-auto ${theme.card} border ${theme.border} rounded-2xl px-6 py-10 text-center shadow-2xl`}
     >
-      <div className={`text-lg mb-8 ${theme.sub}`}>
+      <div className={`text-lg mb-8 ${theme.sub} flex items-center justify-center gap-2`}>
         <span className="opacity-50">[ </span>
         {translation}
         <span className="opacity-50"> ]</span>
+        {onSpeak && (
+          <button
+            data-testid="speak-btn"
+            onClick={onSpeak}
+            title="朗读这个单词"
+            aria-label="朗读这个单词"
+            className={`ml-1 p-1.5 rounded-md border ${theme.border} hover:opacity-70 active:scale-95`}
+          >
+            <Volume2 size={14} />
+          </button>
+        )}
       </div>
 
       <div className="text-4xl sm:text-5xl font-bold tracking-[0.18em] mb-6 min-h-[3.5rem]">

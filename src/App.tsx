@@ -10,6 +10,18 @@ import { sound, type SoundTheme } from './lib/sound'
 import { THEMES, type ThemeId } from './lib/theme'
 import { MODES, getMode, type PracticeModeId } from './lib/modes'
 import { loadCustomBanks, type CustomBank } from './lib/customBanks'
+import {
+  loadAnalytics,
+  rankByWeakness,
+  recordKey,
+  recordWordDone,
+  resetAnalytics,
+  saveAnalytics,
+  weakLetters,
+  type Analytics,
+} from './lib/analytics'
+import { speak, speechSupported, warmSpeech } from './lib/speech'
+import StatsPanel from './components/StatsPanel'
 import { getTodayCount, loadHistory, recordSeconds, recordWord, type History } from './lib/streak'
 import { Terminal } from 'lucide-react'
 
@@ -70,6 +82,8 @@ export default function App() {
 
   const [history, setHistory] = useState<History>(() => loadHistory())
   const [customBanks, setCustomBanks] = useState<CustomBank[]>(() => loadCustomBanks())
+  const [analytics, setAnalytics] = useState<Analytics>(() => loadAnalytics())
+  const [autoSpeak, setAutoSpeak] = useState<boolean>(() => readStorage('gt.autoSpeak', false))
 
   const startedRef = useRef<number | null>(null)
   const lockRef = useRef(false)
@@ -139,6 +153,38 @@ export default function App() {
     [buildQueue],
   )
 
+  /** 弱项专攻：优先出包含最常敲错字母的词 */
+  const startWeakRound = useCallback(() => {
+    const letters = weakLetters(analytics, 6).map((w) => w.letter)
+    if (letters.length === 0) {
+      startRound()
+      return
+    }
+    const set = new Set(letters)
+    const candidates = bank.words.filter((w) => w.word.toLowerCase().split('').some((c) => set.has(c)))
+    const map = new Map(candidates.map((w) => [w.word, w]))
+    const ranked = rankByWeakness(candidates.map((w) => w.word), letters)
+    const picked = ranked.map((w) => map.get(w)).filter((w): w is WordItem => !!w)
+    startRound(picked.length > 0 ? picked : undefined)
+  }, [analytics, bank, startRound])
+
+  /** 单挑一个错词反复练 */
+  const reviewSingleWord = useCallback(
+    (word: string) => {
+      const item = bank.words.find((w) => w.word.toLowerCase() === word.toLowerCase())
+      if (item) startRound(Array.from({ length: 10 }, () => item))
+    },
+    [bank, startRound],
+  )
+
+  /** 当前瞬时 WPM */
+  const currentWpm = useCallback(() => {
+    if (!startedRef.current) return 0
+    const secs = (Date.now() - startedRef.current) / 1000
+    if (secs <= 0) return 0
+    return Math.round(statsRef.current.correct / 5 / (secs / 60))
+  }, [])
+
   /** 结算本轮 */
   const finishRound = useCallback(() => {
     setFinished(true)
@@ -169,6 +215,18 @@ export default function App() {
   useEffect(() => writeStorage('gt.soundTheme', soundTheme), [soundTheme])
   useEffect(() => writeStorage('gt.shuffle', shuffled), [shuffled])
   useEffect(() => writeStorage('gt.mode', mode), [mode])
+  useEffect(() => writeStorage('gt.autoSpeak', autoSpeak), [autoSpeak])
+
+  // 预热语音引擎（某些浏览器首次 getVoices 为空）
+  useEffect(() => {
+    warmSpeech()
+  }, [])
+
+  // 分析数据落盘（节流，避免每次击键都写 localStorage）
+  useEffect(() => {
+    const t = window.setTimeout(() => saveAnalytics(analytics), 800)
+    return () => window.clearTimeout(t)
+  }, [analytics])
 
   /* ---------------- 限时模式倒计时 ---------------- */
   useEffect(() => {
@@ -204,6 +262,13 @@ export default function App() {
   /* ---------------- 核心：全局键盘监听 ---------------- */
   const current = queue[wordIndex]
   const targetLower = (current?.word ?? '').toLowerCase()
+
+  // 换词时自动发音（拼写模式默认发音，或手动开启自动发音）
+  useEffect(() => {
+    if (!current) return
+    if (mode === 'spell' || autoSpeak) speak(current.word)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.word, wordIndex, mode, autoSpeak])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -244,6 +309,7 @@ export default function App() {
         const pos = typed.length
         const good = next[pos] === targetLower[pos]
         setTyped(next)
+        setAnalytics((a) => recordKey(a, key, good))
         sound.correctOrError(good)
         if (!good) {
           setWrongKey(key)
@@ -282,6 +348,7 @@ export default function App() {
           lockRef.current = true
           sound.complete()
           setHistory(recordWord())
+          setAnalytics((a) => recordWordDone(a, current.word, true, currentWpm()))
           window.setTimeout(() => {
             lockRef.current = false
             setTyped('')
@@ -299,6 +366,7 @@ export default function App() {
         const nextCombo = statsRef.current.combo + 1
         sound.correct()
         setTyped(next)
+        setAnalytics((a) => recordKey(a, key, true))
         setErrorFlash(false)
         setStats((s) => ({
           ...s,
@@ -321,6 +389,7 @@ export default function App() {
           lockRef.current = true
           sound.complete()
           setHistory(recordWord())
+          setAnalytics((a) => recordWordDone(a, current.word, statsRef.current.errors === 0, currentWpm()))
           window.setTimeout(() => {
             lockRef.current = false
             setTyped('')
@@ -336,6 +405,7 @@ export default function App() {
 
       // ❌ 敲错了：不允许跳过，必须敲正确的下一个字母
       sound.error()
+      setAnalytics((a) => recordKey(a, key, false))
       setWrongKey(key)
       setErrorFlash(true)
       if (flashTimer.current) window.clearTimeout(flashTimer.current)
@@ -438,6 +508,30 @@ export default function App() {
           {mode === 'spell' && (
             <span className={`ml-2 text-[11px] ${theme.sub}`}>拼错可用 Backspace 删</span>
           )}
+          <div className="ml-auto flex items-center gap-2">
+            {speechSupported() && (
+              <button
+                data-testid="toggle-autospeak"
+                onClick={() => {
+                  sound.tap()
+                  setAutoSpeak((v) => !v)
+                }}
+                title="换词时自动朗读单词"
+                className={`px-3 py-1.5 rounded-lg border text-xs ${theme.border} ${
+                  autoSpeak ? theme.accent : theme.sub
+                }`}
+              >
+                {autoSpeak ? '🔊 自动发音' : '🔇 自动发音'}
+              </button>
+            )}
+            <StatsPanel
+              theme={theme}
+              analytics={analytics}
+              onWeakPractice={startWeakRound}
+              onReviewWord={reviewSingleWord}
+              onReset={() => setAnalytics(resetAnalytics())}
+            />
+          </div>
         </div>
 
         <div className="flex-1 w-full flex items-center justify-center py-4 relative">
@@ -458,6 +552,7 @@ export default function App() {
               wrongKey={wrongKey}
               upcoming={upcoming}
               mode={mode}
+              onSpeak={() => speak(current.word)}
             />
           ) : (
             <div className={theme.sub}>加载词库中…</div>

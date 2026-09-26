@@ -1,0 +1,40 @@
+name: E2E Tests
+
+# 只在 PR 与手动触发时跑端到端测试（避免拖慢主部署流水线，也保证 main 的部署徽章始终反映部署状态）
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm run build
+
+      # 安装 Chromium 供 playwright-core 驱动（tests/e2e.mjs 会自动探测 .cache/ms-playwright）
+      - run: npx playwright@1.49.1 install chromium --with-deps
+
+      - name: Start preview server
+        run: |
+          npm run preview -- --port 4173 --host 127.0.0.1 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4173/ >/dev/null && break
+            sleep 1
+          done
+
+      - name: Run E2E suite
+        run: node tests/e2e.mjs
