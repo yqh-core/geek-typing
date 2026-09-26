@@ -9,6 +9,10 @@
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
+# SW 自身禁止 HTTP 缓存：保证新版本 Service Worker 能被浏览器及时探测与更新
+/sw.js
+  Cache-Control: no-cache
+
 # SVG 图标同样带指纹，可放心长缓存
 /icons.svg
   Cache-Control: public, max-age=604800

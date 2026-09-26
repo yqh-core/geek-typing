@@ -57,9 +57,9 @@ export const en: Record<string, string> = {
   'sound.thock': 'Thock',
   'sound.8bit': '8-bit',
   'theme.matrix': 'Matrix',
-  'theme.ide': 'Sneaky IDE',
+  'theme.ide': 'Focus IDE',
   'theme.ink': 'E-ink',
-  'theme.ideTitle': 'Disguised as a code editor — perfect for slacking off',
+  'theme.ideTitle': 'Code editor style skin — practice vocabulary quietly at the office',
 
   /* Stats bar */
   'stats.progress': 'Progress',

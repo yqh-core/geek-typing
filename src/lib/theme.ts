@@ -25,7 +25,7 @@ export interface ThemeConfig {
   pill: string
   /** 错误底色 */
   wrongBg: string
-  /** 是否 IDE 摸鱼皮肤 */
+  /** 是否 IDE 风格皮肤 */
   ideStyle?: boolean
 }
 
@@ -47,7 +47,7 @@ export const THEMES: Record<ThemeId, ThemeConfig> = {
   },
   ide: {
     id: 'ide',
-    label: '摸鱼 IDE',
+    label: '专注 IDE',
     root: 'bg-[#181818] text-[#d4d4d4]',
     card: 'bg-[#1e1e1e]',
     border: 'border-[#2b2b2b]',

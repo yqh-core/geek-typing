@@ -58,9 +58,9 @@ export const zh: Record<string, string> = {
   'sound.thock': '麻将音',
   'sound.8bit': '8-bit',
   'theme.matrix': '黑客荧光',
-  'theme.ide': '摸鱼 IDE',
+  'theme.ide': '专注 IDE',
   'theme.ink': '墨水屏',
-  'theme.ideTitle': '伪装成代码编辑器，摸鱼背单词不被发现',
+  'theme.ideTitle': '代码编辑器风格皮肤，办公室也能安静背单词',
 
   /* 统计栏 */
   'stats.progress': '进度',

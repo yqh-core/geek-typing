@@ -1,0 +1,84 @@
+{
+  "base": "http://127.0.0.1:4173",
+  "cacheName": "gt-shell-v2",
+  "time": "2026-09-26T04:45:05.318Z",
+  "passed": true,
+  "failures": 0,
+  "results": [
+    {
+      "name": "态1: navigator.serviceWorker.ready 且 active",
+      "ok": true,
+      "detail": "http://127.0.0.1:4173/sw.js"
+    },
+    {
+      "name": "态1: SW 已接管页面（controller）",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "态1.5: SW 接管后在线 reload 成功",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "态2: 断网导航 reload 成功（无 ERR_FAILED）",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "态2: 主 UI 渲染（练习单词面板可见）",
+      "ok": true,
+      "detail": "word 面板数=1"
+    },
+    {
+      "name": "态2: 词库选择/统计栏可见（非空白错误页）",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "态2: 可读出当前单词",
+      "ok": true,
+      "detail": "单词=inference"
+    },
+    {
+      "name": "态2: 断网下敲正确字母光标前进",
+      "ok": true,
+      "detail": "i → e"
+    },
+    {
+      "name": "态3: 背单词卡片出现",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "态3: Space 翻面显示释义",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "态3: 打分键推进进度",
+      "ok": true,
+      "detail": "本组进度：1/20"
+    },
+    {
+      "name": "态3: 无新增 console error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "态4: 缓存 gt-shell-v2 存在",
+      "ok": true,
+      "detail": "caches=[gt-shell-v2]"
+    },
+    {
+      "name": "态4: 全部条目无 redirected=true 毒条目",
+      "ok": true,
+      "detail": "9 条全部干净"
+    },
+    {
+      "name": "态4: /index.html 或 / 已缓存",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

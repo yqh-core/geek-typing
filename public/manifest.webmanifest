@@ -1,7 +1,7 @@
 {
   "name": "Geek Typing · 极客打字背单词",
   "short_name": "Geek Typing",
-  "description": "无输入框的打字背单词工具：2026 AI 核心词库、云原生词库、四六级雅托，敲对变绿、机械键盘音效、摸鱼 IDE 皮肤。",
+  "description": "无输入框的打字背单词工具：雅思核心 3000 词、四六级词库、TS/Go 代码行练习、错题艾宾浩斯复习、中英双语、全键盘命令流，敲对变绿、机械键盘音效。",
   "lang": "zh-CN",
   "start_url": "/",
   "scope": "/",

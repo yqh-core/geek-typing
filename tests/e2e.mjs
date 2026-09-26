@@ -158,7 +158,7 @@ async function run() {
   /* ---------- 4. 皮肤 / 词库 / 音效（下拉内） ---------- */
   console.log('\n【4】皮肤 / 词库 / 音效（下拉内操作）')
   // 皮肤：设置下拉
-  for (const [label, expect] of [['摸鱼 IDE', 'export const'], ['墨水屏', null], ['黑客荧光', null]]) {
+  for (const [label, expect] of [['专注 IDE', 'export const'], ['墨水屏', null], ['黑客荧光', null]]) {
     await page.click('[data-testid="dropdown-settings"]')
     await page.waitForTimeout(150)
     await page.getByRole('button', { name: label, exact: true }).first().click()

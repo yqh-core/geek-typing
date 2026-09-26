@@ -105,7 +105,7 @@ export default function PracticePanel({
   const meaning = isCode ? translation : lang === 'en' && definition ? definition : translation
   const lower = word.toLowerCase()
 
-  /* ---------- 摸鱼 IDE 皮肤：伪装成 VS Code（code 模式走下方标准卡片，等宽大字号更合适） ---------- */
+  /* ---------- IDE 风格皮肤：编辑器外观（code 模式走下方标准卡片，等宽大字号更合适） ---------- */
   if (theme.ideStyle && !isCode) {
     const lines = 6
     return (
