@@ -74,6 +74,39 @@ const readWord = (page) =>
       .join(''),
   )
 
+/**
+ * 等待 body 文本包含全部 needle（带超时轮询）。
+ *
+ * 为什么不能「固定 waitForTimeout + 一次性抓 body」：
+ *   React 切页签后是分帧渲染的 —— 单词面板（PracticePanel）先挂载，统计栏（StatsBar）
+ *   在其子树的后续渲染帧里才出现。CI runner 比本地慢一个量级，300ms 固定等待在 CI 上
+ *   只抓到「渲染中途」的快照 → 断言随机变红（本地快所以从未红过）。
+ *   这里改成轮询等条件满足：断言本身不放宽，只消除取样时机竞态。
+ *
+ * @returns 命中时的 body 文本；超时则返回最后一次快照（供断言打印真实差异）
+ */
+async function waitForBodyText(page, needles, timeoutMs = 8000) {
+  const read = async () => (await page.textContent('body').catch(() => '')) ?? ''
+  const deadline = Date.now() + timeoutMs
+  let body = await read()
+  while (Date.now() < deadline) {
+    if (needles.every((n) => body.includes(n))) return body
+    await page.waitForTimeout(100)
+    body = await read()
+  }
+  return body
+}
+
+/** 轮询等待「页面上出现该 testid 元素」（替代固定等待，供切页签后使用） */
+async function waitForTestId(page, testId, timeoutMs = 8000) {
+  try {
+    await page.waitForSelector(`[data-testid="${testId}"]`, { state: 'attached', timeout: timeoutMs })
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** SW 注册态（带超时保护，防 ready 永久 pending 挂死脚本；ready 后轮询等 claim 接管） */
 const swState = (page, timeoutMs = 15000) =>
   page.evaluate(
@@ -141,8 +174,12 @@ try {
     // V3-P0a：默认页签为 Home，先断言落点，再切打字页签验证练习面板
     check('态1.5: reload 后落在 Home（推荐首页渲染）', (await page.locator('[data-testid="home-panel"]').count()) >= 1)
     await page.click('[data-testid="tab-typing"]', { timeout: 8000 })
-    await page.waitForTimeout(300)
-    check('态1.5: SW 接管后在线 reload 成功（切 typing 后练习面板可见）', (await page.locator('[data-testid="word"]').count()) >= 1)
+    // 轮询等练习面板挂载，替代原 300ms 固定等待（同类竞态，见 waitForBodyText 注释）
+    const wordReadyOnline = await waitForTestId(page, 'word')
+    check(
+      '态1.5: SW 接管后在线 reload 成功（切 typing 后练习面板可见）',
+      wordReadyOnline && (await page.locator('[data-testid="word"]').count()) >= 1,
+    )
   }
 
   /* ---------- 态2 断网 reload ---------- */
@@ -161,11 +198,18 @@ try {
     check('态2: 断网 reload 后落在 Home（推荐首页渲染）', (await page.locator('[data-testid="home-panel"]').count()) >= 1)
     // 切到打字页签（纯前端操作，断网可用）后执行原打字核心断言
     await page.click('[data-testid="tab-typing"]', { timeout: 8000 })
-    await page.waitForTimeout(300)
+    // 轮询等练习面板挂载（CI 慢 runner 上 300ms 固定等待不够）
+    const wordReady = await waitForTestId(page, 'word')
     const wordCount = await page.locator('[data-testid="word"]').count()
-    check('态2: 主 UI 渲染（练习单词面板可见）', wordCount >= 1, `word 面板数=${wordCount}`)
-    const body = (await page.textContent('body').catch(() => '')) ?? ''
-    check('态2: 词库选择/统计栏可见（非空白错误页）', body.includes('进度') && body.includes('正确率'))
+    check('态2: 主 UI 渲染（练习单词面板可见）', wordReady && wordCount >= 1, `word 面板数=${wordCount}`)
+    // 统计栏（StatsBar）在练习面板子树的后续渲染帧出现 → 轮询等「进度」+「正确率」同时就位。
+    // 断言不放宽：仍要求两者都存在，只是不再用一次性快照赌渲染已完成。
+    const body = await waitForBodyText(page, ['进度', '正确率'])
+    check(
+      '态2: 词库选择/统计栏可见（非空白错误页）',
+      body.includes('进度') && body.includes('正确率'),
+      `bodyLen=${body.length} 进度=${body.includes('进度')} 正确率=${body.includes('正确率')}`,
+    )
     // 打字功能活：敲正确字母推进光标
     const w1 = await readWord(page)
     const c0 = await readCursor(page)
@@ -193,13 +237,16 @@ try {
   }
   try {
     await page.click('[data-testid="tab-memorize"]', { timeout: 8000 })
-    await page.waitForTimeout(300)
+    // 轮询等卡片挂载，替代原 300ms 固定等待（CI 慢 runner 上同样会读到渲染中途快照）
+    await waitForTestId(page, 'memorize-card')
     check('态3: 背单词卡片出现', (await page.locator('[data-testid="memorize-card"]').count()) === 1)
     await page.keyboard.press('Space')
-    await page.waitForTimeout(250)
+    // 翻面 = React 状态更新 + 重渲染 → 轮询等释义面板出现
+    await waitForTestId(page, 'memorize-translation', 5000)
     check('态3: Space 翻面显示释义', (await page.locator('[data-testid="memorize-translation"]').count()) === 1)
     await page.keyboard.press('1') // 认识 → 推进
-    await page.waitForTimeout(250)
+    // 打分后进度文案从 0/20 变 1/20 → 轮询等文案就位，而非赌 250ms 够
+    await waitForBodyText(page, ['1/'], 5000)
     const prog = (await page.textContent('[data-testid="memorize-progress"]').catch(() => '')) ?? ''
     check('态3: 打分键推进进度', prog.includes('1/'), prog.trim())
     check('态3: 无新增 console error', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))

@@ -29,6 +29,8 @@ jobs:
   gate-static:
     name: 门禁① 静态与内容（无产物）
     runs-on: ubuntu-latest
+    # 兜底超时：本地实测 14s。给 10 分钟余量防止异常挂死烧满 runner。
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,6 +54,9 @@ jobs:
   gate-build:
     name: 门禁② 构建产物（体积 + 离线）
     runs-on: ubuntu-latest
+    # 兜底超时：本地实测 build+bundle+chromium+offline 约 1 分钟，CI 实测 51s（含失败）。
+    # 给 20 分钟余量防止挂死。
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -79,6 +84,11 @@ jobs:
   gate-e2e:
     name: 门禁③ 端到端（test:e2e）
     runs-on: ubuntu-latest
+    # 兜底超时（关键）：CI run 36308273299 曾因 16 处 networkidle 在最终环境上
+    # 挂死 25 分钟且不会自动失败，只能人工 cancel——白白烧 runner 额度且看起来
+    # 像「一直在跑」。已在 tests/e2e.mjs 改用 waitUntil:'load' + 显式超时修根因，
+    # 这里是第二层保险：20 分钟到点强制失败。本地实测 e2e 约 2.5 分钟。
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -100,6 +110,7 @@ jobs:
   deploy:
     name: 部署到 Cloudflare Pages
     needs: [gate-static, gate-build, gate-e2e]
+    timeout-minutes: 20
     # if 里显式判三条闸的 result，而非只写 always()：
     #   - 不写 always() 时，某闸失败会让本 job 被隐式跳过，表现为 skipped，
     #     容易掩盖「闸门未决」；

@@ -66,6 +66,49 @@ const readCursor = (page) =>
 
 const norm = (s) => (s ?? '').replace(/\s+/g, ' ')
 
+/* ---------------- 导航策略：为什么不用 'networkidle' ----------------
+ * CI run 36308273299 实测：16 处 waitUntil:'networkidle' 让 test:e2e 卡死 25 分钟未完成。
+ * 根因是页面自身的后台流量：
+ *   - public/sw.js 注册后，install 阶段 precacheShell() 会把首页 HTML 里所有 /assets/* 逐个拉一遍；
+ *   - src/main.tsx 的 warmUpVocabulary() 在 window load 后经 requestIdleCallback 预拉
+ *     ielts/kaoyan/toefl 三个 words-*.js（合计约 1.4 MB）。
+ * networkidle 要求「500ms 内无任何进行中的网络请求」；CI runner 首次无缓存、跨公网拉这
+ * 1.4 MB 时，这个窗口长时间无法出现 → page.goto/reload 一直等到 Playwright 默认 30s 超时，
+ * 16 次累积即卡死。本地 chunk 已在磁盘缓存里，网络瞬间 idle，所以从未暴露。
+ *
+ * 改为 'load'（HTML 与同步资源已就绪，含首屏 index-*.js），后台预热/precache 仍在跑也没关系 ——
+ * 各用例真正依赖的元素由下面的 NAV_TIMEOUT + waitForTestId 保证，不依赖「网络静默」这个假信号。
+ */
+const NAV_TIMEOUT = 30000
+
+/** 导航（goto/reload）统一入口：load 事件就绪 + 显式超时，严禁再退回 networkidle */
+const reloadPage = (page) => page.reload({ waitUntil: 'load', timeout: NAV_TIMEOUT })
+const gotoPage = (page) => page.goto(BASE, { waitUntil: 'load', timeout: NAV_TIMEOUT })
+
+/** 轮询等待 body 文本包含全部 needle（带超时）。替代「固定 waitForTimeout + 一次性抓 body」
+ *  的竞态写法：React 分帧渲染下，慢 runner 会在渲染中途被采样而假失败。 */
+async function waitForBodyText(page, needles, timeoutMs = 8000) {
+  const read = async () => (await page.textContent('body').catch(() => '')) ?? ''
+  const deadline = Date.now() + timeoutMs
+  let body = await read()
+  while (Date.now() < deadline) {
+    if (needles.every((n) => body.includes(n))) return body
+    await page.waitForTimeout(100)
+    body = await read()
+  }
+  return body
+}
+
+/** 轮询等待某 testid 元素挂载（带超时）。返回是否命中，供断言组合使用。 */
+async function waitForTestId(page, testId, timeoutMs = 8000) {
+  try {
+    await page.waitForSelector(`[data-testid="${testId}"]`, { state: 'attached', timeout: timeoutMs })
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function typeWord(page, word) {
   // 给足间隔，避免按键快过 React 状态更新导致漏拍
   await page.keyboard.type(word.toLowerCase(), { delay: 20 })
@@ -76,13 +119,20 @@ async function pickMode(page, modeId) {
   await page.click('[data-testid="dropdown-practice"]')
   await page.waitForTimeout(150)
   await page.click(`[data-testid="mode-${modeId}"]`)
+  await waitForTestId(page, 'word') // 模式切换后等练习面板按新模式重渲染就位
   await page.waitForTimeout(300)
 }
 
-/** V3-P0a：默认页签是 Home（今日推荐），打字类用例先切到 typing 页签 */
+/** V3-P0a：默认页签是 Home（今日推荐），打字类用例先切到 typing 页签。
+ *  必须用 waitForSelector 等页签真正可点：reload 后改为 waitUntil:'load'，页签的
+ *  点击监听可能在 load 之后才由 React 挂上（CI 慢 runner 上更明显），
+ *  固定 200ms 会让 click 打在「尚未激活的页签」上（静默不改页签，后续断言全错）。 */
 async function gotoTyping(page) {
-  await page.click('[data-testid="tab-typing"]')
-  await page.waitForTimeout(200)
+  const tab = page.locator('[data-testid="tab-typing"]')
+  await tab.waitFor({ state: 'visible', timeout: NAV_TIMEOUT })
+  await tab.click({ timeout: NAV_TIMEOUT })
+  // 优先等练习面板出现；代码模式下 word 存在但无 keymap，故 word 就位即可返回
+  await waitForTestId(page, 'word', 5000)
 }
 
 async function run() {
@@ -103,7 +153,7 @@ async function run() {
   })
   page.on('pageerror', (e) => consoleErrors.push(String(e)))
 
-  await page.goto(BASE, { waitUntil: 'networkidle' })
+  await gotoPage(page)
   await gotoTyping(page) // V3-P0a：默认落 Home，打字类用例先切 typing
 
   /* ---------- 1. 首屏与下拉导航 ---------- */
@@ -208,8 +258,10 @@ async function run() {
 
   /* ---------- 5. 持久化 ---------- */
   console.log('\n【5】本地持久化')
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadPage(page)
   await gotoTyping(page) // V3-P0a：reload 后落 Home
+  // 词库名经 localStorage 恢复后由 React effect 读回，等文案就位再断言
+  await waitForBodyText(page, ['四级 CET-4'])
   check('刷新后仍是 CET-4', norm(await page.textContent('body')).includes('四级 CET-4'))
 
   /* ---------- 6. 拼写（默写）模式 ---------- */
@@ -334,8 +386,10 @@ async function run() {
   const summary = norm(await page.textContent('body'))
   check('结算含今日新学/复习/已掌握', ['今日新学', '复习', '本库已掌握'].every((k) => summary.includes(k)))
   // 刷新后进度仍在：直接校验 localStorage 记录数 ≥ 20，且新卡组正常开启
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadPage(page)
+  await waitForTestId(page, 'tab-memorize') // 等应用壳挂载，页签可点
   await page.click('[data-testid="tab-memorize"]')
+  await waitForTestId(page, 'memorize-card', 10000)
   await page.waitForTimeout(500)
   const memRaw = await page.evaluate(() => localStorage.getItem('gt.memorize.v1'))
   const memCount = memRaw ? Object.keys(JSON.parse(memRaw)).length : 0
@@ -354,9 +408,12 @@ async function run() {
   check('en 即时生效', ['Typing', 'Vocabulary', 'Practice', 'Settings'].every((k) => bodyEn.includes(k)))
   // 切到 CET-4（无 nameEn，显示中文名属词库数据豁免）之外的主要 UI 不应残留中文
   check('en 模式无中文导航残留', !bodyEn.includes('练习') && !bodyEn.includes('设置') && !bodyEn.includes('背单词'))
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadPage(page)
+  // 语言偏好经 localStorage 恢复后由 React 渲染 → 轮询等英文导航就位
+  await waitForBodyText(page, ['Typing', 'Practice'])
   const bodyEn2 = norm(await page.textContent('body'))
   check('en 刷新保持', bodyEn2.includes('Typing') && bodyEn2.includes('Practice'))
+  await waitForTestId(page, 'lang-zh')
   await page.click('[data-testid="lang-zh"]')
   await page.waitForTimeout(200)
 
@@ -550,7 +607,7 @@ async function run() {
     ':voice en-GB 切换生效（localStorage gt.voice）',
     (await page.evaluate(() => localStorage.getItem('gt.voice'))) === 'en-GB',
   )
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadPage(page)
   check(
     '刷新后 voice 偏好保持 en-GB',
     (await page.evaluate(() => localStorage.getItem('gt.voice'))) === 'en-GB',
@@ -779,8 +836,9 @@ async function run() {
       }),
     )
   }, dueWord)
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadPage(page)
   await page.waitForTimeout(500)
+  await waitForTestId(page, 'open-stats')
   await page.click('[data-testid="open-stats"]')
   await page.waitForTimeout(300)
   check(
@@ -846,8 +904,9 @@ async function run() {
       }),
     )
   }, gradWord)
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadPage(page)
   await page.waitForTimeout(500)
+  await waitForTestId(page, 'tab-typing') // 等应用壳挂载后再按 Esc（面板仅在有监听时打开）
   await page.keyboard.press('Escape')
   await page.waitForTimeout(200)
   await page.keyboard.type(':review', { delay: 25 })
@@ -918,10 +977,10 @@ async function run() {
       }),
     )
   }, kyWrong)
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadPage(page)
   await page.waitForTimeout(800) // 等懒加载词库 chunk 拉取 + bankWords 就位
   await gotoTyping(page) // V3-P0a：reload 后落 Home，readWord 需要打字面板
-  for (let i = 0; i < 10 && (await readWord(page)).length === 0; i++) await page.waitForTimeout(200)
+  for (let i = 0; i < 15 && (await readWord(page)).length === 0; i++) await page.waitForTimeout(200)
   await page.keyboard.press('Escape')
   await page.waitForTimeout(200)
   await page.keyboard.type(':review', { delay: 25 })
@@ -1070,13 +1129,16 @@ async function run() {
   mpage.on('console', (m) => m.type() === 'error' && mConsoleErrors.push(m.text()))
   mpage.on('pageerror', (e) => mConsoleErrors.push(String(e)))
 
-  await mpage.goto(BASE, { waitUntil: 'networkidle' })
+  await gotoPage(mpage)
+  await waitForTestId(mpage, 'tab-memorize') // 等应用壳挂载
 
   // 预热探针：后台轮询 SW 缓存，等手势/命令用例跑完后收取（与 idle 预热并行）。
-  // 预算 60×500ms=30s：生产环境 3 个懒加载 chunk（各 ~170KiB gzip）走 CF 边缘，
-  // 与并发 UI 用例抢带宽时偶尔 >18s，曾偶发 race 失败；本地 127.0.0.1 瞬时完成。
+  // 预算 240×500ms=120s：CI runner 首次无缓存、跨公网拉 3 个 words-*.js（合计约 1.4 MB）
+  // 时，「下载 + SW 写入缓存」可能远超本地；原 30s 预算在 CI 上被判定为下一个红灯风险
+  // （见 CI run 36308273299 复盘）。提到 4 倍余量：仍能在合理时间内失败，不会无限等待。
+  // 生产环境即使并发抢带宽 >18s 也远在预算内。
   const warmProbe = mpage.evaluate(async () => {
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 240; i++) {
       try {
         const names = await caches.keys()
         if (names.includes('gt-shell-v3')) {
@@ -1229,8 +1291,9 @@ async function run() {
     localStorage.removeItem('gt.analytics.v1')
     localStorage.setItem('gt.bank', JSON.stringify('cet4'))
   })
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadPage(page)
   await page.waitForTimeout(500)
+  await waitForTestId(page, 'home-panel') // 等默认 Home 页签渲染后再数页签
   const tabIdsAll = ['home', 'typing', 'memorize', 'review', 'progress']
   let tabsAllThere = true
   for (const id of tabIdsAll) {
@@ -1257,8 +1320,10 @@ async function run() {
     h[keyOf(today)] = { date: keyOf(today), words: 30, seconds: 200 }
     localStorage.setItem('gt.streak.v1', JSON.stringify(h))
   })
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadPage(page)
   await page.waitForTimeout(400)
+  await waitForTestId(page, 'home-goal-bar')
+  await waitForTestId(page, 'home-streak')
   const goalStyle = await page.getAttribute('[data-testid="home-goal-bar"]', 'style')
   check(
     'Daily Goal 进度条渲染（30/50 → 60%）+ streak 3 天',
@@ -1269,8 +1334,9 @@ async function run() {
 
   // 16.2 复习卡两态 + 点击开复习轮
   await page.evaluate(() => localStorage.removeItem('gt.review.v1'))
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadPage(page)
   await page.waitForTimeout(400)
+  await waitForTestId(page, 'home-review-empty') // 空态卡挂载后再断言（避免渲染中途采样）
   check(
     '复习卡空态（空态文案 + 无开始按钮）',
     (await page.locator('[data-testid="home-review-empty"]').count()) === 1 &&
@@ -1284,8 +1350,9 @@ async function run() {
       }),
     )
   })
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadPage(page)
   await page.waitForTimeout(400)
+  await waitForTestId(page, 'home-review-card') // 有态卡挂载
   const reviewCard = norm(await page.textContent('[data-testid="home-review-card"]'))
   check(
     '复习卡有态（1 个单词到期 + abandon 预览）',
@@ -1300,8 +1367,9 @@ async function run() {
 
   // 16.3 弱项卡两态 + 点击专攻
   await page.evaluate(() => localStorage.removeItem('gt.analytics.v1'))
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadPage(page)
   await page.waitForTimeout(400)
+  await waitForTestId(page, 'home-weak-empty')
   check('弱项卡空态（暂无弱项数据）', (await page.locator('[data-testid="home-weak-empty"]').count()) === 1)
   await page.evaluate(() => {
     localStorage.setItem(
@@ -1316,8 +1384,9 @@ async function run() {
       }),
     )
   })
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadPage(page)
   await page.waitForTimeout(400)
+  await waitForTestId(page, 'home-weak-card') // 弱项数据卡挂载
   const weakCard = norm(await page.textContent('[data-testid="home-weak-card"]'))
   check('弱项卡展示 top 弱字母（q 90%）', weakCard.includes('q') && weakCard.includes('90%'), weakCard.slice(0, 60))
   await page.click('[data-testid="home-weak-start"]')
@@ -1348,9 +1417,11 @@ async function run() {
       }),
     )
   })
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadPage(page)
   await page.waitForTimeout(400)
+  await waitForTestId(page, 'tab-review') // 等应用壳挂载后再切 Review 页签
   await page.click('[data-testid="tab-review"]')
+  await waitForTestId(page, 'review-stat-total') // 等 Review 页数据卡挂载
   await page.waitForTimeout(400)
   check(
     'Review 统计：错题总数 2 / 今日到期 2',
