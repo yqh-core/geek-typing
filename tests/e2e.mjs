@@ -81,6 +81,27 @@ const norm = (s) => (s ?? '').replace(/\s+/g, ' ')
  */
 const NAV_TIMEOUT = 30000
 
+/** 锁定 UI 语言为中文。
+ *  应用按 navigator.language 探测默认语言（src/i18n/index.tsx:24，以 'zh' 前缀判断），
+ *  而 CI runner 的 navigator.language 是 en-US ⇒ 本文件里大量按中文文案写的断言
+ *  （102 条）会在 CI 上全数假失败，且「等文案就位」会一路等到超时、把 job 拖死。
+ *  语言不是这些用例的变量，故显式钉死为默认值。
+ *
+ *  注意**只作默认值、不覆盖已有选择**：addInitScript 在每次导航（含 reload）都会执行，
+ *  若无条件写入，会把「用户切到 en 后刷新应保持 en」这条正确行为一起改掉（§10 用例会失败）。
+ *  因此仅在 key 不存在时写入 —— 首次进入消除环境依赖，显式切换仍可持久化。
+ *  语言切换用例（点 lang-en / lang-zh）走显式点击，不受影响。 */
+const lockLangZh = (ctx) =>
+  ctx.addInitScript(() => {
+    try {
+      if (window.localStorage.getItem('gt.lang') === null) {
+        window.localStorage.setItem('gt.lang', 'zh')
+      }
+    } catch {
+      /* localStorage 不可用时忽略，回落到 navigator 探测 */
+    }
+  })
+
 /** 导航（goto/reload）统一入口：load 事件就绪 + 显式超时，严禁再退回 networkidle */
 const reloadPage = (page) => page.reload({ waitUntil: 'load', timeout: NAV_TIMEOUT })
 const gotoPage = (page) => page.goto(BASE, { waitUntil: 'load', timeout: NAV_TIMEOUT })
@@ -143,6 +164,7 @@ async function run() {
 
   const browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] })
   const ctx = await browser.newContext({ viewport: { width: 1360, height: 1000 } })
+  await lockLangZh(ctx)
   const page = await ctx.newPage()
 
   const consoleErrors = []
@@ -1124,6 +1146,7 @@ async function run() {
   /* ---------- 14. 批8-B：移动端手势 + 命令面板唤起 + 预热探针 ---------- */
   console.log('\n【14】批8：移动端手势 / 命令面板 / 预热')
   const mctx = await browser.newContext({ viewport: { width: 375, height: 812 }, hasTouch: true })
+  await lockLangZh(mctx)
   const mpage = await mctx.newPage()
   const mConsoleErrors = []
   mpage.on('console', (m) => m.type() === 'error' && mConsoleErrors.push(m.text()))

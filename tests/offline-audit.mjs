@@ -148,6 +148,23 @@ const browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] }
 
 try {
   const context = await browser.newContext({ viewport: { width: 1360, height: 1000 } })
+  // 锁定 UI 语言为中文：应用按 navigator.language 探测默认语言（src/i18n/index.tsx:24
+  // 以 'zh' 前缀判断），而 CI runner 的 navigator.language 是 en-US ⇒ 界面上「进度」
+  // 「正确率」等中文文案会变成 Progress / Accuracy，导致按中文文案写的断言在 CI 假失败
+  // （CI run 36310587197 实测：bodyLen=481 进度=false 正确率=false，本地则是
+  //  bodyLen=271 进度=true 正确率=true —— 长度差异正是英文文案更长所致）。
+  // 语言不该是「统计栏是否渲染」这条断言的变量，故显式钉死，消除环境依赖。
+  // 只作默认值、不覆盖已有选择（addInitScript 每次导航都执行；本文件虽不测语言切换，
+  // 仍保持与 e2e 一致，避免以后新增用例时踩同一坑）。
+  await context.addInitScript(() => {
+    try {
+      if (window.localStorage.getItem('gt.lang') === null) {
+        window.localStorage.setItem('gt.lang', 'zh')
+      }
+    } catch {
+      /* localStorage 不可用时忽略，回落到 navigator 探测 */
+    }
+  })
   const page = await context.newPage()
   const consoleErrors = []
   page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()))
