@@ -51,7 +51,10 @@ export default function ResultOverlay({
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 z-30">
-      <div className={`w-full max-w-lg ${theme.card} border ${theme.border} rounded-2xl p-8 shadow-2xl animate-popIn`}>
+      <div
+        data-testid="result-overlay"
+        className={`w-full max-w-lg ${theme.card} border ${theme.border} rounded-2xl p-8 shadow-2xl animate-popIn`}
+      >
         <div className="flex items-center gap-2 mb-6">
           {mode === 'timed' ? (
             <Timer size={18} className={theme.accent} />

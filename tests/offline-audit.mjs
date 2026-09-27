@@ -1,5 +1,5 @@
 /**
- * Geek Typing 离线审计（批5）：真实断网四态验证 Service Worker 缜密化效果
+ * Geek Typing 离线审计（批5）：真实断网五态验证 Service Worker 缜密化效果
  *
  * 独立于 tests/e2e.mjs（断网仿真会污染在线用例），勿并入主套件。
  *
@@ -7,11 +7,12 @@
  *   npm run test:offline      # 一键：自举 vite preview（4173 已占用则复用）
  *   npm run test:prod         # 打生产 https://geek-typing.pages.dev（只读）
  *
- * 四态：
+ * 五态：
  *   态1 在线首访 → SW 注册并 active
  *   态2 断网 reload → 主 UI 渲染 + 打字推进
  *   态3 断网功能完整性 → 背单词 Space 翻面 + 三键打分 + 无新增 console error
- *   态4 缓存探针 → gt-shell-v2 全部条目无 redirected=true 毒条目，且 index 已缓存
+ *   态4 缓存探针 → gt-shell-v3 全部条目无 redirected=true 毒条目，且 index 已缓存
+ *   态4b MIME 投毒探针 → /assets/*.js 不得缓存 text/html（BUG-002 回归判据）
  *
  * 结果 JSON：tests/_evidence/offline-audit-result.json
  */
@@ -23,7 +24,7 @@ import { ensurePreviewServer, stopPreview } from './preview-server.mjs'
 const PROD_BASE = 'https://geek-typing.pages.dev'
 const IS_PROD = process.argv.includes('--prod')
 const BASE = process.env.E2E_BASE ?? (IS_PROD ? PROD_BASE : 'http://127.0.0.1:4173')
-const CACHE_NAME = 'gt-shell-v2'
+const CACHE_NAME = 'gt-shell-v3'
 
 function findChrome() {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH
@@ -209,7 +210,7 @@ try {
   await context.setOffline(false)
 
   /* ---------- 态4 缓存探针 ---------- */
-  console.log('\n【态4】缓存探针：无 redirected 毒条目')
+  console.log('\n【态4】缓存探针：无 redirected 毒条目 + 无 MIME 不匹配条目')
   // 在已成功加载的页面上下文 evaluate（错误页上下文 caches 不可用）
   let probe = { exists: false, names: [], entries: [] }
   try {
@@ -227,14 +228,20 @@ try {
         } catch {
           pathname = req.url
         }
-        entries.push({ url: req.url, pathname, redirected: !!res?.redirected, status: res?.status ?? null })
+        entries.push({
+          url: req.url,
+          pathname,
+          redirected: !!res?.redirected,
+          status: res?.status ?? null,
+          contentType: res?.headers.get('content-type') || '',
+        })
       }
       return { exists: true, names, entries }
     }, CACHE_NAME)
   } catch (e) {
     check('态4: 缓存探针执行', false, String(e).split('\n')[0])
   }
-  check('态4: 缓存 gt-shell-v2 存在', probe.exists, `caches=[${probe.names.join(', ')}]`)
+  check('态4: 缓存 gt-shell-v3 存在', probe.exists, `caches=[${probe.names.join(', ')}]`)
   const poisoned = probe.entries.filter((e) => e.redirected)
   check(
     '态4: 全部条目无 redirected=true 毒条目',
@@ -243,7 +250,79 @@ try {
   )
   const hasIndex = probe.entries.some((e) => e.pathname === '/index.html' || e.pathname === '/')
   check('态4: /index.html 或 / 已缓存', hasIndex)
-  probe.entries.forEach((e) => console.log(`    · [${e.status}] redirected=${e.redirected} ${e.pathname}`))
+  probe.entries.forEach((e) => console.log(`    · [${e.status}] redirected=${e.redirected} ${e.pathname} (${e.contentType})`))
+
+  /* ---------- 态4b MIME 投毒探针（BUG-002 回归，主动注入） ---------- */
+  // 为什么必须「主动注入」而不是被动检查缓存：
+  //   本地 vite preview 对缺失资源返回 404/502，而 Cloudflare Pages 返回 200 + text/html（软 404）。
+  //   因此在本地，"SPA fallback 投毒"这一病态输入根本不会自然出现——
+  //   被动探针会**空转通过**（air test），即使校验被删除也不会变红（已实测确认）。
+  //   故本探针用 context.route 伪造一个「/assets/*.js 返回 200 + text/html」的软 404。
+  //
+  // 为什么用 context.route 而不是 CDP Fetch 域：
+  //   Service Worker 发起的 fetch 运行在独立的 worker target 上，
+  //   页面级 CDP 会话（newCDPSession(page) + Fetch.enable）**拦截不到**（已实测：routeHits=0）。
+  //   而 playwright 的 context.route 覆盖 SW 请求（已实测：routeHits=1）。
+  console.log('\n【态4b】MIME 投毒探针：伪造软 404，断言 SW 拒绝缓存（主动注入）')
+  const TRAP = '/assets/__gt-trap-soft404.js'
+  const FAKE_HTML = '<!doctype html><title>trap</title>'
+  let trapResult = { intercepted: false, reqFailed: false, cached: false, cachedType: '', pageGotHtml: false }
+  try {
+    let routeHits = 0
+    await context.route('**/__gt-trap-soft404.js*', async (route) => {
+      routeHits++
+      // 精确复刻 Cloudflare Pages 的软 404：200 + text/html
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: FAKE_HTML,
+      })
+    })
+
+    // 在页面上下文发起请求，走 SW 的 fetch handler（同源 + /assets/ ⇒ 命中策略 A）
+    const r = await page.evaluate(async (url) => {
+      try {
+        const res = await fetch(url)
+        const text = await res.text()
+        return { status: res.status, contentType: res.headers.get('content-type') || '', text }
+      } catch (e) {
+        return { status: null, contentType: '', text: '', threw: String(e) }
+      }
+    }, TRAP)
+    trapResult.intercepted = routeHits > 0
+    trapResult.reqFailed = r.status === null || r.status >= 500
+    trapResult.pageGotHtml = /<!doctype html>/i.test(r.text)
+
+    // 关键断言：SW 不得把这条 HTML 写进缓存
+    const look = await page.evaluate(
+      async ({ cacheName, url }) => {
+        const names = await caches.keys()
+        if (!names.includes(cacheName)) return { cached: false, cachedType: '' }
+        const cache = await caches.open(cacheName)
+        const hit = await cache.match(url)
+        return { cached: !!hit, cachedType: hit ? hit.headers.get('content-type') || '' : '' }
+      },
+      { cacheName: CACHE_NAME, url: TRAP },
+    )
+    trapResult.cached = look.cached
+    trapResult.cachedType = look.cachedType
+
+    check('态4b: 软 404 注入已生效（路由拦截命中）', trapResult.intercepted, `trap=${TRAP}`)
+    check(
+      '态4b: SW 未把 text/html 写入 /assets/*.js 缓存',
+      !trapResult.cached,
+      trapResult.cached ? `已投毒：cachedType=${trapResult.cachedType}` : '未缓存（正确拒绝）',
+    )
+    check(
+      '态4b: SW 未把 HTML 交给页面（返回 5xx 或抛错，而非 200 HTML）',
+      trapResult.reqFailed && !trapResult.pageGotHtml,
+      `status=${trapResult.reqFailed ? '5xx/threw' : '200'} pageGotHtml=${trapResult.pageGotHtml}`,
+    )
+
+    await context.unroute('**/__gt-trap-soft404.js*').catch(() => {})
+  } catch (e) {
+    check('态4b: 主动注入探针执行', false, String(e).split('\n')[0])
+  }
 
   await context.close()
 } finally {
@@ -252,7 +331,7 @@ try {
 
 /* ---------- 总结论 + 证据落盘 ---------- */
 console.log('\n========== 离线审计总结 ==========')
-console.log(`结论：${failures === 0 ? '✅ 四态全部通过' : `❌ ${failures} 项未通过`}`)
+console.log(`结论：${failures === 0 ? '✅ 全部通过' : `❌ ${failures} 项未通过`}`)
 
 mkdirSync(join('tests', '_evidence'), { recursive: true })
 writeFileSync(

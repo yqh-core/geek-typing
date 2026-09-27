@@ -265,9 +265,24 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flipped, item?.word])
 
-  /* ---------- 词库为空 ---------- */
+  /* ---------- 词库未就绪 ----------
+   * 三态区分（修复「加载中」被误判为「空词库」）：
+   *  - lazy 包（bank.load 存在）且 words 为空 ⇒ 词条 chunk 仍在拉取中/拉取失败，显示加载态
+   *  - 无 load 且 words 为空 ⇒ 真·空词库，显示空态文案
+   * 判据依据：wordBanks.ts 仅为 lazy 包挂 load/count；全部内置包 stats.items > 0。 */
   if (bank.words.length === 0) {
-    return <div className={`text-sm ${theme.sub}`}>{t('memorize.emptyBank')}</div>
+    if (bank.load) {
+      return (
+        <div data-testid="memorize-loading" className={`text-sm ${theme.sub}`}>
+          {t('memorize.loadingBank')}
+        </div>
+      )
+    }
+    return (
+      <div data-testid="memorize-empty" className={`text-sm ${theme.sub}`}>
+        {t('memorize.emptyBank')}
+      </div>
+    )
   }
 
   /* ---------- 结算卡 ---------- */

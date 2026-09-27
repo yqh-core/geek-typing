@@ -1,7 +1,7 @@
 {
   "base": "http://127.0.0.1:4173",
-  "cacheName": "gt-shell-v2",
-  "time": "2026-09-26T16:19:47.220Z",
+  "cacheName": "gt-shell-v3",
+  "time": "2026-09-27T09:01:05.738Z",
   "passed": true,
   "failures": 0,
   "results": [
@@ -48,12 +48,12 @@
     {
       "name": "态2: 可读出当前单词",
       "ok": true,
-      "detail": "单词=quantization"
+      "detail": "单词=convergence"
     },
     {
       "name": "态2: 断网下敲正确字母光标前进",
       "ok": true,
-      "detail": "q → n"
+      "detail": "c → v"
     },
     {
       "name": "态3: 背单词卡片出现",
@@ -76,9 +76,9 @@
       "detail": ""
     },
     {
-      "name": "态4: 缓存 gt-shell-v2 存在",
+      "name": "态4: 缓存 gt-shell-v3 存在",
       "ok": true,
-      "detail": "caches=[gt-shell-v2]"
+      "detail": "caches=[gt-shell-v3]"
     },
     {
       "name": "态4: 全部条目无 redirected=true 毒条目",
@@ -89,6 +89,21 @@
       "name": "态4: /index.html 或 / 已缓存",
       "ok": true,
       "detail": ""
+    },
+    {
+      "name": "态4b: 软 404 注入已生效（路由拦截命中）",
+      "ok": true,
+      "detail": "trap=/assets/__gt-trap-soft404.js"
+    },
+    {
+      "name": "态4b: SW 未把 text/html 写入 /assets/*.js 缓存",
+      "ok": true,
+      "detail": "未缓存（正确拒绝）"
+    },
+    {
+      "name": "态4b: SW 未把 HTML 交给页面（返回 5xx 或抛错，而非 200 HTML）",
+      "ok": true,
+      "detail": "status=5xx/threw pageGotHtml=false"
     }
   ]
 }

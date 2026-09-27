@@ -122,7 +122,7 @@ check(
   rsw.status() === 200 && (swHeaders['cache-control'] ?? '').includes('no-cache'),
   `status=${rsw.status()} cache-control=${swHeaders['cache-control'] ?? '(无)'}`,
 )
-check('A2: /sw.js 内容为 gt-shell-v2 版本', swBody.includes('gt-shell-v2'))
+check('A2: /sw.js 内容为 gt-shell-v3 版本', swBody.includes('gt-shell-v3'))
 await rsw.dispose()
 
 // A3 首页 bundle 指纹一致性
@@ -195,7 +195,7 @@ try {
   check('B1: skipWaiting+clients.claim 下立即接管（首访无需二次导航）', st1.controlling)
   await page.waitForTimeout(800) // precache 收尾缓冲
   const names1 = await page.evaluate(() => caches.keys())
-  check('B1: 全新访客仅有 gt-shell-v2 缓存', names1.includes('gt-shell-v2') && !names1.some((n) => n !== 'gt-shell-v2'), `caches=[${names1.join(', ')}]`)
+  check('B1: 全新访客仅有 gt-shell-v3 缓存', names1.includes('gt-shell-v3') && !names1.some((n) => n !== 'gt-shell-v3'), `caches=[${names1.join(', ')}]`)
 
   // B2 连续 reload 两次：第二次断网走缓存
   console.log('\n【B2】连续 reload：第二次断网走缓存')
@@ -246,8 +246,8 @@ try {
   check('B3: 重装后 SW active 且接管', st3.active && st3.controlling, st3.script)
   const names3 = await page.evaluate(() => caches.keys())
   check(
-    'B3: activate 清理旧缓存（仅剩 gt-shell-v2）',
-    !names3.includes('gt-shell-v1') && names3.includes('gt-shell-v2'),
+    'B3: activate 清理旧缓存（仅剩 gt-shell-v3）',
+    !names3.includes('gt-shell-v1') && names3.includes('gt-shell-v3'),
     `caches=[${names3.join(', ')}]`,
   )
   // v2 内容完整性：升级路径收尾后断网仍可用

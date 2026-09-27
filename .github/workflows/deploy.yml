@@ -12,7 +12,105 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ══════════════════════════════════════════════════════════════════════════
+  # P0.7 收口第 9 项：质量门禁（原为人工本地跑，现进入 CI）
+  #
+  # 为什么门禁 job 必须写在**本文件内**：
+  #   GitHub Actions 的 `needs` 只能引用**同一个 workflow 文件**里的 job。
+  #   把门禁放在独立 workflow 再用 `needs: <外部job名>` 引用是**无效的** ——
+  #   GitHub 会在解析阶段直接报 `job 'X' needs unknown job 'Y'` 并使整个
+  #   workflow 失效，反而比没有门禁更糟（部署会彻底停摆）。
+  #   因此这里采用「同文件三闸 + deploy 依赖三闸」的写法，依赖才真正生效。
+  #
+  # 分三条闸是为了 fast-fail：content/lint 约 30s 就能红，不必等 build。
+  # ══════════════════════════════════════════════════════════════════════════
+
+  # ── 闸门 1：不依赖构建产物，最快报红 ────────────────────────────────────────
+  gate-static:
+    name: 门禁① 静态与内容（无产物）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: 安装依赖
+        run: npm ci
+      # 20 项：manifest 三元组自洽、跨包 ContentId 唯一（全库 9346 词）、
+      # inline 预算、manifest↔registry 策略一致性。实测不依赖 dist。
+      - name: 内容门禁（content:validate · 20 项）
+        run: npm run content:validate
+      # 149 项：contract 断言。实测只读 content/ 与 src/，不触碰 dist。
+      - name: 内容契约测试（test:content · 149 项）
+        run: npm run test:content
+      # oxlint：基线 0 error / 16 warning。只拦 error，不把既有 warning 变成阻塞。
+      - name: Lint（oxlint）
+        run: npm run lint
+
+  # ── 闸门 2：需要 dist/ 与 preview 服务器 ───────────────────────────────────
+  gate-build:
+    name: 门禁② 构建产物（体积 + 离线）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: 安装依赖
+        run: npm ci
+      # 夹带 tsc -b 类型检查（build = tsc -b && vite build）
+      - name: 类型检查 & 构建
+        run: npm run build
+      # 3 项：主 chunk raw ≤420KiB / gzip ≤135KiB、words-* chunk 数 ≥ lazy 包数、
+      # 预热 gzip 合计 ≤600KiB。三态判定，UNKNOWN 视为不通过。
+      - name: 体积门禁（check:bundle · 3 项）
+        run: npm run check:bundle
+      - name: 安装 Chromium
+        run: npx playwright@1.49.1 install chromium --with-deps
+      # 20 项：态1/1.5/2/3/4/4b。offline-audit.mjs 经 preview-server.mjs 自举
+      # vite preview（127.0.0.1:4173），自带生命周期，无需额外起服务。
+      # 只打本机地址 —— 打生产的是 test:prod，见文件末尾说明。
+      - name: 离线审计（test:offline · 20 项）
+        run: npm run test:offline
+
+  # ── 闸门 3：真实浏览器端到端（原仅 PR 触发，现补齐 push main）─────────────
+  gate-e2e:
+    name: 门禁③ 端到端（test:e2e）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: 安装依赖
+        run: npm ci
+      - name: 类型检查 & 构建
+        run: npm run build
+      - name: 安装 Chromium
+        run: npx playwright@1.49.1 install chromium --with-deps
+      # e2e.mjs 同样自举 preview，无需手动起服务（旧 e2e.yml 的
+      # 「npm run preview & + curl 探活」是冗余的）。
+      - name: 端到端测试
+        run: npm run test:e2e
+
+  # ── 部署：needs 三条闸，任一失败/取消/跳过都不部署 ─────────────────────────
   deploy:
+    name: 部署到 Cloudflare Pages
+    needs: [gate-static, gate-build, gate-e2e]
+    # if 里显式判三条闸的 result，而非只写 always()：
+    #   - 不写 always() 时，某闸失败会让本 job 被隐式跳过，表现为 skipped，
+    #     容易掩盖「闸门未决」；
+    #   - 只写 always() 则会在闸门 failure 时照样进入。
+    # 因此用 always() && 三条 result == 'success'：既保证「未决」不被误判为通过，
+    # 也保证任一失败都不部署。
+    if: >-
+      always() &&
+      needs.gate-static.result == 'success' &&
+      needs.gate-build.result == 'success' &&
+      needs.gate-e2e.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -58,3 +156,16 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # 不带 --branch，确保发布到生产环境（https://geek-typing.pages.dev）
           command: pages deploy dist --project-name=geek-typing --commit-dirty=true
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 明确排除：这些脚本绝不能进 CI
+#
+#   npm run test:smoke     → tests/prod-smoke.mjs，固定打 https://geek-typing.pages.dev
+#   npm run test:prod      → tests/offline-audit.mjs --prod，打生产域名
+#   npm run test:e2e:prod  → tests/e2e.mjs --prod，打生产域名
+#
+#   CI 在部署**之前**跑，打的是「上一个版本」的生产环境：拿旧产物做断言必然误报，
+#   且把生产流量混进 PR 校验后失败原因无法归因到本次改动。
+#   这类生产专属指纹（308 canonical、_headers 生效、边缘压缩、真实 SW 升级链路）
+#   只能在部署**之后**作为独立的 post-deploy 校验运行。
+# ──────────────────────────────────────────────────────────────────────────────

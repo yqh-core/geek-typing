@@ -12,6 +12,7 @@ export const en: Record<string, string> = {
   'nav.importBank': 'Import banks…',
 
   /* Tabs */
+  'tab.label': 'Page navigation',
   'tab.home': 'Today',
   'tab.typing': 'Typing',
   'tab.memorize': 'Vocabulary',
@@ -220,6 +221,7 @@ export const en: Record<string, string> = {
   'memorize.mastered': 'Mastered in bank',
   'memorize.again': 'Another batch',
   'memorize.emptyBank': 'This bank is empty',
+  'memorize.loadingBank': 'Loading word bank…',
   'memorize.allDone': 'All new words in this bank are learned',
   'memorize.definition': 'Definition',
   'memorize.keyFlip': 'Space to flip',

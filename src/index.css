@@ -33,7 +33,16 @@ body {
   background: transparent;
 }
 
-/* 禁止输入类元素获得焦点框（本项目无需输入框） */
-*:focus {
+/* 焦点可见性：仅在键盘导航时显示焦点环，鼠标点击不显示（保留现有观感） */
+:focus:not(:focus-visible) {
   outline: none;
+}
+
+/* 键盘焦点环：色值复用主题强调色 matrix.accentHex（#34d399），不引入新色值。
+ * 用 !important 是为了压过 Chrome 对 :focus-visible 强制的 UA 默认轮廓
+ * （实测为 `auto 3px` / offset 0，位于 UA 层，仅靠作者层覆盖不了尺寸与偏移）。 */
+:focus-visible {
+  outline: 2px solid #34d399 !important;
+  outline-offset: 2px !important;
+  border-radius: 2px;
 }

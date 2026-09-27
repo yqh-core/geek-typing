@@ -2,14 +2,17 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import AppErrorBoundary from './components/AppErrorBoundary'
 import { LangProvider } from './i18n'
 import { warmUpVocabulary } from './core/content/registry'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <LangProvider>
-      <App />
-    </LangProvider>
+    <AppErrorBoundary>
+      <LangProvider>
+        <App />
+      </LangProvider>
+    </AppErrorBoundary>
   </StrictMode>,
 )
 

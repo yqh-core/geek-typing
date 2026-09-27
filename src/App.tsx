@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import Header from './components/Header'
 import StatsBar from './components/StatsBar'
 import PracticePanel from './components/PracticePanel'
@@ -42,6 +42,13 @@ import { useT, useLang } from './i18n'
 
 /** 页签：推荐首页 / 打字 / 背单词 / 复习 / 进度（V3-P0a 五页签 IA） */
 export type TabId = 'home' | 'typing' | 'memorize' | 'review' | 'progress'
+
+/** 页签顺序：键盘 ←/→ 循环导航、Home/End 跳首尾 与 roving tabindex 均以此为准 */
+const TAB_IDS: TabId[] = ['home', 'typing', 'memorize', 'review', 'progress']
+
+/** 页签 id / 面板 id：tabpanel 的 aria-labelledby 需指回页签 id，故两者成对生成 */
+const tabDomId = (id: TabId) => `tab-${id}`
+const tabPanelDomId = (id: TabId) => `tabpanel-${id}`
 
 /** 每一轮练习的词数 */
 const CHAPTER_SIZE = 20
@@ -118,6 +125,10 @@ export default function App() {
   const milestoneTimer = useRef<number | null>(null)
   const statsRef = useRef<RoundStats>(EMPTY_STATS)
   const flashTimer = useRef<number | null>(null)
+  /** 页签按钮引用：键盘事件需要把焦点移动到新页签（roving tabindex） */
+  const tabRefs = useRef<Partial<Record<TabId, HTMLButtonElement | null>>>({})
+  /** 键盘导航标记：仅键盘切换页签时抢焦点，鼠标点击不抢 */
+  const keyboardNavRef = useRef(false)
 
   const theme = THEMES[themeId]
 
@@ -561,6 +572,41 @@ export default function App() {
     }
   }, [])
 
+  /* ---------------- 页签键盘导航（WAI-ARIA tablist） ----------------
+   * 与 App 的全局 keydown 监听互不干扰：方向键/Home/End 在全局 handler 中未处理。
+   *
+   * ⚠️ 关键：**只有方向键 / Home / End 才 preventDefault**。
+   *   - 这三个键在浏览器里有默认行为（滚动页面），必须拦住。
+   *   - 但 **Enter / Space 绝不 preventDefault** —— 它们是按钮的原生激活键，
+   *     浏览器自己会合成 click。若在此处 preventDefault + 手动 setTab，会把
+   *     页签变成「吞键黑洞」：一旦焦点停在页签上，Space 就再也传不到
+   *     背单词面板（真实缺陷：离线态3「Space 翻面」因此失败）。
+   *     故 Enter/Space 直接 return，交给原生 click 路径处理。 */
+  const handleTabKeyDown = useCallback((e: ReactKeyboardEvent<HTMLButtonElement>, id: TabId) => {
+    const isNav = e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'Home' || e.key === 'End'
+    // Enter / Space：放行，不拦截（原生 click 会触发 onClick 切页签）
+    if (!isNav) return
+    e.preventDefault() // 拦住方向键滚动页面
+    const i = TAB_IDS.indexOf(id)
+    let next: TabId = id
+    if (e.key === 'ArrowRight') next = TAB_IDS[(i + 1) % TAB_IDS.length]
+    else if (e.key === 'ArrowLeft') next = TAB_IDS[(i - 1 + TAB_IDS.length) % TAB_IDS.length]
+    else if (e.key === 'Home') next = TAB_IDS[0]
+    else next = TAB_IDS[TAB_IDS.length - 1]
+    // 自动激活（activation follows focus）：先交接焦点，再切换状态
+    keyboardNavRef.current = true
+    tabRefs.current[next]?.focus()
+    sound.tap()
+    setTab(next)
+  }, [])
+
+  // 键盘导航后，焦点自动跟随到新的选中页签（鼠标点击路径不触发，保持原观感）
+  useEffect(() => {
+    if (!keyboardNavRef.current) return
+    keyboardNavRef.current = false
+    tabRefs.current[tab]?.focus()
+  }, [tab])
+
   /* ---------------- 派生数据 ---------------- */
   const accuracy = stats.keys === 0 ? 100 : Math.round((stats.correct / stats.keys) * 100)
   const minutes = elapsedMs / 60000
@@ -621,8 +667,14 @@ export default function App() {
           onOpenCommand={() => setCommandMode(true)}
         />
 
-        {/* 页签切换：今日 / 打字 / 背单词 / 复习 / 进度 */}
-        <div className={`flex items-center p-1 rounded-xl border ${theme.border} gap-1 flex-wrap`}>
+        {/* 页签切换：今日 / 打字 / 背单词 / 复习 / 进度
+            WAI-ARIA tablist：roving tabindex（仅选中项 tabIndex=0，其余 -1，Tab 一次即可穿过导航）
+            ←/→ 循环切换并自动激活，Home/End 跳首尾，Enter/Space 激活 */}
+        <div
+          role="tablist"
+          aria-label={t('tab.label')}
+          className={`flex items-center p-1 rounded-xl border ${theme.border} gap-1 flex-wrap`}
+        >
           {(
             [
               { id: 'home', label: t('tab.home') },
@@ -634,7 +686,16 @@ export default function App() {
           ).map((tb) => (
             <button
               key={tb.id}
+              id={tabDomId(tb.id)}
+              role="tab"
+              aria-selected={tab === tb.id}
+              aria-controls={tabPanelDomId(tb.id)}
+              tabIndex={tab === tb.id ? 0 : -1}
+              ref={(node) => {
+                tabRefs.current[tb.id] = node
+              }}
               data-testid={`tab-${tb.id}`}
+              onKeyDown={(e) => handleTabKeyDown(e, tb.id)}
               onClick={() => {
                 sound.tap()
                 setTab(tb.id)
@@ -674,7 +735,13 @@ export default function App() {
           <span className={`text-[11px] ${theme.sub}`}>{t('practice.spellFix')}</span>
         )}
 
-        <div className="flex-1 w-full flex items-center justify-center py-4 relative">
+        {/* 页签面板：role=tabpanel 与上方页签通过 id / aria-labelledby 双向关联 */}
+        <div
+          id={tabPanelDomId(tab)}
+          role="tabpanel"
+          aria-labelledby={tabDomId(tab)}
+          className="flex-1 w-full flex items-center justify-center py-4 relative"
+        >
           {tab === 'typing' && milestone && (
             <div
               className={`pointer-events-none absolute top-0 z-20 px-5 py-2 rounded-full border ${theme.border} ${theme.card} ${theme.accent} text-sm font-bold animate-popIn shadow-2xl`}

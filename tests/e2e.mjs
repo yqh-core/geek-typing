@@ -190,7 +190,10 @@ async function run() {
     '词库下拉 8 本齐全（含考研/托福库）',
     ['四级 CET-4', '六级 CET-6', '雅思核心 IELTS', '考研核心', '托福核心', '云原生 K8s 词库'].every((k) => menu.includes(k)),
   )
-  check('词库下拉含导入词库入口', (await page.locator('[data-testid="open-bank-manager"]').count()) >= 1)
+  check(
+    '词库下拉含导入词库入口',
+    (await page.locator('[data-testid="open-bank-manager-import"]').count()) === 1,
+  )
   await page.getByRole('button', { name: /四级 CET-4/ }).first().click()
   await page.waitForTimeout(320)
   check('切到 CET-4 后正常出题', (await readWord(page)).length > 0)
@@ -1076,8 +1079,8 @@ async function run() {
     for (let i = 0; i < 60; i++) {
       try {
         const names = await caches.keys()
-        if (names.includes('gt-shell-v2')) {
-          const cache = await caches.open('gt-shell-v2')
+        if (names.includes('gt-shell-v3')) {
+          const cache = await caches.open('gt-shell-v3')
           const urls = (await cache.keys()).map((r) => r.url)
           // V4-P0：大词库 chunk 从模块名(ielts-*.js)变为 ?raw JSON 命名(words-*.js)，
           // 懒加载 words chunk 当前即三大词库，按前缀计数

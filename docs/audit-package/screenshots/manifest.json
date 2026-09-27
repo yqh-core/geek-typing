@@ -1,0 +1,104 @@
+[
+  {
+    "dir": "desktop",
+    "name": "home",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\home.png",
+    "textLen": 221
+  },
+  {
+    "dir": "desktop",
+    "name": "typing",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\typing.png",
+    "textLen": 337
+  },
+  {
+    "dir": "desktop",
+    "name": "memorize",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\memorize.png",
+    "textLen": 176
+  },
+  {
+    "dir": "desktop",
+    "name": "review",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\review.png",
+    "textLen": 185
+  },
+  {
+    "dir": "desktop",
+    "name": "progress",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\progress.png",
+    "textLen": 218
+  },
+  {
+    "dir": "mobile",
+    "name": "home",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\mobile\\home.png",
+    "textLen": 208
+  },
+  {
+    "dir": "mobile",
+    "name": "typing",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\mobile\\typing.png",
+    "textLen": 306
+  },
+  {
+    "dir": "mobile",
+    "name": "memorize",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\mobile\\memorize.png",
+    "textLen": 163
+  },
+  {
+    "dir": "tablet",
+    "name": "home",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\tablet\\home.png",
+    "textLen": 221
+  },
+  {
+    "dir": "tablet",
+    "name": "typing",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\tablet\\typing.png",
+    "textLen": 332
+  },
+  {
+    "dir": "tablet",
+    "name": "memorize",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\tablet\\memorize.png",
+    "textLen": 176
+  },
+  {
+    "dir": "states",
+    "name": "command-palette",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\states\\command-palette.png",
+    "textLen": 577
+  },
+  {
+    "dir": "states",
+    "name": "search-no-result",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\states\\search-no-result.png",
+    "textLen": 344
+  },
+  {
+    "dir": "states",
+    "name": "empty-review",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\states\\empty-review.png",
+    "textLen": 185
+  },
+  {
+    "dir": "states",
+    "name": "memorize-flipped",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\states\\memorize-flipped.png",
+    "textLen": 205
+  },
+  {
+    "dir": "states",
+    "name": "offline-home",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\states\\offline-home.png",
+    "textLen": 221
+  },
+  {
+    "dir": "states",
+    "name": "result-overlay",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\states\\result-overlay.png",
+    "textLen": 405
+  }
+]

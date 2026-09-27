@@ -206,7 +206,7 @@ export default function Header(props: HeaderProps) {
             <div className={`border-t ${theme.border} my-1`} />
             {/* 导入词库入口：打开 BankManager 弹窗 */}
             <button
-              data-testid="open-bank-manager"
+              data-testid="open-bank-manager-import"
               onClick={() => {
                 sound.tap()
                 setOpenId(null)

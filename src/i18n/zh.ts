@@ -13,6 +13,7 @@ export const zh: Record<string, string> = {
   'nav.importBank': '导入词库…',
 
   /* Tab 切换 */
+  'tab.label': '页面导航',
   'tab.home': '今日',
   'tab.typing': '打字练习',
   'tab.memorize': '背单词',
@@ -221,6 +222,7 @@ export const zh: Record<string, string> = {
   'memorize.mastered': '本库已掌握',
   'memorize.again': '再来一组',
   'memorize.emptyBank': '当前词库为空',
+  'memorize.loadingBank': '正在加载词库…',
   'memorize.allDone': '本库新词已全部学完',
   'memorize.definition': '释义',
   'memorize.keyFlip': 'Space 翻面',

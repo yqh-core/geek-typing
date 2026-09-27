@@ -10,7 +10,7 @@
 ## 本轮（V4.1-P0.6 · Foundation / Contract Hardening）做了什么
 
 P0.6 不新增功能，只把地基钉死 —— 7 件事，全部已落地并通过实测
-（`content:validate` 17 项门禁全绿、`test:content` **148** 项通过、`tsc` 0 错、全库 Σ items = 9346）：
+（`content:validate` 20 项门禁全绿、`test:content` **149** 项通过、`tsc` 0 错、全库 Σ items = 9346）：
 
 | # | 事项 | 落点 |
 |---|---|---|
@@ -359,7 +359,7 @@ Raw → Normalize → Validate → Build → Index → Manifest → Content Regi
   ⚠️ 代码词库须在 manifest 声明 `"normalize": { "stripHtml": false }`，
   否则 `type Handler<T>`、`<div />` 会被当标签删掉，词表被破坏（ts-code 实测 5 条命中）。
   只检测不代改：重复词 / 空字段 / 非法字段由人工决策。
-- **Validate**（`content:validate`）：**17 项门禁**，红了不许合。
+- **Validate**（`content:validate`）：**20 项门禁**，红了不许合。
 - **Build**（`content:build`）：派生 stats / checksum / schemaVersion / 版本三元组 / contentHistory / build，幂等。
   checksum 一律走 `sha256Canonical`，**不得用文件原文或 `JSON.stringify` 直算**。
 
