@@ -92,7 +92,7 @@
 | 文件 | 行数 | 备注 |
 |------|------|------|
 | `src/App.tsx` | **817** | 应用主控；25 个 `useState`、全局键盘监听、9 个派生 `useMemo` |
-| `tests/e2e.mjs` | **1457** | 单文件 E2E，165 个断言用例 |
+| `tests/e2e.mjs` | **1702** | 单文件 E2E，167 个断言用例 |
 | `src/components/Memorize.tsx` | 449 | 背单词卡片；含原生 touch 手势 |
 | `scripts/content/validate.mjs` | 427 | 内容门禁，20 项检查 |
 | `src/components/CommandPalette.tsx` | 404 | 命令面板，14 条命令 |
@@ -125,7 +125,7 @@
 | `build` | `tsc -b && vite build` | **先类型检查再构建** |
 | `lint` | `oxlint` | Lint |
 | `preview` | `vite preview --host 127.0.0.1 --port 4173 --strictPort` | 预览，固定端口 |
-| `test:e2e` | `node tests/e2e.mjs` | 165 例 |
+| `test:e2e` | `node tests/e2e.mjs` | 167 项 |
 | `test:content` | `node tests/content-query.mjs` | 149 例 |
 | `test:offline` | `node tests/offline-audit.mjs` | 20 例 |
 | `test:prod` | `node tests/prod-smoke.mjs` | 22 例 |
@@ -228,7 +228,7 @@
 | `lint` | 0 error / 16 warning |
 | `build` | exit 0（耗时浮动） |
 | `check:bundle` | 3/3 |
-| `test:e2e` | 165/165 |
+| `test:e2e` | 167/167 |
 | `test:offline` | 20/20 |
 | `test:prod`（smoke） | **21/22**（1 条因 bundle hash 漂移） |
 | 截图 | 17 张 |

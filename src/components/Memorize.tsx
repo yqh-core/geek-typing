@@ -6,13 +6,11 @@ import { speak } from '../lib/speech'
 import { sound } from '../lib/sound'
 import { celebrate } from '../lib/confetti'
 import {
-  getMemorizeStats,
-  loadMemorize,
-  recordMemorize,
   type MemStatus,
   type MemStore,
 } from '../lib/memorizeStore'
-import { loadReview, recordCorrect, recordWrong } from '../lib/reviewStore'
+import { learningService } from '../core/learning/service'
+import { practiceEngine } from '../core/practice'
 import { useT } from '../i18n'
 
 interface MemorizeProps {
@@ -39,8 +37,9 @@ const SWIPE_THRESHOLD = 60
 export default function Memorize({ theme, bank, paused = false, streakDays = 0 }: MemorizeProps) {
   const t = useT()
 
-  /** memorize 全量进度（本组件内自持，跨词库共享） */
-  const [store, setStore] = useState<MemStore>(() => loadMemorize())
+  /** memorize 进度（P1.5-S4：**本包视图**，按 (词,包) 归属；State A 为 v1 全表）。
+   *  跨包同名互不可见 —— 「A 库标记认识、B 库也算认识」的进度污染被结构性消灭。 */
+  const [store, setStore] = useState<MemStore>(() => learningService.getMemorizeView(bank.id))
 
   /** 当前这组的队列：从词库里按顺序取进度中没有的词（不认识会追加到队尾） */
   const [deck, setDeck] = useState<string[]>([])
@@ -68,18 +67,16 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
   const item = bank.words.find((w) => w.word === deck[cursor])
   const done = deck.length > 0 && cursor >= deck.length
 
-  /** 三键调度：unknown → 追加 2 次，fuzzy → 1 次，known → 完成；同时驱动词级错题本 */
+  /** 三键调度：unknown → 追加 2 次，fuzzy → 1 次，known → 完成；同时驱动词级错题本。
+   *  S4：所有写入带归属上下文（bankId）—— 进度与错题都记在「当前正在学的这个包」名下。
+   *  P1.6-A05：写链路统一经 LearningService 门面（recordPractice → memorizeStore + reviewStore），
+   *  不再直调 legacy store 写 API；UI 视图从门面权威源刷新。 */
   const answer = (status: MemStatus) => {
     if (!item) return
-    setStore((s) => recordMemorize(s, item.word, status))
-    // 错题本：不熟/不认识 → 记错（1 天后到期）；认识 → 若已是复习词则推进间隔
-    if (status === 'unknown' || status === 'fuzzy') {
-      recordWrong(item.word)
-    } else if (loadReview()[item.word]) {
-      recordCorrect(item.word)
-    }
-    const extra = status === 'unknown' ? 2 : status === 'fuzzy' ? 1 : 0
-    if (extra > 0) setDeck((d) => [...d, ...Array.from({ length: extra }, () => item.word)])
+    // P1.6-C：背单词作答收拢到 Practice Engine（整批 recordPractice + 刷新本包视图 + 队列追加次数）
+    const { view, repeat } = practiceEngine.recordMemorizeAnswer({ word: item.word, bankId: bank.id }, status)
+    setStore(view)
+    if (repeat > 0) setDeck((d) => [...d, ...Array.from({ length: repeat }, () => item.word)])
     setFlipped(false)
     setCursor((c) => c + 1)
   }
@@ -93,7 +90,7 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
   }
 
   const stats = useMemo(
-    () => getMemorizeStats(store, bank.words.map((w) => w.word)),
+    () => learningService.getMemorizeStats(store, bank.words.map((w) => w.word)),
     [store, bank],
   )
 

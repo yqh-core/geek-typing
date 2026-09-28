@@ -91,13 +91,36 @@ if (userStoreArg) {
   const file = userStoreArg.split('=')[1]
   const raw = JSON.parse(readFileSync(file, 'utf8'))
   const oldWords = new Set()
-  for (const [key, val] of Object.entries(raw)) {
-    if (val && typeof val === 'object' && !Array.isArray(val)) oldWords.add(key)
+  const isMultiStore = Object.keys(raw).some((k) => k.startsWith('gt.'))
+  if (isMultiStore) {
+    // 浏览器导出的 gt.* 包形态：localStorage 的值是 **JSON 字符串**，必须解一层。
+    // 首版只认「顶层 word → object」，对 gt.* 包直接得到键数 0 ⇒ orphan=0 是假值。
+    // 词维度只在 review / memorize 两张表（analytics 是统计表，不是词表）。
+    for (const key of ['gt.review.v1', 'gt.memorize.v1']) {
+      const v = raw[key]
+      let obj = v
+      if (typeof v === 'string') {
+        try {
+          obj = JSON.parse(v)
+        } catch {
+          obj = null
+        }
+      }
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+        for (const w of Object.keys(obj)) oldWords.add(w)
+      }
+    }
+    orphanSource = `来自用户存储快照 ${file}（gt.* 多 store 形态，review+memorize 键数 ${oldWords.size}）`
+  } else {
+    // 单表裸 map：顶层就是 word → entry
+    for (const [key, val] of Object.entries(raw)) {
+      if (val && typeof val === 'object' && !Array.isArray(val)) oldWords.add(key)
+    }
+    orphanSource = `来自用户存储快照 ${file}（键数 ${oldWords.size}）`
   }
   orphan = [...oldWords]
     .filter((w) => !wordToPkgs.has(w) && !lowerToPkgs.has(w.toLowerCase()))
     .map((w) => ({ word: w }))
-  orphanSource = `来自用户存储快照 ${file}（键数 ${oldWords.size}）`
 }
 
 /** 5. 10x10 交集矩阵（按包内裸 word 精确集合） */

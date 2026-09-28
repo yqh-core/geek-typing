@@ -389,3 +389,32 @@
 - B 类的保留与否由你决定（不影响功能）。
 - 本轮所有门禁现状：content:validate **20/20 PASS**｜test:content **149/149**｜tsc **0 error**｜lint **16 warning / 0 error**（未增）｜build **exit 0**｜check:bundle **3/3**｜e2e **165/165**｜offline **20/20**（含新态 4b）｜verify-samples **76/76**
 - 上述 9 项均由本轮**逐一复跑确认**（非引用历史值）；`offline` 正向断言 21 个（含 1 个总结行）/ 失败 0。
+
+---
+
+## P1.5-S1/S3/S5 新增条目（2026-09-28）
+
+| ID | 类别 | 标题 | 严重度 | 状态 | 详情 |
+|---|---|---|---|---|---|
+| **R-003** | 已修复 | `recordWordDone` 用 lowercase 做单词身份键（三 store 无法 join） | **P0 Blocker** | ✅ CLOSED | `docs/audit-package/13-acceptance/INCIDENT-ANALYTICS-IDENTITY.md`（三段式修复 + 17/17 锁死 + 真实数据 `Case conflict=0` + e2e 167/167） |
+| **R-004** | 已修复 | `migrate` 备份的 analytics 键序被 `splitSnapshot` 重排 ⇒ 回滚非逐字节还原 | P1 | ✅ CLOSED | `INCIDENT-MIGRATE-BACKUP-KEYORDER.md`（`preserveBackupKeys` 可选注入；SSR 门禁零破坏 78/78 + 27/27） |
+| **B-008** | 已修复 | 4 个 Esafenet 透明加密密文文件（含已入库 `README.md` + 上线产物 `public/robots.txt`） | **P1（生产伤害）** | ✅ **CLOSED** | 根因：本机亿赛通（EsafeNet）透明加密驱动把落盘文件整文件加密，原内容不可恢复；处置（2026-09-28）：`README.md` / `public/robots.txt` 明文重写（README 含不可恢复诚实声明），两个未入库文档隔离至 `docs/_quarantine-esafenet/`（.gitignore 排除）；lint:text Esafenet 判红归零、build 后 dist/robots.txt 与 public 逐字节一致 —— 见 `INCIDENT-ESAFENET.md` §7 |
+
+### 新增测试资产（本轮）
+
+| 文件 | 作用 | 实测 |
+|---|---|---|
+| `tests/analytics-identity.mjs`（`npm run test:analytics`） | G1-3 身份键契约锁死：源码级 2（`recordWordDone` 函数体零 toLowerCase + 全文件白名单归属）+ 行为 15 | **17/17** |
+| `tests/browser-migration-e2e.mjs` | 浏览器内迁移全生命周期：预置 V1 → apply → reload 幂等 → rollback 逐字节 | **19/19** |
+| `scripts/verify-release-gate.mjs`（`npm run release:gate`） | 机器扫描 `Gx-y` 状态 + 与 §0 总览交叉验证；解析失败 `EXIT=2`（不允许静默降级） | **RELEASE=APPROVED**；故障注入自证通过 |
+
+### 记录纪律条目（新类别：**记录器自身的可信度**）
+
+| ID | 标题 | 说明 |
+|---|---|---|
+| **R-005** | 测试输出收集脚本伪造 `EXIT=0` | 首版 `10-FINAL-TEST-OUTPUT.txt` 收集脚本把 `$?` 读成 `echo` 的状态码（恒 0），导致全部命令看起来「全绿」。**已发现并重写**（`eval` 后立即取 `$?`，禁管道遮蔽）。与门禁伪造 PASS 同类事故 —— 记录器也是被测对象 |
+| **R-006** | 浏览器内 rollback 取证的污染风险 | reload 后真实 App 会挂载并自写 localStorage（streak 当日初始化等）；事后 dump 取证会被 React 内存态覆写。**必须在同一 evaluate 同步窗口取证**。S4 接线时沿用此纪律 |
+
+> ⚠️ **不可过度解读**：R-003/R-004 修复后 `Case conflict = 0` 是**真实链路样本**上的结论；
+> 「历史脏数据（跨版本 / 手改 / 真实大小写分布）迁得干净」仍然**未验证**（本机无 `real-user` 数据）。
+> 这条不许含糊 —— 与「PENDING 不得记作 PASS」是同一个道理。

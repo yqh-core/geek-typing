@@ -52,6 +52,11 @@
 | 门禁状态 | 见 `13-acceptance/FINAL_ACCEPTANCE.md`：content:validate PASS / test:content 149/149 / tsc 0 error / lint 0e16w / build exit 0 / check:bundle 3/3 / e2e 165/165 / offline 20/20 / smoke 21/22 / 截图 17 |
 | 未提交内容 | `ResultOverlay.tsx` 新增 `data-testid="result-overlay"`、`scripts/audit-capture.mjs`、`docs/audit-package/**` —— **未 commit 未 push** |
 
+> ⚠️ **上表与 §2.4 表均为基线 `4152eb2` 时刻的历史快照**（含当轮的 149/149、165/165 等数字），不代表现状。
+> 最新口径（2026-09-28 S4 后）：e2e **167/167** / test:content 163/163 / test:storage 78/78 /
+> test:insights 12/12 / test:analytics 17/17 / test:migration 27/27 / browser-migration-e2e 19/19，
+> 见 `13-acceptance/P1.5-RELEASE-GATE.md` §0（两层 Gate）。
+
 ### 2.4 已完成阶段的产物形态
 
 | 维度 | 阶段完成时的状态 |
@@ -215,7 +220,7 @@
 | 账号/同步 | 0 | 跨设备 | 零实现 |
 | 路由 | 0（URL 恒 `/`） | 深链 | 零实现 |
 | 导入 | 纯文本草稿 | 通用导入体系 | 零实现 |
-| 测试 | 165 E2E + 149 content + 20 门禁 | 全进 CI | **CI 里一个都没有** |
+| 测试 | 167 项 E2E + 163 content + 20 门禁 | 全进 CI | **CI 里一个都没有** |
 | 可观测性 | 0 | 监控/容灾 | 零实现 |
 
 ---

@@ -149,7 +149,7 @@
 |---|---|---|
 | `TEST_STRATEGY.md` | ✅ 已有 | 自建断言框架 + 三层门禁 |
 | `TEST_MATRIX.md` | 🔄 混合 | T1~T12 矩阵，已实现标 `✅`，未实现标 `📐` |
-| `E2E.md` | ✅ 已有 | 165 用例真实 |
+| `E2E.md` | ✅ 已有 | 167 项真实 |
 | `CONTENT_TEST.md` | ✅ 已有 | 149 断言 + 20 门禁 |
 | `IMPORT_TEST.md` | 📐 待建 | 无 fixture，无导入测试 |
 | `MEDIA_TEST.md` | 📐 待建 | 零实现 |
@@ -216,7 +216,7 @@ npm run content:validate
 # 2. 内容契约测试（149 项）
 npm run test:content
 
-# 3. 端到端测试（165 项）
+# 3. 端到端测试（167 项）
 node tests/preview-server.mjs start   # 或 npm run preview 另开终端
 npm run test:e2e
 

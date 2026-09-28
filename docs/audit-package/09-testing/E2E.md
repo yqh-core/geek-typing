@@ -2,7 +2,7 @@
 
 > 状态：✅ 已有（实测）
 > 文件：`tests/e2e.mjs`，**1457 行**
-> 实测：**162 个 `check()` 调用点**，实际执行 **165 项**，实测结果 **165/165 通过**
+> 实测：**166 个 `check()` 调用点**，实际执行 **167 项**，实测结果 **167/167 通过**（2026-09-28 S4 后口径）
 > （数字引自 `13-acceptance/FINAL_ACCEPTANCE.md`，本轮未重跑）
 
 ---
@@ -51,7 +51,7 @@ const browser = await chromium.launch({ executablePath: await findChrome() })
 1444:  if (failures > 0) process.exitCode = 1
 ```
 
-**注意**：`results.length`（165）> 静态 `check()` 调用点（162），因为部分 `check()` 在循环/条件内。
+**注意**：`results.length`（167）> 静态 `check()` 调用点（166），因为部分 `check()` 在循环/条件内。
 
 ---
 
@@ -216,7 +216,7 @@ V3 版本的信息架构改造：五个页签 + 今日推荐 + Review 页 + Prog
 
 | 文件 | 测什么 | 断言数 |
 |---|---|---|
-| `tests/e2e.mjs` | 功能正确性 | 165 |
+| `tests/e2e.mjs` | 功能正确性 | 167 |
 | `tests/offline-audit.mjs` | SW 接管 + 断网可用性 | 5 态（20 项断言） |
 | `tests/prod-smoke.mjs` | 线上 CDN + SW 升级 | 22 |
 
@@ -245,7 +245,7 @@ e2e 的预热探针预算实测从 **18s 放宽到 30s**。原因是弱网下预
 
 ### 5.4 五个 check 在循环内
 
-162 个调用点 → 165 项执行，**多出的 3 项**来自循环。报数时须说明口径（见 `TEST_STRATEGY.md` §5.2）。
+166 个调用点 → 167 项执行，**多出的 1 项**来自循环。报数时须说明口径（见 `TEST_STRATEGY.md` §5.2）。
 
 ---
 

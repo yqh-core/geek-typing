@@ -26,9 +26,29 @@ dist-ssr
 # e2e 截图证据不入库（offline-audit-result.json 除外）
 tests/_evidence/*.png
 
+# preview 自举的所有权标记（tests/preview-server.mjs 运行时生成，<pid> 每次不同不可枚举）
+.preview-*.pid
+
 # 审计资料包分发产物（2.5MB 二进制，脚本可重新生成）
 docs/audit-package.rar
 docs/audit-package.zip
 
 # 本地工作日志 / 工具缓存
 .workbuddy/
+
+# 证据采集产物（测试原始输出 / 快照 JSON / 源码包）
+# 必须忽略：里面 pkg/geek-typing-src/ 是 src|scripts|tests 的整份副本，
+# 若不排除会被 oxlint / tsc / git 当成第二份源码重复扫描（实测 lint 从 14 → 42 warnings）
+.evidence-run/
+
+# 截图审计用的临时 Chrome profile
+.audit-chrome-profile*/
+.diag-profile/
+
+# Esafenet 密文文件隔离区（INCIDENT-ESAFENET，2026-09-28）
+docs/_quarantine-esafenet/
+
+# 本地交付包 / 用户快照（P1.6-A..F 逐阶段产物 + 真实用户 localStorage 导出）
+# 一律不入库：zip 二进制 + 源码整包副本会让 lint / tsc 重复扫描（与 .evidence-run/ 同理）
+_deliverable/
+_user-snapshot/

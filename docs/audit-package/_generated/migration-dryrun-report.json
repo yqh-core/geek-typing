@@ -1,0 +1,305 @@
+{
+  "reportVersion": 1,
+  "migratorVersion": "learning-migrator/1.0.0",
+  "runtime": "cli",
+  "startedAt": "2026-09-28T03:37:36.407Z",
+  "finishedAt": "2026-09-28T03:37:36.413Z",
+  "durationMs": 6,
+  "source": "user-store",
+  "sourceDetail": "来自 --user-store=_user-snapshot/real-path-snapshot.json（形状=multi-store（顶层带 gt.* 键）；顶层 gt.* 键 10 个）",
+  "sourceKeys": [
+    {
+      "key": "gt.review.v1",
+      "present": true,
+      "entryCount": 32,
+      "bytesUtf16": 7966,
+      "inScope": true
+    },
+    {
+      "key": "gt.memorize.v1",
+      "present": true,
+      "entryCount": 0,
+      "bytesUtf16": 4,
+      "inScope": true
+    },
+    {
+      "key": "gt.analytics.v1",
+      "present": true,
+      "entryCount": 56,
+      "bytesUtf16": 4972,
+      "inScope": true
+    },
+    {
+      "key": "gt.customBanks.v1",
+      "present": true,
+      "entryCount": 0,
+      "bytesUtf16": 4,
+      "inScope": true
+    },
+    {
+      "key": "gt.streak.v1",
+      "present": true,
+      "entryCount": 1,
+      "bytesUtf16": 118,
+      "inScope": false,
+      "reason": "keys are dates, no word dimension"
+    }
+  ],
+  "targetKeys": [
+    {
+      "key": "gt.learning.v2",
+      "entryCount": 60,
+      "bytesUtf16": 37622,
+      "quotaPercent": 0.36
+    },
+    {
+      "key": "gt.letterStats.v1",
+      "entryCount": 1,
+      "bytesUtf16": 1162,
+      "quotaPercent": 0.01
+    },
+    {
+      "key": "gt.totals.v1",
+      "entryCount": 1,
+      "bytesUtf16": 132,
+      "quotaPercent": 0
+    },
+    {
+      "key": "gt.customBankIndex.v1",
+      "entryCount": 0,
+      "bytesUtf16": 4,
+      "quotaPercent": 0
+    },
+    {
+      "key": "gt.learning.v2.backup",
+      "entryCount": 4,
+      "bytesUtf16": 13048,
+      "quotaPercent": 0.12
+    }
+  ],
+  "targetSizes": {
+    "gt.learning.v2": 37622,
+    "gt.letterStats.v1": 1162,
+    "gt.totals.v1": 132,
+    "gt.customBankIndex.v1": 4,
+    "gt.learning.v2.backup": 13048
+  },
+  "tiers": {
+    "resolved": 34,
+    "ambiguous": 26,
+    "orphan": 0,
+    "caseConflict": 0,
+    "invalid": 0
+  },
+  "orphanWords": [],
+  "ambiguousSample": [
+    {
+      "word": "absurd",
+      "candidates": [
+        "content:word:ecdict-ielts:absurd",
+        "content:word:ecdict-kaoyan:absurd"
+      ]
+    },
+    {
+      "word": "aggregate",
+      "candidates": [
+        "content:word:ecdict-cet6:aggregate",
+        "content:word:ecdict-ielts:aggregate",
+        "content:word:ecdict-toefl:aggregate"
+      ]
+    },
+    {
+      "word": "agitate",
+      "candidates": [
+        "content:word:ecdict-kaoyan:agitate",
+        "content:word:ecdict-toefl:agitate"
+      ]
+    },
+    {
+      "word": "ambiguous",
+      "candidates": [
+        "content:word:ecdict-cet6:ambiguous",
+        "content:word:ecdict-ielts:ambiguous",
+        "content:word:ecdict-kaoyan:ambiguous"
+      ]
+    },
+    {
+      "word": "apparatus",
+      "candidates": [
+        "content:word:ecdict-cet6:apparatus",
+        "content:word:ecdict-ielts:apparatus",
+        "content:word:ecdict-kaoyan:apparatus"
+      ]
+    },
+    {
+      "word": "carrot",
+      "candidates": [
+        "content:word:ecdict-ielts:carrot",
+        "content:word:ecdict-kaoyan:carrot"
+      ]
+    },
+    {
+      "word": "classify",
+      "candidates": [
+        "content:word:curated-ai-core:classify",
+        "content:word:ecdict-ielts:classify",
+        "content:word:ecdict-kaoyan:classify"
+      ]
+    },
+    {
+      "word": "concurrent",
+      "candidates": [
+        "content:word:curated-frontend:concurrent",
+        "content:word:ecdict-toefl:concurrent"
+      ]
+    },
+    {
+      "word": "devote",
+      "candidates": [
+        "content:word:ecdict-cet4:devote",
+        "content:word:ecdict-kaoyan:devote"
+      ]
+    },
+    {
+      "word": "diagnose",
+      "candidates": [
+        "content:word:ecdict-ielts:diagnose",
+        "content:word:ecdict-kaoyan:diagnose"
+      ]
+    },
+    {
+      "word": "eminent",
+      "candidates": [
+        "content:word:ecdict-cet6:eminent",
+        "content:word:ecdict-ielts:eminent",
+        "content:word:ecdict-kaoyan:eminent",
+        "content:word:ecdict-toefl:eminent"
+      ]
+    },
+    {
+      "word": "enlighten",
+      "candidates": [
+        "content:word:ecdict-ielts:enlighten",
+        "content:word:ecdict-kaoyan:enlighten",
+        "content:word:ecdict-toefl:enlighten"
+      ]
+    },
+    {
+      "word": "generalize",
+      "candidates": [
+        "content:word:curated-ai-core:generalize",
+        "content:word:ecdict-cet6:generalize",
+        "content:word:ecdict-ielts:generalize",
+        "content:word:ecdict-kaoyan:generalize",
+        "content:word:ecdict-toefl:generalize"
+      ]
+    },
+    {
+      "word": "impetus",
+      "candidates": [
+        "content:word:ecdict-cet6:impetus",
+        "content:word:ecdict-ielts:impetus",
+        "content:word:ecdict-kaoyan:impetus",
+        "content:word:ecdict-toefl:impetus"
+      ]
+    },
+    {
+      "word": "indulge",
+      "candidates": [
+        "content:word:ecdict-cet6:indulge",
+        "content:word:ecdict-ielts:indulge",
+        "content:word:ecdict-kaoyan:indulge"
+      ]
+    },
+    {
+      "word": "inference",
+      "candidates": [
+        "content:word:curated-ai-core:inference",
+        "content:word:ecdict-ielts:inference",
+        "content:word:ecdict-kaoyan:inference"
+      ]
+    },
+    {
+      "word": "irritate",
+      "candidates": [
+        "content:word:ecdict-ielts:irritate",
+        "content:word:ecdict-kaoyan:irritate"
+      ]
+    },
+    {
+      "word": "iterate",
+      "candidates": [
+        "content:word:curated-ai-core:iterate",
+        "content:word:ecdict-toefl:iterate"
+      ]
+    },
+    {
+      "word": "magnitude",
+      "candidates": [
+        "content:word:ecdict-cet6:magnitude",
+        "content:word:ecdict-ielts:magnitude",
+        "content:word:ecdict-kaoyan:magnitude"
+      ]
+    },
+    {
+      "word": "manifest",
+      "candidates": [
+        "content:word:ecdict-cet6:manifest",
+        "content:word:curated-cloud-native:manifest",
+        "content:word:ecdict-ielts:manifest",
+        "content:word:ecdict-kaoyan:manifest"
+      ]
+    }
+  ],
+  "caseConflictWords": [],
+  "warnings": [
+    {
+      "code": "ANALYTICS_LOWERCASE_HIT",
+      "message": "analytics.words 有 1 个 lowercase 键被回推为原词形（大小写敏感词的历史写入丢过大小写）",
+      "words": [
+        "treeshaking"
+      ]
+    }
+  ],
+  "rollbackToken": {
+    "id": "mig-1-learningmigrator100-34-26-0",
+    "version": 1,
+    "backupKey": "gt.learning.v2.backup",
+    "writtenKeys": [
+      "gt.learning.v2",
+      "gt.letterStats.v1",
+      "gt.totals.v1",
+      "gt.customBankIndex.v1",
+      "gt.learning.v2.backup"
+    ],
+    "backedUpKeys": [
+      "gt.review.v1",
+      "gt.memorize.v1",
+      "gt.analytics.v1",
+      "gt.customBanks.v1"
+    ],
+    "legacyKeysRetained": true
+  },
+  "volumeProjection": {
+    "legacyBytesUtf16": 12946,
+    "newKeysBytesUtf16": 38920,
+    "backupBytesUtf16": 13048,
+    "totalBytesUtf16": 51968,
+    "percentOf10MiBQuota": 0.5,
+    "percentOf5MiBQuota": 0.99
+  },
+  "outcome": "ok",
+  "orphanUnavailableReason": null,
+  "durationMsExact": 6.251,
+  "idempotentProof": {
+    "asserted": true,
+    "method": "对同一输入连续调用纯函数 migrateV1toV2 两次，逐字节比较 next(4 个目标键) 与 report（剥离 startedAt/finishedAt/durationMs 时间元数据后）",
+    "deterministicNext": true,
+    "deterministicReport": true,
+    "byteIdentical": true,
+    "nextSha256": "57df3a55b2cc982b97f77e34692abae573edf25ba4c47e5477dc7145fa0c0b66",
+    "reportSha256": "f1cd9b10e58e28a766ac8be06ef696c3d5d1e0e50f17613be86f8ef200c14aa1",
+    "identicalIncludingTimestamps": false,
+    "note": "identicalIncludingTimestamps=false 是**预期**：幂等性的对象是「产物」而非「观测元数据」。设计文档 §2.6 的幂等实现是「源指纹相等则根本不跑」，其等价保证是「给定相同输入必须产出相同 next 与相同业务正文」。"
+  }
+}

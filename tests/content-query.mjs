@@ -532,6 +532,78 @@ ok(
   cet4Manifest.contentHistory.map((e) => e.revision).join(','),
 )
 
+/* ---------- 14. queryWord（UI 单条寻址入口，设计文档 §4.2） ---------- */
+console.log('\n【14】queryWord —— UI 唯一需要的单条寻址入口')
+{
+  const pkgOf = (id) => registry.getVocabularyPackages().find((p) => p.localId === id)
+  const cet4 = pkgOf('cet4')
+  const cet4Ns = model.parseContentId(cet4.manifest.id).namespace
+  const rawCet4 = JSON.parse(readFileSync(resolve(root, 'content/vocabulary/cet4/words.json'), 'utf8'))
+  const cet4Words = Array.isArray(rawCet4) ? rawCet4 : rawCet4.words
+  const w0 = cet4Words[0].word
+
+  const hit = await q.queryWord('cet4', w0)
+  ok(
+    '命中：返回 WordHit，id = content:word:<namespace>:<原词形>',
+    hit !== null && hit.id === model.wordId(cet4Ns, w0) && hit.word === w0 && hit.packageLocalId === 'cet4',
+    hit ? hit.id : 'null',
+  )
+  ok(
+    '命中：translation 非空（证明拿到的不是「空释义占位对象」）',
+    !!hit && typeof hit.translation === 'string' && hit.translation.length > 0,
+    hit ? hit.translation.slice(0, 24) : 'null',
+  )
+  ok(
+    '未命中：**严格返回 null**（不是空词条对象）—— 这是消灭静默空释义的前提',
+    (await q.queryWord('cet4', '__gt_no_such_word__')) === null,
+    'got=null',
+  )
+  ok(
+    '对照组：换个存在的词立刻非 null（证明上面的 null 来自未命中，而非恒返回 null）',
+    (await q.queryWord('cet4', cet4Words[1].word)) !== null,
+    `w=${cet4Words[1].word}`,
+  )
+  ok('包不存在：返回 null 而不抛异常（C-5 口径：非法 id 返回 null，不抛）', (await q.queryWord('__gt_no_pkg__', w0)) === null)
+  ok('空词形 / 纯空白：返回 null', (await q.queryWord('cet4', '')) === null && (await q.queryWord('cet4', '   ')) === null)
+
+  // 与 getWord 同源口径：不能出现「search 查得到、get 取不回」
+  const viaGet = await q.getWord(model.wordId(cet4Ns, w0))
+  ok(
+    'queryWord 与 getWord 口径一致（同一 id、同一 word、同一 translation）',
+    !!viaGet && !!hit && viaGet.id === hit.id && viaGet.word === hit.word && viaGet.translation === hit.translation,
+    viaGet && hit ? `${viaGet.id} === ${hit.id}` : 'null',
+  )
+
+  // 大小写：ielts 的 Oxford —— 全库含大写词条里最容易被 case 归一化打掉的一类
+  const exact = await q.queryWord('ielts', 'Oxford')
+  ok('大小写①：原词形精确命中（保留大写）', exact !== null && exact.word === 'Oxford', exact ? exact.word : 'null')
+  const lower = await q.queryWord('ielts', 'oxford')
+  ok('大小写②：传 lowercase 仍命中同一 ContentId（norm 兜底生效）', lower !== null && exact !== null && lower.id === exact.id, lower ? lower.id : 'null')
+  const upper = await q.queryWord('ielts', 'OXFORD')
+  ok('大小写③：传全大写同样命中', upper !== null && exact !== null && upper.id === exact.id, upper ? upper.id : 'null')
+
+  // lazy 包：本脚本**无法自证**「无需预加载」—— 前面 13 个段落早已触碰过 Query 层，
+  // 索引在同一个进程里不可能清零。真正的证据在独立进程脚本 tests/queryword-lazy.mjs
+  // （取样词读自磁盘，断言前不碰任何 Query 入口 / loadPackage），这里只做一致性校验。
+  const lazyIds = registry.getVocabularyPackages()
+    .filter((p) => !!p.load && !p.words)
+    .map((p) => p.localId)
+  ok('对照组：仓库里确实存在 lazy 包（否则下一条结论无意义）', lazyIds.length > 0, lazyIds.join(','))
+  const lazyPkg = lazyIds[0]
+  const lazyWords = await registry.loadPackage(lazyPkg)
+  const lw = lazyWords[0]?.word ?? ''
+  const lazyHit = await q.queryWord(lazyPkg, lw)
+  ok(
+    `lazy 包 ${lazyPkg}：queryWord 结果与 loadPackage 数据一致（懒加载自证见 queryword-lazy.mjs）`,
+    lazyHit !== null && lazyHit.word === lw && lazyHit.translation === lazyWords[0].translation,
+    lazyHit ? lazyHit.word : 'null',
+  )
+
+  const again = await q.queryWord('cet4', w0)
+  ok('二次调用：结果逐字节相同（索引缓存不改变语义）', JSON.stringify(again) === JSON.stringify(hit))
+  ok('已挂进 contentQuery 聚合导出（设计文档 §4.2 第 5 条）', typeof q.contentQuery.queryWord === 'function')
+}
+
 await server.close()
 
 console.log(`\n──────────────────────────────────────────────────────`)

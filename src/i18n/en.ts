@@ -145,6 +145,8 @@ export const en: Record<string, string> = {
   'review.drill': 'Drill',
   'review.detail': 'Detail',
   'review.empty': 'No mistakes yet — wrong words join the review plan automatically',
+  'review.noTranslation': 'Meaning unavailable',
+  'review.noTranslationHint': "This word's bank has not loaded (offline or chunk fetch failed) — the entry itself does have a meaning",
 
   /* Mastery levels (V3-P0a) */
   'mastery.struggling': 'Struggling',

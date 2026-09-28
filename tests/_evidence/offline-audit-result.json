@@ -1,14 +1,14 @@
 {
-  "base": "http://127.0.0.1:4173",
+  "base": "http://127.0.0.1:4174",
   "cacheName": "gt-shell-v3",
-  "time": "2026-09-27T10:05:06.194Z",
+  "time": "2026-09-28T17:03:28.425Z",
   "passed": true,
   "failures": 0,
   "results": [
     {
       "name": "态1: navigator.serviceWorker.ready 且 active",
       "ok": true,
-      "detail": "http://127.0.0.1:4173/sw.js"
+      "detail": "http://127.0.0.1:4174/sw.js"
     },
     {
       "name": "态1: SW 已接管页面（controller）",
@@ -43,17 +43,17 @@
     {
       "name": "态2: 词库选择/统计栏可见（非空白错误页）",
       "ok": true,
-      "detail": "bodyLen=288 进度=true 正确率=true"
+      "detail": "bodyLen=282 进度=true 正确率=true"
     },
     {
       "name": "态2: 可读出当前单词",
       "ok": true,
-      "detail": "单词=regularization"
+      "detail": "单词=vector"
     },
     {
       "name": "态2: 断网下敲正确字母光标前进",
       "ok": true,
-      "detail": "r → u"
+      "detail": "下标 0 → 3（期望 3；单词=vector）"
     },
     {
       "name": "态3: 背单词卡片出现",

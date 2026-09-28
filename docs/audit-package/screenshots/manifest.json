@@ -9,7 +9,7 @@
     "dir": "desktop",
     "name": "typing",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\typing.png",
-    "textLen": 337
+    "textLen": 344
   },
   {
     "dir": "desktop",
@@ -39,7 +39,7 @@
     "dir": "mobile",
     "name": "typing",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\mobile\\typing.png",
-    "textLen": 306
+    "textLen": 324
   },
   {
     "dir": "mobile",
@@ -57,7 +57,7 @@
     "dir": "tablet",
     "name": "typing",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\tablet\\typing.png",
-    "textLen": 332
+    "textLen": 324
   },
   {
     "dir": "tablet",
@@ -75,7 +75,7 @@
     "dir": "states",
     "name": "search-no-result",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\states\\search-no-result.png",
-    "textLen": 344
+    "textLen": 337
   },
   {
     "dir": "states",
@@ -99,6 +99,6 @@
     "dir": "states",
     "name": "result-overlay",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\states\\result-overlay.png",
-    "textLen": 405
+    "textLen": 392
   }
 ]

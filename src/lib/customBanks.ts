@@ -13,13 +13,22 @@ export function loadCustomBanks(): CustomBank[] {
   try {
     const raw = localStorage.getItem(KEY)
     return raw ? (JSON.parse(raw) as CustomBank[]) : []
-  } catch {
+  } catch (e) {
+    // G4-3 零静默失败：读取失败按空表处理但留痕（S4 迁移时移除）
+    console.warn('[customBanks] 读取失败，按空表处理', e)
     return []
   }
 }
 
 function persist(banks: CustomBank[]) {
-  localStorage.setItem(KEY, JSON.stringify(banks))
+  try {
+    localStorage.setItem(KEY, JSON.stringify(banks))
+  } catch (e) {
+    // G4-3 ② 无保护 setItem = 0：这里原先**直接抛** —— 异常会穿透 React 事件处理器
+    // 打到 ErrorBoundary，整个词库面板因一次写失败白屏。改为留痕 + 静默返回，
+    // 与其它 store 的「失败可观测、不崩 UI」口径一致（P1.5-LEARNING-MODEL §3.5 S4 称其为修 bug）。
+    console.warn('[customBanks] 写入失败，本次变更仅保留在内存', e)
+  }
 }
 
 export function saveCustomBank(name: string, words: WordItem[]): CustomBank[] {
@@ -62,7 +71,10 @@ export function parseWords(raw: string): WordItem[] {
           return { word: (o.word ?? o.name ?? '').trim(), translation: (o.translation ?? o.meaning ?? '').trim() }
         })
         .filter((w: WordItem) => /^[A-Za-z][A-Za-z'\- ]*$/.test(w.word))
-    } catch {
+    } catch (e) {
+      // G4-3 零静默失败：用户粘贴的 JSON 解析失败必须留痕 —— 静默返回 [] 会让用户
+      // 以为「导入成功但 0 个词」，分不清是格式错了还是内容真的为空。
+      console.warn('[customBanks] 粘贴内容不是合法 JSON，已按 0 条解析', e)
       return []
     }
   }

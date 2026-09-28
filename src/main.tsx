@@ -5,16 +5,23 @@ import App from './App.tsx'
 import AppErrorBoundary from './components/AppErrorBoundary'
 import { LangProvider } from './i18n'
 import { warmUpVocabulary } from './core/content/registry'
+import { runStartupMigration } from './lib/learning/upgrade'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <AppErrorBoundary>
-      <LangProvider>
-        <App />
-      </LangProvider>
-    </AppErrorBoundary>
-  </StrictMode>,
-)
+/* P1.5-S4 §3.5 硬耦合②：M 与读侧切换必须同时 —— 迁移在首屏渲染**之前**完成（或明确放弃），
+ * UI 永远不会看到「一半 v1 一半 v2」的中间态。新用户（no-legacy-data）与已迁移用户
+ * （marker-present）在同步早退路径瞬间通过；仅老用户首次升级这一次需等待内容包加载。
+ * 失败自动放弃（停留 State A，下次启动重试），绝不阻塞使用。 */
+void runStartupMigration().finally(() => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <AppErrorBoundary>
+        <LangProvider>
+          <App />
+        </LangProvider>
+      </AppErrorBoundary>
+    </StrictMode>,
+  )
+})
 
 // PWA：生产环境注册 Service Worker，实现离线可用与秒开
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

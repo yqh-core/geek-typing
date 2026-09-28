@@ -32,13 +32,13 @@
 | T3 | Vocabulary（词库加载与检索） | ✅ **已有（部分）** | 约 60 / 149 | `tests/content-query.mjs:98-201`、`tests/e2e.mjs:864` |
 | T4 | Audio（音频） | 📐 **待建** | **0** | 零实现 |
 | T5 | Video（视频） | 📐 **待建** | **0** | 零实现 |
-| T6 | Learning（学习记录） | ✅ **已有（部分）** | 约 25 / 165 | `tests/e2e.mjs:207`、`:290`、`:1220` |
+| T6 | Learning（学习记录） | ✅ **已有（部分）** | 约 25 / 167 | `tests/e2e.mjs:207`、`:290`、`:1220` |
 | T7 | Relation（词间关系） | 📐 **有模型无数据** | **1**（仅"恒为数组"） | `tests/content-query.mjs:59` |
 | T8 | Offline（离线） | ✅ **已有（实测）** | **5 态（20 项断言）** | `tests/offline-audit.mjs`、`tests/prod-smoke.mjs:PartB` |
 | T9 | Performance（性能） | 🔄 **仅 bundle 门禁** | **3** | `scripts/check-bundle.mjs` |
 | T10 | Security（安全） | 📐 **待建** | **0** | 零实现 |
 | T11 | License（许可合规） | 📐 **待建** | **0**（L1 有一条被动的 checksum 校验） | `scripts/content/validate.mjs:7` |
-| T12 | UX（体验/无障碍） | 🔄 **有移动视口，无 a11y** | 约 12 / 165 | `tests/e2e.mjs:361` |
+| T12 | UX（体验/无障碍） | 🔄 **有移动视口，无 a11y** | 约 12 / 167 | `tests/e2e.mjs:361` |
 
 **统计**：12 项中 ✅ 4 项、🔄 2 项、📐 6 项。
 
@@ -150,7 +150,7 @@ $ grep -rli "fixture" --include="*.mjs" --include="*.json" --include="*.ts" .
 ## T3 — Vocabulary（词库加载与检索）
 
 > 状态：✅ **已有（部分）**
-> 已有断言数：约 **60**（散在 149 个契约断言与 165 个 E2E 断言中）
+> 已有断言数：约 **60**（散在 163 个契约断言与 167 个 E2E 断言中）
 
 ### 已有覆盖
 
@@ -235,7 +235,7 @@ $ grep -rli "fixture" --include="*.mjs" --include="*.json" --include="*.ts" .
 ## T6 — Learning（学习记录）
 
 > 状态：✅ **已有（部分）**
-> 已有断言数：约 **25**（散在 165 个 E2E 断言中）
+> 已有断言数：约 **25**（散在 167 个 E2E 断言中）
 
 ### 已有覆盖
 
@@ -536,7 +536,7 @@ Cross-Origin-Opener-Policy: same-origin
 | `lint`（oxlint） | 0 error / 16 warning |
 | `build` | exit 0（耗时浮动） |
 | `check:bundle` | 3/3 PASS |
-| `test:e2e` | 165/165 |
+| `test:e2e` | 167/167 |
 | `test:offline` | 20/20 |
 | `test:smoke` | **21/22** ← 唯一未满分项 |
 | 截图 | 17 张 |

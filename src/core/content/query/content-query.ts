@@ -18,7 +18,7 @@
  * type='word' 下的薄封装（tests/content-query.mjs 的契约测试依赖它们）。
  */
 import { getPackage, getVocabularyPackages, loadPackage } from '../registry'
-import { parseContentId } from '../model/content'
+import { parseContentId, wordId } from '../model/content'
 import type { ContentType } from '../model/content'
 import { buildHits, ensureIndex, findById, findByPackage, findByWord, idsByPackage, normalizeWord } from '../index/content-index'
 import type { VocabularyPackage } from '../registry'
@@ -317,7 +317,14 @@ export async function count(opts: QueryOptions = {}): Promise<number> {
   return (await poolEntries(scope, true)).length
 }
 
-export const contentQuery = { search, list, get, count }
+/**
+ * 统一入口聚合（`queryWord` 一并入袋，同时保留 named export —— 设计文档 §4.2 第 5 条）。
+ *
+ * ⚠️ `queryWord` 是本袋里唯一「位置参数 + 单词形」签名的成员，这是**故意的例外**：
+ * 文件头的统一入口原则禁止的是**按内容类型散装增殖**（`searchTopics` / `listAudios` …），
+ * 不是禁止新增语义不同的入口。UI 调用它只需包裸 id + 词形，不需要知道 namespace。
+ */
+export const contentQuery = { search, list, get, count, queryWord }
 
 /* ---------------- 兼容封装（type 固定 'word'，语义与 V4.1-P0 完全一致） ---------------- */
 
@@ -377,6 +384,57 @@ export async function getWord(contentId: string): Promise<WordHit | null> {
     if (hit) return toHits(p.localId, p.manifest.id, p.manifest.title, [hit])[0]
   }
   return null
+}
+
+/**
+ * 单词形精确取回（UI 唯一需要的**单条寻址**入口）。
+ *
+ * 存在理由：`getWord(contentId)` 需要 namespace，而 UI 手上只有 `{ bankId, word }` ——
+ * 让 UI 自己拼 namespace 等于泄漏包内部标识，违反 CONTENT_CONTRACT §12.1「UI 只允许
+ * 使用三类 API」。同理不能用 `searchWords({ exact })`：它是**检索语义**且返回数组，
+ * 未命中给 `[]`，`arr[0]` 为 `undefined` ⇒ 又滑回 `?? { word, translation: '' }`
+ * 的静默兜底 —— 那正是本函数要消灭的缺陷。
+ *
+ * 语义：
+ *   1. 作用域锁定在**单个 packageId** 内，不做全库跨包检索（避免同名跨包歧义）
+ *   2. 大小写口径与 `getWord` 完全一致：① 原词形精确 → ② `norm` 兜底
+ *      ⇒ go-code / ts-code 那 93 条含大写词条（`Oxford` / `Marxist`）同样能取回
+ *   3. 未命中**显式返回 null**，绝不返回「空释义词条对象」
+ *   4. lazy 包未预热时 `loadPackage` 会 reject（断网是常态）⇒ 内部 try/catch 收敛成
+ *      null 并 `console.warn` 留痕，**禁止** reject 冒泡进 React 渲染树
+ *
+ * **`queryWord` 是 `getWord` 的「不用 ContentId 的薄封装」**：namespace 拼接只发生在
+ * Query 层内部，查找逻辑全部复用 `getWord` 的 ① ② 两段，不引入第二套口径。
+ * 「成本几乎为零，复用已有全部正确性」是这个入口的主要收益来源。
+ *
+ * @param packageId 包**裸 id**（'ielts' / 'go-code'），不是 ContentId
+ * @param word 词形（原词形优先，大小写不敏感兜底）
+ * @returns WordHit | null —— 包不存在 / 词不存在 / 加载失败 一律 null
+ */
+export async function queryWord(packageId: string, word: string): Promise<WordHit | null> {
+  if (!word) return null
+  try {
+    const pkg = getPackage(packageId)
+    if (!pkg) return null
+    const ns = parseContentId(pkg.manifest.id)?.namespace ?? pkg.localId
+    await ensureIndex([pkg.localId])
+
+    // ① 精确：索引正排表的 key 由 buildHits 写入、与生成侧同源 ⇒ 逐字符一致。
+    //    再校验 packageLocalId：防御两个包解析出同一 namespace 时把别人的词条返回回来。
+    const direct = findById(wordId(ns, word))
+    if (direct && direct.packageLocalId === pkg.localId) return direct
+
+    // ② 兜底：调用方传入 lowercase / 未规范化的词形
+    const target = norm(word)
+    const words = await loadPackage(pkg.localId)
+    const hit = words.find((w) => norm(w.word) === target)
+    if (!hit) return null
+    return buildHits(pkg.localId, pkg.manifest.id, pkg.manifest.title, [hit])[0] ?? null
+  } catch (err) {
+    // 显式降级而**不静默**：断网 / chunk 拉取失败在这里收敛，同时留下可查的痕迹
+    console.warn(`[queryWord] 取词失败，显式降级为 null：${packageId} / ${word}`, err)
+    return null
+  }
 }
 
 /** 词条总数（省略 packageId 时为全库合计） */

@@ -1,0 +1,219 @@
+[
+  {
+    "dir": "desktop",
+    "name": "home",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\home.png",
+    "textLen": 229,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "desktop",
+    "name": "typing-classic",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\typing-classic.png",
+    "textLen": 376,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "desktop",
+    "name": "memorize",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\memorize.png",
+    "textLen": 176,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "desktop",
+    "name": "memorize-flipped",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\memorize-flipped.png",
+    "textLen": 205,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "desktop",
+    "name": "review",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\review.png",
+    "textLen": 185,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "desktop",
+    "name": "progress",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\progress.png",
+    "textLen": 245,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "desktop",
+    "name": "bank-manager",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\bank-manager.png",
+    "textLen": 323,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "desktop",
+    "name": "import-bank",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\import-bank.png",
+    "textLen": 366,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "desktop",
+    "name": "settings",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\settings.png",
+    "textLen": 268,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "desktop",
+    "name": "command-palette",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\command-palette.png",
+    "textLen": 585,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "desktop",
+    "name": "stats-panel",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\stats-panel.png",
+    "textLen": 470,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "desktop",
+    "name": "typing-spell",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\typing-spell.png",
+    "textLen": 379,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "desktop",
+    "name": "typing-timed",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\typing-timed.png",
+    "textLen": 331,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "desktop",
+    "name": "code-mode",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\code-mode.png",
+    "textLen": 354,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "matrix",
+    "name": "loading-bank-chunk",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\matrix\\loading-bank-chunk.png",
+    "textLen": 229,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "matrix",
+    "name": "empty-review",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\matrix\\empty-review.png",
+    "textLen": 185,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "matrix",
+    "name": "empty-home",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\matrix\\empty-home.png",
+    "textLen": 221,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "matrix",
+    "name": "empty-progress",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\matrix\\empty-progress.png",
+    "textLen": 218,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "matrix",
+    "name": "error-boundary",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\matrix\\error-boundary.png",
+    "textLen": 53,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "matrix",
+    "name": "offline-home",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\matrix\\offline-home.png",
+    "textLen": 221,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "matrix",
+    "name": "offline-typing",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\matrix\\offline-typing.png",
+    "textLen": 322,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "matrix",
+    "name": "offline-review",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\matrix\\offline-review.png",
+    "textLen": 185,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "matrix",
+    "name": "finish-result-overlay",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\matrix\\finish-result-overlay.png",
+    "textLen": 395,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "mobile",
+    "name": "home",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\mobile\\home.png",
+    "textLen": 219,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "mobile",
+    "name": "typing",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\mobile\\typing.png",
+    "textLen": 319,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "mobile",
+    "name": "memorize",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\mobile\\memorize.png",
+    "textLen": 165,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "mobile",
+    "name": "review",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\mobile\\review.png",
+    "textLen": 174,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "mobile",
+    "name": "progress",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\mobile\\progress.png",
+    "textLen": 234,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "mobile",
+    "name": "command-palette",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\mobile\\command-palette.png",
+    "textLen": 575,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "mobile",
+    "name": "home-android412",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\mobile\\home-android412.png",
+    "textLen": 219,
+    "consoleErrors": "[]"
+  },
+  {
+    "dir": "mobile",
+    "name": "typing-android412",
+    "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\mobile\\typing-android412.png",
+    "textLen": 315,
+    "consoleErrors": "[]"
+  }
+]

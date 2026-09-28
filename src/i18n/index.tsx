@@ -18,8 +18,9 @@ function detectLang(): Lang {
   try {
     const saved = localStorage.getItem('gt.lang')
     if (saved === 'zh' || saved === 'en') return saved
-  } catch {
-    /* 隐私模式下忽略 */
+  } catch (e) {
+    // G4-3 零静默失败：读取失败按浏览器语言兜底但留痕（S3 迁移时移除）
+    console.warn('[i18n] 语言读取失败，按浏览器语言兜底', e)
   }
   return navigator.language?.toLowerCase().startsWith('zh') ? 'zh' : 'en'
 }
@@ -46,8 +47,9 @@ export function LangProvider({ children }: { children: ReactNode }) {
         setLangState(l)
         try {
           localStorage.setItem('gt.lang', l)
-        } catch {
-          /* 隐私模式下忽略 */
+        } catch (e) {
+          // G4-3 零静默失败：隐私模式写入失败必须可观测（S3 迁移时移除）
+          console.warn('[i18n] 语言偏好写入失败', e)
         }
       },
       // 查当前语言字典 → 回退中文 → 兜底 key 本身

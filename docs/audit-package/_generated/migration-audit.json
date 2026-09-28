@@ -1,6 +1,6 @@
 {
   "generatedBy": "scripts/migration-audit.mjs",
-  "generatedAt": "2026-09-27T08:28:02.973Z",
+  "generatedAt": "2026-09-28T03:44:00.156Z",
   "packages": [
     {
       "pkg": "ai-core",
@@ -106,8 +106,8 @@
   "tiers": {
     "resolved": 4390,
     "ambiguous": 2323,
-    "orphan": null,
-    "orphanSource": "N/A（未提供 --user-store，词表本身无法反映历史消失词汇）"
+    "orphan": 0,
+    "orphanSource": "来自用户存储快照 _user-snapshot/real-path-snapshot.json（gt.* 多 store 形态，review+memorize 键数 32）"
   },
   "ambiguousSample": [
     {

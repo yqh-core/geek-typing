@@ -192,7 +192,7 @@ done
 | **内容门禁（20 项）** | `npm run content:validate` | ❌ **未跑** | ❌ **未跑** |
 | **体积门禁（3 项）** | `npm run check:bundle` | ❌ **未跑** | ❌ **未跑** |
 | **契约测试（149 项）** | `npm run test:content` | ❌ **未跑** | ❌ **未跑** |
-| **E2E（165 项）** | `npm run test:e2e` | ❌ **未跑** | ✅ 仅 PR |
+| **E2E（167 项）** | `npm run test:e2e` | ❌ **未跑** | ✅ 仅 PR |
 | **离线审计（5 态，20 项断言）** | `npm run test:offline` | ❌ **未跑** | ❌ **未跑** |
 | **生产冒烟（22 项）** | `npm run test:smoke` | ❌ **未跑** | ❌ **未跑** |
 | **lint** | `npm run lint` | ❌ **未跑** | ❌ **未跑** |

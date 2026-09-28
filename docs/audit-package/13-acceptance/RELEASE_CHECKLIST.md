@@ -89,7 +89,7 @@
 |---|---|---|---|---|
 | 5.1 | 起预览服务（另一终端） | `npm run preview` | 监听 `http://127.0.0.1:4173`（`--strictPort`，端口被占用会直接失败） | ✅ |
 | 5.2 | 预览服务可访问 | `curl -sf http://127.0.0.1:4173/ >/dev/null && echo OK` | 输出 `OK` | ✅ |
-| 5.3 | E2E 165 项 | `npm run test:e2e` | 末行 `共 165 项，通过 165，失败 0` | ✅ |
+| 5.3 | E2E 167 项 | `npm run test:e2e` | 末行 `共 167 项，通过 167，失败 0` | ✅ |
 | 5.4 | E2E 无 console / page 运行时错误 | 见 `5.3` 的【12】分区 | 该分区 `✓` | ✅ |
 | 5.5 | 移动端无横向溢出 | 见 `5.3` 的【11】分区 | 该分区 `✓` | ✅ |
 | 5.6 | 懒加载 chunk 正常出词 | 见 `5.3` 的【15】分区 | 考研/托福 lazy chunk 正常出词 | ✅ |
@@ -239,7 +239,7 @@ npm run build                   # 期望 1939 modules / built in ...
 npm run check:bundle            # 期望 PASS：3 项全部通过
 
 # 4. E2E + 离线（另开终端跑 npm run preview）
-npm run test:e2e                # 期望 165/165
+npm run test:e2e                # 期望 167/167
 npm run test:offline            # 期望 全部通过
 
 # 5. 截图复核

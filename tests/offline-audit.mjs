@@ -4,7 +4,7 @@
  * 独立于 tests/e2e.mjs（断网仿真会污染在线用例），勿并入主套件。
  *
  * 用法：
- *   npm run test:offline      # 一键：自举 vite preview（4173 已占用则复用）
+ *   npm run test:offline      # 一键：自举 vite preview（4174 空闲则新起；非本项目占用则报错）
  *   npm run test:prod         # 打生产 https://geek-typing.pages.dev（只读）
  *
  * 五态：
@@ -19,11 +19,14 @@
 import { chromium } from 'playwright-core'
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ensurePreviewServer, stopPreview } from './preview-server.mjs'
+import { ensurePreviewServer, stopPreview, clearMarkerInExitHook } from './preview-server.mjs'
 
 const PROD_BASE = 'https://geek-typing.pages.dev'
 const IS_PROD = process.argv.includes('--prod')
-const BASE = process.env.E2E_BASE ?? (IS_PROD ? PROD_BASE : 'http://127.0.0.1:4173')
+// 本地自举端口：offline 固定 4174（e2e 用 4173）。两套件端口隔离，
+// 避免连跑时第一条命令的 preview 拆除窗口污染第二条（EVIDENCE-INDEX §9.4）。
+const LOCAL_PORT = 4174
+const BASE = process.env.E2E_BASE ?? (IS_PROD ? PROD_BASE : `http://127.0.0.1:${LOCAL_PORT}`)
 const CACHE_NAME = 'gt-shell-v3'
 
 function findChrome() {
@@ -60,11 +63,42 @@ function check(name, ok, detail = '') {
   console.log(`${ok ? '  ✅' : '  ❌'} ${name}${detail ? ` — ${detail}` : ''}`)
 }
 
-/** 光标所在字母 */
-const readCursor = (page) =>
-  page.evaluate(
-    () => document.querySelector('[data-state="cursor"]')?.getAttribute('data-letter') ?? null,
-  )
+/**
+ * 光标**位置下标**（0 基；未找到光标返回 -1）。
+ *
+ * ⚠️ 为什么改测下标而不是测 `data-letter` 的字符值：`readCursor()` 读的是光标所在位置的
+ *    **字母**，而旧断言写成 `c0 !== c1`（「字母变了」＝「前进了」）。这两个命题不等价 ——
+ *    单词 `retrieval`（r-e-t-**r**…）敲完前 3 个字母后，下标已从 0 前进到 3，
+ *    但位置 3 的字符仍是 `r` ⇒ 读数 `r → r`，断言误判为「没前进」。
+ *    `gt.shuffle` 默认为 true ⇒ 每次随机抽词 ⇒ 凡第 4 字符与第 1 字符相同的词
+ *    都会随机触发这条假失败，这就是它长期「跑三遍偶尔红一次」的全部原因
+ *    （**量测缺陷，不是产品缺陷**）。
+ *
+ *    改测下标后，断言同时**变强**了：从「字母变了」升级为「下标**恰好等于**期望值」。
+ *    这两个断言内部互为对照组 —— 若某天 `readCursorIndex` 退化成返回常数，
+ *    初值期望 0 与终值期望 typeCount 必有其一转红，不可能恒绿。
+ */
+const readCursorIndex = (page) =>
+  page.evaluate(() => {
+    // 限定在**第一个** word 元素内取下标：将来页面出现多个 word 节点时，
+    // 跨节点 findIndex 会把「第 2 个词的下标」当成「第 1 个词前进了」—— 那又是一次静默误判。
+    const w = document.querySelector('[data-testid="word"]')
+    if (!w) return -1
+    return [...w.querySelectorAll('[data-letter]')].findIndex(
+      (s) => s.getAttribute('data-state') === 'cursor',
+    )
+  })
+
+/** 轮询等光标下标到达 expected（超时返回最后一次读数，供断言打印真实差异） */
+async function waitForCursorIndex(page, expected, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs
+  let idx = await readCursorIndex(page)
+  while (idx !== expected && Date.now() < deadline) {
+    await page.waitForTimeout(50)
+    idx = await readCursorIndex(page)
+  }
+  return idx
+}
 
 /** 当前完整单词（data-letter 拼接，避开嵌套 span） */
 const readWord = (page) =>
@@ -128,12 +162,16 @@ const swState = (page, timeoutMs = 15000) =>
     timeoutMs,
   )
 
-// 自举 preview（--prod 时跳过，直接打生产）；脚本末尾统一 stopPreview
+// 自举 preview（--prod / E2E_BASE 覆盖时跳过，直接打外部目标）；脚本末尾统一 stopPreview
 let previewServer = null
-if (!IS_PROD) {
-  previewServer = await ensurePreviewServer()
-  // 兜底：任何异常退出路径（browser launch 失败等）也杀掉自举的 preview
-  process.on('exit', () => stopPreview(previewServer))
+if (!IS_PROD && !process.env.E2E_BASE) {
+  previewServer = await ensurePreviewServer({ port: LOCAL_PORT })
+  // 兜底：任何异常退出路径（browser launch 失败等）也杀掉自举的 preview。
+  // exit 事件里 event loop 已停，只能同步删 marker，不能等异步 taskkill。
+  process.on('exit', () => {
+    stopPreview(previewServer)
+    clearMarkerInExitHook(LOCAL_PORT)
+  })
 }
 
 const executablePath = findChrome()
@@ -229,13 +267,20 @@ try {
     )
     // 打字功能活：敲正确字母推进光标
     const w1 = await readWord(page)
-    const c0 = await readCursor(page)
+    const c0 = await readCursorIndex(page)
     check('态2: 可读出当前单词', w1.length > 0, `单词=${w1}`)
     if (w1.length > 0) {
-      for (const ch of w1.slice(0, 3)) await page.keyboard.press(ch)
-      await page.waitForTimeout(250)
-      const c1 = await readCursor(page)
-      check('态2: 断网下敲正确字母光标前进', c0 !== null && c1 !== null && c0 !== c1, `${c0 ?? 'null'} → ${c1 ?? 'null'}`)
+      // 最多敲 3 个、且必须留一个字符给光标（敲满整词后光标下标 === 词长，**没有** cursor 元素）
+      const typeCount = Math.min(3, Math.max(1, w1.length - 1))
+      for (const ch of w1.slice(0, typeCount)) await page.keyboard.press(ch)
+      // 轮询等光标到达期望下标，而不是「固定 250ms 后抽样一次」—— 后者会把
+      // React 重渲染稍慢一帧抓成失败。判据没有放宽：仍要求下标**恰好等于** typeCount。
+      const c1 = await waitForCursorIndex(page, typeCount)
+      check(
+        '态2: 断网下敲正确字母光标前进',
+        c0 === 0 && c1 === typeCount,
+        `下标 ${c0} → ${c1}（期望 ${typeCount}；单词=${w1}）`,
+      )
     }
   }
   await context.setOffline(false)

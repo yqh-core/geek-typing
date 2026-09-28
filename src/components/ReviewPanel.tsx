@@ -1,10 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BookOpenCheck, ChevronDown, Crosshair } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
-import { allLoadedWords, type WordBank, type WordItem } from '../data/wordBanks'
-import type { Analytics } from '../lib/analytics'
-import { dueWords, loadReview, type ReviewEntry } from '../lib/reviewStore'
+import { type WordBank, type WordItem } from '../data/wordBanks'
+import { buildLoadedMap, resolveReviewWord } from '../lib/wordResolve'
+import { type Analytics, wordStatOf } from '../lib/analytics'
+import { loadReview, reviewItemViews, type ReviewItemView } from '../lib/reviewStore'
 import { masteryDistribution, masteryOf, type MasteryLevel } from '../lib/mastery'
+import { isV2Store } from '../lib/learning/upgrade'
+import { loadLearningV2 } from '../lib/learning/storage'
+import { masteryDistributionV2 } from '../lib/learning/insights'
 import { useLang, useT } from '../i18n'
 
 interface ReviewPanelProps {
@@ -14,7 +18,8 @@ interface ReviewPanelProps {
   reviewVersion: number
   analytics: Analytics
   onReviewRound: () => void
-  onReviewWord: (word: string) => void
+  /** contentId 存在 = 跨包精确单挑（S4 §3.5 硬耦合③）；缺省回落当前词库归属 */
+  onReviewWord: (word: string, contentId?: string) => void
 }
 
 const MASTERY_CLASS: Record<MasteryLevel, string> = {
@@ -32,28 +37,80 @@ export default function ReviewPanel({ theme, banks, reviewVersion, analytics, on
   const { lang } = useLang()
   const [openWord, setOpenWord] = useState<string | null>(null)
 
-  const store = useMemo(() => {
+  /** 复习条目视图（P1.5-S4：State B = (词,包) 对，含精确 contentId；State A = 词表） */
+  const views = useMemo(() => {
     void reviewVersion
-    return loadReview()
-  }, [reviewVersion])
-  const dist = useMemo(() => masteryDistribution(store), [store])
-  const due = useMemo(() => {
-    void reviewVersion
-    return dueWords()
+    return reviewItemViews()
   }, [reviewVersion])
 
-  // 已加载词库建词映射；未加载词库的词给占位词条（与 startReviewRound 同模式）
-  const itemMap = useMemo(() => new Map(allLoadedWords(banks).map((w) => [w.word, w])), [banks])
-  const itemOf = (word: string): WordItem => itemMap.get(word) ?? { word, translation: '' }
+  /** 掌握度分布。S4：State B 走 insights.masteryDistributionV2（legacy:* 不混入四档 ——
+   *  G6-2 语义；UI → insights → learning/storage 证据链）；
+   *  State A（升级前）仍按 v1 表计算，行为逐字节兼容。 */
+  const dist = useMemo(() => {
+    void reviewVersion
+    return isV2Store() ? masteryDistributionV2(loadLearningV2()).attributed : masteryDistribution(loadReview())
+  }, [reviewVersion])
+
+  const due = useMemo(() => views.filter((v) => v.entry.nextReviewAt <= Date.now()), [views])
+
+  // ① 已加载词条映射（含用户自定义词库）：同步命中，零 await —— 与旧行为等价
+  const itemMap = useMemo(() => buildLoadedMap(banks), [banks])
 
   const now = Date.now()
-  const entries = Object.entries(store)
-    .filter(([, e]) => !!e)
-    .map(([word, entry]) => ({ word, entry: entry as ReviewEntry }))
-    .sort((a, b) => a.entry.nextReviewAt - b.entry.nextReviewAt)
+  const entries = useMemo(() => [...views].sort((a, b) => a.entry.nextReviewAt - b.entry.nextReviewAt), [views])
   // 有到期 → 只列到期词；无到期 → 全量按 nextReviewAt 升序前 20
   const shown = due.length > 0 ? entries.filter((x) => x.entry.nextReviewAt <= now) : entries.slice(0, 20)
   const total = entries.length
+
+  /** State B：同一词可能在多个包各有复习条目 —— DOM key / testid 需消歧；
+   *  State A / 词形唯一时恒为裸词形（e2e 选择器不受影响） */
+  const dupWords = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const v of views) m.set(v.word, (m.get(v.word) ?? 0) + 1)
+    return m
+  }, [views])
+  const domKeyOf = useCallback(
+    (v: ReviewItemView) => ((dupWords.get(v.word) ?? 0) > 1 ? `${v.word}--${v.namespace}` : v.word),
+    [dupWords],
+  )
+
+  /* ② ①未命中的词：异步去 Query 层按词形精确取回（lazy 包在此被按需载入）。
+   *
+   * ⚠️ 关键区别：取不到时**不再**塞 `?? { word, translation: '' }` 空释义占位 ——
+   * 那是 CONTENT_CONTRACT §735-739 点名的 🔴 缺陷（静默空释义，用户以为词条就是空的）。
+   * 这里把未命中记进 `missing`，由下方渲染显式标注「释义不可用」，把静默变成可见。 */
+  const [remoteItems, setRemoteItems] = useState<Record<string, WordItem>>({})
+  const [missing, setMissing] = useState<Record<string, true>>({})
+  const shownKey = shown.map((x) => x.word).join('\u0000')
+  useEffect(() => {
+    // ⚠️ 依赖里用 **shownKey（字符串）而不是 shown（数组）**：shown 每次渲染都是新数组，
+    //    放进依赖会让本 effect 每次渲染都重跑 ⇒ setRemoteItems 又造新对象 ⇒ 触发再渲染
+    //    ⇒ **无限渲染环**。用字符串做稳定投影，词形序列不变就不重跑。
+    const todo = (shownKey ? shownKey.split('\u0000') : []).filter((w) => !itemMap.has(w))
+    // 全都在已加载词库里命中：什么都不做。**刻意不在这里 setState** ——
+    // effect 体内同步 setState 会触发级联渲染（oxlint react/set-state-in-effect）。
+    if (todo.length === 0) return
+    let alive = true
+    void Promise.all(todo.map(async (w) => [w, await resolveReviewWord(w, banks, itemMap)] as const)).then((pairs) => {
+      if (!alive) return
+      const hits: Record<string, WordItem> = {}
+      const misses: Record<string, true> = {}
+      for (const [w, item] of pairs) {
+        if (item) hits[w] = item
+        else misses[w] = true
+      }
+      setRemoteItems(hits)
+      setMissing(misses)
+    })
+    return () => {
+      alive = false
+    }
+  }, [shownKey, banks, itemMap])
+
+  /** 命中返回词条；未命中返回 **null**（不是空释义对象） */
+  const itemOf = (word: string): WordItem | null => itemMap.get(word) ?? remoteItems[word] ?? null
+  /** true = 异步解析已结束且确认取不到释义（区别于「还在解析中」） */
+  const isMissing = (word: string): boolean => itemOf(word) === null && missing[word] === true
 
   const fmtTime = (ms: number) =>
     new Date(ms).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US', {
@@ -129,13 +186,16 @@ export default function ReviewPanel({ theme, banks, reviewVersion, analytics, on
             {t('review.empty')}
           </div>
         ) : (
-          shown.map(({ word, entry }) => {
+          shown.map((v) => {
+            const { word, entry, contentId } = v
+            const domKey = domKeyOf(v)
             const item = itemOf(word)
+            const missed = isMissing(word)
             const level = masteryOf(entry)
-            const open = openWord === word
-            const stat = analytics.words[word.toLowerCase()]
+            const open = openWord === domKey
+            const stat = wordStatOf(analytics, word)
             return (
-              <div key={word} data-testid={`review-item-${word}`} className={`${theme.card} border ${theme.border} rounded-xl px-4 py-3`}>
+              <div key={domKey} data-testid={`review-item-${domKey}`} className={`${theme.card} border ${theme.border} rounded-xl px-4 py-3`}>
                 <div className="flex items-center gap-3">
                   <span
                     data-badge={level}
@@ -143,12 +203,23 @@ export default function ReviewPanel({ theme, banks, reviewVersion, analytics, on
                   >
                     {t(`mastery.${level}`)}
                   </span>
-                  <span className="font-mono font-bold truncate">{item.word}</span>
-                  {item.phonetic && <span className={`text-xs font-mono truncate hidden sm:inline ${theme.sub}`}>{item.phonetic}</span>}
-                  <span className={`ml-auto text-xs truncate hidden md:inline max-w-[14em] ${theme.sub}`}>{item.translation}</span>
+                  <span className="font-mono font-bold truncate">{word}</span>
+                  {item?.phonetic && <span className={`text-xs font-mono truncate hidden sm:inline ${theme.sub}`}>{item.phonetic}</span>}
+                  {item ? (
+                    <span className={`ml-auto text-xs truncate hidden md:inline max-w-[14em] ${theme.sub}`}>{item.translation}</span>
+                  ) : missed ? (
+                    // 显式标注取代静默空串：用户看得见「这条取不到释义」，而不是以为词条本身为空
+                    <span
+                      data-testid="review-item-meaning-missing"
+                      title={t('review.noTranslationHint')}
+                      className="ml-auto shrink-0 text-xs text-amber-400"
+                    >
+                      ⚠ {t('review.noTranslation')}
+                    </span>
+                  ) : null}
                   <button
                     data-testid="review-item-detail"
-                    onClick={() => setOpenWord(open ? null : word)}
+                    onClick={() => setOpenWord(open ? null : domKey)}
                     title={t('review.detail')}
                     className={`shrink-0 p-1 rounded-md border ${theme.border} ${theme.sub} active:scale-95 transition-all`}
                   >
@@ -156,7 +227,7 @@ export default function ReviewPanel({ theme, banks, reviewVersion, analytics, on
                   </button>
                   <button
                     data-testid="review-item-drill"
-                    onClick={() => onReviewWord(word)}
+                    onClick={() => onReviewWord(word, contentId || undefined)}
                     title={t('review.drill')}
                     className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-semibold active:scale-95 transition-all ${theme.accent} ${theme.border}`}
                   >
@@ -169,15 +240,23 @@ export default function ReviewPanel({ theme, banks, reviewVersion, analytics, on
                 {open && (
                   <div data-testid="review-detail" className={`mt-3 pt-3 border-t ${theme.border} flex flex-col gap-2`}>
                     <div className="flex items-baseline gap-3 flex-wrap">
-                      <span className="text-xl font-bold font-mono">{item.word}</span>
-                      {item.phonetic && (
+                      <span className="text-xl font-bold font-mono">{word}</span>
+                      {item?.phonetic && (
                         <span data-testid="review-detail-phonetic" className={`text-sm font-mono ${theme.sub}`}>
                           {item.phonetic}
                         </span>
                       )}
                     </div>
-                    {item.translation && <div className="text-sm">{item.translation}</div>}
-                    {item.definition && <div className={`text-xs ${theme.sub}`}>{item.definition}</div>}
+                    {item ? (
+                      <>
+                        {item.translation && <div className="text-sm">{item.translation}</div>}
+                        {item.definition && <div className={`text-xs ${theme.sub}`}>{item.definition}</div>}
+                      </>
+                    ) : missed ? (
+                      <div data-testid="review-detail-meaning-missing" className="text-sm text-amber-400">
+                        ⚠ {t('review.noTranslation')}
+                      </div>
+                    ) : null}
                     <div className={`flex flex-wrap gap-x-4 gap-y-1 text-[11px] tabular-nums ${theme.sub}`}>
                       <span>
                         {t('review.statDone')} ×{stat?.done ?? 0} · {t('review.statWrong')} ×{stat?.wrong ?? 0}
@@ -194,7 +273,7 @@ export default function ReviewPanel({ theme, banks, reviewVersion, analytics, on
                     </div>
                     <button
                       data-testid="review-detail-practice"
-                      onClick={() => onReviewWord(word)}
+                      onClick={() => onReviewWord(word, contentId || undefined)}
                       className={`self-start flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-semibold active:scale-95 transition-all ${theme.accent}`}
                     >
                       <BookOpenCheck size={12} />

@@ -2,7 +2,7 @@
  * Geek Typing 端到端自动化测试（v2：下拉导航 + 背单词 + 中英双语）
  *
  * 用法：
- *   npm run test:e2e            # 一键：自举 vite preview（4173 已占用则复用）+ 全量用例
+ *   npm run test:e2e            # 一键：自举 vite preview（4173 空闲则新起；非本项目占用则报错）+ 全量用例
  *   npm run test:e2e:prod       # 打生产 https://geek-typing.pages.dev（只读）
  *   E2E_BASE=http://127.0.0.1:5173 node tests/e2e.mjs   # 也可以打 dev server
  *   CHROME_PATH=<chrome.exe>                            # 手动指定浏览器
@@ -14,7 +14,10 @@ import { ensurePreviewServer, stopPreview } from './preview-server.mjs'
 
 const PROD_BASE = 'https://geek-typing.pages.dev'
 const IS_PROD = process.argv.includes('--prod')
-const BASE = process.env.E2E_BASE ?? (IS_PROD ? PROD_BASE : 'http://127.0.0.1:4173')
+// 本地自举端口：e2e 固定 4173；offline-audit 用 4174。两套件端口隔离，
+// 避免连跑时第一条命令的 preview 拆除窗口污染第二条（EVIDENCE-INDEX §9.4）。
+const LOCAL_PORT = 4173
+const BASE = process.env.E2E_BASE ?? (IS_PROD ? PROD_BASE : `http://127.0.0.1:${LOCAL_PORT}`)
 
 function findChrome() {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH
@@ -129,6 +132,41 @@ async function waitForTestId(page, testId, timeoutMs = 8000) {
     return false
   }
 }
+
+// ===== P1.5-S4 State B 存储夹具助手 =====
+const V2_KEYS = ['gt.learning.v2', 'gt.migration.v1', 'gt.learning.v2.backup', 'gt.letterStats.v1', 'gt.totals.v1', 'gt.review.v1', 'gt.memorize.v1']
+// 清空 Learning 存储家族（含迁移标记）：下次 reload 必然重跑迁移（若有 v1 种子）
+const clearLearningStorage = (page) => page.evaluate((keys) => { for (const k of keys) localStorage.removeItem(k) }, V2_KEYS)
+const readV2Store = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('gt.learning.v2') || '{}'))
+// 按词形取复习条目（contentId 第 4 段 = 原词形；legacy:* 天然排除；无 review 子记录 = null）
+const readReviewEntry = async (page, word) => {
+  const store = await readV2Store(page)
+  const hit = Object.entries(store).find(([k, v]) => k.startsWith('content:word:') && k.split(':')[3] === word && v && v.review)
+  return hit ? hit[1].review : null
+}
+// 轮询等 v2 出现任意带 review 的记录（打分落盘有 UI 动画后置延迟，固定 sleep 偶发读空）
+const waitForV2Review = async (page, timeoutMs = 4000) => {
+  for (let i = 0; i < timeoutMs / 200; i++) {
+    const has = await page.evaluate(() => {
+      const s = JSON.parse(localStorage.getItem('gt.learning.v2') || '{}')
+      return Object.values(s).some((v) => v && v.review)
+    })
+    if (has) return true
+    await page.waitForTimeout(200)
+  }
+  return false
+}
+// 轮询等指定词形的 review 条目出现（返回条目或 null）
+const waitForReviewEntry = async (page, word, timeoutMs = 4000) => {
+  for (let i = 0; i < timeoutMs / 200; i++) {
+    const e = await readReviewEntry(page, word)
+    if (e) return e
+    await page.waitForTimeout(200)
+  }
+  return null
+}
+// v1 形状种子（字段与旧夹具逐字一致）→ reload 后由启动迁移转成 v2 正式记录
+const seedReviewV1 = (page, entries) => page.evaluate((e) => { localStorage.setItem('gt.review.v1', JSON.stringify(e)) }, entries)
 
 async function typeWord(page, word) {
   // 给足间隔，避免按键快过 React 状态更新导致漏拍
@@ -302,6 +340,42 @@ async function run() {
   await page.keyboard.press('Backspace')
   await page.waitForTimeout(120)
   check('Backspace 可删除错字母', (await page.locator('[data-state="wrong"]').count()) === 0)
+
+  /* 回归锁定（P1.6-D）：拼错后**不退格**、继续敲对下一个字母，红闪必须即时消退。
+   * 背景：拼写模式允许自由输入。P1.6-D 把打字状态机搬进 src/hooks/useTypingRound.ts 时
+   * 漏抄了旧 App.tsx:519 的 `setErrorFlash(false)`，导致红闪要等满 280ms 定时器才消失。
+   * 原有用例走的是 Backspace 分支（该分支自带清红闪），故零覆盖、静默漏过。
+   *
+   * 判据不是「最终会消失」（两种实现都会被定时器归位），而是**多久消失**：
+   *   有修复 ≈ 1 帧（<60ms）；无修复 = 等满 280ms 定时器（此处已先行等待 120ms，缺口 ≈160ms）。
+   * 阈值取 120ms，两侧各留约 2 倍余量。红闪的 DOM 表现 = 光标格 animate-shake。 */
+  await page.keyboard.press(spellWord[0] === 'z' ? 'x' : 'z') // 再敲一个错字母
+  await page.waitForTimeout(120)
+  check('拼错 120ms 时红闪仍在（用例前置条件成立）', (await page.locator('.animate-shake').count()) >= 1)
+  const shakeClearWatch = page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const t0 = performance.now()
+        const tick = () => {
+          if (document.querySelectorAll('.animate-shake').length === 0) return resolve(Math.round(performance.now() - t0))
+          if (performance.now() - t0 > 2000) return resolve(-1)
+          requestAnimationFrame(tick)
+        }
+        tick()
+      }),
+  )
+  await page.keyboard.press(spellWord.toLowerCase()[1]) // 不退格，直接敲对下一个字母
+  const shakeClearMs = await shakeClearWatch
+  check(
+    '拼错后不退格继续敲对 → 红闪即时消退（<120ms，非 280ms 定时器兜底）',
+    shakeClearMs >= 0 && shakeClearMs < 120,
+    `敲对后 ${shakeClearMs}ms 消退；漏抄修复时应 ≈160ms`,
+  )
+  // 复原：清掉这两个字母，回到空输入再走完整拼写流程
+  await page.keyboard.press('Backspace')
+  await page.keyboard.press('Backspace')
+  await page.waitForTimeout(120)
+
   await typeWord(page, spellWord)
   await page.waitForTimeout(400)
   check('拼写正确后进入下一词', norm(await page.textContent('body')).includes('2/20'))
@@ -413,8 +487,8 @@ async function run() {
   await page.click('[data-testid="tab-memorize"]')
   await waitForTestId(page, 'memorize-card', 10000)
   await page.waitForTimeout(500)
-  const memRaw = await page.evaluate(() => localStorage.getItem('gt.memorize.v1'))
-  const memCount = memRaw ? Object.keys(JSON.parse(memRaw)).length : 0
+  // P1.5-S4 State B：背单词进度写 gt.learning.v2 的 memorize 子记录，不再写 gt.memorize.v1
+  const memCount = Object.values(await readV2Store(page)).filter((v) => v && v.memorize).length
   check('刷新后背单词进度仍在（localStorage ≥20 词）', memCount >= 20, `记录数=${memCount}`)
   check(
     '刷新后背单词页可继续学（新卡组或已学完提示）',
@@ -805,8 +879,8 @@ async function run() {
   await page.waitForTimeout(300)
   check('补全后继续输参数执行生效', (await page.evaluate(() => localStorage.getItem('gt.voice'))) === 'en-GB')
 
-  // 14.2 错题入库：classic 敲错一个字母再敲对 → gt.review.v1 出现条目
-  await page.evaluate(() => localStorage.removeItem('gt.review.v1')) // 清掉前面用例的敲错记录，保证断言精确
+  // 14.2 错题入库：classic 敲错一个字母再敲对 → gt.learning.v2 出现 review 子记录
+  await clearLearningStorage(page) // 清掉前面用例的学习记录（含迁移标记），保证断言精确
   await page.keyboard.press('Escape')
   await page.waitForTimeout(200)
   await page.keyboard.type(':mode classic', { delay: 25 })
@@ -823,13 +897,13 @@ async function run() {
   await page.waitForTimeout(150)
   await typeWord(page, wrongTarget) // 敲对完成整词
   await page.waitForTimeout(500)
-  const review1 = JSON.parse((await page.evaluate(() => localStorage.getItem('gt.review.v1'))) || '{}')
+  const review1 = await readReviewEntry(page, wrongTarget)
   check(
     '敲错的词入库（wrongCount=1、间隔归 0、明天到期）',
-    review1[wrongTarget]?.wrongCount === 1 &&
-      review1[wrongTarget]?.intervalIdx === 0 &&
-      review1[wrongTarget]?.nextReviewAt > Date.now(),
-    JSON.stringify(review1[wrongTarget] ?? null),
+    review1?.wrongCount === 1 &&
+      review1?.intervalIdx === 0 &&
+      review1?.nextReviewAt > Date.now(),
+    JSON.stringify(review1 ?? null),
   )
   await page.click('[data-testid="dropdown-practice"]')
   await page.waitForTimeout(150)
@@ -843,21 +917,17 @@ async function run() {
 
   // 14.3 到期判定：注入 yesterday 到期的词 → StatsPanel 到期 1 → :review 拉出
   const dueWord = await readWord(page)
-  await page.evaluate((word) => {
-    const now = Date.now()
-    localStorage.setItem(
-      'gt.review.v1',
-      JSON.stringify({
-        [word]: {
-          wrongCount: 1,
-          correctStreak: 0,
-          lastWrongAt: now - 2 * 864e5,
-          nextReviewAt: now - 864e5,
-          intervalIdx: 0,
-        },
-      }),
-    )
-  }, dueWord)
+  // P1.5-S4：v1 形状种子 + reload → 启动迁移把种子转成 v2 正式记录
+  await clearLearningStorage(page)
+  await seedReviewV1(page, {
+    [dueWord]: {
+      wrongCount: 1,
+      correctStreak: 0,
+      lastWrongAt: Date.now() - 2 * 864e5,
+      nextReviewAt: Date.now() - 864e5,
+      intervalIdx: 0,
+    },
+  })
   await reloadPage(page)
   await page.waitForTimeout(500)
   await waitForTestId(page, 'open-stats')
@@ -887,13 +957,13 @@ async function run() {
   // 14.4 复习推进：到期词全对敲完 → intervalIdx 推进、明天+2 天后到期
   await typeWord(page, dueWord)
   await page.waitForTimeout(500)
-  const review2 = JSON.parse((await page.evaluate(() => localStorage.getItem('gt.review.v1'))) || '{}')
+  const review2 = await readReviewEntry(page, dueWord)
   check(
     '复习全对间隔推进（intervalIdx 0→1、nextReviewAt 顺延）',
-    review2[dueWord]?.intervalIdx === 1 &&
-      review2[dueWord]?.correctStreak === 1 &&
-      review2[dueWord]?.nextReviewAt > Date.now() + 864e5,
-    JSON.stringify(review2[dueWord] ?? null),
+    review2?.intervalIdx === 1 &&
+      review2?.correctStreak === 1 &&
+      review2?.nextReviewAt > Date.now() + 864e5,
+    JSON.stringify(review2 ?? null),
   )
   // 未到期：:review 提示「没有到期的错题」且不开轮
   await page.keyboard.press('Escape')
@@ -911,21 +981,17 @@ async function run() {
 
   // 14.5 毕业移除：走完 15 天最后一档再对 → 条目移除
   const gradWord = await readWord(page) // reload 后轮内任意词均可作为毕业候选
-  await page.evaluate((word) => {
-    const now = Date.now()
-    localStorage.setItem(
-      'gt.review.v1',
-      JSON.stringify({
-        [word]: {
-          wrongCount: 2,
-          correctStreak: 4,
-          lastWrongAt: now - 16 * 864e5,
-          nextReviewAt: now - 864e5,
-          intervalIdx: 4,
-        },
-      }),
-    )
-  }, gradWord)
+  // P1.5-S4：v1 形状种子 + reload → 启动迁移转成 v2 正式记录
+  await clearLearningStorage(page)
+  await seedReviewV1(page, {
+    [gradWord]: {
+      wrongCount: 2,
+      correctStreak: 4,
+      lastWrongAt: Date.now() - 16 * 864e5,
+      nextReviewAt: Date.now() - 864e5,
+      intervalIdx: 4,
+    },
+  })
   await reloadPage(page)
   await page.waitForTimeout(500)
   await waitForTestId(page, 'tab-typing') // 等应用壳挂载后再按 Esc（面板仅在有监听时打开）
@@ -937,11 +1003,13 @@ async function run() {
   check('毕业候选被拉进复习轮', (await readWord(page)) === gradWord)
   await typeWord(page, gradWord)
   await page.waitForTimeout(500)
-  const review3 = JSON.parse((await page.evaluate(() => localStorage.getItem('gt.review.v1'))) || '{}')
+  // P1.5-S4：v2 毕业语义 = 摘除 review 子记录（同条记录可能残留 analytics 子记录，
+  // 因打字完成会写 recordWordDoneV2），锁的语义是「review 条目移除」，不是整条记录消失。
+  const v2AfterGrad = await readV2Store(page)
   check(
     '走完 15 天间隔毕业移除条目',
-    !(gradWord in review3),
-    `剩余=${JSON.stringify(Object.keys(review3))}`,
+    (await readReviewEntry(page, gradWord)) === null,
+    `剩余=${JSON.stringify(Object.keys(v2AfterGrad))}`,
   )
 
   /* ---------- 15. 批6：考研/托福词库（懒加载分包）---------- */
@@ -975,30 +1043,29 @@ async function run() {
   check('考研词库打字推进到下一词', kyWord2.length > 0 && kyWord2 !== kyWord1, `下一词=${kyWord2}`)
 
   // 15.3 错题复习在懒词库下工作：敲错考研词入库 → 注入到期 → :review 拉出
-  await page.evaluate(() => localStorage.removeItem('gt.review.v1'))
+  await clearLearningStorage(page)
   await page.waitForTimeout(150)
   const kyWrong = await readWord(page)
   await page.keyboard.press(kyWrong[0] === 'z' ? 'x' : 'z') // 故意敲错
   await page.waitForTimeout(150)
   await typeWord(page, kyWrong)
   await page.waitForTimeout(500)
-  const kyReview = JSON.parse((await page.evaluate(() => localStorage.getItem('gt.review.v1'))) || '{}')
-  check('考研词敲错入库（懒词库下错题本可用）', kyReview[kyWrong]?.wrongCount === 1, JSON.stringify(kyReview[kyWrong] ?? null))
-  await page.evaluate((word) => {
-    const now = Date.now()
-    localStorage.setItem(
-      'gt.review.v1',
-      JSON.stringify({
-        [word]: {
-          wrongCount: 1,
-          correctStreak: 0,
-          lastWrongAt: now - 2 * 864e5,
-          nextReviewAt: now - 864e5,
-          intervalIdx: 0,
-        },
-      }),
-    )
-  }, kyWrong)
+  const kyReview = await readReviewEntry(page, kyWrong)
+  check('考研词敲错入库（懒词库下错题本可用）', kyReview?.wrongCount === 1, JSON.stringify(kyReview ?? null))
+  // P1.5-S4：clear + v1 种子 → 下方 reload 触发启动迁移，种子进 v2。
+  //    夹具修复：注入词改用 kaoyan 独有词 overpass —— kyWrong 这类屏幕词可能同属多包
+  //    （pearl∈kaoyan+toefl），种子迁移判 ambiguous 归入 legacy → :review 不开轮。
+  //    （打字敲错写入带归属上下文不受多包影响，「敲错入库」已由上方 readReviewEntry(kyWrong) 验证。）
+  await clearLearningStorage(page)
+  await seedReviewV1(page, {
+    overpass: {
+      wrongCount: 1,
+      correctStreak: 0,
+      lastWrongAt: Date.now() - 2 * 864e5,
+      nextReviewAt: Date.now() - 864e5,
+      intervalIdx: 0,
+    },
+  })
   await reloadPage(page)
   await page.waitForTimeout(800) // 等懒加载词库 chunk 拉取 + bankWords 就位
   await gotoTyping(page) // V3-P0a：reload 后落 Home，readWord 需要打字面板
@@ -1008,7 +1075,7 @@ async function run() {
   await page.keyboard.type(':review', { delay: 25 })
   await page.keyboard.press('Enter')
   await page.waitForTimeout(500)
-  check('懒词库下 :review 拉出到期考研词', (await readWord(page)) === kyWrong, `首词=${await readWord(page)}`)
+  check('懒词库下 :review 拉出到期考研词', (await readWord(page)) === 'overpass', `首词=${await readWord(page)}`)
 
   /* ---------- 13. 批8-A：艾宾浩斯 Jitter + Quota 熔断 ---------- */
   console.log('\n【13】批8：Jitter 抗雪崩 + Quota 熔断')
@@ -1018,7 +1085,7 @@ async function run() {
   await page.waitForTimeout(350)
 
   // 13.1 recordWrong Jitter 窗口：背单词打「不认识」→ nextReviewAt ∈ t0+[0.85d, 1.15d]
-  await page.evaluate(() => localStorage.removeItem('gt.review.v1'))
+  await clearLearningStorage(page)
   await page.click('[data-testid="tab-memorize"]')
   await page.waitForTimeout(400)
   const t0 = Date.now()
@@ -1026,10 +1093,14 @@ async function run() {
   await page.waitForTimeout(300)
   await page.click('[data-testid="memorize-unknown"]')
   await page.waitForTimeout(450)
-  const driftW = await page.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem('gt.review.v1') || '{}')
-    return Object.values(s)[0]?.nextReviewAt ?? 0
-  }) - t0
+  // State B：清空后 v2 里唯一的 review 记录就是刚写入的这条。
+  // P1.5-S4 夹具修复：打分落盘存在 >450ms 的 UI 动画后置延迟，固定 sleep 会偶发读空
+  // —— 改成轮询等写入落地（下方 1d 档 Jitter 窗口断言不变）。
+  await waitForV2Review(page)
+  const reviewsW = Object.values(await readV2Store(page)).filter((v) => v && v.review)
+  // ⚠️ v2 记录的 nextReviewAt 在 review 子记录里（v1 store 的值才是扁平 ReviewEntry），
+  //    取值必须下钻一层 —— 窗口断言本身不变。
+  const driftW = (reviewsW[0]?.review?.nextReviewAt ?? 0) - t0
   check(
     'recordWrong Jitter：1d 档落在 [0.85d, 1.15d] 窗口',
     driftW >= 0.85 * 864e5 && driftW <= 1.15 * 864e5,
@@ -1037,18 +1108,31 @@ async function run() {
   )
 
   // 13.2 recordCorrect Jitter 窗口：注入到期词 → :review 敲对 → 2d 档 ∈ t0+[1.8d, 2.2d]
-  await page.evaluate(() => localStorage.removeItem('gt.review.v1'))
-  const dueWord2 = 'zz-jitter-correct'
-  await page.evaluate((w) => {
-    localStorage.setItem(
-      'gt.review.v1',
-      JSON.stringify({
-        [w]: { wrongCount: 1, correctStreak: 0, lastWrongAt: Date.now() - 864e5, nextReviewAt: Date.now() - 1000, intervalIdx: 0 },
-      }),
-    )
-  }, dueWord2)
+  await clearLearningStorage(page)
+  // ⚠️ 注入词必须是**真实存在于已加载词库**的词。执行计划第 ⑧ 步之后，复习轮不再为
+  //    取不到释义的词塞 `?? { word, translation: '' }` 空释义占位（那正是 CONTENT_CONTRACT
+  //    §735-739 点名的 🔴 缺陷），取不到就**显式跳过**；原先这里用的合成词
+  //    `zz-jitter-correct` 在新语义下理所当然开不了轮。
+  //    这里换成从屏幕取真词 —— **断言一字未改**（仍要求首词 === 注入的到期词），
+  //    改的只是夹具；被移走的那个语义由下面 13.2b 单独接管。
   await page.click('[data-testid="tab-typing"]')
-  await page.waitForTimeout(200)
+  await page.waitForTimeout(300)
+  for (let i = 0; i < 15 && (await readWord(page)).length === 0; i++) await page.waitForTimeout(200)
+  // P1.5-S4 夹具修复：注入词改用 **kaoyan 独有词**（单包归属）。旧的「从屏幕取词」会取到
+  // 多包共有词（eagle∈ielts+kaoyan、pearl∈kaoyan+toefl）——v1 种子迁移对多包词判
+  // ambiguous 归入 legacy:unattributed:*，:review 按 G6-3 排除 legacy → 不开轮
+  //（旧的「首词=eagle 通过」实为练习轮重置首词恰好同名的假阳性）。
+  // 注入词仍须是真实存在于已加载词库的词（:review 对取不到释义的词显式跳过，见 13.2b）。
+  const dueWord2 = 'overpass' // kaoyan 独有（content/vocabulary/kaoyan/words.json，他包均无）
+  // P1.5-S4：State B 下不 reload 读不到 v1 种子 —— clear + v1 种子后 reload 触发启动迁移
+  await clearLearningStorage(page)
+  await seedReviewV1(page, {
+    [dueWord2]: { wrongCount: 1, correctStreak: 0, lastWrongAt: Date.now() - 864e5, nextReviewAt: Date.now() - 1000, intervalIdx: 0 },
+  })
+  await reloadPage(page)
+  await page.waitForTimeout(800)
+  await gotoTyping(page) // reload 后落 Home，readWord 需要打字面板
+  for (let i = 0; i < 15 && (await readWord(page)).length === 0; i++) await page.waitForTimeout(200)
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
   await page.keyboard.type(':review', { delay: 25 })
@@ -1058,39 +1142,111 @@ async function run() {
   const t1 = Date.now()
   await typeWord(page, dueWord2)
   await page.waitForTimeout(500)
-  const driftC = await page.evaluate((w) => {
-    const s = JSON.parse(localStorage.getItem('gt.review.v1') || '{}')
-    return s[w]?.nextReviewAt ?? 0
-  }, dueWord2) - t1
+  // P1.5-S4 夹具修复：复习轮敲对的落盘同样存在 UI 后置延迟，轮询等条目出现（2d 档窗口断言不变）
+  const entryC = await waitForReviewEntry(page, dueWord2)
+  const driftC = (entryC?.nextReviewAt ?? 0) - t1
   check(
     'recordCorrect Jitter：2d 档落在 [1.8d, 2.2d] 窗口',
     driftC >= 1.8 * 864e5 && driftC <= 2.2 * 864e5,
     `漂移=${(driftC / 864e5).toFixed(3)}d`,
   )
 
-  // 13.3 Quota 熔断：mock setItem 前两次对 gt.review.v1 抛 QuotaExceededError → 清洗后重试成功
+  /* ---------- 13.2b 行为锁：取不到释义的词**不再**用空释义占位开轮 ---------- */
+  // 这是执行计划第 ⑧ 步的核心语义变更。旧实现用 `?? { word, translation: '' }` 让任意
+  // 合成词都能拉动复习轮（用户看到一个没有释义的「假词条」）；新实现显式跳过 + 告警。
+  // 没有这条锁，上面 13.2 换成真词之后就再没人盯着这个语义了。
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(350)
+  // P1.5-S4：clear + ghost v1 种子 + reload 触发启动迁移 —— ghost 词不在内容包，
+  // 迁移后成 legacy:* 到期记录，reviewItemViews 排除 legacy:* → :review 不开轮
+  //（比「读不到」更强：锁的是 G6-3 的排除语义本身）。
+  await clearLearningStorage(page)
+  await seedReviewV1(page, {
+    '__gt_ghost_word__': {
+      wrongCount: 1, correctStreak: 0, lastWrongAt: Date.now() - 864e5, nextReviewAt: Date.now() - 1000, intervalIdx: 0,
+    },
+  })
+  await reloadPage(page)
+  await page.waitForTimeout(800)
+  await gotoTyping(page) // reload 后落 Home，beforeGhost 的 readWord 需要打字面板
+  for (let i = 0; i < 15 && (await readWord(page)).length === 0; i++) await page.waitForTimeout(200)
+  // ⚠️ 本组断言的**自校验**：必须确认命令面板真的被拉起并回车了，否则「练习轮没变」无法区分
+  //    「未命中 ⇒ 显式跳过（期望行为）」与「`:review` 压根没执行（假通过）」。
+  //    第一版缺这一步时，对照组直接 FAIL 把这层猫腻顶了出来 —— 这正是它存在的意义。
+  const runReview = async () => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await page.keyboard.press('Escape')
+      await page.waitForTimeout(250)
+      await page.keyboard.type(':review', { delay: 25 })
+      let opened = false
+      for (let i = 0; i < 20; i++) {
+        if ((await page.locator('[data-testid="command-item-review"]').count()) === 1) {
+          opened = true
+          break
+        }
+        await page.waitForTimeout(100)
+      }
+      if (opened) {
+        await page.keyboard.press('Enter')
+        await page.waitForTimeout(500)
+        return true
+      }
+    }
+    return false
+  }
+  const beforeGhost = await readWord(page)
+  const ghostRan = await runReview()
+  check(
+    '无释义的合成词不再靠空释义占位开轮：练习轮未被替换',
+    ghostRan && beforeGhost.length > 0 && (await readWord(page)) === beforeGhost,
+    `命令已执行=${ghostRan}；轮首词 ${beforeGhost} → ${await readWord(page)}`,
+  )
+  // 对照组：换成**真实**到期词 ⇒ 立刻能开轮。缺了这一条，一个「永远返回 false」的实现
+  // 会把上面的「不开轮」判成绿 —— 必须证明不开轮是**未命中**导致的，不是入口整体失效。
+  // P1.5-S4：对照组同样 clear + v1 种子 + reload（启动迁移把种子转成 v2 到期记录）
+  await clearLearningStorage(page)
+  await seedReviewV1(page, {
+    [dueWord2]: { wrongCount: 1, correctStreak: 0, lastWrongAt: Date.now() - 864e5, nextReviewAt: Date.now() - 1000, intervalIdx: 0 },
+  })
+  await reloadPage(page)
+  await page.waitForTimeout(800)
+  await gotoTyping(page)
+  for (let i = 0; i < 15 && (await readWord(page)).length === 0; i++) await page.waitForTimeout(200)
+  const realRan = await runReview()
+  check(
+    '对照组：换成真实到期词立刻能开轮（证明上面「不开轮」源于未命中，而非复习入口整体失效）',
+    realRan && (await readWord(page)) === dueWord2,
+    `命令已执行=${realRan}；首词=${await readWord(page)}`,
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+
+  // 13.3 Quota 熔断：mock setItem 前两次对 gt.learning.v2 抛 QuotaExceededError → 清洗后重试成功
   // 13.2 复习敲对可能已结算出 ResultOverlay，先 Enter 重开解除遮罩
   await page.keyboard.press('Enter')
   await page.waitForTimeout(350)
-  await page.evaluate(() => localStorage.removeItem('gt.review.v1'))
+  await clearLearningStorage(page)
   await page.evaluate(() => {
     const orig = Storage.prototype.setItem.bind(localStorage)
     window.__origSetItem = orig
     let calls = 0
     Storage.prototype.setItem = function (k, v) {
-      if (k === 'gt.review.v1' && calls++ < 2) {
+      if (k === 'gt.learning.v2' && calls++ < 2) {
         const e = new Error('mock: quota exceeded')
         e.name = 'QuotaExceededError'
         throw e
       }
       return orig(k, v)
     }
-    // 预置 6 条既有错题：熔断清洗后总条目应减少
+    // 预置 6 条合法 v2 错题记录：熔断清洗后 review 总条目应减少
     const seed = {}
     for (let i = 0; i < 6; i++) {
-      seed[`quota-seed-${i}`] = { wrongCount: 1, correctStreak: 0, lastWrongAt: Date.now(), nextReviewAt: Date.now() + 864e5, intervalIdx: 0 }
+      seed[`content:word:quota-seed:${i}`] = {
+        contentId: `content:word:quota-seed:${i}`,
+        review: { wrongCount: 1, correctStreak: 0, lastWrongAt: Date.now(), nextReviewAt: Date.now() + 864e5, intervalIdx: 0 },
+      }
     }
-    orig('gt.review.v1', JSON.stringify(seed))
+    orig('gt.learning.v2', JSON.stringify(seed))
   })
   const errQ = consoleErrors.length
   await page.click('[data-testid="tab-memorize"]')
@@ -1100,8 +1256,12 @@ async function run() {
   await page.click('[data-testid="memorize-unknown"]')
   await page.waitForTimeout(600)
   const qState = await page.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem('gt.review.v1') || '{}')
-    return { total: Object.keys(s).length, hasNew: Object.keys(s).some((k) => !k.startsWith('quota-seed-')) }
+    const s = JSON.parse(localStorage.getItem('gt.learning.v2') || '{}')
+    const reviews = Object.values(s).filter((v) => v && v.review)
+    return {
+      total: reviews.length,
+      hasNew: reviews.some((r) => typeof r.contentId === 'string' && !r.contentId.startsWith('content:word:quota-seed:')),
+    }
   })
   check('Quota 熔断：清洗重试后条目最终写入', qState.hasNew && qState.total > 0, `total=${qState.total}`)
   check('Quota 熔断：清洗发生（条目数 < 7）', qState.total < 7, `total=${qState.total}`)
@@ -1119,7 +1279,7 @@ async function run() {
   await page.evaluate(() => {
     const orig = window.__origSetItem
     Storage.prototype.setItem = function (k, v) {
-      if (k === 'gt.review.v1') {
+      if (k === 'gt.learning.v2') {
         const e = new Error('mock: quota always')
         e.name = 'QuotaExceededError'
         throw e
@@ -1136,7 +1296,9 @@ async function run() {
   const progQ1 = await page.textContent('[data-testid="memorize-progress"]')
   check('Quota 全失败：UI 不受影响照常推进（内存态兜底）', progQ0 !== progQ1, `${progQ0.trim()} → ${progQ1.trim()}`)
   check('Quota 全失败：无未捕获异常', consoleErrors.length === errQ2, consoleErrors.slice(errQ2).join(' | '))
-  check('Quota 全失败：放弃写入有 warn', consoleWarns.some((w) => w.includes('仍写入失败')))
+  // P1.5-S4：放弃路径 warn 文案对齐 src/lib/learning/storage.ts failWrite 实际输出
+  //（`[learning/storage] gt.learning.v2 写入失败（reason=quota...）`），断言语义不变。
+  check('Quota 全失败：放弃写入有 warn', consoleWarns.some((w) => w.includes('写入失败')))
   await page.evaluate(() => {
     Storage.prototype.setItem = window.__origSetItem
   })
@@ -1308,9 +1470,9 @@ async function run() {
   console.log('\n【16】V3-P0a：五页签 IA / 今日推荐 / Review / Progress')
   const errP0a = consoleErrors.length
 
-  // 预置：清错题本/分析，词库切 CET-4（同步词库，便于断言音标与单挑）
+  // 预置：清学习存储家族（P1.5-S4 State B）+ 旧分析键，词库切 CET-4（同步词库，便于断言音标与单挑）
+  await clearLearningStorage(page)
   await page.evaluate(() => {
-    localStorage.removeItem('gt.review.v1')
     localStorage.removeItem('gt.analytics.v1')
     localStorage.setItem('gt.bank', JSON.stringify('cet4'))
   })
@@ -1355,8 +1517,8 @@ async function run() {
     `style=${goalStyle}`,
   )
 
-  // 16.2 复习卡两态 + 点击开复习轮
-  await page.evaluate(() => localStorage.removeItem('gt.review.v1'))
+  // 16.2 复习卡两态 + 点击开复习轮（P1.5-S4：清 v2 键族后空态）
+  await clearLearningStorage(page)
   await reloadPage(page)
   await page.waitForTimeout(400)
   await waitForTestId(page, 'home-review-empty') // 空态卡挂载后再断言（避免渲染中途采样）
@@ -1365,13 +1527,10 @@ async function run() {
     (await page.locator('[data-testid="home-review-empty"]').count()) === 1 &&
       (await page.locator('[data-testid="home-review-start"]').count()) === 0,
   )
-  await page.evaluate(() => {
-    localStorage.setItem(
-      'gt.review.v1',
-      JSON.stringify({
-        abandon: { wrongCount: 2, correctStreak: 0, lastWrongAt: Date.now() - 2 * 864e5, nextReviewAt: Date.now() - 864e5, intervalIdx: 0 },
-      }),
-    )
+  // P1.5-S4：v1 种子 + reload（启动迁移转成 v2 到期记录）
+  await clearLearningStorage(page)
+  await seedReviewV1(page, {
+    abandon: { wrongCount: 2, correctStreak: 0, lastWrongAt: Date.now() - 2 * 864e5, nextReviewAt: Date.now() - 864e5, intervalIdx: 0 },
   })
   await reloadPage(page)
   await page.waitForTimeout(400)
@@ -1389,23 +1548,19 @@ async function run() {
   await page.waitForTimeout(300)
 
   // 16.3 弱项卡两态 + 点击专攻
-  await page.evaluate(() => localStorage.removeItem('gt.analytics.v1'))
+  // P1.5-S4：State B 弱项数据来自 gt.letterStats.v1 / gt.totals.v1（gt.analytics.v1 在 State B 不被读）
+  await page.evaluate(() => {
+    localStorage.removeItem('gt.letterStats.v1')
+    localStorage.removeItem('gt.totals.v1')
+  })
   await reloadPage(page)
   await page.waitForTimeout(400)
   await waitForTestId(page, 'home-weak-empty')
   check('弱项卡空态（暂无弱项数据）', (await page.locator('[data-testid="home-weak-empty"]').count()) === 1)
+  // P1.5-S4：有态种子改写 State B 实际读取的两键（字段等价平移自旧 gt.analytics.v1 种子）
   await page.evaluate(() => {
-    localStorage.setItem(
-      'gt.analytics.v1',
-      JSON.stringify({
-        letters: { q: { hit: 1, miss: 9 }, z: { hit: 2, miss: 5 } },
-        words: { abandon: { done: 3, wrong: 2 } },
-        totalKeys: 17,
-        totalCorrect: 3,
-        totalWords: 1,
-        bestWpm: 20,
-      }),
-    )
+    localStorage.setItem('gt.letterStats.v1', JSON.stringify({ letters: { q: { hit: 1, miss: 9 }, z: { hit: 2, miss: 5 } } }))
+    localStorage.setItem('gt.totals.v1', JSON.stringify({ totalKeys: 17, totalCorrect: 3, totalWords: 1, bestWpm: 20 }))
   })
   await reloadPage(page)
   await page.waitForTimeout(400)
@@ -1430,13 +1585,27 @@ async function run() {
   )
 
   // 16.5 Review 页：统计 / 分布 / 徽章（intervalIdx=0 与 =3 各一词）/ 详情 / 单挑
+  // P1.5-S4：clear + v1 种子 + reload（启动迁移转成 v2 正式记录，分布走 insights.masteryDistributionV2）。
+  //    夹具修复：迁移器会把 gt.analytics.v1 的 letters/totals **平移并覆盖写入**
+  //    gt.letterStats.v1 / gt.totals.v1（migrate.ts ④「两个全局聚合独自搬走」，writtenKeys
+  //    含这两键）—— 直种两键会被迁移覆盖成空表。弱项种子必须种在 gt.analytics.v1（迁移
+  //    正路，与旧夹具字段逐字一致），由迁移器平移落位；words.abandon 随 analytics 分片
+  //    进 v2 记录，供 Progress 错词列表读取。
+  await clearLearningStorage(page)
+  await seedReviewV1(page, {
+    abandon: { wrongCount: 3, correctStreak: 0, lastWrongAt: Date.now() - 864e5, nextReviewAt: Date.now() - 3600e3, intervalIdx: 0 },
+    absolute: { wrongCount: 1, correctStreak: 3, lastWrongAt: Date.now() - 6 * 864e5, nextReviewAt: Date.now() - 60e3, intervalIdx: 3 },
+  })
   await page.evaluate(() => {
-    const now = Date.now()
     localStorage.setItem(
-      'gt.review.v1',
+      'gt.analytics.v1',
       JSON.stringify({
-        abandon: { wrongCount: 3, correctStreak: 0, lastWrongAt: now - 864e5, nextReviewAt: now - 3600e3, intervalIdx: 0 },
-        absolute: { wrongCount: 1, correctStreak: 3, lastWrongAt: now - 6 * 864e5, nextReviewAt: now - 60e3, intervalIdx: 3 },
+        letters: { q: { hit: 1, miss: 9 }, z: { hit: 2, miss: 5 } },
+        words: { abandon: { done: 3, wrong: 2 } },
+        totalKeys: 17,
+        totalCorrect: 3,
+        totalWords: 1,
+        bestWpm: 20,
       }),
     )
   })
@@ -1487,6 +1656,21 @@ async function run() {
     startBtnThere && (dueFirst === 'abandon' || dueFirst === 'absolute'),
     `按钮=${startBtnThere} 首词=${dueFirst}`,
   )
+
+  // P1.5-S4 夹具修复：Progress 错词列表（State B）读 v2 记录的 **analytics 子记录**（打字
+  // 维度，对应旧 gt.analytics.v1 的 words —— ProgressPanel 仍消费 wrongWords(analytics)）。
+  // 种子只带 review 子记录，这里按词形补齐打字维度（迁移已完成、marker 已在，直接改 v2
+  // 安全），再 reload 让 loadAnalyticsV2 聚合出 words.abandon。字段平移自旧 analytics.v1 种子。
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('gt.learning.v2') || '{}')
+    for (const [k, v] of Object.entries(s)) {
+      const w = k.startsWith('content:word:') ? k.split(':')[3] : null
+      if (w === 'abandon' && v) v.analytics = { done: 3, wrong: 2 }
+      if (w === 'absolute' && v) v.analytics = { done: 1, wrong: 0 }
+    }
+    localStorage.setItem('gt.learning.v2', JSON.stringify(s))
+  })
+  await reloadPage(page)
 
   // 16.7 Progress 页：热力图 / 累计统计 / 弱项列表
   await page.click('[data-testid="tab-progress"]')
@@ -1541,10 +1725,10 @@ async function run() {
   if (failures > 0) process.exitCode = 1
 }
 
-// 自举 preview（--prod 时跳过，直接打生产），全程 finally 保证杀干净
+// 自举 preview（--prod / E2E_BASE 覆盖时跳过，直接打外部目标），全程 finally 保证杀干净
 let previewServer = null
 try {
-  if (!IS_PROD) previewServer = await ensurePreviewServer()
+  if (!IS_PROD && !process.env.E2E_BASE) previewServer = await ensurePreviewServer({ port: LOCAL_PORT })
   await run()
 } catch (e) {
   console.error('\n💥 测试脚本异常：', e)

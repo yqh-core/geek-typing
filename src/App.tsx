@@ -1,4 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+/* P1.6-D · App 组合层
+ *
+ * 重构说明：原 957 行的「上帝组件」已拆为 8 个 hook，App 只保留两件事：
+ *   1) 把 hook 组合起来（含跨 hook 的依赖桥接）；
+ *   2) 渲染 JSX。
+ *
+ * hook 分工：
+ *   useTabNav        页签导航（WAI-ARIA tablist，roving tabindex）
+ *   useSettings      7 项偏好 + 持久化 + 音效开关
+ *   useCommandMode   命令态（Esc 切换，打开时打字/背单词键盘流让位）
+ *   useBank          词库（内置 + 自定义 + 懒加载词条）
+ *   useAnalytics     analytics 态 + 镜像 ref + 节流落盘
+ *   useStreak        打卡 history + 今日词数 / 连续天数
+ *   useReviewFlow    错题本派生 + 复习轮 / 单挑轮归属映射
+ *   useTypingRound   打字状态机（**不认识学习语义**，只回调 onCompleteWord）
+ *
+ * 学习语义的唯一接线点在本文件：onCompleteWord → practiceEngine.completeTypingWord。
+ * 这样 practice-engine 门禁天然成立（hook 里不出现「完成三连」）。
+ */
+import { useCallback, useEffect, useRef } from 'react'
 import Header from './components/Header'
 import StatsBar from './components/StatsBar'
 import PracticePanel from './components/PracticePanel'
@@ -10,618 +29,154 @@ import HomePanel from './components/HomePanel'
 import ReviewPanel from './components/ReviewPanel'
 import ProgressPanel from './components/ProgressPanel'
 import CommandPalette from './components/CommandPalette'
-import {
-  DEFAULT_BANK_ID,
-  WORD_BANKS,
-  allLoadedWords,
-  bankWordsOf,
-  ensureBankWords,
-  type WordBank,
-  type WordItem,
-} from './data/wordBanks'
-import { sound, type SoundTheme } from './lib/sound'
-import { THEMES, type ThemeId } from './lib/theme'
-import { getMode, type PracticeModeId } from './lib/modes'
-import { loadCustomBanks, type CustomBank } from './lib/customBanks'
-import {
-  loadAnalytics,
-  rankByWeakness,
-  recordKey,
-  recordWordDone,
-  resetAnalytics,
-  saveAnalytics,
-  weakLetters,
-  type Analytics,
-} from './lib/analytics'
+import { THEMES } from './lib/theme'
+import { sound } from './lib/sound'
+import { practiceEngine, type PracticeSession } from './core/practice'
 import { speak, warmSpeech } from './lib/speech'
-import { getStreakDays, getTodayCount, loadHistory, recordSeconds, recordWord, type History } from './lib/streak'
-import { dueWords, loadReview, recordCorrect, recordWrong } from './lib/reviewStore'
-import { buildRecommendation } from './lib/recommend'
 import { Terminal } from 'lucide-react'
 import { useT, useLang } from './i18n'
+import { useTabNav, type TabId } from './hooks/useTabNav'
+import { useSettings } from './hooks/useSettings'
+import { useCommandMode } from './hooks/useCommandMode'
+import { useBank } from './hooks/useBank'
+import { useAnalytics } from './hooks/useAnalytics'
+import { useStreak } from './hooks/useStreak'
+import { useReviewFlow } from './hooks/useReviewFlow'
+import { useTypingRound } from './hooks/useTypingRound'
+import type { WordItem } from './data/wordBanks'
 
-/** 页签：推荐首页 / 打字 / 背单词 / 复习 / 进度（V3-P0a 五页签 IA） */
-export type TabId = 'home' | 'typing' | 'memorize' | 'review' | 'progress'
-
-/** 页签顺序：键盘 ←/→ 循环导航、Home/End 跳首尾 与 roving tabindex 均以此为准 */
-const TAB_IDS: TabId[] = ['home', 'typing', 'memorize', 'review', 'progress']
+/** CommandPalette 等外部消费者仍从 '../App' 取 TabId，此处保持再导出 */
+export type { TabId }
 
 /** 页签 id / 面板 id：tabpanel 的 aria-labelledby 需指回页签 id，故两者成对生成 */
 const tabDomId = (id: TabId) => `tab-${id}`
 const tabPanelDomId = (id: TabId) => `tabpanel-${id}`
 
-/** 每一轮练习的词数 */
-const CHAPTER_SIZE = 20
-
-/** 连击里程碑阈值 */
-const MILESTONES = [10, 20, 30, 50, 100]
-
-interface RoundStats {
-  keys: number
-  correct: number
-  errors: number
-  combo: number
-  bestCombo: number
-}
-
-const EMPTY_STATS: RoundStats = { keys: 0, correct: 0, errors: 0, combo: 0, bestCombo: 0 }
-
-function readStorage<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? (JSON.parse(raw) as T) : fallback
-  } catch {
-    return fallback
-  }
-}
-
-function writeStorage(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value))
-  } catch {
-    /* 隐私模式下忽略 */
-  }
-}
-
 export default function App() {
   const t = useT()
   const { lang } = useLang()
-  // V3-P0a：默认落在 Today's Practice 推荐首页
-  const [tab, setTab] = useState<TabId>('home')
-  const [bankId, setBankId] = useState<string>(() => readStorage('gt.bank', DEFAULT_BANK_ID))
-  const [themeId, setThemeId] = useState<ThemeId>(() => readStorage('gt.theme', 'matrix'))
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => readStorage('gt.sound', true))
-  const [soundTheme, setSoundTheme] = useState<SoundTheme>(() => readStorage('gt.soundTheme', 'mech'))
-  const [shuffled, setShuffled] = useState<boolean>(() => readStorage('gt.shuffle', true))
-  const [mode, setMode] = useState<PracticeModeId>(() => readStorage('gt.mode', 'classic'))
-  const [running, setRunning] = useState(false)
-  const [countdown, setCountdown] = useState<number | null>(null)
-  /** 命令态：Esc 切换，打开时打字引擎与背单词键盘流都让位 */
-  const [commandMode, setCommandMode] = useState(false)
 
-  const [queue, setQueue] = useState<WordItem[]>([])
-  const [wordIndex, setWordIndex] = useState(0)
-  const [typed, setTyped] = useState('')
-  const [errorFlash, setErrorFlash] = useState(false)
-  const [wrongKey, setWrongKey] = useState<string | null>(null)
-  const [finished, setFinished] = useState(false)
-
-  const [stats, setStats] = useState<RoundStats>(EMPTY_STATS)
-  const [elapsedMs, setElapsedMs] = useState(0)
-  const [wrongWords, setWrongWords] = useState<string[]>([])
-  const [milestone, setMilestone] = useState<number | null>(null)
-
-  const [history, setHistory] = useState<History>(() => loadHistory())
-  const [customBanks, setCustomBanks] = useState<CustomBank[]>(() => loadCustomBanks())
-  const [analytics, setAnalytics] = useState<Analytics>(() => loadAnalytics())
-  const [autoSpeak, setAutoSpeak] = useState<boolean>(() => readStorage('gt.autoSpeak', false))
-
-  /** 错题本版本号：recordWrong/recordCorrect 后自增，驱动到期数等派生数据刷新 */
-  const [reviewVersion, setReviewVersion] = useState(0)
-  const bumpReview = useCallback(() => setReviewVersion((v) => v + 1), [])
-
-  const startedRef = useRef<number | null>(null)
-  const lockRef = useRef(false)
-  const milestoneTimer = useRef<number | null>(null)
-  const statsRef = useRef<RoundStats>(EMPTY_STATS)
-  const flashTimer = useRef<number | null>(null)
-  /** 页签按钮引用：键盘事件需要把焦点移动到新页签（roving tabindex） */
-  const tabRefs = useRef<Partial<Record<TabId, HTMLButtonElement | null>>>({})
-  /** 键盘导航标记：仅键盘切换页签时抢焦点，鼠标点击不抢 */
-  const keyboardNavRef = useRef(false)
+  const { tab, setTab, tabRefs, handleTabKeyDown } = useTabNav()
+  const {
+    bankId,
+    setBankId,
+    themeId,
+    setThemeId,
+    soundEnabled,
+    setSoundEnabled,
+    soundTheme,
+    setSoundTheme,
+    shuffled,
+    setShuffled,
+    mode,
+    setMode,
+    autoSpeak,
+    setAutoSpeak,
+  } = useSettings()
+  const { commandMode, setCommandMode, closePalette } = useCommandMode()
+  const { banks, bank, bankWords } = useBank(bankId)
+  const { analytics, analyticsRef, updateAnalytics, reset: resetAnalytics } = useAnalytics()
+  const { history, setHistory, todayCount, streakDays } = useStreak()
 
   const theme = THEMES[themeId]
 
-  /** 内置词库 + 我的自定义词库 */
-  const banks = useMemo<WordBank[]>(
-    () => [
-      ...WORD_BANKS,
-      ...customBanks.map((c) => ({
-        id: c.id,
-        name: c.name,
-        description: '我的自定义词库',
-        icon: 'FileText',
-        words: c.words,
-      })),
-    ],
-    [customBanks],
-  )
-
-  // 切换词库时顺带刷新一次自定义词库列表（导入新词库后会触发这里）
-  useEffect(() => {
-    setCustomBanks(loadCustomBanks())
-  }, [bankId])
-
-  const bank = useMemo(
-    () => banks.find((b) => b.id === bankId) ?? banks[0],
-    [banks, bankId],
-  )
-
-  /** 当前词库已解析词条：小词库同步；懒加载词库在下方 effect 异步填充（模块级缓存兜底） */
-  const [bankWords, setBankWords] = useState<WordItem[]>([])
-  useEffect(() => {
-    const ready = bankWordsOf(bank)
-    if (ready.length > 0) {
-      setBankWords(ready)
+  /* ---------------- 依赖环的显式破环点 ----------------
+   * useReviewFlow 需要 startRound（复习轮开轮），而 useTypingRound 的完成回调需要
+   * useReviewFlow 的 wordCtx（跨包归属）—— 二者互为依赖。用一层 ref 桥接：
+   * 复习流的开轮动作只发生在事件回调里，挂载后 startRoundRef 必然已填充。 */
+  const startRoundRef = useRef<((source?: WordItem[]) => void) | null>(null)
+  const startRoundBridge = useCallback((source?: WordItem[]) => {
+    if (!startRoundRef.current) {
+      // G4-3 零静默失败：桥未回填就开轮会是「点了没反应」的静默故障，必须可观测。
+      // （挂载 effect 必然先于任何用户事件回填，此处只在极端时序异常时触发）
+      console.warn('[App] startRound 桥未就绪，复习轮开轮被忽略', source?.length ?? 0)
       return
     }
-    // 懒加载词库且未缓存：清空占位进入「加载词库中」态
-    setBankWords([])
-    let alive = true
-    ensureBankWords(bank)
-      .then((w) => {
-        if (alive) setBankWords(w)
-      })
-      .catch((e) => {
-        // 断网首次切到未加载过的大词库：chunk 拉取失败，保持加载态（词库数据无法凭空获得）
-        console.warn(`词库 ${bank.id} 加载失败`, e)
-      })
-    return () => {
-      alive = false
-    }
-  }, [bank])
-
-  /* ---------------- 错题本（艾宾浩斯）派生数据 ---------------- */
-  const reviewDue = useMemo(() => {
-    void reviewVersion
-    // 存储里的词本身即历史上练过的词（懒词库下无法依赖全词库展开），不再做词库过滤
-    return dueWords()
-    // 切页签时也刷新一次：背单词页的三键打分不在本组件内打点
-  }, [reviewVersion, tab])
-  const reviewTotal = useMemo(() => {
-    void reviewVersion
-    return Object.keys(loadReview()).length
-  }, [reviewVersion, tab])
-
-  /** Today's Practice 推荐快照：错题本变化（或切回页签）时重建 */
-  const recommendation = useMemo(() => buildRecommendation(), [reviewVersion, tab])
-
-  /* ---------------- 生成一轮练习队列 ---------------- */
-  const buildQueue = useCallback(
-    (source?: WordItem[]) => {
-      const base = source && source.length > 0 ? source : bankWords
-      const arr = [...base]
-      if (shuffled) {
-        for (let i = arr.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1))
-          ;[arr[i], arr[j]] = [arr[j], arr[i]]
-        }
-      }
-      return arr.slice(0, CHAPTER_SIZE)
-    },
-    [bankWords, shuffled],
-  )
-
-  const startRound = useCallback(
-    (source?: WordItem[]) => {
-      setQueue(buildQueue(source))
-      setWordIndex(0)
-      setTyped('')
-      setErrorFlash(false)
-      setWrongKey(null)
-      setFinished(false)
-      setStats(EMPTY_STATS)
-      setElapsedMs(0)
-      setWrongWords([])
-      startedRef.current = null
-      lockRef.current = false
-      setRunning(false)
-      setCountdown(null)
-    },
-    [buildQueue],
-  )
-
-  /** 弱项专攻：优先出包含最常敲错字母的词 */
-  const startWeakRound = useCallback(() => {
-    const letters = weakLetters(analytics, 6).map((w) => w.letter)
-    if (letters.length === 0) {
-      startRound()
-      return
-    }
-    const set = new Set(letters)
-    const candidates = bankWords.filter((w) => w.word.toLowerCase().split('').some((c) => set.has(c)))
-    const map = new Map(candidates.map((w) => [w.word, w]))
-    const ranked = rankByWeakness(candidates.map((w) => w.word), letters)
-    const picked = ranked.map((w) => map.get(w)).filter((w): w is WordItem => !!w)
-    startRound(picked.length > 0 ? picked : undefined)
-  }, [analytics, bankWords, startRound])
-
-  /** 单挑一个错词反复练 */
-  const reviewSingleWord = useCallback(
-    (word: string) => {
-      const item = bankWords.find((w) => w.word.toLowerCase() === word.toLowerCase())
-      if (item) startRound(Array.from({ length: 10 }, () => item))
-    },
-    [bankWords, startRound],
-  )
-
-  /** 错题复习轮：拉出全部到期词开一轮；无到期返回 false（由入口提示） */
-  const startReviewRound = useCallback((): boolean => {
-    const due = dueWords()
-    if (due.length === 0) return false
-    const map = new Map(allLoadedWords(banks).map((w) => [w.word, w]))
-    // 已加载词库中找不到的（如词库 chunk 未加载）给占位词条，保证复习轮不断链
-    const items = due.map((w) => map.get(w) ?? { word: w, translation: '' })
-    setTab('typing')
-    startRound(items)
-    return true
-  }, [banks, startRound])
-
-  /** 整词完成时打点错题本：本轮敲错的词记错，复习中的词敲对则推进间隔 */
-  const settleReview = useCallback(
-    (word: string, missed: boolean) => {
-      if (missed) {
-        recordWrong(word)
-        bumpReview()
-      } else if (loadReview()[word]) {
-        recordCorrect(word)
-        bumpReview()
-      }
-    },
-    [bumpReview],
-  )
-
-  /** 当前瞬时 WPM */
-  const currentWpm = useCallback(() => {
-    if (!startedRef.current) return 0
-    const secs = (Date.now() - startedRef.current) / 1000
-    if (secs <= 0) return 0
-    return Math.round(statsRef.current.correct / 5 / (secs / 60))
+    startRoundRef.current(source)
   }, [])
 
-  /** 结算本轮 */
-  const finishRound = useCallback(() => {
-    setFinished(true)
-    const secs = startedRef.current ? Math.round((Date.now() - startedRef.current) / 1000) : 0
-    setHistory(recordSeconds(secs))
-    setElapsedMs(secs * 1000)
-    sound.fanfare()
-  }, [])
+  const {
+    reviewVersion,
+    bumpReview,
+    roundContentIdsRef,
+    wordCtx,
+    dueCount,
+    reviewTotal,
+    recommendation,
+    reviewSingleWord,
+    startReviewRound,
+  } = useReviewFlow({ banks, bankWords, bankId, startRound: startRoundBridge, setTab, tab })
 
-  /** 切下一个词，或本轮结束 */
-  const advance = useCallback(() => {
-    if (wordIndex + 1 >= queue.length) {
-      finishRound()
-    } else {
-      setWordIndex((i) => i + 1)
-    }
-  }, [wordIndex, queue.length, finishRound])
+  /** 本轮练习会话（Practice Engine 的去重作用域）：每轮重建，保证一轮内同 contentId 只落一次 */
+  const sessionRef = useRef<PracticeSession | null>(null)
 
-  // 切换词库 / 切换排序方式 → 重开一轮
+  /** 开轮钩子：清空归属映射 + 重建引擎会话（复习轮 / 单挑轮随后自行覆盖映射） */
+  const onRoundStart = useCallback(() => {
+    roundContentIdsRef.current = new Map()
+    sessionRef.current = practiceEngine.createSession('typing', [])
+  }, [roundContentIdsRef])
+
+  /** 整词完成 —— 学习语义的唯一接线点：Practice Engine（3 连调用语义中枢） */
+  const onCompleteWord = useCallback(
+    (word: string, perfect: boolean, wpm: number) => {
+      const session = sessionRef.current ?? practiceEngine.createSession('typing', [])
+      sessionRef.current = session
+      const res = practiceEngine.completeTypingWord(
+        session,
+        { word, perfect, wpm },
+        analyticsRef.current,
+        wordCtx(word),
+      )
+      updateAnalytics(() => res.analytics)
+      if (res.reviewWritten) bumpReview()
+    },
+    [analyticsRef, updateAnalytics, wordCtx, bumpReview],
+  )
+
+  const {
+    queue,
+    wordIndex,
+    typed,
+    errorFlash,
+    wrongKey,
+    finished,
+    stats,
+    elapsedMs,
+    wrongItems,
+    milestone,
+    countdown,
+    current,
+    startRound,
+    startWeakRound,
+    accuracy,
+    wpm,
+    percent,
+    upcoming,
+    nextKey,
+    completedWords,
+  } = useTypingRound({
+    bankWords,
+    shuffled,
+    mode,
+    tab,
+    commandMode,
+    autoSpeak,
+    analytics,
+    updateAnalytics,
+    setHistory,
+    onCompleteWord,
+    onRoundStart,
+  })
+
+  // 破环桥回填：挂载后复习流的开轮动作即指向真实 startRound
   useEffect(() => {
-    startRound()
+    startRoundRef.current = startRound
   }, [startRound])
-
-  // 偏好持久化
-  useEffect(() => writeStorage('gt.bank', bankId), [bankId])
-  useEffect(() => writeStorage('gt.theme', themeId), [themeId])
-  useEffect(() => writeStorage('gt.sound', soundEnabled), [soundEnabled])
-  useEffect(() => writeStorage('gt.soundTheme', soundTheme), [soundTheme])
-  useEffect(() => writeStorage('gt.shuffle', shuffled), [shuffled])
-  useEffect(() => writeStorage('gt.mode', mode), [mode])
-  useEffect(() => writeStorage('gt.autoSpeak', autoSpeak), [autoSpeak])
 
   // 预热语音引擎（某些浏览器首次 getVoices 为空）
   useEffect(() => {
     warmSpeech()
   }, [])
-
-  // 分析数据落盘（节流，避免每次击键都写 localStorage）
-  useEffect(() => {
-    const t = window.setTimeout(() => saveAnalytics(analytics), 800)
-    return () => window.clearTimeout(t)
-  }, [analytics])
-
-  /* ---------------- 限时模式倒计时 ---------------- */
-  useEffect(() => {
-    if (mode !== 'timed' || !running || finished) return
-    const total = getMode('timed').duration ?? 60
-    if (countdown === null) setCountdown(total)
-    const id = window.setInterval(() => setCountdown((c) => (c === null ? c : Math.max(0, c - 1))), 1000)
-    return () => window.clearInterval(id)
-  }, [mode, running, finished, countdown])
-
-  useEffect(() => {
-    if (mode === 'timed' && countdown === 0 && running && !finished) finishRound()
-  }, [countdown, running, finished, mode, finishRound])
-
-  useEffect(() => {
-    sound.enabled = soundEnabled
-    sound.theme = soundTheme
-  }, [soundEnabled, soundTheme])
-
-  useEffect(() => {
-    statsRef.current = stats
-  }, [stats])
-
-  /* ---------------- 计时器 ---------------- */
-  useEffect(() => {
-    if (finished || startedRef.current === null) return
-    const timer = window.setInterval(() => {
-      if (startedRef.current) setElapsedMs(Date.now() - startedRef.current)
-    }, 250)
-    return () => window.clearInterval(timer)
-  }, [finished, wordIndex, typed])
-
-  /* ---------------- Esc 全局切换：打字态 ↔ 命令态 ---------------- */
-  const closePalette = useCallback(() => {
-    setCommandMode(false)
-    // 焦点归还页面（输入框卸载后 activeElement 可能残留）
-    const el = document.activeElement as HTMLElement | null
-    el?.blur()
-  }, [])
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      if (commandMode) {
-        // 捕获阶段拦截，避免下拉等其它 Esc 处理器再次响应
-        e.preventDefault()
-        e.stopPropagation()
-        closePalette()
-        return
-      }
-      // 已有下拉打开时让它们自己处理 Esc，不抢
-      if (document.querySelector('[data-testid^="dropdown-"][aria-expanded="true"]')) return
-      // 焦点在表单元素里时不劫持 Esc
-      const ae = document.activeElement
-      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT')) return
-      setCommandMode(true)
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [commandMode, closePalette])
-
-  /* ---------------- 核心：全局键盘监听 ---------------- */
-  const current = queue[wordIndex]
-  const targetLower = (current?.word ?? '').toLowerCase()
-  // code 模式大小写敏感：target 用原文比较；其余模式保持小写比较
-  const target = mode === 'code' ? (current?.word ?? '') : targetLower
-
-  // 换词时自动发音（拼写模式默认发音，或手动开启自动发音；仅打字页签生效）
-  // code 模式朗读代码行无意义，禁用自动发音
-  useEffect(() => {
-    if (tab !== 'typing') return
-    if (mode === 'code') return
-    if (!current) return
-    if (mode === 'spell' || autoSpeak) speak(current.word)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.word, wordIndex, mode, autoSpeak, tab])
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // 命令态下打字引擎完全让位，键全给命令行
-      if (commandMode) return
-      // 背单词页签下禁用全局打字引擎，避免按键触发练习
-      if (tab !== 'typing') return
-      if (e.ctrlKey || e.metaKey || e.altKey) return
-
-      if (e.key === 'Enter' && finished) {
-        e.preventDefault()
-        sound.tap()
-        startRound()
-        return
-      }
-      if (finished) return
-
-      // 拼写模式的退格要在长度过滤之前处理
-      if (mode === 'spell' && e.key === 'Backspace') {
-        e.preventDefault()
-        sound.tap()
-        setTyped((t) => t.slice(0, -1))
-        setErrorFlash(false)
-        return
-      }
-
-      // 只处理单字符按键，忽略 Shift / CapsLock / Tab 等功能键
-      if (e.key.length !== 1) return
-      e.preventDefault()
-      if (lockRef.current || !current) return
-
-      if (startedRef.current === null) {
-        startedRef.current = Date.now()
-        setRunning(true)
-      }
-
-      // code 模式保持按键原文（大小写敏感）；其余模式统一小写比较
-      const key = mode === 'code' ? e.key : e.key.toLowerCase()
-
-      /* ================= 拼写（默写）模式：允许自由输入 ================= */
-      if (mode === 'spell') {
-        const next = typed + key
-        const pos = typed.length
-        const good = next[pos] === targetLower[pos]
-        setTyped(next)
-        setAnalytics((a) => recordKey(a, key, good))
-        sound.correctOrError(good)
-        if (!good) {
-          setWrongKey(key)
-          setErrorFlash(true)
-          if (flashTimer.current) window.clearTimeout(flashTimer.current)
-          flashTimer.current = window.setTimeout(() => setErrorFlash(false), 280)
-          setWrongWords((prev) => (prev.includes(targetLower) ? prev : [...prev, targetLower]))
-          setStats((s) => ({ ...s, keys: s.keys + 1, errors: s.errors + 1, combo: 0 }))
-          return
-        }
-        const nextCombo = statsRef.current.combo + 1
-        setErrorFlash(false)
-        setStats((s) => ({
-          ...s,
-          keys: s.keys + 1,
-          correct: s.correct + 1,
-          combo: s.combo + 1,
-          bestCombo: Math.max(s.bestCombo, s.combo + 1),
-        }))
-        if (MILESTONES.includes(nextCombo)) {
-          sound.milestone()
-          setMilestone(nextCombo)
-          if (milestoneTimer.current) window.clearTimeout(milestoneTimer.current)
-          milestoneTimer.current = window.setTimeout(() => setMilestone(null), 1400)
-        }
-        if (next.length >= targetLower.length) {
-          // 长度够但仍有错字母：不许过关，提示用退格修正
-          const perfect = next === targetLower
-          if (!perfect) {
-            sound.error()
-            setErrorFlash(true)
-            if (flashTimer.current) window.clearTimeout(flashTimer.current)
-            flashTimer.current = window.setTimeout(() => setErrorFlash(false), 400)
-            return
-          }
-          lockRef.current = true
-          sound.complete()
-          setHistory(recordWord())
-          setAnalytics((a) => recordWordDone(a, current.word, true, currentWpm()))
-          // 错题本：该词本轮敲错过 → 记错；否则若在复习中 → 推进间隔
-          settleReview(current.word, wrongWords.includes(targetLower))
-          window.setTimeout(() => {
-            lockRef.current = false
-            setTyped('')
-            advance()
-          }, 220)
-        }
-        return
-      }
-
-      /* ================= 经典 / 限时 / 代码模式：严格纠错 ================= */
-      const next = typed + key
-
-      // ✅ 敲对了（code 模式为原文比较，大小写敏感）
-      if (target.startsWith(next)) {
-        const nextCombo = statsRef.current.combo + 1
-        sound.correct()
-        setTyped(next)
-        setAnalytics((a) => recordKey(a, key, true))
-        setErrorFlash(false)
-        setStats((s) => ({
-          ...s,
-          keys: s.keys + 1,
-          correct: s.correct + 1,
-          combo: s.combo + 1,
-          bestCombo: Math.max(s.bestCombo, s.combo + 1),
-        }))
-
-        // 🎉 连击里程碑提示
-        if (MILESTONES.includes(nextCombo)) {
-          sound.milestone()
-          setMilestone(nextCombo)
-          if (milestoneTimer.current) window.clearTimeout(milestoneTimer.current)
-          milestoneTimer.current = window.setTimeout(() => setMilestone(null), 1400)
-        }
-
-        // 整个单词敲完
-        if (next === target) {
-          lockRef.current = true
-          sound.complete()
-          setHistory(recordWord())
-          setAnalytics((a) => recordWordDone(a, current.word, statsRef.current.errors === 0, currentWpm()))
-          // 错题本：该词本轮敲错过（classic/code 与 spell 同口径）→ 记错；否则若在复习中 → 推进间隔
-          settleReview(current.word, wrongWords.includes(targetLower))
-          window.setTimeout(() => {
-            lockRef.current = false
-            setTyped('')
-            if (wordIndex + 1 >= queue.length) {
-              finishRound()
-            } else {
-              setWordIndex((i) => i + 1)
-            }
-          }, 220)
-        }
-        return
-      }
-
-      // ❌ 敲错了：不允许跳过，必须敲正确的下一个字母
-      sound.error()
-      setAnalytics((a) => recordKey(a, key, false))
-      setWrongKey(key)
-      setErrorFlash(true)
-      if (flashTimer.current) window.clearTimeout(flashTimer.current)
-      flashTimer.current = window.setTimeout(() => setErrorFlash(false), 280)
-      setWrongWords((prev) => (prev.includes(targetLower) ? prev : [...prev, targetLower]))
-      setStats((s) => ({ ...s, keys: s.keys + 1, errors: s.errors + 1, combo: 0 }))
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [typed, wordIndex, queue, targetLower, target, current, finished, startRound, mode, advance, finishRound, tab, commandMode, wrongWords, settleReview])
-
-  useEffect(() => {
-    return () => {
-      if (flashTimer.current) window.clearTimeout(flashTimer.current)
-      if (milestoneTimer.current) window.clearTimeout(milestoneTimer.current)
-    }
-  }, [])
-
-  /* ---------------- 页签键盘导航（WAI-ARIA tablist） ----------------
-   * 与 App 的全局 keydown 监听互不干扰：方向键/Home/End 在全局 handler 中未处理。
-   *
-   * ⚠️ 关键：**只有方向键 / Home / End 才 preventDefault**。
-   *   - 这三个键在浏览器里有默认行为（滚动页面），必须拦住。
-   *   - 但 **Enter / Space 绝不 preventDefault** —— 它们是按钮的原生激活键，
-   *     浏览器自己会合成 click。若在此处 preventDefault + 手动 setTab，会把
-   *     页签变成「吞键黑洞」：一旦焦点停在页签上，Space 就再也传不到
-   *     背单词面板（真实缺陷：离线态3「Space 翻面」因此失败）。
-   *     故 Enter/Space 直接 return，交给原生 click 路径处理。 */
-  const handleTabKeyDown = useCallback((e: ReactKeyboardEvent<HTMLButtonElement>, id: TabId) => {
-    const isNav = e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'Home' || e.key === 'End'
-    // Enter / Space：放行，不拦截（原生 click 会触发 onClick 切页签）
-    if (!isNav) return
-    e.preventDefault() // 拦住方向键滚动页面
-    const i = TAB_IDS.indexOf(id)
-    let next: TabId = id
-    if (e.key === 'ArrowRight') next = TAB_IDS[(i + 1) % TAB_IDS.length]
-    else if (e.key === 'ArrowLeft') next = TAB_IDS[(i - 1 + TAB_IDS.length) % TAB_IDS.length]
-    else if (e.key === 'Home') next = TAB_IDS[0]
-    else next = TAB_IDS[TAB_IDS.length - 1]
-    // 自动激活（activation follows focus）：先交接焦点，再切换状态
-    keyboardNavRef.current = true
-    tabRefs.current[next]?.focus()
-    sound.tap()
-    setTab(next)
-  }, [])
-
-  // 键盘导航后，焦点自动跟随到新的选中页签（鼠标点击路径不触发，保持原观感）
-  useEffect(() => {
-    if (!keyboardNavRef.current) return
-    keyboardNavRef.current = false
-    tabRefs.current[tab]?.focus()
-  }, [tab])
-
-  /* ---------------- 派生数据 ---------------- */
-  const accuracy = stats.keys === 0 ? 100 : Math.round((stats.correct / stats.keys) * 100)
-  const minutes = elapsedMs / 60000
-  const wpm = minutes > 0 ? Math.max(0, Math.round(stats.correct / 5 / minutes)) : 0
-  const percent = queue.length ? Math.round((wordIndex / queue.length) * 100) : 0
-  const upcoming = queue.slice(wordIndex + 1, wordIndex + 4)
-
-  const wrongItems = useMemo(
-    () => queue.filter((w) => wrongWords.includes(w.word.toLowerCase())),
-    [queue, wrongWords],
-  )
-
-  const todayCount = getTodayCount(history)
-  const nextKey = current ? current.word.toLowerCase()[typed.length] ?? null : null
-  const completedWords = finished ? Math.min(wordIndex + (countdown === 0 ? 0 : 1), queue.length) : wordIndex
 
   return (
     <div className={`min-h-screen ${theme.root} transition-colors duration-300`}>
@@ -653,12 +208,12 @@ export default function App() {
           analytics={analytics}
           onWeakPractice={startWeakRound}
           onReviewWord={reviewSingleWord}
-          onReset={() => setAnalytics(resetAnalytics())}
-          dueCount={reviewDue.length}
+          onReset={resetAnalytics}
+          dueCount={dueCount}
           reviewTotal={reviewTotal}
           onReviewRound={() => {
             sound.tap()
-            startReviewRound()
+            void startReviewRound()
           }}
           onRestart={() => {
             sound.tap()
@@ -757,7 +312,7 @@ export default function App() {
               bankCount={bank?.count ?? bank?.words.length ?? 0}
               onReviewRound={() => {
                 sound.tap()
-                startReviewRound()
+                void startReviewRound()
               }}
               onWeakRound={() => {
                 setTab('typing')
@@ -776,7 +331,7 @@ export default function App() {
               analytics={analytics}
               onReviewRound={() => {
                 sound.tap()
-                startReviewRound()
+                void startReviewRound()
               }}
               onReviewWord={(word) => {
                 setTab('typing')
@@ -784,9 +339,11 @@ export default function App() {
               }}
             />
           ) : tab === 'progress' ? (
-            <ProgressPanel theme={theme} history={history} analytics={analytics} streakDays={getStreakDays(history)} />
+            <ProgressPanel theme={theme} history={history} analytics={analytics} streakDays={streakDays} />
           ) : tab === 'memorize' ? (
-            <Memorize theme={theme} bank={{ ...bank, words: bankWords }} paused={commandMode} streakDays={getStreakDays(history)} />
+            /* key=bank.id：memorize 视图按 (词,包) 归属，切库即重挂载重取本包视图，
+             * 杜绝「旧库视图过滤新库词表」的瞬时脏状态 */
+            <Memorize key={bank.id} theme={theme} bank={{ ...bank, words: bankWords }} paused={commandMode} streakDays={streakDays} />
           ) : current ? (
             <PracticePanel
               theme={theme}

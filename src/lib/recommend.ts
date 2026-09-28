@@ -3,7 +3,7 @@
  * 纯读取 localStorage 派生、无副作用；调用方在 reviewVersion 变化（及切回页签）时重建。
  */
 import { loadAnalytics, weakLetters, wrongWords } from './analytics'
-import { dueWords } from './reviewStore'
+import { reviewDueViews } from './reviewStore'
 import { DAILY_GOAL, getStreakDays, getTodayCount, loadHistory } from './streak'
 
 export interface TodayRecommendation {
@@ -26,10 +26,12 @@ export interface TodayRecommendation {
 export function buildRecommendation(): TodayRecommendation {
   const analytics = loadAnalytics()
   const history = loadHistory()
-  const due = dueWords()
+  // P1.5-S4：due 读数走 v2 感知视图（reviewItemViews 内部按 isV2Store 派发 State A/B；
+  // State B 的 dueCount = (词,包) 对数，legacy:* 不计入 —— 设计 §5.5）
+  const due = reviewDueViews()
   return {
     dueCount: due.length,
-    dueTopWords: due.slice(0, 5),
+    dueTopWords: due.slice(0, 5).map((i) => i.word),
     weakWords: wrongWords(analytics, 3).map((w) => ({ word: w.word, wrong: w.wrong })),
     weakLetters: weakLetters(analytics, 3).map((w) => ({ letter: w.letter, rate: w.rate })),
     todayCount: getTodayCount(history),

@@ -309,7 +309,7 @@
 | FM-5 | `Sort.updated` 不可用 | A-2 |
 | FM-6 | 内容预热硬编码 3 包 | A-3 |
 | FM-7 | 自定义词库不进 Content 链 | B-05 |
-| FM-8 | 有 165 E2E 但 CI 不跑 | DEBT-002 |
+| FM-8 | 有 167 项 E2E 但 CI 不跑 | DEBT-002 |
 | FM-9 | `open-bank-manager` testid 重复 | `BankManager.tsx:78` + `Header.tsx:209` |
 
 ---

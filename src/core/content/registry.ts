@@ -102,21 +102,37 @@ export async function loadPackage(id: string): Promise<WordPayload[]> {
   return words
 }
 
-/** ContentId → 单条内容（当前仅 word 类型可解析；其余类型待内容接入后扩展） */
+/**
+ * ContentId → 单条内容（当前仅 word 类型可解析；其余类型待内容接入后扩展）。
+ *
+ * 单条寻址的唯一出口：**委托 query 层 `getWord`**，本层不再自己实现词形匹配。
+ *
+ * 为什么必须委托（而不是在这里 `w.word.toLowerCase() === localId.toLowerCase()`）：
+ *  - ContentId 的匹配口径是**原词形逐字符精确**（CONTENT_CONTRACT C-1 大小写敏感 / C-6
+ *    词条 id 保留原词形，lowercase 只允许出现在检索 key normalizeWord 里）。原先的双侧
+ *    lowercase 归一化把 `content:word:ns:useEffect` 与 `content:word:ns:useeffect` 判成同一条，
+ *    直接违反 C-1/C-6；一旦语料引入大写变体（如 ts-code / go-code 里的 `const`、`Oxford`），
+ *    就会出现「id 指错条目」的静默错数据。
+ *  - 精确寻址（id 逐字符同源）与检索（normalizeWord 宽松匹配）的口径必须**只有一处实现**，
+ *    否则两条路径迟早漂移。query 层 getWord 已是正确实现：先 findById 精确取，未命中才用
+ *    norm 兜底，且兜底同时防了「独立展开子串 id」的过度匹配（如 `content:word:ns:word:foo`）。
+ *  - 循环依赖：content-query 已 import 本文件（getPackage / getVocabularyPackages /
+ *    loadPackage），此处只能**函数体内动态 import** 破环；静态 import 会形成
+ *    registry ↔ content-query 的模块环。懒加载只在首次调用时付一次 Promise 开销。
+ */
 export async function getContent<T = WordPayload>(contentId: string): Promise<T | null> {
-  const parsed = parseContentId(contentId)
-  if (!parsed) return null
-  if (parsed.type === 'word') {
-    // 词条的 namespace 即包所在 namespace：在对应 namespace 的包内按词形查找
-    const pkgs = packages.filter((p) => parseContentId(p.manifest.id)?.namespace === parsed.namespace)
-    for (const p of pkgs) {
-      const words = await loadPackage(p.localId)
-      const hit = words.find((w) => w.word.toLowerCase() === parsed.localId.toLowerCase())
-      if (hit) return hit as T
-    }
-    return null
-  }
-  return null
+  const { getWord } = await import('./query/content-query')
+  const hit = await getWord(contentId)
+  if (!hit) return null
+  // WordHit（含 id / packageId / packageLocalId / packageTitle 等寻址上下文）
+  // → WordPayload（words.json 原始载荷形状）。只做字段搬运，不丢字段：
+  // WordPayload = Omit<WordContent, 'id' | 'type'> = { word, translation, phonetic?, definition? }
+  return {
+    word: hit.word,
+    translation: hit.translation,
+    phonetic: hit.phonetic,
+    definition: hit.definition,
+  } as T
 }
 
 /** 按类型列出内容包清单（listening 等类型当前为空数组） */

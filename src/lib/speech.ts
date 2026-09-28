@@ -13,7 +13,9 @@ let cachedVoice: SpeechSynthesisVoice | null = null
 function readVoicePref(): VoicePref {
   try {
     return localStorage.getItem(VOICE_KEY) === 'en-GB' ? 'en-GB' : 'en-US'
-  } catch {
+  } catch (e) {
+    // G4-3 零静默失败：读取失败按默认音色处理但留痕（S3 迁移时移除）
+    console.warn('[speech] 音色读取失败，按默认处理', e)
     return 'en-US'
   }
 }
@@ -31,8 +33,9 @@ export function setVoicePref(p: VoicePref) {
   cachedVoice = null // 让 pickVoice 按新偏好重选
   try {
     localStorage.setItem(VOICE_KEY, p)
-  } catch {
-    /* 隐私模式下忽略 */
+  } catch (e) {
+    // G4-3 零静默失败：隐私模式写入失败必须可观测（S3 迁移时移除）
+    console.warn('[speech] 音色写入失败', e)
   }
 }
 

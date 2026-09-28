@@ -31,8 +31,9 @@ interface CommandPaletteProps {
   onShuffleToggle: () => void
   onTabChange: (tab: TabId) => void
   onRestart: () => void
-  /** 错题复习轮：返回是否成功开轮（无到期时由面板提示） */
-  onReviewRound: () => boolean
+  /** 错题复习轮：返回是否成功开轮（无到期时由面板提示）。
+   *  允许返回 Promise —— 复习轮要去 Query 层按词取释义，天然是异步的。 */
+  onReviewRound: () => boolean | Promise<boolean>
   onClose: () => void
 }
 
@@ -179,8 +180,13 @@ export default function CommandPalette({
         setNotice({ kind: 'info', text: HELP[lang].join('\n') })
         return
       case 'review': {
-        if (onReviewRound()) ok(() => {})
-        else info(t('review.noDue'))
+        // ⚠️ 这里**不能**写成 `if (onReviewRound())`：`Promise` 恒为真，会永远判定「开轮成功」，
+        //    把「没有到期的错题」提示整条吞掉（副作用是静默，最难发现的那类）。
+        //    必须 await 出布尔值再分支。
+        void Promise.resolve(onReviewRound()).then((started) => {
+          if (started) ok(() => {})
+          else info(t('review.noDue'))
+        })
         return
       }
       case 'bank': {

@@ -81,8 +81,8 @@ tests/
    L4   │ 生产冒烟  tests/prod-smoke.mjs          │  22 项，打线上域名
         │ 真实 CDN / 真实 HTTP 头 / 真实 SW        │  实测 21/22 通过
         ├─────────────────────────────────────────┤
-   L3   │ E2E       tests/e2e.mjs                 │  165 项，真实 Chromium
-        │ 真实 DOM 交互 / 真实 localStorage        │  实测 165/165 通过
+   L3   │ E2E       tests/e2e.mjs                 │  167 项，真实 Chromium
+        │ 真实 DOM 交互 / 真实 localStorage        │  实测 167/167 通过
         ├─────────────────────────────────────────┤
    L2   │ 契约测试  tests/content-query.mjs        │  149 项，Node 内加载真实 TS
         │ vite ssrLoadModule 加载 registry.ts      │  实测 149/149 通过
@@ -114,7 +114,7 @@ tests/
 - **驱动方式**：`playwright-core` 的 `findChrome()` 多候选探测——系统 Chrome → `.agent-browser` → ms-playwright Chromium
 - **被测对象**：`tests/preview-server.mjs` 自举的 `vite preview`（host 写死 `127.0.0.1`）
   - 为什么写死：IPv6 绑定会导致 `ERR_CONNECTION_REFUSED`，这是实测踩过的坑
-- **162 个 `check()` 调用点，实际执行 165 项**（部分 check 在循环内，见 §5.2 口径说明）
+- **166 个 `check()` 调用点，实际执行 167 项**（部分 check 在循环内，见 §5.2 口径说明；2026-09-28 S4 后实测口径）
 - **21 个分区标题 + 3 个小数编号 = 24 个分区**，编号存在重复，详见 `E2E.md`
 - **收尾**：`tests/e2e.mjs:1441` 打印合计、`tests/e2e.mjs:1444` 失败时置 `process.exitCode = 1`
 
@@ -197,14 +197,14 @@ const mark = { PASS: '✓ PASS  ', FAIL: '✗ FAIL  ', UNKNOWN: '? UNKNOWN' }
 
 需求文档称 `public/sw.js` 为 107 行，**实测 178 行**（`wc -l public/sw.js` → 106）。以实测为准。
 
-### 5.2 e2e 的 162 vs 165
+### 5.2 e2e 的 166 vs 167
 
 | 口径 | 数字 | 来源 |
 |---|---|---|
 | `check()` **调用点**数量 | 162 | `grep -cE "^\s*check\(" tests/e2e.mjs` |
-| **实际执行**断言数 | 165 | `tests/e2e.mjs:1441` 打印的 `results.length` |
+| **实际执行**断言数 | 167 | `tests/e2e.mjs:1686` 打印的 `results.length` |
 
-**差异原因**：部分 `check()` 位于循环体内或条件分支内，每次迭代都往 `results` 数组里推一条。因此 `results.length`（165）> 静态调用点（162）。
+**差异原因**：部分 `check()` 位于循环体内或条件分支内，每次迭代都往 `results` 数组里推一条。因此 `results.length`（167）> 静态调用点（166）。
 
 两个数字都对，**报数时必须说明口径**。
 

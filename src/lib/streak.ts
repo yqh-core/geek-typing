@@ -26,7 +26,9 @@ export function loadHistory(): History {
   try {
     const raw = localStorage.getItem(KEY)
     return raw ? (JSON.parse(raw) as History) : {}
-  } catch {
+  } catch (e) {
+    // G4-3 零静默失败：读取失败按空表处理但留痕（S4 迁移时移除）
+    console.warn('[streak] 读取失败，按空表处理', e)
     return {}
   }
 }
@@ -34,8 +36,9 @@ export function loadHistory(): History {
 function saveHistory(h: History) {
   try {
     localStorage.setItem(KEY, JSON.stringify(h))
-  } catch {
-    /* 忽略隐私模式写入失败 */
+  } catch (e) {
+    // G4-3 零静默失败：隐私模式写入失败必须可观测（S4 迁移时移除）
+    console.warn('[streak] 写入失败，本次变更仅保留在内存', e)
   }
 }
 

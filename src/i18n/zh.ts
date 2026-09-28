@@ -146,6 +146,8 @@ export const zh: Record<string, string> = {
   'review.drill': '单挑',
   'review.detail': '详情',
   'review.empty': '错题本还是空的，敲错的单词会自动进入复习计划',
+  'review.noTranslation': '释义不可用',
+  'review.noTranslationHint': '该词所在的词库尚未加载（离线或分包拉取失败），不是词条本身没有释义',
 
   /* 掌握度四级（V3-P0a） */
   'mastery.struggling': '挣扎中',

@@ -4,6 +4,12 @@
 > 基线 commit：`4152eb2`
 > 环境：Windows 11 + Git Bash；Node 22；Chrome 153.0.8010.53；生产 `https://geek-typing.pages.dev`
 
+> ⚠️ **本文件是 2026-09-27 那一轮验收的历史实跑记录**（下表 e2e 165/165、test:content 149/149
+> 等数字均为当轮实测），不代表最新现状。最新口径（2026-09-28 S4 后）：e2e **167/167** /
+> test:content 163/163 / test:storage 78/78 / test:insights 12/12 / test:analytics 17/17 /
+> test:migration 27/27 / browser-migration-e2e 19/19 —— 门禁现状以
+> `P1.5-RELEASE-GATE.md` §0 两层 Gate（ENGINEERING READY / RELEASE READY）为准。
+
 ---
 
 ## 1. 门禁总览（实测）
