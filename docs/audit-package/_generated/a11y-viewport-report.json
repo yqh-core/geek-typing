@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generatedAt": "2026-09-28T18:06:33.809Z",
+    "generatedAt": "2026-09-28T22:46:53.181Z",
     "base": "http://127.0.0.1:4181",
     "thresholds": {
       "contrastNormal": 4.5,
@@ -101,7 +101,7 @@
         "docOk": true
       },
       "contrast": {
-        "scanned": 73,
+        "scanned": 78,
         "skippedInactive": 0,
         "violationCount": 0,
         "violations": []
@@ -196,7 +196,7 @@
         "docOk": true
       },
       "contrast": {
-        "scanned": 71,
+        "scanned": 77,
         "skippedInactive": 0,
         "violationCount": 0,
         "violations": []
@@ -291,7 +291,7 @@
         "docOk": true
       },
       "contrast": {
-        "scanned": 75,
+        "scanned": 72,
         "skippedInactive": 0,
         "violationCount": 0,
         "violations": []
@@ -481,7 +481,7 @@
         "docOk": true
       },
       "contrast": {
-        "scanned": 69,
+        "scanned": 74,
         "skippedInactive": 0,
         "violationCount": 0,
         "violations": []
