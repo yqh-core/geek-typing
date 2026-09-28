@@ -36,6 +36,7 @@
     "gate:legacy-wordbank": "node scripts/gate-legacy-wordbank.mjs",
     "gate:learning-boundary": "node scripts/gate-learning-boundary.mjs",
     "gate:practice-engine": "node scripts/gate-practice-engine.mjs",
+    "audit:a11y": "node scripts/audit-a11y-viewports.mjs",
     "release:gate": "node scripts/verify-release-gate.mjs"
   },
   "dependencies": {

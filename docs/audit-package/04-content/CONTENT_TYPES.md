@@ -191,7 +191,7 @@ for (const p of pkgs) { cur.packages += 1; cur.items += p.manifest.stats.items; 
 
 | 类型 | 特有字段 |
 |---|---|
-| Vocabulary | word / phonetic / definition / examples / partOfSpeech |
+| Vocabulary | word / phonetic / definition / examples |
 | Audio | audioUrl / duration / transcript / segments / speaker / difficulty |
 | Reading | title / body / paragraphs / questions / answers |
 | Topic | title / description / children |

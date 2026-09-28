@@ -419,7 +419,7 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
             </div>
             {item.definition && (
               <div className={`text-xs ${theme.sub} max-w-sm`}>
-                <span className="opacity-60">{t('memorize.definition')}: </span>
+                <span>{t('memorize.definition')}: </span>
                 {item.definition}
               </div>
             )}
@@ -449,7 +449,7 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
       </div>
 
       {/* 手势/键盘流提示：主指针为触摸（手机/平板）显示滑动手势，鼠标设备保留键盘提示 */}
-      <div data-testid="memorize-keyhint" className={`mt-3 text-center text-[11px] tracking-wide ${theme.sub} opacity-70`}>
+      <div data-testid="memorize-keyhint" className={`mt-3 text-center text-[11px] tracking-wide ${theme.sub}`}>
         {coarsePointer
           ? flipped
             ? t('memorize.swipeGrade')

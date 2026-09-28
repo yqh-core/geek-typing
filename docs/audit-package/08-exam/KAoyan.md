@@ -65,7 +65,7 @@
 | `translation` 非空 | 3000 / 3000 = 100% |
 | 最长词形 | 15 字符 |
 | 含空格的词组 | **0** |
-| `partOfSpeech` | **0 / 3000 = 0%** |
+| `partOfSpeech` | **0 / 3000 = 0%**（**P1.6-E 已移除该字段声明**） |
 | `examples` | **0 / 3000 = 0%** |
 
 **本包是三个 3000 词包中字段完整度最高的**（phonetic 99.80% 最高、definition 100% 唯一满值）。
@@ -214,7 +214,7 @@ const loadKaoyan = async () => parseWords((await import('../../../content/vocabu
 | K-4 | **不要用 tags 做考试筛选** | 三包 tags 分别为 `["kaoyan"]` / `["ielts"]` / `["toefl"]`，虽可区分但语义非考试维度 | 建议补 `exam` 维度查询 |
 | K-5 | **补 6 条缺失 `phonetic`** | 2994 / 3000 | 低成本 |
 | K-6 | **补记 C-6 缺口条目** | 现有 C-6 未列考研与 GRE | 既有文档遗漏，建议更新 `GAP_ANALYSIS.md` |
-| K-7 | **补 `partOfSpeech`** | 覆盖率 0% | 考研完形填空需要词性 |
+| ~~K-7~~ | ~~**补 `partOfSpeech`**~~ | **作废**：P1.6-E 已移除该字段（覆盖率 0%）；考研完形填空需要词性这一点仍成立，但须先补真实数据源再加字段 | — |
 
 ---
 

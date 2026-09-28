@@ -21,7 +21,7 @@
 > **只检测、不自动修（交人工决策）：**
 > · 包内重复 normalized word（NFC + lowercase + 空白折叠后同 key ⇒ 大小写/空格差异会撞车）
 > · 空 word / 空 translation（规范化后为空串）
-> · 非法字段（白名单外的键，白名单 = word/translation/phonetic/definition/partOfSpeech）
+> · 非法字段（白名单外的键，白名单 = word/translation/phonetic/definition）
 
 ---
 

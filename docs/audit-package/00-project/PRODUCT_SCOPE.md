@@ -113,7 +113,7 @@
 | CET4 覆盖率 | **1.9%** | `13-acceptance/KNOWN_ISSUES.md` CONTENT-001 |
 | 自有整理词条 | 346 / 9,346 = **3.70%** | `content-samples/SIZE-REPORT.md` |
 | ECDICT 词频包词条 | 9,000 / 9,346 = **96.30%** | 同上 |
-| `partOfSpeech` 字段 | **零数据** | `KNOWN_ISSUES.md` CONTENT-005 |
+| `partOfSpeech` 字段 | ~~**零数据**~~ → **已移除**（P1.6-E；零数据空壳，留着会误导为「有词性数据」） | `KNOWN_ISSUES.md` CONTENT-005（已关闭） |
 | 空 `definition` 词条 | **9 条** | `KNOWN_ISSUES.md` BUG-001（`normalize.mjs:135-137`） |
 | 音标体系 | **混用**（两套标注体系并存） | `KNOWN_ISSUES.md` CONTENT-004 |
 

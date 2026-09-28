@@ -20,7 +20,7 @@
  * 只检测、不自动修（交人工决策）：
  *   · 包内重复 normalized word（NFC + lowercase + 空白折叠后同 key ⇒ 大小写/空格差异会撞车）
  *   · 空 word / 空 translation（规范化后为空串）
- *   · 非法字段（白名单外的键，白名单 = word/translation/phonetic/definition/partOfSpeech）
+ *   · 非法字段（白名单外的键，白名单 = word/translation/phonetic/definition）
  *
  * 退出码：存在「重复词 / 空字段 / 非法字段」→ exit 1（CI 可用）；
  *         仅格式差异不 exit 1，提示加 --write。
@@ -42,9 +42,9 @@ import { canonicalFile } from './canonical.mjs'
 const ROOT = path.resolve(process.cwd())
 const VOCAB_DIR = path.join(ROOT, 'content', 'vocabulary')
 
-/** 词条合法字段白名单（V4.1 契约：word / translation / phonetic? / definition? / partOfSpeech?） */
-const FIELD_WHITELIST = ['word', 'translation', 'phonetic', 'definition', 'partOfSpeech']
-/** 参与文本规范化的字段（partOfSpeech 是枚举型，不做文本清洗） */
+/** 词条合法字段白名单（V4.1 契约：word / translation / phonetic? / definition?） */
+const FIELD_WHITELIST = ['word', 'translation', 'phonetic', 'definition']
+/** 参与文本规范化的字段（当前与白名单一致：四个字段全是文本型） */
 const TEXT_FIELDS = ['word', 'translation', 'phonetic', 'definition']
 
 const ENTITIES = [

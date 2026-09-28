@@ -84,12 +84,14 @@
 
 ---
 
-### CONTENT-005 · `partOfSpeech` 已声明但零数据
+### CONTENT-005 · `partOfSpeech` 已声明但零数据 —— ✅ 已关闭（P1.6-E）
 
 | 项 | 值 |
 |---|---|
-| 现象 | `normalize.mjs:46` 白名单含 5 个字段，实测数据只出现 4 个，`partOfSpeech` 覆盖率 **0%** |
+| 现象（审计时点） | `normalize.mjs:46` 白名单含 5 个字段，实测数据只出现 4 个，`partOfSpeech` 覆盖率 **0%** |
 | 定性 | `【已有·实测】` |
+| **处置（P1.6-E）** | **移除字段声明**（`model/vocabulary.ts`、`canonical.mjs:36`、`normalize.mjs:46`、`CONTENT_CONTRACT.md`）。全库 9346 条该键零出现、0 处代码读取、`WordItem` / `WordHit` 均未声明 ⇒ 纯声明层空壳。不补假数据、不写 `[]` 占位；移除后 10 包 `contentChecksum` 逐包不变（`version` / `revision` / `history` 全不动） |
+| 状态 | ✅ 已关闭 |
 
 ---
 
@@ -333,7 +335,7 @@
 
 | 项 | 值 |
 |---|---|
-| 现象 | 全库无 `partOfSpeech` / `example` / `exampleAudio` / `frequency` / `cefr` / `sense` |
+| 现象 | 全库无 `partOfSpeech`（**P1.6-E 已移除该字段声明**）/ `example` / `exampleAudio` / `frequency` / `cefr` / `sense` |
 | 影响 | 无法支撑"点击单词看例句、听发音"等核心学习场景 |
 | 定性 | `【已有·实测】` |
 

@@ -151,7 +151,7 @@
 |---|---|---|
 | C-1 | **词汇总量少** | 9346 词，其中 9000 词来自 3 个 ECDICT 词频包 |
 | C-2 | **CET 覆盖率致命不足** | cet4 仅 **84 词**、cet6 仅 **69 词**。CET-4 考纲实际约 4500 词 —— **覆盖率约 1.9%** |
-| C-3 | **字段贫瘠** | 全库只有 4 个 key：`word`/`translation`/`definition`/`phonetic`。**无** `partOfSpeech`/`example`/`audio`/`frequency`/`cefr`/`sense`/`collocation` |
+| C-3 | **字段贫瘠** | 全库只有 4 个 key：`word`/`translation`/`definition`/`phonetic`。**无** `partOfSpeech`（**P1.6-E 已移除该字段声明**）/`example`/`audio`/`frequency`/`cefr`/`sense`/`collocation` |
 | C-4 | **5 个包只有 word+translation** | ai-core/cloud-native/frontend/go-code/ts-code（phonetic 与 definition 覆盖均为 0）。注：**不是 7 个**——7 是"inline 包"的数量，别混用口径 |
 | C-5 | **无音频/视频/字幕/课文** | 零文件。`content/assets/` **不存在** |
 | C-6 | **无真考题库** | IELTS/TOEFL/CET 均只有词汇包，无听/说/读/写/真题 |

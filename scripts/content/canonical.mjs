@@ -14,8 +14,8 @@
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * 规则：
- *  1. 对象键按**固定顺序**：词条白名单序 word → translation → phonetic → definition →
- *     partOfSpeech；白名单外的未知键按**字典序**（UTF-16 码位序，与 locale 无关）
+ *  1. 对象键按**固定顺序**：词条白名单序 word → translation → phonetic → definition；
+ *     白名单外的未知键按**字典序**（UTF-16 码位序，与 locale 无关）
  *     排在白名单键之后 —— 既不丢字段，也不因 JS 插入序漂移。
  *     值为 undefined 的键**省略**；null **保留**（"exam": null 是有语义的取值）。
  *  2. 数组保持原顺序（见铁律 1）。
@@ -33,7 +33,7 @@ import { createHash } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 
 /** 词条字段白名单序 —— 同时也是 src/core/content 词模型的字段序，勿随意调整。 */
-export const CANONICAL_FIELD_ORDER = ['word', 'translation', 'phonetic', 'definition', 'partOfSpeech']
+export const CANONICAL_FIELD_ORDER = ['word', 'translation', 'phonetic', 'definition']
 
 /** 字典序比较器：显式用 UTF-16 码位序，避免 localeCompare / 引擎差异 */
 const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0)

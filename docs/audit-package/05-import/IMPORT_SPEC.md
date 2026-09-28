@@ -65,10 +65,10 @@ const namespaceOf = (id) => `${SOURCE[id] ?? 'curated'}-${id}`   // build.mjs:49
 最小形状 = `word` + `translation`（`content/README.md:465`）。完整字段白名单由 `normalize.mjs:46` 定义：
 
 ```js
-const FIELD_WHITELIST = ['word', 'translation', 'phonetic', 'definition', 'partOfSpeech']
+const FIELD_WHITELIST = ['word', 'translation', 'phonetic', 'definition']
 ```
 
-**实测各包真实字段**：全库 9346 词只用到 4 个 key —— `word` / `translation` / `definition` / `phonetic`。**`partOfSpeech` 全库 0 条**（白名单内但无数据）。白名单外字段会被 `normalize.mjs:132-134` 报为「非法字段」并 `exit 1`。
+**实测各包真实字段**：全库 9346 词只用到 4 个 key —— `word` / `translation` / `definition` / `phonetic`，与白名单**完全一致**。~~`partOfSpeech`~~ 曾列入白名单但全库 0 条、0 处读取，已于 **P1.6-E** 从白名单移除（移除后 10 包 checksum 逐包不变）。白名单外字段会被 `normalize.mjs:132-134` 报为「非法字段」并 `exit 1`。
 
 真实词条样本（`content/vocabulary/ielts/words.json` 首条）：
 

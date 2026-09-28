@@ -22,8 +22,6 @@
 
 ## 二、逐包出现的所有 key 及频次
 
-> ⚠️ **本节口径 = 「key 存在」**（`definition: ""` 也计入），与 §一 的「值非空」口径**不同**，故 ielts(3000 vs 2999) 与 toefl(3000 vs 2992) 的 `definition` 列**数值有意不同**。差额 9 条即全库 9 条空串 `definition`（ielts 1 + toefl 8）。两节都对，**引用时必须说明口径**。
-
 | 包 | 总词条数 | `word` | `translation` | `phonetic` | `definition` |
 |---|---|---|---|---|---|
 | ai-core | 43 | 43 | 43 | 0 | 0 |
@@ -40,28 +38,21 @@
 
 ## 三、全库 key 汇总（降序）
 
-> **口径说明（重要）**：本书及 §二 使用「**key 存在**」口径 —— `definition` 存在但为空字符串 `""` 也计为覆盖。
-> 与 §一（「**值非空**」口径）的差额恰为 **9 条空串**：
-> `definition` key 存在 **9153** 条（97.93%），其中 **9 条值为空串**，故值非空为 **9144** 条（97.84%）。
-> 两个数字都对，**引用时必须说明口径**，否则会得出偏差结论。
-> manifest `stats.definition` 用的是「key 存在」口径（见 §五）。
-
-| key | 全库出现条数（key 存在） | 占全库词条比例 | 值非空条数 | 覆盖包数 |
-|---|---|---|---|---|
-| `word` | 9346 | 100.00% | 9346 | 10 / 10 |
-| `translation` | 9346 | 100.00% | 9346 | 10 / 10 |
-| `definition` | 9153 | 97.93% | **9144** | 5 / 10 |
-| `phonetic` | 9076 | 97.11% | 9076（无空串） | 5 / 10 |
+| key | 全库出现条数 | 占全库词条比例 | 覆盖包数 |
+|---|---|---|---|
+| `word` | 9346 | 100.00% | 10 / 10 |
+| `translation` | 9346 | 100.00% | 10 / 10 |
+| `definition` | 9153 | 97.93% | 5 / 10 |
+| `phonetic` | 9076 | 97.11% | 5 / 10 |
 
 ## 四、结论
 
 - 全库共出现 **4** 个不同的 key：`word`、`translation`、`phonetic`、`definition`。
 - 所有 9346 条词条**均含**的 key：`word`、`translation`。
-- 非全覆盖 key：`phonetic(9076)`、`definition(9153 key 存在 / 9144 值非空)`。
-- **`partOfSpeech` 零覆盖** —— 它虽在 `scripts/content/normalize.mjs:46` 白名单内，但无任何词条使用。
+- 非全覆盖 key：`phonetic(9076)`、`definition(9153)`。
 
 - **无任何 phonetic 的包（5 个）**：`ai-core`、`cloud-native`、`frontend`、`go-code`、`ts-code` —— 这些包只有 `word` + `translation` 两个 key。
-- **无任何 definition 的包（5 个）**：同上 5 个包。
+- **无任何 definition 的包（5 个）**：`ai-core`、`cloud-native`、`frontend`、`go-code`、`ts-code`。
 - phonetic **100% 覆盖**的包：`cet4`、`cet6`。
 
 ## 五、manifest `stats` 声明值 vs 实测值

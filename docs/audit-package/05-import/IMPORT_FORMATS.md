@@ -170,13 +170,12 @@ interface ParsedEntry {
   translation: string
   phonetic?: string
   definition?: string
-  partOfSpeech?: string
   /** 来源定位（文件 + 行号），用于错误提示与去重归因 */
   origin?: { file: string; line: number }
 }
 ```
 
-这个形状**恰好等于**内容层白名单（`normalize.mjs:46` 的 `FIELD_WHITELIST`），从而让「用户导入」与「内容包」共享字段语义。
+这个形状**恰好等于**内容层白名单（`normalize.mjs:46` 的 `FIELD_WHITELIST`；**P1.6-E** 起为 4 个字段，原 `partOfSpeech` 因全库零数据已移除），从而让「用户导入」与「内容包」共享字段语义。
 
 ### 5.3 建议的格式探测策略
 

@@ -65,11 +65,11 @@ export default function KeyMap({ theme, nextKey, wrongKey, compact }: KeyMapProp
                       : wrong
                         ? '#f87171'
                         : 'transparent',
-                    color: active ? '#ecfdf5' : undefined,
+                    color: active ? theme.keyActiveFg : undefined,
                     boxShadow: active ? '0 0 12px rgba(52,211,153,.45)' : undefined,
                     transform: active ? 'translateY(-2px) scale(1.06)' : undefined,
                   }}
-                  className={`${base} ${active ? '' : theme.pending}`}
+                  className={`${base} ${active ? '' : theme.sub}`}
                 >
                   {k}
                 </span>
@@ -77,7 +77,7 @@ export default function KeyMap({ theme, nextKey, wrongKey, compact }: KeyMapProp
             })}
           </div>
         ))}
-        <div className="text-[11px] tracking-widest uppercase opacity-50 mt-1">{t('keymap.hint')}</div>
+        <div className={`text-[11px] tracking-widest uppercase ${theme.sub} mt-1`}>{t('keymap.hint')}</div>
       </div>
     </div>
   )

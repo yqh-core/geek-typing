@@ -80,7 +80,7 @@ $ find . -path ./node_modules -prune -o -iname "*ielts*" -print
 | `translation` 非空 | 3000 / 3000 = 100% |
 | 最长词形 | 15 字符 |
 | 含空格的词组 | **0** |
-| `partOfSpeech` | **0 / 3000 = 0%** |
+| `partOfSpeech` | **0 / 3000 = 0%**（**P1.6-E 已移除该字段声明**） |
 | `examples` | **0 / 3000 = 0%** |
 
 字段样例（`words.json` 首条，原文）：
@@ -232,7 +232,7 @@ const loadIelts = async () => parseWords((await import('../../../content/vocabul
 | E-3 | **不要用「加第 4 个 3000 词包」的方式提升雅思覆盖** | ielts ∩ kaoyan = 1802（60.1%）⇒ 第 4 个同源包边际收益低 | — |
 | E-4 | **扩包前先改 `warmUpVocabulary()`** | 余量仅 17.2%（497.03 / 600 KiB） | `content/README.md:611` 已列为前置约束 |
 | E-5 | **记录「3000 是词频截断上限」而非「覆盖率」** | 三个包同为 `LIMIT = 3000`，无覆盖率口径 | 需先定义雅思考纲总量作为分母 |
-| E-6 | **补 `partOfSpeech`** | ielts 覆盖率 0%（白名单已声明，`normalize.mjs:46`） | 雅思阅读/写作需要词性 |
+| ~~E-6~~ | ~~**补 `partOfSpeech`**~~ | **作废**：P1.6-E 已移除该字段（覆盖率 0%、白名单已无此项）；雅思阅读/写作需要词性这一点仍成立，但须先补真实数据源再加字段 | `normalize.mjs:46` |
 
 ---
 

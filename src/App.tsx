@@ -366,13 +366,13 @@ export default function App() {
         {tab === 'typing' && <KeyMap theme={theme} nextKey={nextKey} wrongKey={errorFlash ? wrongKey : null} />}
 
         {tab === 'typing' && (
-          <div data-testid="esc-hint" className={`text-[11px] tracking-widest uppercase ${theme.sub} opacity-60 -mt-4`}>
+          <div data-testid="esc-hint" className={`text-[11px] tracking-widest uppercase ${theme.sub} -mt-4`}>
             {t('keymap.escHint')}
           </div>
         )}
 
         {tab === 'typing' && (
-          <footer className={`flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs ${theme.sub} opacity-70`}>
+          <footer className={`flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs ${theme.sub}`}>
             <span className="flex items-center gap-1.5">
               <Terminal size={13} />
               {t('footer.hint1')}

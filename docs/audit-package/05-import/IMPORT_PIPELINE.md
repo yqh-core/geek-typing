@@ -78,7 +78,7 @@ Raw → Normalize → Validate → Build → Index → Manifest → Content Regi
 
 **目的**（文件头 `:1-6` 原文）：外来词表（ECDICT 导出、CSV、网页抓取）常带全角空格 / HTML 标签 / 实体 / 大小写与空白差异，直接入库会让「同一个词」在包里出现多次、或让 checksum 因无关空白漂移。
 
-规范化规则（`normalizeText()`，`:60-69`），**作用于 `word / translation / phonetic / definition`**（`TEXT_FIELDS`，`:48`；`partOfSpeech` 是枚举型不做清洗）：
+规范化规则（`normalizeText()`，`:60-69`），**作用于 `word / translation / phonetic / definition`**（`TEXT_FIELDS`，`:48`；P1.6-E 后与白名单完全相同，四字段均为文本型）：
 
 ```
 NFC 归一 (s.normalize('NFC'))
@@ -97,7 +97,7 @@ NFC 归一 (s.normalize('NFC'))
 |---|---|---|
 | 包内重复 normalized word | `:139-143` | `dupKey` = NFC + lowercase + 空白折叠 |
 | 空 word / 空 translation | `:136-137` | 规范化后为空串 |
-| 非法字段 | `:132-134` | 不在白名单 `word/translation/phonetic/definition/partOfSpeech`（`:46`） |
+| 非法字段 | `:132-134` | 不在白名单 `word/translation/phonetic/definition`（`:46`） |
 
 **代码词库例外**（`:14-18`、`:105-111`）：`ts-code` / `go-code` 必须在 manifest 声明 `"normalize": { "stripHtml": false }`，否则泛型 `type Handler<T>`、JSX `<div className="app">`、`<List />` 会被 `<[^>]*>` 当标签删掉 —— **实测 5 条命中**（`:16`）。
 
@@ -127,7 +127,7 @@ NFC 归一 (s.normalize('NFC'))
 **三条硬规则**：
 
 1. **数组保持原顺序，绝不重排**（铁律 1，`:11-14`、`:57`）—— 词表顺序 = 产品语义（词频序 / 教材序 / 难度梯度）。自检断言 `:112-114`：`canonicalize([{word:'z'},{word:'a'}]) === '[{"word":"z"},{"word":"a"}]'`。
-2. **对象键按白名单序**（`CANONICAL_FIELD_ORDER`，`:36`）：`word → translation → phonetic → definition → partOfSpeech`；白名单外未知键按 UTF-16 字典序排后（`orderedKeys()`，`:42-47`）。
+2. **对象键按白名单序**（`CANONICAL_FIELD_ORDER`，`:36`）：`word → translation → phonetic → definition`；白名单外未知键按 UTF-16 字典序排后（`orderedKeys()`，`:42-47`）。
 3. **留痕** —— 值为 `undefined` 的键省略；`null` 保留（`:43`）。
 
 自检可直接跑：`node scripts/content/canonical.mjs`（`:122-134`，无 npm script 包装）。

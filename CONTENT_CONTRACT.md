@@ -275,7 +275,7 @@ NFC 归一 → trim → 连续空白折叠为单空格 → 删除控制字符 �
 
 | # | 规则 | 说明 |
 |---|---|---|
-| N-1 | 白名单字段按固定顺序输出 | `['word','translation','phonetic','definition','partOfSpeech']`。⚠️ 白名单对**任意对象**生效、不只对词条 —— 所以 `manifest.stats` 落盘是 `{"phonetic":..,"definition":..,"items":..}`（`phonetic`/`definition` 命中白名单被前置，`items` 走字典序），不是字典序 |
+| N-1 | 白名单字段按固定顺序输出 | `['word','translation','phonetic','definition']`。⚠️ 白名单对**任意对象**生效、不只对词条 —— 所以 `manifest.stats` 落盘是 `{"phonetic":..,"definition":..,"items":..}`（`phonetic`/`definition` 命中白名单被前置，`items` 走字典序），不是字典序 |
 | N-2 | 未知字段**全部**白名单之后，按 **code unit 字典序**排 | 新字段出现不会让既有 checksum 失效 |
 | N-3 | **value 为 `undefined` 的键跳过** | 保证 `{}` 与 `{a:undefined}` 同指纹 |
 | N-4 | **数组绝不重排** | 🔴 词表顺序是有语义的，排序 = 破坏数据 |
@@ -437,9 +437,11 @@ interface ContentRevisionEntry {
 ### 8.1 words.json
 
 - 形态：`WordPayload[]`，**顺序是有语义的**（Canonical JSON 规则 N-4：数组绝不重排）。
-- `WordPayload = { word, translation, phonetic?, definition?, partOfSpeech?: string[] }`
-  （= `Omit<WordContent, 'id' | 'type'>`）。⚠️ `schema.ts` 里的 `WordItem` 只是 `WordPayload` 的
-  **子集描述**（缺 `partOfSpeech`），写类型请以 `WordPayload` 为准，否则会丢字段。
+- `WordPayload = { word, translation, phonetic?, definition? }`（= `Omit<WordContent, 'id' | 'type'>`）。
+  ✅ **类型分裂已收口**（P1.6-E）：`schema.ts` 的 `WordItem` 与 `WordPayload` **字段完全一致**
+  （同 4 个：word / translation / phonetic? / definition?），不再是子集描述；
+  `query/content-query.ts` 的 `WordHit` = 同样的 4 个词条字段 + 4 个包上下文字段
+  （`id` / `packageId` / `packageLocalId` / `packageTitle`）。三者无缺字段之分。
 - 学习状态**绝不挂在这里**（mastery / streak / nextReviewAt 属 Learning 层）。
 - 落盘格式 = `canonicalFile(words)`：紧凑单行 + 尾随换行。
 - `contentChecksum === sha256Canonical(words)`（**必须走 canonical**，门禁第 15 项）。

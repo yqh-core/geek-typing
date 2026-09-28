@@ -1,0 +1,783 @@
+{
+  "meta": {
+    "generatedAt": "2026-09-28T18:06:33.809Z",
+    "base": "http://127.0.0.1:4181",
+    "thresholds": {
+      "contrastNormal": 4.5,
+      "contrastLarge": 3,
+      "largeTextPx": 24,
+      "largeBoldPx": 18.66,
+      "largeBoldWeight": 700,
+      "maxTextElements": 300,
+      "overflowTolerancePx": 1,
+      "mobileInputMinPx": 16
+    },
+    "viewports": [
+      {
+        "id": "desktop-1440",
+        "label": "desktop 大",
+        "width": 1440,
+        "height": 900
+      },
+      {
+        "id": "desktop-1280",
+        "label": "desktop",
+        "width": 1280,
+        "height": 800
+      },
+      {
+        "id": "tablet-1024",
+        "label": "tablet",
+        "width": 1024,
+        "height": 768
+      },
+      {
+        "id": "mobile-390",
+        "label": "mobile iPhone 12",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "id": "mobile-412",
+        "label": "mobile Android",
+        "width": 412,
+        "height": 915
+      }
+    ],
+    "tabs": [
+      "home",
+      "typing",
+      "memorize",
+      "review",
+      "progress"
+    ],
+    "themes": [
+      {
+        "id": "matrix",
+        "label": "黑客荧光",
+        "light": false
+      },
+      {
+        "id": "ide",
+        "label": "专注 IDE",
+        "light": false
+      },
+      {
+        "id": "ink",
+        "label": "墨水屏",
+        "light": true
+      }
+    ],
+    "chrome": "153.0.8010.53"
+  },
+  "combos": [
+    {
+      "viewport": "desktop-1440",
+      "tab": "home",
+      "overflow": {
+        "viewportWidth": 1440,
+        "documentScrollWidth": 1440,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 29,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/desktop-1440__home.png"
+    },
+    {
+      "viewport": "desktop-1440",
+      "tab": "typing",
+      "overflow": {
+        "viewportWidth": 1440,
+        "documentScrollWidth": 1440,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 73,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/desktop-1440__typing.png"
+    },
+    {
+      "viewport": "desktop-1440",
+      "tab": "memorize",
+      "overflow": {
+        "viewportWidth": 1440,
+        "documentScrollWidth": 1440,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 21,
+        "skippedInactive": 3,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/desktop-1440__memorize.png"
+    },
+    {
+      "viewport": "desktop-1440",
+      "tab": "review",
+      "overflow": {
+        "viewportWidth": 1440,
+        "documentScrollWidth": 1440,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 24,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/desktop-1440__review.png"
+    },
+    {
+      "viewport": "desktop-1440",
+      "tab": "progress",
+      "overflow": {
+        "viewportWidth": 1440,
+        "documentScrollWidth": 1440,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 33,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/desktop-1440__progress.png"
+    },
+    {
+      "viewport": "desktop-1280",
+      "tab": "home",
+      "overflow": {
+        "viewportWidth": 1280,
+        "documentScrollWidth": 1280,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 29,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/desktop-1280__home.png"
+    },
+    {
+      "viewport": "desktop-1280",
+      "tab": "typing",
+      "overflow": {
+        "viewportWidth": 1280,
+        "documentScrollWidth": 1280,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 71,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/desktop-1280__typing.png"
+    },
+    {
+      "viewport": "desktop-1280",
+      "tab": "memorize",
+      "overflow": {
+        "viewportWidth": 1280,
+        "documentScrollWidth": 1280,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 21,
+        "skippedInactive": 3,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/desktop-1280__memorize.png"
+    },
+    {
+      "viewport": "desktop-1280",
+      "tab": "review",
+      "overflow": {
+        "viewportWidth": 1280,
+        "documentScrollWidth": 1280,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 24,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/desktop-1280__review.png"
+    },
+    {
+      "viewport": "desktop-1280",
+      "tab": "progress",
+      "overflow": {
+        "viewportWidth": 1280,
+        "documentScrollWidth": 1280,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 33,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/desktop-1280__progress.png"
+    },
+    {
+      "viewport": "tablet-1024",
+      "tab": "home",
+      "overflow": {
+        "viewportWidth": 1024,
+        "documentScrollWidth": 1024,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 29,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/tablet-1024__home.png"
+    },
+    {
+      "viewport": "tablet-1024",
+      "tab": "typing",
+      "overflow": {
+        "viewportWidth": 1024,
+        "documentScrollWidth": 1024,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 75,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/tablet-1024__typing.png"
+    },
+    {
+      "viewport": "tablet-1024",
+      "tab": "memorize",
+      "overflow": {
+        "viewportWidth": 1024,
+        "documentScrollWidth": 1024,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 21,
+        "skippedInactive": 3,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/tablet-1024__memorize.png"
+    },
+    {
+      "viewport": "tablet-1024",
+      "tab": "review",
+      "overflow": {
+        "viewportWidth": 1024,
+        "documentScrollWidth": 1024,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 24,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/tablet-1024__review.png"
+    },
+    {
+      "viewport": "tablet-1024",
+      "tab": "progress",
+      "overflow": {
+        "viewportWidth": 1024,
+        "documentScrollWidth": 1024,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 33,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/tablet-1024__progress.png"
+    },
+    {
+      "viewport": "mobile-390",
+      "tab": "home",
+      "overflow": {
+        "viewportWidth": 390,
+        "documentScrollWidth": 390,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 28,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/mobile-390__home.png"
+    },
+    {
+      "viewport": "mobile-390",
+      "tab": "typing",
+      "overflow": {
+        "viewportWidth": 390,
+        "documentScrollWidth": 390,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 72,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/mobile-390__typing.png"
+    },
+    {
+      "viewport": "mobile-390",
+      "tab": "memorize",
+      "overflow": {
+        "viewportWidth": 390,
+        "documentScrollWidth": 390,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 20,
+        "skippedInactive": 3,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/mobile-390__memorize.png"
+    },
+    {
+      "viewport": "mobile-390",
+      "tab": "review",
+      "overflow": {
+        "viewportWidth": 390,
+        "documentScrollWidth": 390,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 23,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/mobile-390__review.png"
+    },
+    {
+      "viewport": "mobile-390",
+      "tab": "progress",
+      "overflow": {
+        "viewportWidth": 390,
+        "documentScrollWidth": 390,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 32,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/mobile-390__progress.png"
+    },
+    {
+      "viewport": "mobile-412",
+      "tab": "home",
+      "overflow": {
+        "viewportWidth": 412,
+        "documentScrollWidth": 412,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 28,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/mobile-412__home.png"
+    },
+    {
+      "viewport": "mobile-412",
+      "tab": "typing",
+      "overflow": {
+        "viewportWidth": 412,
+        "documentScrollWidth": 412,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 69,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/mobile-412__typing.png"
+    },
+    {
+      "viewport": "mobile-412",
+      "tab": "memorize",
+      "overflow": {
+        "viewportWidth": 412,
+        "documentScrollWidth": 412,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 20,
+        "skippedInactive": 3,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/mobile-412__memorize.png"
+    },
+    {
+      "viewport": "mobile-412",
+      "tab": "review",
+      "overflow": {
+        "viewportWidth": 412,
+        "documentScrollWidth": 412,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 23,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/mobile-412__review.png"
+    },
+    {
+      "viewport": "mobile-412",
+      "tab": "progress",
+      "overflow": {
+        "viewportWidth": 412,
+        "documentScrollWidth": 412,
+        "offenders": [],
+        "ok": true,
+        "docOk": true
+      },
+      "contrast": {
+        "scanned": 32,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "consoleErrors": [],
+      "screenshot": "docs/audit-package/screenshots/a11y/mobile-412__progress.png"
+    }
+  ],
+  "crossViewport": [
+    {
+      "viewport": "desktop-1440",
+      "kind": "theme",
+      "from": "matrix",
+      "to": "ink",
+      "bgBefore": {
+        "body": "rgb(11, 17, 32)",
+        "root": "rgb(11, 17, 32)",
+        "rootSelector": "div#root > div.min-h-screen.bg-[#0b1120]"
+      },
+      "bgAfter": {
+        "body": "rgb(11, 17, 32)",
+        "root": "rgb(245, 243, 236)",
+        "rootSelector": "div#root > div.min-h-screen.bg-[#f5f3ec]"
+      },
+      "changed": true,
+      "contrast": {
+        "scanned": 38,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "screenshot": "docs/audit-package/screenshots/a11y/desktop-1440__theme-ink.png"
+    },
+    {
+      "viewport": "desktop-1280",
+      "kind": "theme",
+      "from": "matrix",
+      "to": "ink",
+      "bgBefore": {
+        "body": "rgb(11, 17, 32)",
+        "root": "rgb(11, 17, 32)",
+        "rootSelector": "div#root > div.min-h-screen.bg-[#0b1120]"
+      },
+      "bgAfter": {
+        "body": "rgb(11, 17, 32)",
+        "root": "rgb(245, 243, 236)",
+        "rootSelector": "div#root > div.min-h-screen.bg-[#f5f3ec]"
+      },
+      "changed": true,
+      "contrast": {
+        "scanned": 38,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "screenshot": "docs/audit-package/screenshots/a11y/desktop-1280__theme-ink.png"
+    },
+    {
+      "viewport": "tablet-1024",
+      "kind": "theme",
+      "from": "matrix",
+      "to": "ink",
+      "bgBefore": {
+        "body": "rgb(11, 17, 32)",
+        "root": "rgb(11, 17, 32)",
+        "rootSelector": "div#root > div.min-h-screen.bg-[#0b1120]"
+      },
+      "bgAfter": {
+        "body": "rgb(11, 17, 32)",
+        "root": "rgb(245, 243, 236)",
+        "rootSelector": "div#root > div.min-h-screen.bg-[#f5f3ec]"
+      },
+      "changed": true,
+      "contrast": {
+        "scanned": 38,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "screenshot": "docs/audit-package/screenshots/a11y/tablet-1024__theme-ink.png"
+    },
+    {
+      "viewport": "mobile-390",
+      "kind": "theme",
+      "from": "matrix",
+      "to": "ink",
+      "bgBefore": {
+        "body": "rgb(11, 17, 32)",
+        "root": "rgb(11, 17, 32)",
+        "rootSelector": "div#root > div.min-h-screen.bg-[#0b1120]"
+      },
+      "bgAfter": {
+        "body": "rgb(11, 17, 32)",
+        "root": "rgb(245, 243, 236)",
+        "rootSelector": "div#root > div.min-h-screen.bg-[#f5f3ec]"
+      },
+      "changed": true,
+      "contrast": {
+        "scanned": 37,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "screenshot": "docs/audit-package/screenshots/a11y/mobile-390__theme-ink.png"
+    },
+    {
+      "viewport": "mobile-390",
+      "kind": "command-palette",
+      "inputFontSize": 16,
+      "screenshot": "docs/audit-package/screenshots/a11y/mobile-390__command-palette.png"
+    },
+    {
+      "viewport": "mobile-412",
+      "kind": "theme",
+      "from": "matrix",
+      "to": "ink",
+      "bgBefore": {
+        "body": "rgb(11, 17, 32)",
+        "root": "rgb(11, 17, 32)",
+        "rootSelector": "div#root > div.min-h-screen.bg-[#0b1120]"
+      },
+      "bgAfter": {
+        "body": "rgb(11, 17, 32)",
+        "root": "rgb(245, 243, 236)",
+        "rootSelector": "div#root > div.min-h-screen.bg-[#f5f3ec]"
+      },
+      "changed": true,
+      "contrast": {
+        "scanned": 37,
+        "skippedInactive": 0,
+        "violationCount": 0,
+        "violations": []
+      },
+      "screenshot": "docs/audit-package/screenshots/a11y/mobile-412__theme-ink.png"
+    },
+    {
+      "viewport": "mobile-412",
+      "kind": "command-palette",
+      "inputFontSize": 16,
+      "screenshot": "docs/audit-package/screenshots/a11y/mobile-412__command-palette.png"
+    }
+  ],
+  "controlGroups": [
+    {
+      "viewport": "desktop-1440",
+      "kind": "overflow",
+      "mustFail": true,
+      "didFail": true,
+      "scrollWidth": 2880,
+      "viewportWidth": 1440,
+      "afterRemoveScrollWidth": 1440
+    },
+    {
+      "viewport": "desktop-1440",
+      "kind": "contrast",
+      "mustFail": true,
+      "didFail": true,
+      "measuredRatio": 4.48,
+      "scanned": 30
+    },
+    {
+      "viewport": "desktop-1280",
+      "kind": "overflow",
+      "mustFail": true,
+      "didFail": true,
+      "scrollWidth": 2560,
+      "viewportWidth": 1280,
+      "afterRemoveScrollWidth": 1280
+    },
+    {
+      "viewport": "desktop-1280",
+      "kind": "contrast",
+      "mustFail": true,
+      "didFail": true,
+      "measuredRatio": 4.48,
+      "scanned": 30
+    },
+    {
+      "viewport": "tablet-1024",
+      "kind": "overflow",
+      "mustFail": true,
+      "didFail": true,
+      "scrollWidth": 2048,
+      "viewportWidth": 1024,
+      "afterRemoveScrollWidth": 1024
+    },
+    {
+      "viewport": "tablet-1024",
+      "kind": "contrast",
+      "mustFail": true,
+      "didFail": true,
+      "measuredRatio": 4.48,
+      "scanned": 30
+    },
+    {
+      "viewport": "mobile-390",
+      "kind": "overflow",
+      "mustFail": true,
+      "didFail": true,
+      "scrollWidth": 780,
+      "viewportWidth": 390,
+      "afterRemoveScrollWidth": 390
+    },
+    {
+      "viewport": "mobile-390",
+      "kind": "contrast",
+      "mustFail": true,
+      "didFail": true,
+      "measuredRatio": 4.48,
+      "scanned": 29
+    },
+    {
+      "viewport": "mobile-412",
+      "kind": "overflow",
+      "mustFail": true,
+      "didFail": true,
+      "scrollWidth": 824,
+      "viewportWidth": 412,
+      "afterRemoveScrollWidth": 412
+    },
+    {
+      "viewport": "mobile-412",
+      "kind": "contrast",
+      "mustFail": true,
+      "didFail": true,
+      "measuredRatio": 4.48,
+      "scanned": 29
+    }
+  ],
+  "summary": {
+    "total": 102,
+    "pass": 92,
+    "fail": 0,
+    "undecided": 0,
+    "controlGroups": {
+      "total": 10,
+      "didFail": 10,
+      "broken": 0
+    }
+  },
+  "verdict": "PASS"
+}

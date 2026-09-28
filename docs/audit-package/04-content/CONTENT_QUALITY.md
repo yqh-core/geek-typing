@@ -19,7 +19,7 @@
 | 词条必填字段覆盖（`word` / `translation`） | **100% / 100%** | ✅ |
 | `definition` 覆盖 | **9144 / 9346 = 97.84%** | ⚠️ 5 包完全无此字段 |
 | `phonetic` 覆盖 | **9076 / 9346 = 97.11%** | ⚠️ 5 包完全无此字段 |
-| `partOfSpeech` 覆盖 | **0 / 9346 = 0%** | ❌ 白名单有、数据中零出现 |
+| `partOfSpeech` 覆盖 | **0 / 9346 = 0%**（审计时点） | ❌ 白名单有、数据中零出现 ⇒ **P1.6-E 已移除该字段**，不再计入契约 |
 | 只有 2 个字段（`word`+`translation`）的包 | **5 个**（ai-core / cloud-native / frontend / go-code / ts-code） | ⚠️ |
 | 内容正确性校验（释义是否准确、音标是否规范） | **无任何实现** | 📐 |
 | 质量评分 / 质量门禁 | **无任何实现** | 📐 |
@@ -71,7 +71,7 @@
 | toefl | `word, translation, phonetic, definition` |
 | ts-code | `word, translation` |
 
-**只有两种字段组合**，无第三种。没有包使用 `partOfSpeech`。
+**只有两种字段组合**，无第三种。（审计时点）没有包使用 `partOfSpeech`；该字段已于 **P1.6-E** 从契约移除。
 
 ### 2.3 全库字段汇总
 
@@ -81,17 +81,19 @@
 | `translation` | 9346 | 100.00% | 10 / 10 | 必填 |
 | `definition` | 9144 | 97.84% | 5 / 10 | 可选 |
 | `phonetic` | 9076 | 97.11% | 5 / 10 | 可选 |
-| `partOfSpeech` | 0 | 0.00% | 0 / 10 | 可选 |
+| `partOfSpeech` | 0 | 0.00% | 0 / 10 | ~~可选~~ **P1.6-E 已移除** |
 
 契约侧字段白名单见 `scripts/content/normalize.mjs:46`：
 
 ```js
-const FIELD_WHITELIST = ['word', 'translation', 'phonetic', 'definition', 'partOfSpeech']
+const FIELD_WHITELIST = ['word', 'translation', 'phonetic', 'definition']   // P1.6-E：移除 partOfSpeech
 ```
 
-实测：白名单 5 个字段中，**只出现了 4 个**；`partOfSpeech` 是**已声明但零数据**的字段。
+实测：审计时点白名单 5 个字段中**只出现了 4 个**，`partOfSpeech` 是**已声明但零数据**的空壳 ——
+**P1.6-E 已把它从白名单移除**，现在白名单 4 个字段与数据实际用到的 4 个字段**一一对齐**。
 
-另：`scripts/content/normalize.mjs:48` 的 `TEXT_FIELDS = ['word', 'translation', 'phonetic', 'definition']` 是参与文本规范化的字段集合 —— 与白名单的差别正是「`partOfSpeech` 是枚举型不做文本清洗」（`:47` 注释）。
+另：`scripts/content/normalize.mjs:48` 的 `TEXT_FIELDS = ['word', 'translation', 'phonetic', 'definition']`
+是参与文本规范化的字段集合 —— P1.6-E 后与白名单**完全相同**（原差别是「`partOfSpeech` 是枚举型不做文本清洗」，该字段已不存在）。
 
 ---
 
@@ -188,7 +190,7 @@ if (!out.translation) empties.push(`#${i} translation 为空（word=${out.word |
 | 音标规范（IPA 还是其他体系？） | 无校验 | 实测音标体系**不统一**（见 §4.1），无字段声明体系 |
 | 词形合法性（是否为真实英文单词） | 无校验 | 无词典白名单 |
 | 释义非空（`definition` 有内容） | 无校验 | 见 §3.3 根因 |
-| 词性标注（`partOfSpeech` 填充） | **0% 覆盖** | 白名单已声明该字段，零数据 |
+| 词性标注（`partOfSpeech` 填充） | **0% 覆盖**（审计时点） | 白名单已声明该字段，零数据 ⇒ **P1.6-E 已移除字段，本项作废** |
 | 重复语义（同义词是否被当作两条） | 无校验 | 门禁第 4/12(a) 项只查**精确重复**（`validate.mjs:172-176`）与大小写折叠重复（`normalize.mjs:72-74`），不查同义 |
 | 跨包内容一致性（同词在不同包释义是否矛盾） | 无校验 | 见 §6 |
 
@@ -356,7 +358,7 @@ CET-6 覆盖率本文据同一考纲数字计算：69 / 5500 ≈ **1.25%**（既
 |---|---|---|---|
 | CET-6 覆盖率 | 未给出比值 | 69 / 5500 ≈ 1.25% | 新增（补算） |
 | 「7 包只有 2 字段」 | 未记载 | 实测 5 包只有 2 字段（共 193 条） | **口径不同**：`FIELD-COVERAGE.md:54-55` 的「无 phonetic 的包（5 个）」与「无 definition 的包（5 个）」为同一集合，共 **5** 包而非 7 包；7 包是「inline 包」的数目（`validate.mjs:59`），与「无音标包」不是同一组 |
-| `partOfSpeech` 零覆盖 | 未记载 | 白名单已声明、数据 0 条 | 新增 |
+| `partOfSpeech` 零覆盖 | 未记载 | 白名单已声明、数据 0 条 | 新增（**P1.6-E：已移除该字段，闭环**） |
 | 音标体系不统一（IPA vs KK 混用） | 未记载 | 已给实测样例 | 新增 |
 
 ### 7.4 实测通过、但无门禁守护的项
@@ -377,7 +379,7 @@ CET-6 覆盖率本文据同一考纲数字计算：69 / 5500 ≈ **1.25%**（既
 | Q-2 | 增加 `stats.phonetic` / `stats.definition` 的实测比对门禁 | 该两项无门禁，仅靠 build 自动生成 | `validate.mjs:178-180` |
 | Q-3 | 新增 `phoneticScheme` 字段（`ipa`/`kk`/`other`） | 实测两套音标体系混用无标识 | 词条或 manifest |
 | Q-4 | 新增包级 `fieldPolicy` 声明，区分「有意不提供」与「未补齐」 | 5 个 2 字段包的设计意图无法从数据判定 | 各包 manifest |
-| Q-5 | 填充 `partOfSpeech`（白名单已声明，覆盖 0%） | 4 词性标注能力实际不可用 | `normalize.mjs:46` |
+| ~~Q-5~~ | ~~填充 `partOfSpeech`（白名单已声明，覆盖 0%）~~ | **作废**：P1.6-E 已移除该字段（留着会误导为「有词性数据」）；真要上词性须先补真实数据源 | `normalize.mjs:46` |
 | Q-6 | 为考试包定义覆盖率目标并入门禁 | CET-4 仅 84 词（约 1.9%） | 新增 |
 | Q-7 | 引入释义准确性抽检机制（人工或第二数据源交叉） | 正确性维度实现量为零 | 新增 |
 | Q-8 | 修正 `content-samples/FIELD-COVERAGE.md` §二/§三 的口径矛盾 | 同文件内两种统计口径混用，差 9 条 | `FIELD-COVERAGE.md:37,45` |

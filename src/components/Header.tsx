@@ -95,7 +95,7 @@ export default function Header(props: HeaderProps) {
         <div className="flex items-center gap-2">
           <div className="flex flex-col leading-tight">
             <span className={`text-lg font-bold tracking-[0.2em] ${theme.accent}`}>GEEK&nbsp;TYPING</span>
-            <span className={`hidden sm:block text-[11px] ${theme.sub} opacity-80`}>{t('app.tagline')}</span>
+            <span className={`hidden sm:block text-[11px] ${theme.sub}`}>{t('app.tagline')}</span>
           </div>
         </div>
 
@@ -228,7 +228,7 @@ export default function Header(props: HeaderProps) {
             theme={theme}
             testId="dropdown-settings"
           >
-            <div className="px-3 pt-2 pb-1 text-[11px] uppercase tracking-widest opacity-60">
+            <div className="px-3 pt-2 pb-1 text-[11px] uppercase tracking-widest">
               {t('settings.theme')}
             </div>
             {THEME_LIST.map((th) => (

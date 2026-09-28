@@ -120,15 +120,15 @@ export default function PracticePanel({
             <span className="px-2.5 py-1 bg-[#1e1e1e] text-white rounded-t border-t border-[#569cd6]">
               agent.ts
             </span>
-            <span className="px-2.5 py-1 text-[#8b8b8b]">llm-utils.ts</span>
-            <span className="px-2.5 py-1 text-[#8b8b8b]">README.md</span>
+            <span className="px-2.5 py-1 text-[#a3a3a3]">llm-utils.ts</span>
+            <span className="px-2.5 py-1 text-[#a3a3a3]">README.md</span>
           </div>
         </div>
 
         <div className="flex">
           <div className="flex-1 px-0 py-4 overflow-x-auto">
             <div className="flex">
-              <div className="select-none px-3 text-right text-[#5a5a5a] text-[13px] leading-7">
+              <div className="select-none px-3 text-right text-[#888888] text-[13px] leading-7">
                 {Array.from({ length: lines }, (_, i) => (
                   <div key={i}>{i + 8}</div>
                 ))}
@@ -174,9 +174,9 @@ export default function PracticePanel({
       className={`w-full max-w-2xl mx-auto ${theme.card} border ${theme.border} rounded-2xl px-6 py-10 text-center shadow-2xl`}
     >
       <div className={`text-lg mb-8 ${theme.sub} flex items-center justify-center gap-2`}>
-        <span className="opacity-50">[ </span>
+        <span>[ </span>
         {meaning}
-        <span className="opacity-50"> ]</span>
+        <span> ]</span>
         {onSpeak && (
           <button
             data-testid="speak-btn"
@@ -210,18 +210,18 @@ export default function PracticePanel({
           </span>
         )}
         {mode === 'spell' && (
-          <span className="text-xs opacity-60">
+          <span className={`text-xs ${theme.sub}`}>
             {typed.length > 0 ? t('practice.spellFix') : t('practice.spellIntro')}
           </span>
         )}
         {isCode && !errorFlash && (
-          <span className="text-xs opacity-60">{t('practice.codeHint')}</span>
+          <span className={`text-xs ${theme.sub}`}>{t('practice.codeHint')}</span>
         )}
       </div>
 
       <div className={`mt-8 pt-5 border-t ${theme.border} flex items-center justify-center gap-6 flex-wrap`}>
         {upcoming.map((item, idx) => (
-          <div key={`${item.word}-${idx}`} className="flex flex-col items-center gap-1 opacity-40 max-w-full">
+          <div key={`${item.word}-${idx}`} className={`flex flex-col items-center gap-1 ${theme.sub} max-w-full`}>
             <span className={`text-sm ${isCode ? 'font-mono' : 'tracking-wider'}`}>
               {mode === 'spell'
                 ? '•'.repeat(item.word.length)

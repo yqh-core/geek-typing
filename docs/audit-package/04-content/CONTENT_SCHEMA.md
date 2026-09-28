@@ -170,7 +170,7 @@ id / namespace / packageId / stats / sources[].checksum / schemaVersion
 
 `canonicalize()` 的键序规则（契约 §5.1 N-1）：
 
-> 白名单字段按固定顺序输出 `['word','translation','phonetic','definition','partOfSpeech']`。
+> 白名单字段按固定顺序输出 `['word','translation','phonetic','definition']`（`partOfSpeech` 已于 P1.6-E 移除）。
 > ⚠️ 白名单对**任意对象**生效、不只对词条。
 
 实际效果：
@@ -190,21 +190,22 @@ id / namespace / packageId / stats / sources[].checksum / schemaVersion
 
 ## 4. `WordItem` / `WordPayload` 字段
 
-### 4.1 ⚠️ 两个类型描述同一份数据，但字段数不同
+### 4.1 ✅ 类型分裂已收口（P1.6-E）
+
+> 审计时点此处记录的是「`WordItem` 4 个字段 vs `WordPayload` 5 个字段（多 `partOfSpeech`）」的
+> 类型不一致。**P1.6-E 已移除 `partOfSpeech`**，分裂随之消失：
 
 | 类型 | 定义位置 | 字段 |
 |---|---|---|
 | `WordItem` | `src/core/content/schema.ts:83-88` | `word` / `translation` / `phonetic?` / `definition?`（**4 个**） |
-| `WordPayload` | `src/core/content/model/vocabulary.ts:29` | = `Omit<WordContent, 'id' \| 'type'>`（**word / translation / phonetic? / definition? / partOfSpeech?**，**5 个**） |
-| `WordContent` | `src/core/content/model/vocabulary.ts:8-18` | `+ id` / `+ type: 'word'`（**6 个**，含继承的 `ContentItem` 两字段） |
+| `WordPayload` | `src/core/content/model/vocabulary.ts:29` | = `Omit<WordContent, 'id' \| 'type'>`（**word / translation / phonetic? / definition?**，**4 个**） |
+| `WordContent` | `src/core/content/model/vocabulary.ts:8` | `+ id` / `+ type: 'word'`（**6 个**，含继承的 `ContentItem` 两字段） |
+| `WordHit` | `src/core/content/query/content-query.ts:27-39` | 同上 4 个词条字段 `+ id` / `packageId` / `packageLocalId` / `packageTitle`（包上下文） |
 
-契约 §8.1（`:441-443`）明确以哪个为准：
+契约 §8.1（`:440-445`）现为：
 
-> ⚠️ `schema.ts` 里的 `WordItem` 只是 `WordPayload` 的**子集描述**（缺 `partOfSpeech`），
-> 写类型请以 `WordPayload` 为准，否则会丢字段。
-
-**这是一处类型层的不一致**：`schema.ts:83` 导出的 `WordItem` 被 `src/data/wordBanks.ts:8-10`
-用作 UI 侧词条类型，意味着 **UI 侧的类型定义看不到 `partOfSpeech`**。
+> ✅ `WordItem` 与 `WordPayload` **字段完全一致**（同 4 个）；`WordHit` = 这 4 个 + 4 个包上下文字段。
+> 三者不再有「子集 / 缺字段」之分，`schema.ts:83` 的 `WordItem` 用作 UI 侧词条类型不会丢字段。
 
 ### 4.2 `WordContent` 完整定义
 
@@ -219,17 +220,18 @@ export interface WordContent extends ContentItem {
   phonetic?: string
   /** 英文释义（ECDICT 提供；code 词库无） */
   definition?: string
-  /** 词性（V4.1-P1 由 ECDICT 词性列注入；当前未填充） */
-  partOfSpeech?: string[]
 }
 ```
 
-`partOfSpeech` 的状态（`:16-17` 注释）：**「V4.1-P1 由 ECDICT 词性列注入；当前未填充」**。
-`normalize.mjs:46-48` 把它列入白名单与参与规范化的字段集合（但不做文本清洗）：
+~~`partOfSpeech` 的状态（`:16-17` 注释）：「V4.1-P1 由 ECDICT 词性列注入；当前未填充」~~
+**P1.6-E 已移除**：全库 9346 条该键零出现、0 处代码读取、`WordItem` / `WordHit` 从未声明 ——
+纯声明层空壳。需要词性时应先补真实数据源再加字段（不得为让卡片显示而补假数据）。
+
+`normalize.mjs:46-48` 现为白名单与文本规范化字段**同集合**：
 
 ```js
-const FIELD_WHITELIST = ['word', 'translation', 'phonetic', 'definition', 'partOfSpeech']
-const TEXT_FIELDS = ['word', 'translation', 'phonetic', 'definition']   // partOfSpeech 是枚举型
+const FIELD_WHITELIST = ['word', 'translation', 'phonetic', 'definition']
+const TEXT_FIELDS = ['word', 'translation', 'phonetic', 'definition']
 ```
 
 ### 4.3 `PhraseContent`（模型占位）
@@ -396,7 +398,7 @@ if (!lic.spdx && !String(s.origin).includes('curated')) fail(...)  // 外部来�
 > `schemaVersion = 4`，manifest 有 **25 个字段**（含 1 个可选 `normalize`），
 > 其中 **11 个禁止手改**、由 `content:build` 派生，另有 12 个必填字段门禁。
 > 词条层实际只有 **4 个 key**（`word` / `translation` / `phonetic` / `definition`），
-> 类型定义里的 `partOfSpeech` 与 `PhraseContent` **零数据**。
+> 类型定义里的 `partOfSpeech`（**P1.6-E 已移除**）与 `PhraseContent` **零数据**。
 > 一项发现：`normalize.stripHtml` 开关的合规是**人工维持**的 ——
 > 两个代码词库当前都正确声明（ts-code 16/50、go-code 3/50 词条含尖括号，开关确有必要），
 > 但**门禁不校验该字段的存在性**，新增代码词库时漏声明不会被拦下（详见 §5.3）。

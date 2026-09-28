@@ -306,7 +306,7 @@ export interface ContentSource {
 
 ### 3.5 建议：`rightsStatus` 不进 `contentChecksum`（📐）
 
-`contentChecksum` 由 `scripts/content/canonical.mjs:54-71` 的 `canonicalize()` 计算，其字段顺序白名单在 `:36`（`CANONICAL_FIELD_ORDER`），当前仅覆盖词条的 `[word, translation, phonetic, definition, partOfSpeech]`。
+`contentChecksum` 由 `scripts/content/canonical.mjs:54-71` 的 `canonicalize()` 计算，其字段顺序白名单在 `:36`（`CANONICAL_FIELD_ORDER`），当前仅覆盖词条的 `[word, translation, phonetic, definition]`（`partOfSpeech` 已于 P1.6-E 移除）。
 
 **建议**：权利字段（`rightsStatus` / `originKind`）保持在词条与 `contentChecksum` 之外，只写在 `manifest.sources[].license` 同级的元数据位置。理由：
 

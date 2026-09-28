@@ -15,14 +15,23 @@
  *   不是乱码。把它们列出来是为了让扫描「不喊狼来了」—— 告警一旦有噪音就会被忽略。
  *
  * 用法：
- *   node scripts/scan-mojibake.mjs                # 扫默认集合（src + tests + scripts + docs）
+ *   node scripts/scan-mojibake.mjs                # 扫默认集合（src + tests + scripts + docs + content）
  *   node scripts/scan-mojibake.mjs <路径...>       # 扫指定文件
  *
- * > ⚠️ **扫描 outra 一个副产品（ `[实测]` ）**：`docs/audit-package/content-samples/*.json`
- * >   的 `phonetic` 字段里混进了**西里尔字母 schwa**（U+04D9）来代替 IPA 的 ə（U+0259）。
- * >   肉眼与渲染都看不出来，但它会让「逐字符比较 ContentId / 音标去抖」这类逻辑
- * >   把两条本应相同的音标判成不同。这不是乱码（不属于本次要抓的事故），
- * >   但既然被扫出来了就记一笔 —— 属于内容数据质量，留给 CONTENT_QUALITY 章节处理。
+ * > ⚠️ **扫描的另一个副产品（ `[实测]` ），已于 2026-09-29 P1.6-E 关闭**：
+ * >   `content/vocabulary/<包id>/words.json` 的 `phonetic` 字段里混进了**西里尔字母 schwa**（U+04D9）
+ * >   来代替 IPA 的 ə（U+0259）—— **同形字污染**（肉眼与渲染都看不出来，但码位不同，
+ * >   会让「逐字符比较 ContentId / 音标去抖」把两条本应相同的音标判成不同）。
+ * >   当时它被判定为「内容数据质量，留给 CONTENT_QUALITY 章节」⇒ **本扫描把它放进了白名单**，
+ * >   结果就是：数据修之前，本脚本一整年都不会响。
+ * >
+ * > **本轮的处置**（顺序不能反）：
+ * >   ① 修数据：`content/vocabulary/{cet4,cet6,ielts,kaoyan,toefl}/words.json` 的 `phonetic`
+ * >      共 4907 条 / 6397 处 U+04D9 → U+0259（其余字段零改动），随后 content:build 重算 checksum；
+ * >   ② 接进门禁：**移出西里尔白名单 + 把 content/ 加进扫描范围**（之前根本没扫 content/，
+ * >      这才是「修改数据也不会响」的真正原因）。
+ * >   ⇒ 现在任何一处 U+04D9 都会 exit 1。 detector 是否真的会响，已用「恢复一个受污染文件」
+ * >      的合成对照实测过，不是靠推理。
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, extname } from 'node:path'
@@ -35,7 +44,6 @@ const ALLOWED = [
   [0x03a1, 0x03a9, '希腊字母 Σ 等（本仓库用作求和符号）'],
   [0x0250, 0x02ff, 'IPA 音标 + 间隔修饰字母（phonetic 字段的合法字符）'],
   [0x0370, 0x03ff, '希腊字母全区间（θ 等音标/符号）'],
-  [0x0400, 0x04ff, '西里尔字母（数据里 U+04D9 被当作 schwa 用，见文件头注）'],
   [0x2010, 0x203b, '通用标点（– — 「」 ‐ •）'],
   [0x2190, 0x21ff, '箭头'],
   [0x2200, 0x22ff, '数学运算符'],
@@ -64,6 +72,33 @@ const WATCHED = [
   [0xac00, 0xd7af, '韩文音节'],
 ]
 
+/**
+ * 精确到「码位 × 路径」的豁免（**不是整个区间**）—— 每条必须写明是什么、为什么、什么时候。
+ *
+ * 为什么不能用「把西里尔区间放回白名单」这种省事做法：那等于宣布「插入音标里的同形字不算错」，
+ * 于是下一个混入的字符（除了 U+04D9 还有一整串同形西里尔小写：
+ * U+0430 / U+0435 / U+043E / U+0440 / U+0441 / U+0445，分别与拉丁 a / e / o / p / c / x 同形）
+ * 再也不会被抓到。白名单一旦为了当下的方便放开一格，它就再也收不回来。
+ *
+ * 规则：只有「**指定码位**出现在**指定路径正则**里」才豁免；同一码位出现在别处照样判红，
+ * 别的西里尔码位出现在这些文件里也照样判红。
+ */
+const CODEPOINT_ALLOW = [
+  // ── U+0454（西里尔小写乌克兰 ye）—— 2026-09-29 P1.6-E 第二批已全量修正为 U+025B，豁免随之作废 ──
+  // 原豁免项：content/vocabulary/{ielts,kaoyan,toefl}/words.json（87 条）+ 派生样本 docs/.../SAMPLE-ielts.json（1 条）。
+  // 数据已清干净，此处刻意**不留任何 U+0454 豁免**：再留就是放水，以后真混进来反而抓不到。
+  // ── U+04D9（西里尔 schwa）—— 仅豁免「审计留档正文中对该历史缺陷的叙述引用」──
+  // 这些是 2026-09-29 之前写下的证据叙述：它们引用的是**修复前**的样例音标，
+  // 正文不可改（改了就等于改写证据）。新增实例由 content/ 与其它路径的 0 容忍兜底。
+  [0x04d9, /^docs\/audit-package\/04-content\/CONTENT_QUALITY\.md$/,
+    '审计留档：叙述中提到修复前的 toefl 样例音标（KK/旧式标注体系的那段论证依赖该原文）'],
+  [0x04d9, /^docs\/audit-package\/08-exam\/CET\.md$/,
+    '审计留档：CET 实测样例引用修复前的 cet4 数据 + 说明这两者的差异'],
+  [0x04d9, /^docs\/audit-package\/08-exam\/TOEFL\.md$/,
+    '审计留档：TOEFL 实测样例引用修复前的 toefl 数据 + 说明这两者的差异'],
+  [0x04d9, /^docs\/audit-package\/13-acceptance\/KNOWN_ISSUES\.md$/,
+    '审计留档：已知问题清单中引用修复前的 toefl 样例'],
+]
 /**
  * 已知豁免：**整文件**级别的例外，必须写明原因与日期，不许裸着忽略。
  *
@@ -100,6 +135,7 @@ function listFiles(dir, out = []) {
 }
 
 function scan(path) {
+  const rel = path.replace(/\\/g, '/')
   let hits = 0
   let line = ''
   let lineno = 0
@@ -120,7 +156,10 @@ function scan(path) {
         const cp = seg[c].codePointAt(0)
         const allowed = ALLOWED.some(([lo, hi]) => cp >= lo && cp <= hi)
         if (!allowed) {
-          report(c + 1, seg[c], '非预期文字')
+          // 精确到「码位 × 路径」的豁免：命中就不报，否则判红
+          if (!CODEPOINT_ALLOW.some(([code, where]) => code === cp && where.test(rel))) {
+            report(c + 1, seg[c], '非预期文字')
+          }
           continue
         }
         const watched = WATCHED.find(([lo, hi]) => cp >= lo && cp <= hi)
@@ -136,7 +175,11 @@ function scan(path) {
 const targets = process.argv.slice(2)
 const files = targets.length
   ? targets.flatMap((t) => (statSync(t).isDirectory() ? listFiles(t) : [t]))
-  : [...listFiles('src'), ...listFiles('tests'), ...listFiles('scripts'), ...listFiles('docs')]
+  // content/ 必须扫：2026-09-29 之前它**不在集合里**，所以即使数据里躺着 6397 处西里尔 schwa，
+  // 本脚本也一声不响 —— 「负责的脚本没覆盖出问题的目录」和「没有脚本」是同一件事。
+  : [
+    ...listFiles('src'), ...listFiles('tests'), ...listFiles('scripts'), ...listFiles('docs'), ...listFiles('content'),
+  ]
 
 console.log(`[scan-mojibake] 扫描 ${files.length} 个文件`)
 const skipped = []

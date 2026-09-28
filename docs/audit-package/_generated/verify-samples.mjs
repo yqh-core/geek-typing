@@ -121,7 +121,9 @@ const sumWordsB = discovered.reduce((s, p) => s + data[p].wordsBytes, 0);
 const inlineWordsB = inlinePkgs.reduce((s, p) => s + data[p].wordsBytes, 0);
 const lazyWordsB = lazyPkgs.reduce((s, p) => s + data[p].wordsBytes, 0);
 
-check('10 个 manifest 合计字节', sumManifestB, 13391);
+// 注：manifest 字节随每次 content:build 追加一条 contentHistory 而增长，
+// 基线 2026-09-29 P1.6-E 第二批（U+0454→U+025B 修复）后同步刷新 —— words.json 字节不受 build 影响。
+check('10 个 manifest 合计字节', sumManifestB, 14503);
 check('全库 words.json 合计字节', sumWordsB, 1477598);
 check('inline Σ words.json 字节', inlineWordsB, 37043);
 check('lazy Σ words.json 字节', lazyWordsB, 1440555);
@@ -129,9 +131,9 @@ check('inline + lazy == 全库', inlineWordsB + lazyWordsB, sumWordsB);
 
 // 逐包体积快照（防止后续源数据变化而交付文件未同步）
 const EXPECTED_BYTES = {
-  'ai-core': [1323, 2324], cet4: [1300, 12353], cet6: [1285, 9840],
+  'ai-core': [1323, 2324], cet4: [1439, 12353], cet6: [1424, 9840],
   'cloud-native': [1321, 1591], frontend: [1304, 992], 'go-code': [1406, 4644],
-  ielts: [1337, 482461], kaoyan: [1347, 483016], toefl: [1331, 475078],
+  ielts: [1615, 482461], kaoyan: [1625, 483016], toefl: [1609, 475078],
   'ts-code': [1437, 5299],
 };
 for (const pkg of discovered) {

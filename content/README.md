@@ -189,7 +189,7 @@ lowercase 由 vocabulary 侧决定，code 词库大小写敏感）。
 
 | # | 规则 |
 |---|---|
-| 1 | 对象键按**白名单序**：`word → translation → phonetic → definition → partOfSpeech`；白名单外的未知键按 **UTF-16 字典序**（与 locale 无关）排在白名单键之后 —— 既不丢字段，也不因 JS 插入序漂移 |
+| 1 | 对象键按**白名单序**：`word → translation → phonetic → definition`；白名单外的未知键按 **UTF-16 字典序**（与 locale 无关）排在白名单键之后 —— 既不丢字段，也不因 JS 插入序漂移 |
 | 2 | 值为 `undefined` 的键**省略**；`null` **保留**（`"exam": null` 是有语义的取值） |
 | 3 | **数组绝不重排**（铁律 1）：只做「逐元素 canonicalize + 逗号拼接」，禁止排序 / 去重 / 过滤 |
 | 4 | 字符串用 `JSON.stringify` 标准转义，**Unicode 原样输出**（不转成 `\uXXXX`）；仅孤立代理项（lone surrogate）按 ES2019 well-formed 转义 |
@@ -226,7 +226,7 @@ canonicalize([{ word: 'z' }, { word: 'a' }]) === '[{"word":"z"},{"word":"a"}]'
 
 | 类型 | 特有字段 |
 |---|---|
-| Vocabulary | word / phonetic / definition / examples / partOfSpeech |
+| Vocabulary | word / phonetic / definition / examples |
 | Audio | audioUrl / duration / transcript / segments / speaker / difficulty |
 | Reading | title / body / paragraphs / questions / answers |
 | Topic | title / description / children |

@@ -3,105 +3,105 @@
     "dir": "desktop",
     "name": "home",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\home.png",
-    "textLen": 229,
+    "textLen": 224,
     "consoleErrors": "[]"
   },
   {
     "dir": "desktop",
     "name": "typing-classic",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\typing-classic.png",
-    "textLen": 376,
+    "textLen": 340,
     "consoleErrors": "[]"
   },
   {
     "dir": "desktop",
     "name": "memorize",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\memorize.png",
-    "textLen": 176,
+    "textLen": 178,
     "consoleErrors": "[]"
   },
   {
     "dir": "desktop",
     "name": "memorize-flipped",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\memorize-flipped.png",
-    "textLen": 205,
+    "textLen": 207,
     "consoleErrors": "[]"
   },
   {
     "dir": "desktop",
     "name": "review",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\review.png",
-    "textLen": 185,
+    "textLen": 187,
     "consoleErrors": "[]"
   },
   {
     "dir": "desktop",
     "name": "progress",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\progress.png",
-    "textLen": 245,
+    "textLen": 220,
     "consoleErrors": "[]"
   },
   {
     "dir": "desktop",
     "name": "bank-manager",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\bank-manager.png",
-    "textLen": 323,
+    "textLen": 318,
     "consoleErrors": "[]"
   },
   {
     "dir": "desktop",
     "name": "import-bank",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\import-bank.png",
-    "textLen": 366,
+    "textLen": 361,
     "consoleErrors": "[]"
   },
   {
     "dir": "desktop",
     "name": "settings",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\settings.png",
-    "textLen": 268,
+    "textLen": 263,
     "consoleErrors": "[]"
   },
   {
     "dir": "desktop",
     "name": "command-palette",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\command-palette.png",
-    "textLen": 585,
+    "textLen": 580,
     "consoleErrors": "[]"
   },
   {
     "dir": "desktop",
     "name": "stats-panel",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\stats-panel.png",
-    "textLen": 470,
+    "textLen": 357,
     "consoleErrors": "[]"
   },
   {
     "dir": "desktop",
     "name": "typing-spell",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\typing-spell.png",
-    "textLen": 379,
+    "textLen": 367,
     "consoleErrors": "[]"
   },
   {
     "dir": "desktop",
     "name": "typing-timed",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\typing-timed.png",
-    "textLen": 331,
+    "textLen": 334,
     "consoleErrors": "[]"
   },
   {
     "dir": "desktop",
     "name": "code-mode",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\desktop\\code-mode.png",
-    "textLen": 354,
+    "textLen": 351,
     "consoleErrors": "[]"
   },
   {
     "dir": "matrix",
     "name": "loading-bank-chunk",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\matrix\\loading-bank-chunk.png",
-    "textLen": 229,
+    "textLen": 224,
     "consoleErrors": "[]"
   },
   {
@@ -143,7 +143,7 @@
     "dir": "matrix",
     "name": "offline-typing",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\matrix\\offline-typing.png",
-    "textLen": 322,
+    "textLen": 314,
     "consoleErrors": "[]"
   },
   {
@@ -171,7 +171,7 @@
     "dir": "mobile",
     "name": "typing",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\mobile\\typing.png",
-    "textLen": 319,
+    "textLen": 331,
     "consoleErrors": "[]"
   },
   {
@@ -213,7 +213,7 @@
     "dir": "mobile",
     "name": "typing-android412",
     "file": "D:\\work\\geek-typing\\docs\\audit-package\\screenshots\\mobile\\typing-android412.png",
-    "textLen": 315,
+    "textLen": 326,
     "consoleErrors": "[]"
   }
 ]

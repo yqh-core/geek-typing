@@ -185,7 +185,7 @@ export function canonicalFile(value) { return canonicalize(value) + '\n' }
 
 | # | 规则 | 实现行 |
 |---|---|---|
-| N-1 | 白名单字段按固定顺序：`word → translation → phonetic → definition → partOfSpeech` | `:36`、`:42-47` |
+| N-1 | 白名单字段按固定顺序：`word → translation → phonetic → definition` | `:36`、`:42-47` |（**P1.6-E**：`partOfSpeech` 已从白名单移除 —— 全库 0 条数据、0 处读取；移除后 10 包 checksum 逐包不变）
 | N-2 | 未知字段按 code-unit 字典序排在白名单之后 | `:45`、`:39` |
 | N-3 | value 为 `undefined` 的键跳过 | `:43` |
 | N-4 | **数组绝不重排**（硬规矩） | `:57-58` |

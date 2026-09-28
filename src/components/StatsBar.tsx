@@ -9,7 +9,7 @@ interface StatProps {
 function Stat({ label, value, valueClass }: StatProps) {
   return (
     <div className="flex flex-col items-center gap-0.5">
-      <span className="text-[10px] uppercase tracking-widest opacity-60">{label}</span>
+      <span className="text-[10px] uppercase tracking-widest">{label}</span>
       <span className={`text-xl font-bold tabular-nums ${valueClass}`}>{value}</span>
     </div>
   )
