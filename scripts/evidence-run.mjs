@@ -146,10 +146,12 @@ const TASKS = {
     { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
   ],
   /**
-   * Wave 3 · Architecture（A-3 AST 门禁三阶段 + A-4 汇总门 + A-5 不变量 + §14 TODO 门）
+   * Wave 3 · Architecture（A-3 AST 门禁三阶段 + A-4 汇总门 + A-5 不变量 + §14 待办标记门）
    *
-   * 本轮新增三项证据：GATE-ARCHITECTURE（一键串行汇总门）、GATE-TODO（待办标记门）、
+   * 本轮新增三项证据：GATE-ARCHITECTURE（一键串行汇总门）、待办标记门（§14）、
    * TEST-BOUNDARY-AST（探针 6 例 5 红 1 放行 + src 违规数快照）。
+   * 注：§14 判注释节点里的标记词为 FAIL —— 所以这里不能把门禁名原样写进注释
+   * （字符串字面量放行，注释必判红），措辞须绕开标记词本身。
    * DUAL-RUN-BOUNDARY 在 Phase 3 后语义改为「探针 6 例 + 快照不变」的回归断言
    * （正则 oracle 已按计划删除，等价性证据留在 c9a4d50 的 git 历史里）。
    *
