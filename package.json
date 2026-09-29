@@ -37,6 +37,8 @@
     "gate:legacy-wordbank": "node scripts/gate-legacy-wordbank.mjs",
     "gate:learning-boundary": "node scripts/gate-learning-boundary.mjs",
     "gate:practice-engine": "node scripts/gate-practice-engine.mjs",
+    "gate:architecture": "node scripts/gate-architecture.mjs",
+    "gate:todo": "node scripts/gate-todo.mjs",
     "audit:a11y": "node scripts/audit-a11y-viewports.mjs",
     "release:gate": "node scripts/verify-release-gate.mjs"
   },
@@ -57,6 +59,7 @@
     "playwright-core": "^1.63.0",
     "postcss": "^8.5.28",
     "tailwindcss": "^3.4.17",
+    "ts-morph": "^28.0.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
   }
