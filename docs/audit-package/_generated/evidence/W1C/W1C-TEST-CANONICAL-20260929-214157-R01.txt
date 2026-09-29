@@ -1,0 +1,42 @@
+# RunId: W1C-TEST-CANONICAL-20260929-214157-R01
+# Command: node tests/canonical.mjs
+# Commit: 571fcb3be245c44d2b5840f830da8148447a6320
+# StartedAt: 2026-09-29T13:41:57.849Z
+# DurationMs: 2959
+# ExitCode: 0
+
+--- stdout+stderr ---
+== 1. NFC（é 组合字符等值） ==
+  ✅ é 单码元与 e+组合符 hash 相同（NFC） — 755e4df32d20 vs 755e4df32d20
+  ✅ canonical 串本身已 NFC
+  ✅ NFC 作用于键
+== 2. JCS 基础 ==
+  ✅ 键按 code unit 序排序（b,a → a,b）
+  ✅ 键序置换 hash 不变
+  ✅ 数组保序（不排序）
+  ✅ 嵌套对象键也排序
+  ✅ 数值序列化 = JSON 数字格式
+== 3. -0 与判红 ==
+  ✅ -0 → 0
+  ✅ -0 与 0 hash 相同
+  ✅ NaN → 判红
+  ✅ Infinity → 判红
+  ✅ -Infinity → 判红
+  ✅ BigInt → 判红
+  ✅ undefined → 判红
+  ✅ symbol → 判红
+  ✅ function → 判红
+  ✅ unsafe integer（2**53）→ 判红
+  ✅ safe integer 边界内（2**53-1）→ 通过
+  ✅ 判红抛的是 CanonicalizationError
+== 4. Date ==
+  ✅ Date → ISO 字符串
+  ✅ Date 与其 ISO 串 hash 相同
+== 5. hash 确定性 ==
+  ✅ 同值重复 hash 一致
+  ✅ canonicalEqual 真
+  ✅ canonicalEqual 假
+  ✅ hash 是 64 位 hex
+──────────────────────────────────────────────────────
+共 26 项，通过 26，失败 0
+──────────────────────────────────────────────────────

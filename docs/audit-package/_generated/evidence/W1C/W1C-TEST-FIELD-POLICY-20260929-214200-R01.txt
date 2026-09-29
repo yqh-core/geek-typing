@@ -1,0 +1,46 @@
+# RunId: W1C-TEST-FIELD-POLICY-20260929-214200-R01
+# Command: node tests/field-policy.mjs
+# Commit: 571fcb3be245c44d2b5840f830da8148447a6320
+# StartedAt: 2026-09-29T13:42:00.828Z
+# DurationMs: 1827
+# ExitCode: 0
+
+--- stdout+stderr ---
+== 步骤 1：no rule → FAIL ==
+  ✅ 未登记字段 → FAIL no-rule
+  ✅ 新增字段（target 有 source 无、无规则）→ FAIL
+== 步骤 2/3：exact ==
+  ✅ 缺省 comparator = exact-deep-equal（键序无关）→ PASS
+  ✅ 注册 comparator → PASS
+  ✅ 自定义 comparator（5<=3 假）→ FAIL mismatch
+  ✅ comparator 未注册 → FAIL transformer-missing
+== 步骤 4：TRANSFORM ==
+  ✅ transform 后 exact → PASS（via=transformed，value=变换后值）
+  ✅ transform 永不收敛 → FAIL transform-loop
+== 步骤 5：OPTIONAL_PRESERVE ==
+  ✅ source 缺失 target 在 → PASS optional-missing
+  ✅ source 在 target 缺失 → PASS optional-missing
+  ✅ 双侧存在但不等 → FAIL
+  ✅ 双侧缺失 → PASS
+== 步骤 6：DROP_ALLOWED ==
+  ✅ target 无此键（显式移除）→ PASS dropped
+  ✅ source 缺失 target 在（新增）→ FAIL
+  ✅ 双侧存在不等 → FAIL
+== 步骤 7：终端 FAIL 策略 ==
+  ✅ REQUIRED_PRESERVE 值变 → FAIL
+  ✅ REQUIRED_PRESERVE target 缺失 → FAIL
+  ✅ DROP_FORBIDDEN target 缺失 → FAIL
+  ✅ DROP_FORBIDDEN 双侧缺失 → PASS（无移除行为）
+== 步骤 8：transformer 缺失 ==
+  ✅ TRANSFORM_ALLOWED 但 transformer 未注册 → FAIL
+  ✅ TRANSFORM_ALLOWED 无 transformer 声明 → FAIL
+== decideFields 批量 ==
+  ✅ 混合策略全过 → ok=true — ["exact","dropped","transformed"]
+  ✅ 未登记字段 extra → ok=false（no-rule）
+== exactDeepEqual ==
+  ✅ deep equal：嵌套 + 数组
+  ✅ 不等：数组顺序
+  ✅ 不等：类型
+──────────────────────────────────────────────────────
+共 26 项，通过 26，失败 0
+──────────────────────────────────────────────────────

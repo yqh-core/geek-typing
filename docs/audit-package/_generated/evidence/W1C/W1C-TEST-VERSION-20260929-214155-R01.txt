@@ -1,0 +1,35 @@
+# RunId: W1C-TEST-VERSION-20260929-214155-R01
+# Command: node tests/version-contract.mjs
+# Commit: 571fcb3be245c44d2b5840f830da8148447a6320
+# StartedAt: 2026-09-29T13:41:55.904Z
+# DurationMs: 1925
+# ExitCode: 0
+
+--- stdout+stderr ---
+== 解析 ==
+  ✅ migration-1 → kind=migration num=1
+  ✅ schema-3 → kind=schema
+  ✅ format-2 → kind=format
+  ✅ license-policy-1 → kind=license-policy（在 content 前匹配，不被吞）
+  ✅ content-cet4-v2 → kind=content id=cet4-v2
+  ✅ 裸垃圾串 → null
+  ✅ migration-x（非数字尾）→ null
+  ✅ migration-（空尾）→ null
+  ✅ content- 前缀任意 id 均解析
+== 比较 ==
+  ✅ migration-1 < migration-2
+  ✅ migration-2 > migration-1
+  ✅ migration-2 === migration-2
+  ✅ 跨 kind 比较 → null（不可比）
+  ✅ content（非数值）比较 → null
+  ✅ schema-10 > schema-9（数值序而非字典序）
+== 单调性 ==
+  ✅ 递增注册表 → null（无违例）
+  ✅ 乱序混入同 kind 递减 → 报违例
+  ✅ 相等序号也算违例（严格递增）
+  ✅ 无法解析的版本 → 报违例
+  ✅ content 版本（非数值）不参与单调断言
+  ✅ 项目注册表示例 → 无违例
+──────────────────────────────────────────────────────
+共 21 项，通过 21，失败 0
+──────────────────────────────────────────────────────

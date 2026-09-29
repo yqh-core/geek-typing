@@ -1,0 +1,37 @@
+# RunId: W1C-TEST-R5-20260929-214202-R01
+# Command: node tests/r5.mjs
+# Commit: 571fcb3be245c44d2b5840f830da8148447a6320
+# StartedAt: 2026-09-29T13:42:02.675Z
+# DurationMs: 1851
+# ExitCode: 0
+
+--- stdout+stderr ---
+== setEqual ==
+  ✅ 同集不同序 → true
+  ✅ size 相同元素不同 → false
+  ✅ size 不同 → false
+  ✅ 重复元素不影响集合语义（["a","a","a"] 的集合就是 {"a"}）
+== 五零 happy path ==
+  ✅ R5 ok=true
+  ✅ 五零全 0 — {"duplicateCount":0,"danglingReferenceCount":0,"brokenRequiredRelationCount":0,"invalidEnumCount":0,"unexpectedLossCount":0}
+  ✅ identitySetEqual=true
+  ✅ identityDiff 空
+== 违规判红 ==
+  ✅ A,B,C → A,B,D：identitySetEqual=false（size 相等也抓）
+  ✅ 同例：unexpectedLoss=1（C 丢）+ gained=D
+  ✅ 同例：ok=false
+  ✅ duplicateCount=1
+  ✅ danglingReferenceCount=1
+  ✅ brokenRequiredRelationCount=1（null 关系）
+  ✅ required relation 字段缺失也判红
+  ✅ invalidEnumCount=1（status=frozen 不在合法集）
+  ✅ unexpectedLossCount=1
+== allowedLoss ==
+  ✅ 显式豁免的丢失不计 unexpectedLoss
+  ✅ 豁免后 identity set 相等
+  ✅ 豁免名单外的丢失仍判红
+== 顺序扰动 ==
+  ✅ 迁移后顺序变化不判红（集合语义）
+──────────────────────────────────────────────────────
+共 21 项，通过 21，失败 0
+──────────────────────────────────────────────────────

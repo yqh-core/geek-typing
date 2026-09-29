@@ -1,0 +1,143 @@
+{
+  "wave": "W1C",
+  "commit": "571fcb3be245c44d2b5840f830da8148447a6320",
+  "generatedAt": "2026-09-29T13:44:46.071Z",
+  "summary": {
+    "total": 10,
+    "pass": 10,
+    "fail": 0
+  },
+  "note": "Status machine-generated from exit code; PASS is not manually writable (P1.7-PLAN v2.3.2 §15/§19-9).",
+  "entries": [
+    {
+      "task": "TSC",
+      "command": "npx tsc -b --noEmit",
+      "owner": "agent",
+      "runId": "W1C-TSC-20260929-214132-R01",
+      "exitCode": 0,
+      "commit": "571fcb3be245c44d2b5840f830da8148447a6320",
+      "timestamp": "2026-09-29T13:41:32.039Z",
+      "durationMs": 6070,
+      "artifactSha256": "127e723fa9f88b898ab3e4114d02a35e6fec519b7eabf6b48e48581fc21cd6c9",
+      "evidence": "docs/audit-package/_generated/evidence/W1C/W1C-TSC-20260929-214132-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "LINT",
+      "command": "npx oxlint src/",
+      "owner": "agent",
+      "runId": "W1C-LINT-20260929-214138-R01",
+      "exitCode": 0,
+      "commit": "571fcb3be245c44d2b5840f830da8148447a6320",
+      "timestamp": "2026-09-29T13:41:38.130Z",
+      "durationMs": 2412,
+      "artifactSha256": "381420eba005f5ef645d1e539738bda4beebf84b9e5c67b2e2406e4211bcca48",
+      "evidence": "docs/audit-package/_generated/evidence/W1C/W1C-LINT-20260929-214138-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "GATE-LEARNING-BOUNDARY",
+      "command": "node scripts/gate-learning-boundary.mjs",
+      "owner": "agent",
+      "runId": "W1C-GATE-LEARNING-BOUNDARY-20260929-214140-R01",
+      "exitCode": 0,
+      "commit": "571fcb3be245c44d2b5840f830da8148447a6320",
+      "timestamp": "2026-09-29T13:41:40.562Z",
+      "durationMs": 460,
+      "artifactSha256": "469a1fa5d92689fafffef13fd435397e82ece11d6b074fc346c95cfeb9748b6f",
+      "evidence": "docs/audit-package/_generated/evidence/W1C/W1C-GATE-LEARNING-BOUNDARY-20260929-214140-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "BUILD",
+      "command": "npm run build",
+      "owner": "agent",
+      "runId": "W1C-BUILD-20260929-214141-R01",
+      "exitCode": 0,
+      "commit": "571fcb3be245c44d2b5840f830da8148447a6320",
+      "timestamp": "2026-09-29T13:41:41.042Z",
+      "durationMs": 12767,
+      "artifactSha256": "41fd8d349f9c48db6b366e7448670a7093c22c9971a0a349c45b243c6e27f80c",
+      "evidence": "docs/audit-package/_generated/evidence/W1C/W1C-BUILD-20260929-214141-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "TEST-RECOVERY",
+      "command": "node tests/recovery.mjs",
+      "owner": "agent",
+      "runId": "W1C-TEST-RECOVERY-20260929-214153-R01",
+      "exitCode": 0,
+      "commit": "571fcb3be245c44d2b5840f830da8148447a6320",
+      "timestamp": "2026-09-29T13:41:53.829Z",
+      "durationMs": 2054,
+      "artifactSha256": "4da9ad5c38bc6bdf9138962d440579cbac03142baab16236309bec73e104fd7f",
+      "evidence": "docs/audit-package/_generated/evidence/W1C/W1C-TEST-RECOVERY-20260929-214153-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "TEST-VERSION",
+      "command": "node tests/version-contract.mjs",
+      "owner": "agent",
+      "runId": "W1C-TEST-VERSION-20260929-214155-R01",
+      "exitCode": 0,
+      "commit": "571fcb3be245c44d2b5840f830da8148447a6320",
+      "timestamp": "2026-09-29T13:41:55.904Z",
+      "durationMs": 1925,
+      "artifactSha256": "b741e06dbc8a02813f05d1f9e1f18760d323969250461f1b7032bca97c8fa29c",
+      "evidence": "docs/audit-package/_generated/evidence/W1C/W1C-TEST-VERSION-20260929-214155-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "TEST-CANONICAL",
+      "command": "node tests/canonical.mjs",
+      "owner": "agent",
+      "runId": "W1C-TEST-CANONICAL-20260929-214157-R01",
+      "exitCode": 0,
+      "commit": "571fcb3be245c44d2b5840f830da8148447a6320",
+      "timestamp": "2026-09-29T13:41:57.849Z",
+      "durationMs": 2959,
+      "artifactSha256": "0c73423d3b260ecdd137477f09d9c27d5a63bfd6dc3d305aead9493d10871858",
+      "evidence": "docs/audit-package/_generated/evidence/W1C/W1C-TEST-CANONICAL-20260929-214157-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "TEST-FIELD-POLICY",
+      "command": "node tests/field-policy.mjs",
+      "owner": "agent",
+      "runId": "W1C-TEST-FIELD-POLICY-20260929-214200-R01",
+      "exitCode": 0,
+      "commit": "571fcb3be245c44d2b5840f830da8148447a6320",
+      "timestamp": "2026-09-29T13:42:00.828Z",
+      "durationMs": 1827,
+      "artifactSha256": "5bc3258a8734fdd88e460501099f1318e22dc636058d11a9f897b97329b0c4c1",
+      "evidence": "docs/audit-package/_generated/evidence/W1C/W1C-TEST-FIELD-POLICY-20260929-214200-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "TEST-R5",
+      "command": "node tests/r5.mjs",
+      "owner": "agent",
+      "runId": "W1C-TEST-R5-20260929-214202-R01",
+      "exitCode": 0,
+      "commit": "571fcb3be245c44d2b5840f830da8148447a6320",
+      "timestamp": "2026-09-29T13:42:02.675Z",
+      "durationMs": 1851,
+      "artifactSha256": "5c8450697c8e66d26584af434d81a09a71f41f39adf50eea518315f20c7acc61",
+      "evidence": "docs/audit-package/_generated/evidence/W1C/W1C-TEST-R5-20260929-214202-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "TEST-E2E",
+      "command": "node tests/e2e.mjs",
+      "owner": "agent",
+      "runId": "W1C-TEST-E2E-20260929-214204-R01",
+      "exitCode": 0,
+      "commit": "571fcb3be245c44d2b5840f830da8148447a6320",
+      "timestamp": "2026-09-29T13:42:04.546Z",
+      "durationMs": 161504,
+      "artifactSha256": "d80af97eb75c4eaae7fff59e1267fa67fc21a13894da32be680e5861ceb2bc09",
+      "evidence": "docs/audit-package/_generated/evidence/W1C/W1C-TEST-E2E-20260929-214204-R01.txt",
+      "status": "PASS"
+    }
+  ]
+}

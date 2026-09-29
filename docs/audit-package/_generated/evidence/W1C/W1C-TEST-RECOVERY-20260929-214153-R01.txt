@@ -1,0 +1,39 @@
+# RunId: W1C-TEST-RECOVERY-20260929-214153-R01
+# Command: node tests/recovery.mjs
+# Commit: 571fcb3be245c44d2b5840f830da8148447a6320
+# StartedAt: 2026-09-29T13:41:53.829Z
+# DurationMs: 2054
+# ExitCode: 0
+
+--- stdout+stderr ---
+== 1. 枚举驱动穷举 ==
+  报告：phases=5 oldStates=3 newStates=4 totalCases=60 undefined=0
+  ✅ 穷举组合数 = 5×3×4 = 60 — totalCases=60
+  ✅ 全部组合决策 total（undefined=0） — undefined=0
+  ✅ 决策来源分布：corrupt=30 / core=8 / manual=22 — {"corrupt-terminal":30,"core-rule":8,"manual-fallback":22}
+  ✅ CORRUPT_STATE = 30（5×(1×4+2×1)）
+  ✅ MANUAL_REVIEW = 22（兜底永不静默）
+  ✅ 显式规则表恰 8 核心行 — len=8
+== 2. 8 核心行 ==
+  ✅ pending+complete+missing → RUN — got=RUN/core-rule
+  ✅ pending+missing+missing → COMPLETE — got=COMPLETE/core-rule
+  ✅ running+complete+missing → RESUME — got=RESUME/core-rule
+  ✅ verified+complete+missing → COMMIT — got=COMMIT/core-rule
+  ✅ committed+complete+complete → CLEANUP_OLD — got=CLEANUP_OLD/core-rule
+  ✅ committed+missing+complete → COMPLETE — got=COMPLETE/core-rule
+  ✅ failed+complete+missing → RERUN — got=RERUN/core-rule
+  ✅ failed+missing+complete → COMPLETE — got=COMPLETE/core-rule
+== 3. corrupt 终端 ==
+  ✅ pending+complete+corrupt → CORRUPT_STATE
+  ✅ failed+corrupt+missing → CORRUPT_STATE（尽管 failed+complete+missing 是 RERUN 核心行）
+  ✅ committed+complete+corrupt → CORRUPT_STATE（压过 CLEANUP_OLD 形）
+  ✅ corrupt 决策 via=corrupt-terminal
+  ✅ corrupt 组合恰 30：phase×(old corrupt 全 new + new corrupt 且 old 非 corrupt)
+== 4. MANUAL_REVIEW 兜底 ==
+  ✅ running+complete+partial → MANUAL_REVIEW（protocol 违常态）
+  ✅ pending+missing+partial → MANUAL_REVIEW
+  ✅ verified+missing+complete → MANUAL_REVIEW（旧数据丢了但新数据在，异常）
+  ✅ 所有 partial 组合（non-corrupt）= MANUAL_REVIEW
+──────────────────────────────────────────────────────
+共 23 项，通过 23，失败 0
+──────────────────────────────────────────────────────
