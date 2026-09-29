@@ -62,6 +62,19 @@ const TASKS = {
     { task: 'TEST-FENCED-WRITE-BROWSER', command: 'node tests/fenced-write-browser.mjs' },
     { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
   ],
+  /** Wave 1-C · Recovery / Version / Canonical / FieldPolicy / R5 */
+  W1C: [
+    { task: 'TSC', command: 'npx tsc -b --noEmit' },
+    { task: 'LINT', command: 'npx oxlint src/' },
+    { task: 'GATE-LEARNING-BOUNDARY', command: 'node scripts/gate-learning-boundary.mjs' },
+    { task: 'BUILD', command: 'npm run build' },
+    { task: 'TEST-RECOVERY', command: 'node tests/recovery.mjs' },
+    { task: 'TEST-VERSION', command: 'node tests/version-contract.mjs' },
+    { task: 'TEST-CANONICAL', command: 'node tests/canonical.mjs' },
+    { task: 'TEST-FIELD-POLICY', command: 'node tests/field-policy.mjs' },
+    { task: 'TEST-R5', command: 'node tests/r5.mjs' },
+    { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
+  ],
 }[WAVE]
 
 if (!TASKS) { console.error(`unknown wave: ${WAVE}`); process.exit(2) }
