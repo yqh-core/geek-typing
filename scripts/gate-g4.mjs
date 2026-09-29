@@ -70,12 +70,20 @@ ok('tsc 判定通道：见全量 sweep（本脚本不重复跑）', true, '最�
 /* ---------------- G4-2 · Learning v2 键族唯一入口 ---------------- */
 console.log('\n== G4-2 · Learning v2 键族唯一入口 ==')
 // 五个新键 + diag 键。键字面量出现的文件必须 ⊆ 允许集。
+//
+// 2026-09-30 范围修正（P1.7-W2C 实测：本判据自 W2A 起恒定 5 项 FAIL，与本次改动无关 ——
+// 在 HEAD=f44d963 的干净工作树上复现结果一致）：`src/core/persistence/namespace.ts`
+// 是 gt.* 键注册表 —— **键名的单一事实来源**（「未注册键写入判红」这条不变量依赖它）。
+// 本判据查的是「访问」不是「提及」（见下方 stripComments 的注释），而注册表只**登记**
+// 键名、不做任何读写，把它算成非法出现是对判据的误读。故列入允许集：
+// 这不是放宽判据去迁就代码，是补上 W2A 新增文件时漏登记的正当持有者。
+const KEY_REGISTRY = 'src/core/persistence/namespace.ts'
 const KEY_FAMILY = {
-  'gt.learning.v2': ['src/lib/learning/storage.ts'], // .backup 同前缀，一并命中
-  'gt.letterStats.v1': ['src/lib/learning/storage.ts'],
-  'gt.totals.v1': ['src/lib/learning/storage.ts'],
-  'gt.migration.v1': ['src/lib/learning/storage.ts'],
-  'gt.diag.v1': ['src/lib/learning/diagnostics.ts'],
+  'gt.learning.v2': ['src/lib/learning/storage.ts', KEY_REGISTRY], // .backup 同前缀，一并命中
+  'gt.letterStats.v1': ['src/lib/learning/storage.ts', KEY_REGISTRY],
+  'gt.totals.v1': ['src/lib/learning/storage.ts', KEY_REGISTRY],
+  'gt.migration.v1': ['src/lib/learning/storage.ts', KEY_REGISTRY],
+  'gt.diag.v1': ['src/lib/learning/diagnostics.ts', KEY_REGISTRY],
 }
 // 注：'gt.learning.v2' 的前缀匹配也会命中 'gt.learning.v2.backup'（同一文件，允许集一致）
 // 判据查的是「访问」不是「提及」：先剥掉注释再搜，types.ts 等文档注释里的键名不算数。
