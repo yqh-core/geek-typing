@@ -1,0 +1,71 @@
+# RunId: W1D-VERIFYCHAIN-20260929-231727-R01
+# Command: node scripts/evidence-verify.mjs --wave=W1D
+# Commit: 4d8bcbacd6425b4f469e670de2455d60c5d69639
+# StartedAt: 2026-09-29T23:17:28+08:00
+== Evidence Chain Verify · W1D ==
+matrix commit : 4d8bcbacd6425b4f469e670de2455d60c5d69639
+current HEAD  : 4d8bcbacd6425b4f469e670de2455d60c5d69639
+
+  ✅ TSC: RunId 格式合法 — W1D-TSC-20260929-231350-R01
+  ✅ TSC: RunId 与矩阵文件名一致 — W1D-TSC-20260929-231350-R01.txt
+  ✅ TSC: Evidence 文件存在
+  ✅ TSC: ArtifactHash 全长一致 — 568c2a0582bc
+  ✅ TSC: 头部 RunId 一致 — W1D-TSC-20260929-231350-R01
+  ✅ TSC: 头部 Commit 一致 — 4d8bcbacd6425b4f469e670de2455d60c5d69639
+  ✅ TSC: 头部 ExitCode 一致 — 0
+  ✅ TSC: Status 与 ExitCode 一致（PASS ⇔ 0） — exit=0 status=PASS
+  ✅ LINT: RunId 格式合法 — W1D-LINT-20260929-231357-R01
+  ✅ LINT: RunId 与矩阵文件名一致 — W1D-LINT-20260929-231357-R01.txt
+  ✅ LINT: Evidence 文件存在
+  ✅ LINT: ArtifactHash 全长一致 — d1d19a2c0ecf
+  ✅ LINT: 头部 RunId 一致 — W1D-LINT-20260929-231357-R01
+  ✅ LINT: 头部 Commit 一致 — 4d8bcbacd6425b4f469e670de2455d60c5d69639
+  ✅ LINT: 头部 ExitCode 一致 — 0
+  ✅ LINT: Status 与 ExitCode 一致（PASS ⇔ 0） — exit=0 status=PASS
+  ✅ GATE-LEARNING-BOUNDARY: RunId 格式合法 — W1D-GATE-LEARNING-BOUNDARY-20260929-231400-R01
+  ✅ GATE-LEARNING-BOUNDARY: RunId 与矩阵文件名一致 — W1D-GATE-LEARNING-BOUNDARY-20260929-231400-R01.txt
+  ✅ GATE-LEARNING-BOUNDARY: Evidence 文件存在
+  ✅ GATE-LEARNING-BOUNDARY: ArtifactHash 全长一致 — 8d5d9fc14387
+  ✅ GATE-LEARNING-BOUNDARY: 头部 RunId 一致 — W1D-GATE-LEARNING-BOUNDARY-20260929-231400-R01
+  ✅ GATE-LEARNING-BOUNDARY: 头部 Commit 一致 — 4d8bcbacd6425b4f469e670de2455d60c5d69639
+  ✅ GATE-LEARNING-BOUNDARY: 头部 ExitCode 一致 — 0
+  ✅ GATE-LEARNING-BOUNDARY: Status 与 ExitCode 一致（PASS ⇔ 0） — exit=0 status=PASS
+  ✅ BUILD: RunId 格式合法 — W1D-BUILD-20260929-231400-R01
+  ✅ BUILD: RunId 与矩阵文件名一致 — W1D-BUILD-20260929-231400-R01.txt
+  ✅ BUILD: Evidence 文件存在
+  ✅ BUILD: ArtifactHash 全长一致 — addca9edb3e3
+  ✅ BUILD: 头部 RunId 一致 — W1D-BUILD-20260929-231400-R01
+  ✅ BUILD: 头部 Commit 一致 — 4d8bcbacd6425b4f469e670de2455d60c5d69639
+  ✅ BUILD: 头部 ExitCode 一致 — 0
+  ✅ BUILD: Status 与 ExitCode 一致（PASS ⇔ 0） — exit=0 status=PASS
+  ✅ TEST-ORCHESTRATOR: RunId 格式合法 — W1D-TEST-ORCHESTRATOR-20260929-231414-R01
+  ✅ TEST-ORCHESTRATOR: RunId 与矩阵文件名一致 — W1D-TEST-ORCHESTRATOR-20260929-231414-R01.txt
+  ✅ TEST-ORCHESTRATOR: Evidence 文件存在
+  ✅ TEST-ORCHESTRATOR: ArtifactHash 全长一致 — dfa1a131def8
+  ✅ TEST-ORCHESTRATOR: 头部 RunId 一致 — W1D-TEST-ORCHESTRATOR-20260929-231414-R01
+  ✅ TEST-ORCHESTRATOR: 头部 Commit 一致 — 4d8bcbacd6425b4f469e670de2455d60c5d69639
+  ✅ TEST-ORCHESTRATOR: 头部 ExitCode 一致 — 0
+  ✅ TEST-ORCHESTRATOR: Status 与 ExitCode 一致（PASS ⇔ 0） — exit=0 status=PASS
+  ✅ DRYRUN-REAL: RunId 格式合法 — W1D-DRYRUN-REAL-20260929-231419-R01
+  ✅ DRYRUN-REAL: RunId 与矩阵文件名一致 — W1D-DRYRUN-REAL-20260929-231419-R01.txt
+  ✅ DRYRUN-REAL: Evidence 文件存在
+  ✅ DRYRUN-REAL: ArtifactHash 全长一致 — 3eb95104f785
+  ✅ DRYRUN-REAL: 头部 RunId 一致 — W1D-DRYRUN-REAL-20260929-231419-R01
+  ✅ DRYRUN-REAL: 头部 Commit 一致 — 4d8bcbacd6425b4f469e670de2455d60c5d69639
+  ✅ DRYRUN-REAL: 头部 ExitCode 一致 — 0
+  ✅ DRYRUN-REAL: Status 与 ExitCode 一致（PASS ⇔ 0） — exit=0 status=PASS
+  ✅ TEST-E2E: RunId 格式合法 — W1D-TEST-E2E-20260929-231423-R01
+  ✅ TEST-E2E: RunId 与矩阵文件名一致 — W1D-TEST-E2E-20260929-231423-R01.txt
+  ✅ TEST-E2E: Evidence 文件存在
+  ✅ TEST-E2E: ArtifactHash 全长一致 — 3fd53e66b8d6
+  ✅ TEST-E2E: 头部 RunId 一致 — W1D-TEST-E2E-20260929-231423-R01
+  ✅ TEST-E2E: 头部 Commit 一致 — 4d8bcbacd6425b4f469e670de2455d60c5d69639
+  ✅ TEST-E2E: 头部 ExitCode 一致 — 0
+  ✅ TEST-E2E: Status 与 ExitCode 一致（PASS ⇔ 0） — exit=0 status=PASS
+  ✅ 无 orphan 产物（或全部可解释为历史失败轮） — 无
+──────────────────────────────────────────────────────
+Evidence Chain: CLOSED  （checks 57/57）
+被测基线语义：matrix commit = 4d8bcbacd6425b4f469e670de2455d60c5d69639；current HEAD = 4d8bcbacd6425b4f469e670de2455d60c5d69639
+若 matrix commit ≠ HEAD：证明的是「matrix commit 时代的代码树」（W1A 为 fa63d17 + 未提交改动 = 315e92a 内容），
+自 Wave 1-B 起协议改为「先提交实现、后跑证据」，被测树与提交一一对应。
+──────────────────────────────────────────────────────

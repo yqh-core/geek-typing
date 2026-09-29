@@ -1,0 +1,49 @@
+# RunId: W1D-TEST-ORCHESTRATOR-20260929-231414-R01
+# Command: node tests/migration-orchestrator.mjs
+# Commit: 4d8bcbacd6425b4f469e670de2455d60c5d69639
+# StartedAt: 2026-09-29T15:14:14.112Z
+# DurationMs: 5012
+# ExitCode: 0
+
+--- stdout+stderr ---
+== 1. RUN 全流水线 ==
+  ✅ 报告 committed=true
+  ✅ 恢复决策 = RUN（pending+complete+missing）
+  ✅ 新键 3 条落 localStorage
+  ✅ REMOVE OLD：旧键已移除
+  ✅ journal phase=committed
+  ✅ 锁已释放（墓碑：owner 空、token 保留）
+  ✅ 重复运行 → COMPLETE（committed=true）
+== 2. R5 违规路径 ==
+  ✅ R5 违规 → aborted=true
+  ✅ 失败原因 = R5 违规
+  ✅ r5 结果随报告返回：identitySetEqual=false
+  ✅ 旧 localStorage 完整（切换前零写入）
+  ✅ journal phase=failed
+  ✅ RERUN（failed+complete+missing）→ committed
+  ✅ RERUN 后新键完整
+== 3. corrupt 终止 ==
+  ✅ CORRUPT_STATE → aborted
+  ✅ 旧数据未被触碰
+  ✅ journal 未建立（终端决策不写 journal）
+== 4. kill-after-stage → RESUME ==
+  ✅ 恢复决策 = RESUME（running+complete+missing）
+  ✅ RESUME 续走 → committed
+  ✅ 新键完整 + 旧键移除
+  ✅ journal phase=committed
+== 5. kill-after-marker → COMMIT 重放 ==
+  ✅ setup：marker 已授予且 localStorage 未动
+  ✅ 恢复决策 = COMMIT（verified+complete+missing）
+  ✅ marker 重放 → committed — marker 重放（W1B committing 崩溃恢复）
+  ✅ 重放后新键完整 + 旧键移除
+  ✅ journal phase=committed
+== 6. lock-held ==
+  ✅ 锁被他人持有 → aborted lock-held
+  ✅ 旧数据未动
+== 7. CLEANUP_OLD ==
+  ✅ 恢复决策 = CLEANUP_OLD（committed+complete+complete）
+  ✅ REMOVE OLD 重放完成
+  ✅ committed=true（收口）
+──────────────────────────────────────────────────────
+共 31 项，通过 31，失败 0
+──────────────────────────────────────────────────────

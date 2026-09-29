@@ -1,0 +1,8 @@
+# RunId: W1D-TSC-20260929-231350-R01
+# Command: npx tsc -b --noEmit
+# Commit: 4d8bcbacd6425b4f469e670de2455d60c5d69639
+# StartedAt: 2026-09-29T15:13:50.815Z
+# DurationMs: 6466
+# ExitCode: 0
+
+--- stdout+stderr ---

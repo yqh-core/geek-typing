@@ -1,0 +1,104 @@
+{
+  "wave": "W1D",
+  "commit": "4d8bcbacd6425b4f469e670de2455d60c5d69639",
+  "generatedAt": "2026-09-29T15:17:08.459Z",
+  "summary": {
+    "total": 7,
+    "pass": 7,
+    "fail": 0
+  },
+  "note": "Status machine-generated from exit code; PASS is not manually writable (P1.7-PLAN v2.3.2 §15/§19-9).",
+  "entries": [
+    {
+      "task": "TSC",
+      "command": "npx tsc -b --noEmit",
+      "owner": "agent",
+      "runId": "W1D-TSC-20260929-231350-R01",
+      "exitCode": 0,
+      "commit": "4d8bcbacd6425b4f469e670de2455d60c5d69639",
+      "timestamp": "2026-09-29T15:13:50.815Z",
+      "durationMs": 6466,
+      "artifactSha256": "568c2a0582bce4706971a509af2ab19750d30343353b896ba3f7abbb0643b107",
+      "evidence": "docs/audit-package/_generated/evidence/W1D/W1D-TSC-20260929-231350-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "LINT",
+      "command": "npx oxlint src/",
+      "owner": "agent",
+      "runId": "W1D-LINT-20260929-231357-R01",
+      "exitCode": 0,
+      "commit": "4d8bcbacd6425b4f469e670de2455d60c5d69639",
+      "timestamp": "2026-09-29T15:13:57.302Z",
+      "durationMs": 2707,
+      "artifactSha256": "d1d19a2c0ecf405519c4227808dc25eecde9f40748ac5cad5ec4440797243b9c",
+      "evidence": "docs/audit-package/_generated/evidence/W1D/W1D-LINT-20260929-231357-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "GATE-LEARNING-BOUNDARY",
+      "command": "node scripts/gate-learning-boundary.mjs",
+      "owner": "agent",
+      "runId": "W1D-GATE-LEARNING-BOUNDARY-20260929-231400-R01",
+      "exitCode": 0,
+      "commit": "4d8bcbacd6425b4f469e670de2455d60c5d69639",
+      "timestamp": "2026-09-29T15:14:00.028Z",
+      "durationMs": 510,
+      "artifactSha256": "8d5d9fc14387099d3b7e2cc0a69e654bb16212507f696512592b610495a7e292",
+      "evidence": "docs/audit-package/_generated/evidence/W1D/W1D-GATE-LEARNING-BOUNDARY-20260929-231400-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "BUILD",
+      "command": "npm run build",
+      "owner": "agent",
+      "runId": "W1D-BUILD-20260929-231400-R01",
+      "exitCode": 0,
+      "commit": "4d8bcbacd6425b4f469e670de2455d60c5d69639",
+      "timestamp": "2026-09-29T15:14:00.558Z",
+      "durationMs": 13534,
+      "artifactSha256": "addca9edb3e358ef19384c1424d8918ebf1edcc12a046b7669ca979050827754",
+      "evidence": "docs/audit-package/_generated/evidence/W1D/W1D-BUILD-20260929-231400-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "TEST-ORCHESTRATOR",
+      "command": "node tests/migration-orchestrator.mjs",
+      "owner": "agent",
+      "runId": "W1D-TEST-ORCHESTRATOR-20260929-231414-R01",
+      "exitCode": 0,
+      "commit": "4d8bcbacd6425b4f469e670de2455d60c5d69639",
+      "timestamp": "2026-09-29T15:14:14.112Z",
+      "durationMs": 5012,
+      "artifactSha256": "dfa1a131def87c7d776f0b46c33a1719d3bc8a5f3c797f803507de9d0bff4d08",
+      "evidence": "docs/audit-package/_generated/evidence/W1D/W1D-TEST-ORCHESTRATOR-20260929-231414-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "DRYRUN-REAL",
+      "command": "node scripts/migration-dryrun-w1.mjs --user-store=_user-snapshot/real-user-localStorage.json",
+      "owner": "agent",
+      "runId": "W1D-DRYRUN-REAL-20260929-231419-R01",
+      "exitCode": 0,
+      "commit": "4d8bcbacd6425b4f469e670de2455d60c5d69639",
+      "timestamp": "2026-09-29T15:14:19.144Z",
+      "durationMs": 4519,
+      "artifactSha256": "3eb95104f785b603e2b4f2aaf86b55201cf9b8595a9a9a3d0cd310038b86fa7b",
+      "evidence": "docs/audit-package/_generated/evidence/W1D/W1D-DRYRUN-REAL-20260929-231419-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "TEST-E2E",
+      "command": "node tests/e2e.mjs",
+      "owner": "agent",
+      "runId": "W1D-TEST-E2E-20260929-231423-R01",
+      "exitCode": 0,
+      "commit": "4d8bcbacd6425b4f469e670de2455d60c5d69639",
+      "timestamp": "2026-09-29T15:14:23.683Z",
+      "durationMs": 164756,
+      "artifactSha256": "3fd53e66b8d6da7bf59ed234742b59b60d4786c6cbfea21e6ebeb9655681603b",
+      "evidence": "docs/audit-package/_generated/evidence/W1D/W1D-TEST-E2E-20260929-231423-R01.txt",
+      "status": "PASS"
+    }
+  ]
+}
