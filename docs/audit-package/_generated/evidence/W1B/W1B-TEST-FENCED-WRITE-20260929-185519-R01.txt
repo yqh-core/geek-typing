@@ -1,0 +1,114 @@
+# RunId: W1B-TEST-FENCED-WRITE-20260929-185519-R01
+# Command: node tests/fenced-write.mjs
+# Commit: 6982aa3c36da0ab44df6761a9e9e567d5336a08a
+# StartedAt: 2026-09-29T10:55:19.177Z
+# DurationMs: 1987
+# ExitCode: 0
+
+--- stdout+stderr ---
+== 1. checkWrite 纯决策函数 ==
+  ✅ 无锁 → no-lock
+  ✅ owner 不符 → not-owner
+  ✅ token 不符（旧 token）→ stale-token
+  ✅ token 超前（伪造）→ stale-token
+  ✅ leaseUntil < now → expired
+  ✅ leaseUntil === now → expired（边界含等号，与 §3 一致）
+  ✅ owner+token+未过期 → ok
+  ✅ 恰好未过期（leaseUntil = now+1）→ ok
+== 2. decideKillRecovery total（穷举相位枚举） ==
+  ✅ decideKillRecovery(idle) = RERUN — got=RERUN
+  ✅ decideKillRecovery(staged) = RESUME — got=RESUME
+  ✅ decideKillRecovery(verified) = RESUME — got=RESUME
+  ✅ decideKillRecovery(committing) = REDO_SWITCH — got=REDO_SWITCH
+  ✅ decideKillRecovery(committed) = NOOP — got=NOOP
+  ✅ 穷举 5 相位 → undefined=0（total） — phases=5 undefined=0
+== 3. guard.stage：fencing ==
+  ✅ 合法 owner+token staging → ok
+  ✅ staging 落库（编码后解码 = 原值）
+  ✅ phase → staged
+  ✅ 旧 token（4 < 5）staging → FAIL stale-token
+  ✅ 拒绝后 staging 无新增（gt.evil 未落库）
+  ✅ 拒绝后 phase 不变（仍 staged）
+  ✅ 非 owner staging → FAIL not-owner
+  ✅ 伪造超前 token staging → FAIL stale-token
+== 4. 过期 owner 全链 FAIL ==
+  ✅ 过期前 markVerified → ok
+  ✅ 过期后 staging → FAIL expired
+  ✅ 过期后 markVerified → FAIL expired
+  ✅ 过期后 requestCommit → FAIL expired
+  ✅ 全部拒绝后 phase 不变（仍 verified）
+  ✅ 全部拒绝后 marker 不存在
+== 5. requestCommit 四项确认 ==
+  ✅ ① token 再确认 + ② lease 有效 → 授予 ok
+  ✅ marker.entries 完整（2 条，来自 staging）
+  ✅ ③ renew 同事务：leaseUntil = now + leaseMs（覆盖切换窗口）
+  ✅ marker 持有授予时身份
+  ✅ phase → committing
+  ✅ 旧 token commit 请求 → FAIL stale-token
+  ✅ 拒绝后无 marker
+  ✅ 拒绝后 phase 不变（仍 staged）
+== 6. applySwitch 同步切换 ==
+  ✅ 行为证明：返回时全部条目已生效（同步段）
+  ✅ 结构证明：applySwitch 非 AsyncFunction
+  ✅ 结构证明：源码无 await
+  ✅ 幂等：整表重放结果不变
+  ✅ REMOVE OLD 生效（旧键已移除）
+  ✅ 重放再次清除复活旧键
+== 7. finalize / redoSwitch / reset ==
+  ✅ 非 committing 相位 finalize → FAIL no-marker
+  ✅ requestCommit → ok
+  ✅ redoSwitch（committing 中）→ ok 且重放生效
+  ✅ finalize → ok，phase=committed
+  ✅ finalize 后 staging 已清
+  ✅ finalize 后 marker 已删
+  ✅ finalize 幂等（committed 再 finalize → ok）
+  ✅ committed 相位 reset → ok（清理重跑合法）
+  ✅ committing 相位 reset → 拒绝（committing-locked，防丢已授予提交）
+  ✅ 拒绝后 marker 仍在
+== 8. kill-page 六位置模拟 ==
+  ✅ 六位置决策映射表自校验（恰 6 位置）
+  -- P1-before-stage: phase=idle → recovery=RERUN
+  ✅ P1-before-stage: 恢复决策正确 — action=RERUN
+  ✅ P1-before-stage: 旧 localStorage 完整
+  ✅ P1-before-stage: RERUN reset → idle 可重跑
+  -- P2-after-stage: phase=staged → recovery=RESUME
+  ✅ P2-after-stage: 恢复决策正确 — action=RESUME
+  ✅ P2-after-stage: 旧 localStorage 完整（切换未开始）
+  ✅ P2-after-stage: marker 不存在（未授予）
+  ✅ P2-after-stage: RESUME 续走至 committed
+  ✅ P2-after-stage: 恢复后新数据生效
+  ✅ P2-after-stage: 恢复后旧数据无残留
+  -- P3-after-verify: phase=verified → recovery=RESUME
+  ✅ P3-after-verify: 恢复决策正确 — action=RESUME
+  ✅ P3-after-verify: 旧 localStorage 完整（切换未开始）
+  ✅ P3-after-verify: marker 不存在（未授予）
+  ✅ P3-after-verify: RESUME 续走至 committed
+  ✅ P3-after-verify: 恢复后新数据生效
+  ✅ P3-after-verify: 恢复后旧数据无残留
+  -- P4-after-marker: phase=committing → recovery=REDO_SWITCH
+  ✅ P4-after-marker: 恢复决策正确 — action=REDO_SWITCH
+  ✅ P4-after-marker: marker 已固化（entries 可重放）
+  ✅ P4-after-marker: REDO_SWITCH 重放 + finalize → committed
+  ✅ P4-after-marker: 恢复后新数据生效
+  ✅ P4-after-marker: 恢复后旧数据无残留
+  -- P5-mid-setItem: phase=committing → recovery=REDO_SWITCH
+  ✅ P5-mid-setItem: 恢复决策正确 — action=REDO_SWITCH
+  ✅ P5-mid-setItem: 部分切换可见（gt.learning.v2 已新、gt.settings 未动）
+  ✅ P5-mid-setItem: marker 完整可重放
+  ✅ P5-mid-setItem: REDO_SWITCH 重放 + finalize → committed
+  ✅ P5-mid-setItem: 恢复后新数据生效
+  ✅ P5-mid-setItem: 恢复后旧数据无残留
+  -- P6-after-removeItem: phase=committing → recovery=REDO_SWITCH
+  ✅ P6-after-removeItem: 恢复决策正确 — action=REDO_SWITCH
+  ✅ P6-after-removeItem: 切换已生效但未 finalize
+  ✅ P6-after-removeItem: REDO_SWITCH 重放 + finalize → committed
+  ✅ P6-after-removeItem: 恢复后新数据生效
+  ✅ P6-after-removeItem: 恢复后旧数据无残留
+== 9. 旧 token 永不覆盖（§19-4 端到端） ==
+  ✅ 旧 owner 旧 token：staging FAIL
+  ✅ 旧 owner 旧 token：commit FAIL
+  ✅ staging 数据仍是 B 可见的 A-token5 版本（未被 stale 覆盖）
+  ✅ 当前 owner token=6 commit → ok（fencing chain write 侧闭合）
+──────────────────────────────────────────────────────
+共 88 项，通过 88，失败 0
+──────────────────────────────────────────────────────

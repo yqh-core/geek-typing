@@ -1,0 +1,15 @@
+# RunId: W1B-GATE-LEARNING-BOUNDARY-20260929-185505-R01
+# Command: node scripts/gate-learning-boundary.mjs
+# Commit: 6982aa3c36da0ab44df6761a9e9e567d5336a08a
+# StartedAt: 2026-09-29T10:55:05.404Z
+# DurationMs: 501
+# ExitCode: 0
+
+--- stdout+stderr ---
+== P1.6-B02 · Learning Boundary Gate ==
+  ✅ 消费者文件无学习模块静态值导入（防倒退） — 无
+  ✅ 消费者文件无学习模块动态导入（import()/require()） — 无
+  ✅ 消费者文件无学习键族字面量（键族唯一入口 = lib/learning/storage.ts） — 无
+  ✅ 白名单为空或仅含已知待迁移项 — 无（白名单已清零，边界全收口）
+
+共 4 项，通过 4，失败 0

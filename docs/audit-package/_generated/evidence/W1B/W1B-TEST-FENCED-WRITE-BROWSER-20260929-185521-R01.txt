@@ -1,0 +1,67 @@
+# RunId: W1B-TEST-FENCED-WRITE-BROWSER-20260929-185521-R01
+# Command: node tests/fenced-write-browser.mjs
+# Commit: 6982aa3c36da0ab44df6761a9e9e567d5336a08a
+# StartedAt: 2026-09-29T10:55:21.185Z
+# DurationMs: 38023
+# ExitCode: 0
+
+--- stdout+stderr ---
+== 1. 真 IDB：Lock + Guard 同库集成，全链路提交 ==
+  ✅ 真 IDB：acquire → token=1
+  ✅ 真 IDB：marker.entries 完整（3 条，含 REMOVE OLD）
+  ✅ 真 IDB：finalize → committed + release → ok
+  ✅ 真 localStorage：新键已写入
+  ✅ 真 localStorage：旧键已 REMOVE
+== 2. 跨页签 kill-page 六位置（真 IDB + 真 localStorage） ==
+  -- P1-before-stage: phase=idle → recovery=RERUN
+  ✅ P1-before-stage: 恢复决策 = RERUN — got=RERUN
+  ✅ P1-before-stage: 旧 localStorage 完整
+  ✅ P1-before-stage: marker 不存在
+  ✅ P1-before-stage: RERUN reset → idle
+  ✅ P1-before-stage: 恢复后 phase=idle（等重跑）
+  ✅ P1-before-stage: localStorage 未被触碰
+  -- P2-after-stage: phase=staged → recovery=RESUME
+  ✅ P2-after-stage: 恢复决策 = RESUME — got=RESUME
+  ✅ P2-after-stage: 崩溃时旧 localStorage 完整（切换未开始）
+  ✅ P2-after-stage: marker 不存在（未授予）
+  ✅ P2-after-stage: RESUME 续走 → committed
+  ✅ P2-after-stage: 恢复后 phase=committed
+  ✅ P2-after-stage: 恢复后新键生效
+  ✅ P2-after-stage: 恢复后旧键已 REMOVE
+  -- P3-after-verify: phase=verified → recovery=RESUME
+  ✅ P3-after-verify: 恢复决策 = RESUME — got=RESUME
+  ✅ P3-after-verify: 崩溃时旧 localStorage 完整（切换未开始）
+  ✅ P3-after-verify: marker 不存在（未授予）
+  ✅ P3-after-verify: RESUME 续走 → committed
+  ✅ P3-after-verify: 恢复后 phase=committed
+  ✅ P3-after-verify: 恢复后新键生效
+  ✅ P3-after-verify: 恢复后旧键已 REMOVE
+  -- P4-after-marker: phase=committing → recovery=REDO_SWITCH
+  ✅ P4-after-marker: 恢复决策 = REDO_SWITCH — got=REDO_SWITCH
+  ✅ P4-after-marker: marker 已固化可重放（3 条）
+  ✅ P4-after-marker: 崩溃时旧 localStorage 完整
+  ✅ P4-after-marker: 恢复后 phase=committed
+  ✅ P4-after-marker: 恢复后新键生效
+  ✅ P4-after-marker: 恢复后旧键已 REMOVE
+  -- P5-mid-setItem: phase=committing → recovery=REDO_SWITCH
+  ✅ P5-mid-setItem: 恢复决策 = REDO_SWITCH — got=REDO_SWITCH
+  ✅ P5-mid-setItem: 崩溃时部分切换（new1 已写、new2 未写）
+  ✅ P5-mid-setItem: marker 完整可重放
+  ✅ P5-mid-setItem: 恢复后 phase=committed
+  ✅ P5-mid-setItem: 恢复后新键生效
+  ✅ P5-mid-setItem: 恢复后旧键已 REMOVE
+  -- P6-after-removeItem: phase=committing → recovery=REDO_SWITCH
+  ✅ P6-after-removeItem: 恢复决策 = REDO_SWITCH — got=REDO_SWITCH
+  ✅ P6-after-removeItem: 崩溃时切换已生效但未 finalize
+  ✅ P6-after-removeItem: 恢复后 phase=committed
+  ✅ P6-after-removeItem: 恢复后新键生效
+  ✅ P6-after-removeItem: 恢复后旧键已 REMOVE
+== 3. 跨页签 stale token ==
+  ✅ A acquire(token=1) + staging 成功后 release（墓碑）
+  ✅ B acquire → token=2（跨周期单调）
+  ✅ stale A staging → FAIL not-owner（墓碑 owner 已清空）
+  ✅ stale A commit → FAIL
+  ✅ B token=2 staging → ok，staging 值未被 stale 覆盖
+──────────────────────────────────────────────────────
+共 47 项，通过 47，失败 0
+──────────────────────────────────────────────────────
