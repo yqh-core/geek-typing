@@ -116,6 +116,35 @@ const TASKS = {
     { task: 'DRYRUN-REAL', command: 'node scripts/migration-dryrun-w1.mjs --user-store=_user-snapshot/real-user-localStorage.json' },
     { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
   ],
+  /**
+   * Wave 2-C · 迁移批次②③（legacy 三 store + settings 域 + diagnostics 收口）
+   *
+   * 与 W2B 的差别：本轮改动面横跨 25 个文件（含 hooks / i18n / speech / 三个 legacy store /
+   * diagnostics），不再是 learning 单域 —— 因此任务清单扩到「全部门禁 + 全部既有套件 + R5
+   * 真实快照对照」。§1 要求「每批迁移后全套 fresh 全绿 + R5 快照对照」，AUDIT-LEARNING-R5
+   * 就是这条判据的落点（用真实用户快照，不是夹具）。
+   */
+  W2C: [
+    { task: 'TSC', command: 'npx tsc -b --noEmit' },
+    { task: 'LINT', command: 'npx oxlint src/' },
+    { task: 'GATE-PERSISTENCE', command: 'node scripts/gate-persistence.mjs' },
+    { task: 'GATE-LEARNING-BOUNDARY', command: 'node scripts/gate-learning-boundary.mjs' },
+    { task: 'GATE-G4', command: 'node scripts/gate-g4.mjs' },
+    { task: 'GATE-LEGACY-WORDBANK', command: 'node scripts/gate-legacy-wordbank.mjs' },
+    { task: 'GATE-PRACTICE-ENGINE', command: 'node scripts/gate-practice-engine.mjs' },
+    { task: 'BUILD', command: 'npm run build' },
+    { task: 'TEST-PERSISTENCE-BOUNDARY', command: 'node tests/persistence-boundary.mjs' },
+    { task: 'TEST-LEARNING-BOUNDARY-WIRING', command: 'node tests/learning-boundary-wiring.mjs' },
+    { task: 'TEST-LEARNING-STORAGE', command: 'node tests/learning-storage.mjs' },
+    { task: 'TEST-LEARNING-SERVICE', command: 'node tests/learning-service.mjs' },
+    { task: 'TEST-LEARNING-INSIGHTS', command: 'node tests/learning-insights.mjs' },
+    { task: 'TEST-ANALYTICS-IDENTITY', command: 'node tests/analytics-identity.mjs' },
+    { task: 'TEST-MIGRATION-GUARDS', command: 'node tests/migration-guards.mjs' },
+    { task: 'TEST-CONTENT-QUERY', command: 'node tests/content-query.mjs' },
+    { task: 'AUDIT-LEARNING-R5', command: 'node scripts/learning-consistency.mjs --user-store=_user-snapshot/real-user-localStorage.json' },
+    { task: 'DRYRUN-REAL', command: 'node scripts/migration-dryrun-w1.mjs --user-store=_user-snapshot/real-user-localStorage.json' },
+    { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
+  ],
 }[WAVE]
 
 if (!TASKS) { console.error(`unknown wave: ${WAVE}`); process.exit(2) }
