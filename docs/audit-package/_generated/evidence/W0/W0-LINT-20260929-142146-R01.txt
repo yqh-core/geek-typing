@@ -1,0 +1,8 @@
+# RunId: W0-LINT-20260929-142146-R01
+# Command: npx oxlint src/
+# Commit: unknown
+# StartedAt: 2026-09-29T06:21:46.402Z
+# DurationMs: 1
+# ExitCode: null
+
+--- stdout+stderr ---

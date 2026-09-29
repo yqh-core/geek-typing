@@ -1,0 +1,39 @@
+# RunId: W0-TEST-LEARNING-SERVICE-20260929-142515-R01
+# Command: node tests/learning-service.mjs
+# Commit: a8d10c047c5ab09274bd9a28bbe101372defce34
+# StartedAt: 2026-09-29T06:25:15.269Z
+# DurationMs: 6039
+# ExitCode: 0
+
+--- stdout+stderr ---
+
+【1】memorize known → 仅写 memorize 子记录
+  ✅ memorize known 写入 gt.learning.v2 — content:word:curated-ai-core:__p16_known__
+  ✅ memorize known status = known
+  ✅ memorize known 不写 review 子记录
+
+【2】memorize 二次 → reviews 自增
+  ✅ memorize 二次 reviews = 2 — reviews=2
+
+【3】memorize unknown → 写 review 子记录（wrongCount=1）
+  ✅ memorize unknown 写 review 子记录 — content:word:curated-ai-core:__p16_unknown__
+  ✅ memorize unknown review.wrongCount = 1 — wrongCount=1
+
+【4】typing 错 → review.wrongCount=1（recordWordDoneV2 也写 analytics）
+  ✅ typing 错 → review.wrongCount = 1 — wrongCount=1
+  ✅ typing 错 → analytics 子记录已写 — done=1
+
+【5】typing 对（已有 review）→ recordCorrect 推进 intervalIdx
+  ✅ typing 对 → review.intervalIdx 推进为 1 — idx=1
+
+【6】读取侧（门面转发，不抛）
+  ✅ getMemorizeView 返回对象
+  ✅ getDueItems 返回数组
+  ✅ getMastery 返回分布（含 attributed）
+  ✅ getReviewItems 返回数组
+  ✅ getState 命中已知词
+  ✅ getState 未命中返回 hasRecord=false
+
+──────────────────────────────────────────────────────
+共 15 项，通过 15，失败 0
+──────────────────────────────────────────────────────

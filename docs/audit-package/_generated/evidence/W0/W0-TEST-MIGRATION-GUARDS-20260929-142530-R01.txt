@@ -1,0 +1,52 @@
+# RunId: W0-TEST-MIGRATION-GUARDS-20260929-142530-R01
+# Command: node tests/migration-guards.mjs
+# Commit: a8d10c047c5ab09274bd9a28bbe101372defce34
+# StartedAt: 2026-09-29T06:25:30.236Z
+# DurationMs: 5057
+# ExitCode: 0
+
+--- stdout+stderr ---
+==========================================================================
+P1.5 · G3 门禁：Migration 纯函数性 / 幂等性 / 回滚
+==========================================================================
+
+输入：review=11 memorize=6 analytics.words=6
+
+【G3-3 纯函数性（不碰 localStorage / 不改入参）】
+  ✅ 迁移过程未触碰 localStorage（探针触碰数=0） — touches=0
+  ✅ 未就改写入参：调用不抛（深冻结 ⇒ ESM 严格模式下就地改写会 TypeError） — no throw
+  ✅ 未就改写入参：调用前后入参逐字节相同 — snapshot 前后一致
+  ✅ 对照组：主动触碰一次 ⇒ 探针必然记录（证明探针有效） — touches=1
+
+【G3-3 确定性（固定时钟下逐字节相同）】
+  ✅ 两次调用 next 逐字节相同
+  ✅ 两次调用 report 除时间戳外逐字节相同 — startedAt/finishedAt/durationMs 已剔除
+  ✅ 对照组：now 变化 ⇒ marker.migratedAt 必然跟随 — 2026-09-27T12:00:00.000Z → 2026-09-27T12:01:00.000Z
+  ✅ 对照组：now 变化的**影响范围仅限时间戳**（数据部分仍逐字节相同） — 剔除 marker.migratedAt 后逐字节相同
+  ✅ 对照组：省略时钟必定响错（证明没有隐含的 Date.now 兜底） — RangeError: Invalid time value
+
+【G3-4 幂等性（第二次必须 0 次 setItem）】
+  ✅ 首次迁移产出待写项 — 5 个键
+  ✅ 标记键排在 pendingWrites 最后（崩溃后重跑可自愈的前提） — gt.learning.v2 → gt.letterStats.v1 → gt.totals.v1 → gt.learning.v2.backup → gt.migration.v1
+  ✅ 首次落盘写入了全部新键 — setItem=5
+  ✅ gt.learning.v2 已落盘
+  ✅ 第二次被标记为 skipped — source fingerprint unchanged since last migration
+  ✅ 第二次 pendingWrites 为空数组 — length=0
+  ✅ **第二次 0 次 setItem**（这是幂等的唯一可观测定义） — 5 → 5（+0）
+  ✅ 第二次落盘后存储状态与首次完全一致
+  ✅ 对照组：源快照变了 ⇒ 指纹必然变化（否则幂等判定本身失效）
+  ✅ 对照组：**指纹不同 ⇒ 不得跳过**（必须重新产出待写项） — skipped=false writes=5
+
+【G3-6 回滚（备份 ⇒ 逐字节恢复）】
+  ✅ 备份包含全部 4 个迁移源键 — review,memorize,analytics,customBanks
+  ✅ 备份内容与原始输入逐字节相同
+  ✅ rollbackToken 指向备份键
+  ✅ rollbackToken.backedUpKeys 与实际迁移源一致 — gt.review.v1,gt.memorize.v1,gt.analytics.v1,gt.customBanks.v1
+  ✅ 回滚后旧键逐字节还原
+  ✅ 回滚后新键 gt.learning.v2 已清除
+  ✅ 回滚后迁移标记已清除（下次会重新迁移）
+  ✅ 对照组：篡改一个字节 ⇒ 与原文**必须**不同（证明比较不是恒真）
+
+──────────────────────────────────────────────────────────────────────────
+共 27 项，通过 27，失败 0
+──────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,36 @@
+# RunId: W0-RELEASE-GATE-20260929-142514-R01
+# Command: node scripts/verify-release-gate.mjs
+# Commit: a8d10c047c5ab09274bd9a28bbe101372defce34
+# StartedAt: 2026-09-29T06:25:14.710Z
+# DurationMs: 538
+# ExitCode: 0
+
+--- stdout+stderr ---
+======================================================================
+ P1.5 RELEASE GATE — 两层机器判定（verify-release-gate.mjs）
+ 事实源：docs/audit-package/13-acceptance/P1.5-RELEASE-GATE.md 的逐节标题
+======================================================================
+Unit    判据  PASS  FAIL  PENDING   总览声明(行)      一致
+G1      5     5     0     0        5/0/0            ✅
+G2      4     4     0     0        4/0/0            ✅
+G3      6     6     0     0        6/0/0            ✅
+G4      5     5     0     0        5/0/0            ✅
+G5      4     4     0     0        4/0/0            ✅
+G6      5     5     0     0        5/0/0            ✅
+R1      1     1     0     0        1/0/0            ✅
+R2      1     1     0     0        1/0/0            ✅
+R3      1     1     0     0        1/0/0            ✅
+R4      1     1     0     0        1/0/0            ✅
+R5      1     1     0     0        1/0/0            ✅
+R6      1     1     0     0        1/0/0            ✅
+──────────────────────────────────────────────────────────────────────
+层一（工程 G1..G6）合计 29 项判据：29 PASS / 0 FAIL / 0 PENDING
+层二（产品 R 系列）合计 6 项判据：6 PASS / 0 FAIL / 0 PENDING
+
+层级判定：
+  层一 CODE/ARCHITECTURE GATE: 🟢 ENGINEERING READY（G1..G6，29/29 PASS）
+  层二 PRODUCT RELEASE GATE:  🟢 RELEASE READY（R1..R6，6/6 PASS）
+──────────────────────────────────────────────────────────────────────
+
+RELEASE=APPROVED —— 两层全绿（工程 29 项 + 产品 6 项判据逐节核实，总览数字机器核对一致）
+⚠️ 这只代表门禁文档自洽；发布前仍需：未提交改动清点（git status）+ FINAL-TEST-OUTPUT 全量复跑留档。

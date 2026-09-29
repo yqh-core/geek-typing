@@ -1,0 +1,8 @@
+# RunId: W0-TEST-E2E-20260929-142146-R01
+# Command: node tests/e2e.mjs
+# Commit: unknown
+# StartedAt: 2026-09-29T06:21:46.435Z
+# DurationMs: 2
+# ExitCode: null
+
+--- stdout+stderr ---

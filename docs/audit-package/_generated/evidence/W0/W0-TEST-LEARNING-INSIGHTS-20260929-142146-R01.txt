@@ -1,0 +1,8 @@
+# RunId: W0-TEST-LEARNING-INSIGHTS-20260929-142146-R01
+# Command: node tests/learning-insights.mjs
+# Commit: unknown
+# StartedAt: 2026-09-29T06:21:46.429Z
+# DurationMs: 1
+# ExitCode: null
+
+--- stdout+stderr ---

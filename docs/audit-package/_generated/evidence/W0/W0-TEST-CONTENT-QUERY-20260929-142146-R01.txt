@@ -1,0 +1,8 @@
+# RunId: W0-TEST-CONTENT-QUERY-20260929-142146-R01
+# Command: node tests/content-query.mjs
+# Commit: unknown
+# StartedAt: 2026-09-29T06:21:46.433Z
+# DurationMs: 1
+# ExitCode: null
+
+--- stdout+stderr ---

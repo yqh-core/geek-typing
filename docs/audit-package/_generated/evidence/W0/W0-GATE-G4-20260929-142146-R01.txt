@@ -1,0 +1,8 @@
+# RunId: W0-GATE-G4-20260929-142146-R01
+# Command: node scripts/gate-g4.mjs
+# Commit: unknown
+# StartedAt: 2026-09-29T06:21:46.407Z
+# DurationMs: 2
+# ExitCode: null
+
+--- stdout+stderr ---

@@ -1,0 +1,141 @@
+# RunId: W0-TEST-LEARNING-STORAGE-20260929-142521-R01
+# Command: node tests/learning-storage.mjs
+# Commit: a8d10c047c5ab09274bd9a28bbe101372defce34
+# StartedAt: 2026-09-29T06:25:21.328Z
+# DurationMs: 4868
+# ExitCode: 0
+
+--- stdout+stderr ---
+== 加载 src/lib/learning/*.ts（Vite ssrLoadModule）==
+
+== A · 导出符号齐备 ==
+  ✅ storage.ts 导出 20 个设计符号 — 缺失 = 无
+  ✅ BACKUP_FIELD_TO_LEGACY_KEY 导出且为 4 字段映射（G3-6 回滚封装）
+  ✅ diagnostics.ts 导出三件套 + quota 观测 — 缺失 = 无
+  ✅ codec.ts 导出 mapCodec / arrayCodec / 形状工具
+  ✅ QUOTA_WARN_PERCENT = 70（G4-4 判据原值）
+  ✅ QUOTA_CONSERVATIVE_BYTES = 5 MiB（§2.9 保守口径）
+
+== B · 读写 roundtrip（成功对照组：零 diag）==
+  ✅ putRecord 成功：{ok:true, evicted:0} — {"ok":true,"evicted":0}
+  ✅ loadLearningV2 roundtrip：contentId 命中
+  ✅ getRecord 返回同一条
+  ✅ 对照组：成功路径零 diag — len=0
+  ✅ 对照组：成功路径零 console.warn（未安装捕获但 buffer 为空即证）
+
+== C · 写失败 → diag + 事件双路（G4-3②）==
+  ✅ 非 quota 失败：{ok:false, reason:"unavailable", evicted:0} — {"ok":false,"evicted":0,"reason":"unavailable"}
+  ✅ reportDiag 记了 STORAGE_WRITE_FAILED
+  ✅ emitSaveFailure 触发订阅（key / ok=false）
+  ✅ 半静默防线：warn 也发生了（三路齐全）
+[learning/storage] gt.letterStats.v1 写入失败（reason=unavailable，evicted=0），本轮变更仅保留在内存 Error: generic setItem failure
+    at Object.setItem (file:///D:/work/geek-typing/tests/learning-storage.mjs:62:30)
+    at saveLetterStats (D:/work/geek-typing/src/lib/learning/storage.ts:265:16)
+    at file:///D:/work/geek-typing/tests/learning-storage.mjs:176:23
+  ✅ saveLetterStats 失败 → diag key=gt.letterStats.v1
+[learning/storage] gt.totals.v1 写入失败（reason=unavailable，evicted=0），本轮变更仅保留在内存 Error: generic setItem failure
+    at Object.setItem (file:///D:/work/geek-typing/tests/learning-storage.mjs:62:30)
+    at saveTotals (D:/work/geek-typing/src/lib/learning/storage.ts:296:16)
+    at file:///D:/work/geek-typing/tests/learning-storage.mjs:178:18
+  ✅ saveTotals 失败 → diag key=gt.totals.v1
+[learning/storage] gt.migration.v1 写入失败（reason=unavailable，evicted=0），本轮变更仅保留在内存 Error: generic setItem failure
+    at Object.setItem (file:///D:/work/geek-typing/tests/learning-storage.mjs:62:30)
+    at saveMigrationMarker (D:/work/geek-typing/src/lib/learning/storage.ts:318:16)
+    at file:///D:/work/geek-typing/tests/learning-storage.mjs:180:27
+  ✅ saveMigrationMarker 失败 → diag key=gt.migration.v1
+  ✅ 三键失败各记一条（不相互吞） — len=3
+
+== D · Quota 熔断可观测（G4-4①）==
+  ✅ 首轮清洗后写入成功：{ok:true, evicted:1} — {"ok":true,"evicted":1}
+  ✅ diag 记 QUOTA_EVICTED count=1
+  ✅ 被清洗的条目不在落盘结果里
+  ✅ 清洗轮有 console.warn 留痕
+[learning/storage] gt.learning.v2 写入失败（reason=quota，evicted=0），本轮变更仅保留在内存 undefined
+  ✅ protectedKey 唯一条目：候选空 → 不空跑 → {ok:false, reason:"quota", evicted:0} — {"ok":false,"evicted":0,"reason":"quota"}
+  ✅ 旧值未被破坏（清洗没有误伤磁盘历史数据）
+  ✅ protectedKey 场景无 QUOTA_EVICTED（一次都没清成）
+  ✅ 最终失败也走 failWrite（STORAGE_WRITE_FAILED 在案）
+
+== E · Quota 压力观测（G4-4②）==
+  ✅ snapshotQuota 覆盖全部 gt.* 键
+  ✅ 非 gt. 键不计入
+  ✅ totalGtBytes = 3000（UTF-16 ×2 口径）
+  ✅ percent = totalGtBytes / 5MiB × 100
+  ✅ 70%：checkQuotaPressure 返回 true 且事件触发
+  ✅ 70%：diag 记 QUOTA_PRESSURE
+  ✅ 滞回：持续超阈值不重复触发（第二次 false）
+  ✅ 对照组 69%：不触发
+  ✅ 滞回复位后再次跨阈值：重新触发
+
+== F · 校验挡脏数据（G4-5）==
+  ✅ 合法项保留：正式记录还在
+  ✅ 合法项保留：legacy 占位还在
+  ✅ 非法项丢弃：两条垃圾都消失
+  ✅ diag 记 STORAGE_ENTRY_DROPPED count=2
+  ✅ 丢弃留痕：console.warn 提到被丢的键名
+[learning/storage] gt.learning.v2 丢弃 2 条非法条目：junk1, junk2
+  ✅ getRecord(合法) 正常返回
+[learning/storage] gt.learning.v2 丢弃 2 条非法条目：junk1, junk2
+  ✅ getLegacyRecord(legacy 键) 正常返回
+  ✅ getRecord(legacy 键) 收窄为 null（不串区）
+[learning/storage] gt.learning.v2 丢弃 2 条非法条目：junk1, junk2
+  ✅ getRecord(已丢弃键) 返回 null 而不抛
+  ✅ 整表是数组 → 空表（不产生数字键怪对象）
+  ✅ 整表非法 → diag STORAGE_READ_CORRUPT
+  ✅ 坏 JSON → 空表 + warn + diag
+[learning/storage] gt.letterStats.v1 结构非法，已按空表处理（原值被丢弃）
+  ✅ letterStats.letters 非对象 → 空表 + diag
+[learning/storage] gt.totals.v1 结构非法，已按空表处理（原值被丢弃）
+  ✅ totals 缺字段 → 整份回落 EMPTY_TOTALS + diag
+  ✅ totals 合法 → 原样读回
+[learning/storage] gt.migration.v1 结构非法，已按空表处理（原值被丢弃）
+  ✅ marker 残缺（缺 rollbackToken）→ null + diag
+  ✅ marker 合法 → 原样读回（rollbackToken 完整）
+  ✅ 隐私模式（getItem 抛）→ 空表且零 diag（环境问题不是损坏）
+  ✅ mapCodec.decode：坏 JSON → null（不抛）
+  ✅ mapCodec.decode：数组 → null（isPlainObject 防线）
+  ✅ mapCodec.decode：合法保留 + 非法丢弃（逐项，不整表判废）
+  ✅ arrayCodec.decode：合法项保留、非法项丢弃
+  ✅ diagnostics()：learningRecords=1 / legacyRecords=1 / bytesUtf16>0 / markerPresent=false — {"bytesUtf16":234,"learningRecords":1,"legacyRecords":1,"markerPresent":false}
+
+== G · rollbackLearningV1（G3-6 一键回滚）==
+  ✅ 漂移锁死：Object.values(mapping) 逐项 === IN_SCOPE_KEYS（同序同值） — mapping=["gt.review.v1","gt.memorize.v1","gt.analytics.v1","gt.customBanks.v1"] vs IN_SCOPE_KEYS=["gt.review.v1","gt.memorize.v1","gt.analytics.v1","gt.customBanks.v1"]
+  ✅ 漂移锁死：mapping 字段名 = migrate.ts backup 构造的四字段（review/memorize/analytics/customBanks）
+  ✅ 成功路径：restored=4 / cleared=3 / failed=0 / markerCleared=true — {"restored":["gt.review.v1","gt.memorize.v1","gt.analytics.v1","gt.customBanks.v1"],"cleared":["gt.learning.v2","gt.learning.v2.backup","gt.migration.v1"],"failed":[],"markerCleared":true}
+  ✅ 旧键逐字节写回：review / memorize / analytics / customBanks 四键全同值
+  ✅ G3-6 判据：回滚后 5 类新键全部不存在（learning.v2 / backup / marker）
+  ✅ 对照组：成功回滚零 diag（不滥报） — len=0
+  ✅ backedUpKeys 驱动：restored 只含清单内的键 — ["gt.review.v1"]
+  ✅ backedUpKeys 驱动：清单外的 gt.analytics.v1 原样幸存（junk 未被 backup 覆盖）
+  ✅ backedUpKeys 驱动：清单外的 gt.memorize.v1 不被 removeItem（仍为 null）
+  ✅ 缺键占位：迁移前不存在的 analytics/customBanks 被写回占位 '{}' / '[]'（backup 忠实） — analytics={} customBanks=[]
+[learning/storage] 回滚有 1 项失败 [
+  {
+    key: 'gt.learning.v2.backup',
+    reason: 'backup missing or not an object'
+  }
+]
+  ✅ backup 缺失：failed 记 {backupKey, "backup missing…"}，restored=[]，不抛 — [{"key":"gt.learning.v2.backup","reason":"backup missing or not an object"}]
+  ✅ backup 缺失：新键仍清除
+  ✅ backup 缺失：MIGRATION_WARNING diag（失败留痕）
+[learning/storage] 回滚有 1 项失败 [
+  {
+    key: 'gt.learning.v2.backup',
+    reason: 'backup unreadable: SyntaxError'
+  }
+]
+  ✅ backup 损坏：failed 记 backup unreadable: SyntaxError — [{"key":"gt.learning.v2.backup","reason":"backup unreadable: SyntaxError"}]
+  ✅ backup 损坏：新键仍清除
+  ✅ 写回失败：不抛（能走到断言即证）+ 4 个旧键全进 failed — [{"key":"gt.review.v1","reason":"Error"},{"key":"gt.memorize.v1","reason":"Error"},{"key":"gt.analytics.v1","reason":"Error"},{"key":"gt.customBanks.v1","reason":"Error"}]
+  ✅ 写回失败：diag 双码 —— STORAGE_WRITE_FAILED（逐键）+ MIGRATION_WARNING（汇总）
+  ✅ 写回失败：console.warn 留痕（半静默防线）
+[learning/storage] 回滚有 1 项失败 [
+  {
+    key: 'gt.learning.v2.backup',
+    reason: 'backup missing or not an object'
+  }
+]
+  ✅ marker 漏出 writtenKeys → markerCleared=false（不静默吞掉漏清）
+
+共 78 项，通过 78，失败 0
+G4 行为侧：全部通过
