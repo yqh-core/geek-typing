@@ -25,27 +25,26 @@
  *   - `import type` / `export type` 仅引入类型、无运行时耦合，不计入违规
  *     （如 Header 的 Analytics 类型）。
  *
+ * 实现：2026-09-30 P1.7 Wave 3 · A-3 —— 判定核心换成 **AST（ts-morph）**，见
+ * scripts/ast/boundary-ast.mjs。语义与原先的正则实现一致（消费者定义、禁用模块片段、
+ * 8 个学习键族、type-only 放行、白名单 ∅ 均照旧），但额外覆盖：
+ *   export...from 再导出链、字符串常量折叠拼接路径（BinaryExpression / 模板串 / 模块级 const）。
+ * 三阶段：Phase 1 双跑对照（diff=0）→ Phase 2 本文件转正 → Phase 3 删除正则实现
+ * （scripts/boundary-regex-legacy.mjs，git 历史留档）。
+ *
+ * CLI：node scripts/gate-learning-boundary.mjs [--scan-root=<dir>]（默认 src/）
  * 退出码：0 = 通过；1 = 任一 FAIL。
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative, resolve, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
+import { checkBoundary, WHITELIST, DEFAULT_SCAN_ROOT } from './ast/boundary-ast.mjs'
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const SRC = join(ROOT, 'src')
-
-/** 待迁移消费者白名单：**已清零**（保留集合结构以便未来如需临时豁免时显式列出、可审计）。 */
-const WHITELIST = new Set()
-
-/** 禁止 UI 直连的模块（import 路径片段）。 */
-const FORBIDDEN = ['memorizeStore', 'reviewStore', 'analytics', 'learning/storage', 'learning/insights', 'learning/upgrade']
-
-/** 学习键族字面量（消费者文件中禁止出现；唯一入口 lib/learning/storage.ts，见 G4-2）。 */
-const FORBIDDEN_KEY_LITERALS = [
-  'gt.learning.v2', 'gt.learning.v2.backup', 'gt.diag.v1',
-  'gt.review.v1', 'gt.memorize.v1', 'gt.analytics.v1',
-  'gt.totals.v1', 'gt.letterStats.v1',
-]
+function parseScanRoot(argv) {
+  for (const a of argv) {
+    const m = /^--scan-root=(.*)$/.exec(a)
+    if (m && m[1]) return resolve(m[1])
+  }
+  return DEFAULT_SCAN_ROOT
+}
 
 let pass = 0
 let fail = 0
@@ -59,77 +58,8 @@ function ok(name, cond, detail = '') {
   }
 }
 
-function walk(dir, out = []) {
-  for (const name of readdirSync(dir)) {
-    const p = join(dir, name)
-    const st = statSync(p)
-    if (st.isDirectory()) walk(p, out)
-    else if (/\.(ts|tsx)$/.test(name)) out.push(p)
-  }
-  return out
-}
-
-const files = walk(SRC)
-const rel = (p) => relative(ROOT, p).replaceAll('\\', '/')
-
-// 仅扫描消费者文件：跳过 src/core（桥接/领域层，含 core/learning 与 core/practice）与 src/lib（内部互引）
-const consumers = files.filter((f) => {
-  const r = rel(f)
-  return !r.includes('/core/') && !r.includes('/lib/')
-})
-
-// 匹配模块片段
-const modOf = (spec) => {
-  for (const f of FORBIDDEN) if (spec.includes(`/${f}`)) return f
-  return null
-}
-
-/** 判断一条 import/export 语句是否「仅类型」（无运行时耦合）：
- *  - `import type { ... } from` / `export type { ... } from` → 是；
- *  - `import { type A, type B } from` 全部绑定带 `type` 前缀 → 是；
- *  - 其余（含混合 `import { a, type B }`）→ 否（存在运行时绑定）。 */
-function isTypeOnly(clause) {
-  if (/^import\s+type\b/.test(clause.trim()) || /^export\s+type\b/.test(clause.trim())) return true
-  const open = clause.indexOf('{')
-  const close = clause.lastIndexOf('}')
-  if (open >= 0 && close > open) {
-    const inner = clause.slice(open + 1, close)
-    const parts = inner.split(',').map((s) => s.trim()).filter(Boolean)
-    if (parts.length > 0 && parts.every((p) => p.startsWith('type '))) return true
-  }
-  return false
-}
-
-// 捕获 import/export 整句（含绑定区与 from 子句）
-const STMT_RE = /(import|export)([^;]*?)\s+from\s+['"]([^'"]+)['"]/g
-// 动态导入 / require（2026-09-29 补强：静态 from 正则的绕过向量）
-const DYNAMIC_RE = /\b(?:import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/g
-
-const violations = [] // { file, mod }
-const dynamicViolations = [] // { file, mod }
-const keyViolations = [] // { file, key }
-
-for (const f of consumers) {
-  const text = readFileSync(f, 'utf8')
-  const r = rel(f)
-  for (const m of text.matchAll(STMT_RE)) {
-    const clause = `${m[1]}${m[2]}` // import/export + 绑定区（不含 from 'mod'）
-    const spec = m[3]
-    const mod = modOf(spec)
-    if (!mod) continue
-    if (isTypeOnly(clause)) continue // 类型导入放行（无运行时耦合）
-    violations.push({ file: r, mod })
-  }
-  for (const m of text.matchAll(DYNAMIC_RE)) {
-    const mod = modOf(m[1])
-    if (mod) dynamicViolations.push({ file: r, mod })
-  }
-  for (const key of FORBIDDEN_KEY_LITERALS) {
-    if (text.includes(`'${key}'`) || text.includes(`"${key}"`) || text.includes('`' + key)) {
-      keyViolations.push({ file: r, key })
-    }
-  }
-}
+const result = checkBoundary({ scanRoot: parseScanRoot(process.argv.slice(2)) })
+const { violations, dynamicViolations, keyViolations } = result
 
 console.log('== P1.6-B02 · Learning Boundary Gate ==')
 ok('消费者文件无学习模块静态值导入（防倒退）', violations.length === 0,

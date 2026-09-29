@@ -37,6 +37,7 @@
     "gate:legacy-wordbank": "node scripts/gate-legacy-wordbank.mjs",
     "gate:learning-boundary": "node scripts/gate-learning-boundary.mjs",
     "gate:practice-engine": "node scripts/gate-practice-engine.mjs",
+    "test:boundary-ast": "node tests/boundary-ast.mjs",
     "gate:architecture": "node scripts/gate-architecture.mjs",
     "gate:todo": "node scripts/gate-todo.mjs",
     "audit:a11y": "node scripts/audit-a11y-viewports.mjs",
