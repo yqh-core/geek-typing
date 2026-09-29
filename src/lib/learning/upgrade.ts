@@ -30,13 +30,19 @@ import {
 import { IN_SCOPE_KEYS, migrateV1toV2, splitSnapshot } from './migrate'
 import type { ContentProvider, MigrationReport, RawStoreDump } from './types'
 import { getVocabularyPackages, loadPackage } from '../../core/content/registry'
+import { readKeyRaw, writeKeyRaw } from '../../core/learning/storage-io'
 
 /** 迁移源键 → localStorage 原始键名（与 IN_SCOPE_KEYS 同序同源，勿增勿删） */
 const SOURCE_RAW_KEYS: readonly string[] = IN_SCOPE_KEYS
 
+/* P1.7-W2B：迁移读写同样经 persistence Repository（namespace 注册校验 + owner 域匹配）。
+ * 四个源键 gt.review.v1 / gt.memorize.v1 / gt.analytics.v1 / gt.customBanks.v1 与备份键
+ * gt.learning.v2.backup 均已注册，域分别落在 learning/analytics/content —— 全在
+ * learning 通道的允许域内，因此接线后不会把合法迁移写成判红。
+ * 失败语义保持不变：抛（含 NamespaceError）→ 本次迁移放弃，停留 State A 下次重试。 */
 function safeGetItem(key: string): string | null {
   try {
-    return localStorage.getItem(key)
+    return readKeyRaw(key)
   } catch {
     return null
   }
@@ -44,7 +50,7 @@ function safeGetItem(key: string): string | null {
 
 function safeSetItem(key: string, value: string): boolean {
   try {
-    localStorage.setItem(key, value)
+    writeKeyRaw(key, value)
     return true
   } catch (e) {
     console.warn(`[learning/upgrade] ${key} 写入失败，本次迁移放弃（下次启动重试）`, e)

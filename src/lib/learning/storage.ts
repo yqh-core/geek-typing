@@ -31,6 +31,9 @@ import type {
 import { isLearningRecord, isLegacyKey, isLegacyRecord } from './types'
 import { mapCodec } from './codec'
 import { reportDiag, emitSaveFailure, errorNameOf, isQuotaError, checkQuotaPressure } from './diagnostics'
+// P1.7-W2B：原生 localStorage 读写收口到 persistence 层 Repository（namespace 注册校验 + owner 域匹配）。
+// 只走 getRaw/setRaw，写入字节与改造前完全一致，配额熔断 / 损坏告警 / diag 逻辑零改动。
+import { readKeyRaw, writeKeyRaw, removeKeyRaw } from '../../core/learning/storage-io'
 
 export const KEY_LEARNING_V2 = 'gt.learning.v2'
 export const KEY_LETTER_STATS = 'gt.letterStats.v1'
@@ -76,7 +79,7 @@ function failWrite(key: string, result: SaveResult, e: unknown): SaveResult {
 function readRaw<T>(key: string, fallback: T, guard: (v: unknown) => v is T): { value: T; corrupted: boolean } {
   let raw: string | null
   try {
-    raw = localStorage.getItem(key)
+    raw = readKeyRaw(key) // P1.7-W2B：经 persistence Repository（namespace 校验 + owner 域匹配）
   } catch {
     // 隐私模式 / localStorage 不可用 —— 这是**环境不支持**，不是数据损坏
     return { value: fallback, corrupted: false }
@@ -122,7 +125,7 @@ const learningStoreCodec = mapCodec<LearningEntry>(isValidEntry, (droppedKeys) =
 export function loadLearningV2(): LearningStoreV2 {
   let raw: string | null
   try {
-    raw = localStorage.getItem(KEY_LEARNING_V2)
+    raw = readKeyRaw(KEY_LEARNING_V2)
   } catch {
     // 隐私模式 / 存储不可用 —— 环境问题，不是数据损坏：返回空表、**不打 diag**
     return {}
@@ -147,7 +150,7 @@ export function loadLearningV2(): LearningStoreV2 {
 export function saveLearningV2(store: LearningStoreV2, protectedKey?: string): SaveResult {
   const json = JSON.stringify(store)
   try {
-    localStorage.setItem(KEY_LEARNING_V2, json)
+    writeKeyRaw(KEY_LEARNING_V2, json)
     checkQuotaPressure()
     return { ok: true, evicted: 0 }
   } catch (e) {
@@ -173,7 +176,7 @@ export function saveLearningV2(store: LearningStoreV2, protectedKey?: string): S
       `[learning/storage] localStorage 配额不足，熔断清洗第 ${round} 轮：清理 ${victims.length} 条（累计 ${evicted}）`,
     )
     try {
-      localStorage.setItem(KEY_LEARNING_V2, JSON.stringify(working))
+      writeKeyRaw(KEY_LEARNING_V2, JSON.stringify(working))
       reportDiag({ code: 'QUOTA_EVICTED', key: KEY_LEARNING_V2, count: evicted })
       checkQuotaPressure()
       return { ok: true, evicted }
@@ -240,7 +243,7 @@ export function loadLetterStats(): LetterStats {
  */
 export function saveLetterStats(stats: LetterStats): SaveResult {
   try {
-    localStorage.setItem(KEY_LETTER_STATS, JSON.stringify(stats))
+    writeKeyRaw(KEY_LETTER_STATS, JSON.stringify(stats))
     checkQuotaPressure()
     return { ok: true, evicted: 0 }
   } catch (e) {
@@ -267,7 +270,7 @@ export function loadTotals(): GlobalTotals {
 /** 同 letters：跨 content 的累加量，不做熔断清洗 */
 export function saveTotals(totals: GlobalTotals): SaveResult {
   try {
-    localStorage.setItem(KEY_TOTALS, JSON.stringify(totals))
+    writeKeyRaw(KEY_TOTALS, JSON.stringify(totals))
     checkQuotaPressure()
     return { ok: true, evicted: 0 }
   } catch (e) {
@@ -296,7 +299,7 @@ export function loadMigrationMarker(): MigrationMarker | null {
 
 export function saveMigrationMarker(marker: MigrationMarker): SaveResult {
   try {
-    localStorage.setItem(KEY_MIGRATION, JSON.stringify(marker))
+    writeKeyRaw(KEY_MIGRATION, JSON.stringify(marker))
     return { ok: true, evicted: 0 }
   } catch (e) {
     return failWrite(KEY_MIGRATION, { ok: false, evicted: 0, reason: isQuotaError(e) ? 'quota' : 'unavailable' }, e)
@@ -306,7 +309,7 @@ export function saveMigrationMarker(marker: MigrationMarker): SaveResult {
 /** 删除迁移标记（回滚路径用：让下次启动重新走迁移） */
 export function clearMigrationMarker(): SaveResult {
   try {
-    localStorage.removeItem(KEY_MIGRATION)
+    removeKeyRaw(KEY_MIGRATION)
     return { ok: true, evicted: 0 }
   } catch (e) {
     return failWrite(KEY_MIGRATION, { ok: false, evicted: 0, reason: 'unavailable' }, e)
@@ -363,7 +366,7 @@ export function rollbackLearningV1(token: RollbackToken): RollbackOutcome {
   /* ① 取备份 */
   let backup: Record<string, unknown> | null = null
   try {
-    const raw = localStorage.getItem(token.backupKey)
+    const raw = readKeyRaw(token.backupKey)
     const parsed: unknown = raw === null ? null : JSON.parse(raw)
     if (isRecord(parsed)) backup = parsed
     else outcome.failed.push({ key: token.backupKey, reason: 'backup missing or not an object' })
@@ -384,8 +387,8 @@ export function rollbackLearningV1(token: RollbackToken): RollbackOutcome {
         continue
       }
       try {
-        if (field in backup) localStorage.setItem(legacyKey, JSON.stringify(backup[field]))
-        else localStorage.removeItem(legacyKey)
+        if (field in backup) writeKeyRaw(legacyKey, JSON.stringify(backup[field]))
+        else removeKeyRaw(legacyKey)
         outcome.restored.push(legacyKey)
       } catch (e) {
         outcome.failed.push({ key: legacyKey, reason: errorNameOf(e) ?? 'write failed' })
@@ -397,7 +400,7 @@ export function rollbackLearningV1(token: RollbackToken): RollbackOutcome {
   /* ③ 清除迁移写入的全部新键（token.writtenKeys 由迁移器生成，含 backup 与 marker 自身） */
   for (const key of token.writtenKeys) {
     try {
-      localStorage.removeItem(key)
+      removeKeyRaw(key)
       outcome.cleared.push(key)
     } catch (e) {
       outcome.failed.push({ key, reason: errorNameOf(e) ?? 'remove failed' })
@@ -436,7 +439,7 @@ export function diagnostics(): LearningDiagnostics {
 
 function safeGet(key: string): string | null {
   try {
-    return localStorage.getItem(key)
+    return readKeyRaw(key)
   } catch {
     return null
   }

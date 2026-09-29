@@ -94,6 +94,28 @@ const TASKS = {
     { task: 'TEST-PERSISTENCE-BOUNDARY', command: 'node tests/persistence-boundary.mjs' },
     { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
   ],
+  /**
+   * Wave 2-B · Service Split（learning 域接线 + 单体服务拆分）
+   *
+   * 任务选择原则：**证明「W2A 的边界真的被业务模块接起来了」**，因此除了本轮新增的
+   * 接线测试，还保留所有会被这次改道波及的既有套件作为回归证据 —— 尤其
+   * TEST-MIGRATION-GUARDS（回滚要写 analytics / content 域旧键，正是 owner 驱动路由
+   * 的真回归点）与 TEST-E2E（浏览器里跑真实 runStartupMigration，覆盖 upgrade.ts 改道）。
+   */
+  W2B: [
+    { task: 'TSC', command: 'npx tsc -b --noEmit' },
+    { task: 'LINT', command: 'npx oxlint src/' },
+    { task: 'GATE-LEARNING-BOUNDARY', command: 'node scripts/gate-learning-boundary.mjs' },
+    { task: 'BUILD', command: 'npm run build' },
+    { task: 'TEST-PERSISTENCE-BOUNDARY', command: 'node tests/persistence-boundary.mjs' },
+    { task: 'TEST-LEARNING-BOUNDARY-WIRING', command: 'node tests/learning-boundary-wiring.mjs' },
+    { task: 'TEST-LEARNING-STORAGE', command: 'node tests/learning-storage.mjs' },
+    { task: 'TEST-LEARNING-SERVICE', command: 'node tests/learning-service.mjs' },
+    { task: 'TEST-LEARNING-INSIGHTS', command: 'node tests/learning-insights.mjs' },
+    { task: 'TEST-MIGRATION-GUARDS', command: 'node tests/migration-guards.mjs' },
+    { task: 'DRYRUN-REAL', command: 'node scripts/migration-dryrun-w1.mjs --user-store=_user-snapshot/real-user-localStorage.json' },
+    { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
+  ],
 }[WAVE]
 
 if (!TASKS) { console.error(`unknown wave: ${WAVE}`); process.exit(2) }
