@@ -62,7 +62,7 @@
 
 | 断言 | 业务行为 |
 |------|----------|
-| jsonCodec round-trip 与原生 JSON 逐字节一致 | **存量线上格式逐字节兼容**——现有 19 个触点的数据不改格式即可继续读写 |
+| jsonCodec round-trip 与原生 JSON 序列化结果逐字节一致（断言：`jsonCodec.encode(v) === JSON.stringify(v)`，字符串严格相等）+ 值往返 `JSON.stringify(decode(encode(v))) === JSON.stringify(v)` | **存量线上格式逐字节兼容**——现有 19 个触点的数据不改格式即可继续读写。注：值往返用 `JSON.stringify` 比较，在键序一致的前提下字节相同；语义等价而非「任意键序都字节相同」——任意键序的字节稳定性由 canonicalCodec 承担 |
 | canonicalCodec 键序置换 encode 相同 | JCS 规范化在写入侧生效（§7/§19-6） |
 | canonicalCodec é 组合字符等值 | NFC 附加规范化生效（冻结强制测试） |
 | canonicalCodec decode 兼容存量 JSON | canonical codec 读旧数据不炸（decode = JSON.parse） |
@@ -107,3 +107,18 @@
 | W2C 迁移批次① | learning 域键经 Orchestrator（W1D）+ Repository 真实迁移，R5 快照对照真实数据 |
 | Wave 3 AST Gate | `UI ❌→localStorage` / `业务域 ❌→StorageAdapter` 升级为 AST 静态门禁 |
 | 每轮 Evidence | TEST-PERSISTENCE-BOUNDARY 进 W2 起固定任务清单，防回归 |
+
+## 5. Acceptance Conclusion（W2A 收口结论）
+
+**W2A CLOSED 的证明范围**：
+
+1. Persistence 基础通道行为已通过 53 项行为断言验证（7 + 24 + 6 + 15 + 1）；
+2. Evidence Chain：6/6 Evidence tasks 全 PASS、49/49 chain checks 全绿，matrix commit == HEAD（`e32a03a`）；
+3. 真实快照 16/16 键均可由 namespace registry 识别，0 遗漏（差集 4 键为代码触点校准，见 §0）；
+4. Repository 的跨域写/删边界已具备**运行时判红**；
+5. §3 不覆盖项已显式列出，**不作为 W2A 的隐含证明**；
+6. 后续 W2B（Service Split）/ W2C（迁移批次①）/ Wave 3（AST Boundary Gate）/ Wave 5（性能）各自承担自己的验证责任。
+
+**因此：W2A = CLOSED，且不将未覆盖范围误计入 W2A 证明范围。**
+
+（本节为结论钉死，不产生新证据；W2A 的全部证据仍以 `docs/audit-package/_generated/evidence/W2A/` 下的 6 份 artifact 与 verify 链输出为准。）
