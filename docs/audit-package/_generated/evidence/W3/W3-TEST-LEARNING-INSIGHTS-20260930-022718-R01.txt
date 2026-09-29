@@ -1,0 +1,27 @@
+# RunId: W3-TEST-LEARNING-INSIGHTS-20260930-022718-R01
+# Command: node tests/learning-insights.mjs
+# Commit: 9ae0eeeb2a21166fa34a01e34af3ee50ab4b91cf
+# StartedAt: 2026-09-29T18:27:18.930Z
+# DurationMs: 5341
+# ExitCode: 0
+
+--- stdout+stderr ---
+
+== G6-2 · masteryDistributionV2 过滤 legacy:* ==
+  ✅ 前置自校验：unattributed = 3（legacy 确实在场，防「恒空分布」假通过）
+  ✅ 四档分布不含 legacy（struggling=1, strong=1，其余 0） — {"struggling":1,"learning":0,"familiar":0,"strong":1}
+  ✅ 四档计数之和 = 带 review 的正式记录数（2），不是全表条数（5） — sum=2
+  ✅ legacy 记录的 freshness=unknown 不影响分布（分布只看 review）
+  ✅ 对照组：换成正式键后 struggling=4（证明上面的过滤是内容驱动的，不是写死） — {"struggling":4,"learning":0,"familiar":0,"strong":1}
+  ✅ memorize-only / analytics-only 不进四档分布（分布主题 = 错题本）
+
+== G6-3 · dueWordsV2 分区 ==
+  ✅ due 列表 = 正式到期 contentId，且不含任何 legacy: 前缀 — ["content:word:cet4:dueReal"]
+  ✅ 前置自校验：unattributed = 1（legacy 到期条目确实在场且被计数，不是悄悄消失）
+  ✅ 对照组等式：attributed.length + unattributed === total（分开展示 ≠ 悄悄隐藏） — total=2
+  ✅ 对照组：无 legacy 到期 ⇒ unattributed=0 且 total=1（计数是内容驱动的）
+  ✅ 无 review 的 legacy 占位：不进 due、不计到期数（nothing to review）
+  ✅ 空表：分布全零 + due 全零
+
+共 12 项，通过 12，失败 0
+G6-2 / G6-3 行为侧：全部通过

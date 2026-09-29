@@ -1,0 +1,69 @@
+# RunId: W3-TEST-PERSISTENCE-BOUNDARY-20260930-022657-R01
+# Command: node tests/persistence-boundary.mjs
+# Commit: 9ae0eeeb2a21166fa34a01e34af3ee50ab4b91cf
+# StartedAt: 2026-09-29T18:26:57.877Z
+# DurationMs: 5319
+# ExitCode: 0
+
+--- stdout+stderr ---
+== 1. StorageAdapter ==
+  ✅ 空读 → null
+  ✅ set/get round-trip
+  ✅ has
+  ✅ keys 枚举
+  ✅ remove 后 null
+  ✅ LocalStorageAdapter set/get
+  ✅ LocalStorageAdapter keys/has/remove
+== 2. namespace 注册表 ==
+  ✅ gt.learning.v2 → learning/versioned
+  ✅ gt.learning.v2.backup → learning/versioned
+  ✅ gt.review.v1 → learning/versioned
+  ✅ gt.memorize.v1 → learning/versioned
+  ✅ gt.totals.v1 → learning/versioned
+  ✅ gt.letterStats.v1 → learning/versioned
+  ✅ gt.streak.v1 → learning/versioned
+  ✅ gt.analytics.v1 → analytics/versioned
+  ✅ gt.migration.v1 → migration/versioned
+  ✅ gt.diag.v1 → diagnostics/versioned
+  ✅ gt.customBanks.v1 → content/versioned
+  ✅ gt.bank → settings/simple
+  ✅ gt.mode → settings/simple
+  ✅ gt.theme → settings/simple
+  ✅ gt.shuffle → settings/simple
+  ✅ gt.sound → settings/simple
+  ✅ gt.soundTheme → settings/simple
+  ✅ gt.autoSpeak → settings/simple
+  ✅ gt.voice → settings/simple
+  ✅ gt.lang → settings/simple
+  ✅ 动态键族 gt.learning.v3:<contentId> 可解析
+  ✅ 注册表总量 = 21（20 实测键 + v3 动态族） — len=21
+  ✅ 未注册 gt 键 → null
+  ✅ 非 gt 键 → null
+  ✅ assertWritable 合法键通过
+  ✅ assertWritable 未注册 → NamespaceError
+  ✅ assertWritable 非 gt → NamespaceError
+== 3. codec ==
+  ✅ jsonCodec round-trip 与原生 JSON 逐字节一致
+  ✅ canonicalCodec：键序置换 encode 相同（JCS）
+  ✅ canonicalCodec：é 组合字符等值（NFC）
+  ✅ canonicalCodec decode 兼容存量 JSON 格式
+  ✅ jsonCodec decode 损坏数据 → CodecError
+  ✅ canonicalCodec encode NaN → CodecError（§7 判红透传）
+== 4. Repository ==
+  ✅ 同域写读 round-trip
+  ✅ 跨域读放行（迁移批次需要）
+  ✅ 跨域写判红
+  ✅ 未注册键写判红
+  ✅ 非 gt 键写判红
+  ✅ 跨域删判红
+  ✅ setRaw 过 namespace 但不经 codec
+  ✅ 跨域 setRaw 判红
+  ✅ 按次 codec 注入（canonical 写入）
+  ✅ remove 同域放行
+  ✅ keys() 只返回本域键
+  ✅ settings keys() 域过滤
+== 5. 真实快照键全部可解析 ==
+  ✅ 真实快照 16 键全部在注册表内
+──────────────────────────────────────────────────────
+共 53 项，通过 53，失败 0
+──────────────────────────────────────────────────────

@@ -1,0 +1,47 @@
+# RunId: W3-TEST-LEARNING-BOUNDARY-WIRING-20260930-023233-R01
+# Command: node tests/learning-boundary-wiring.mjs
+# Commit: 743240a6f4be696e191b88dd94fa333da8ca0592
+# StartedAt: 2026-09-29T18:32:33.301Z
+# DurationMs: 6106
+# ExitCode: 0
+
+--- stdout+stderr ---
+== 1. gt.learning.v2 经 Repository 接线 ==
+  ✅ saveLearningV2 → ok
+  ✅ 字节与改造前一致（JSON.stringify 原样落盘）
+  ✅ 键落在 persistence 适配器上（证明走了 Repository）
+  ✅ loadLearningV2 读回等价
+== 2. letterStats / totals ==
+  ✅ saveLetterStats → ok 且字节一致
+  ✅ loadLetterStats 读回等价
+  ✅ saveTotals → ok 且字节一致
+  ✅ loadTotals 读回等价
+== 3. migration 域隔离 ==
+  ✅ saveMigrationMarker 落盘（migration 域仓路由）
+  ✅ loadMigrationMarker 读回
+  ✅ clearMigrationMarker 生效
+  ✅ 跨域写判红（settings 键经 learning 路径）
+  ✅ 未注册键写判红
+  ✅ 非 gt 键写判红
+  ✅ 越界域读判红（settings 键经 learning 通道读 → throw，不静默为 null）
+  ✅ 仓储层跨域读放行（W2A 契约不变：learning 仓可读 settings 键）
+  ✅ 仓储层跨域写仍判红（W2A 契约不变）
+  ✅ 允许域内跨域读放行（analytics 旧键可读）
+  ✅ removeKeyRaw 同域放行
+== 4. 既有语义保持 ==
+[learning/storage] gt.letterStats.v1 JSON 解析失败，已按空表处理（原值被丢弃）
+  ✅ 损坏数据 → 空表（不抛、不静默构造）
+[learning/storage] gt.learning.v2 整表非法，已按空表处理（原值被丢弃）
+  ✅ 键缺失 → 空表
+  ✅ learning.v2 整表非法 → 空表
+  ✅ 存储不可用 → readKeyRaw null（环境语义，不判损坏）
+== 5. 服务拆分向后兼容 ==
+  ✅ 门面 24 个函数全部导出
+  ✅ learningService 单例成员集合不减
+[learning/storage] gt.learning.v2 整表非法，已按空表处理（原值被丢弃）
+  ✅ 拆分后 getState 行为不变（无记录 → null/false）
+  ✅ 拆分后 resolveContentId 行为不变（无 ctx → ''）
+  ✅ 拆分后 rankByWeakness 返回数组
+──────────────────────────────────────────────────────
+共 28 项，通过 28，失败 0
+──────────────────────────────────────────────────────

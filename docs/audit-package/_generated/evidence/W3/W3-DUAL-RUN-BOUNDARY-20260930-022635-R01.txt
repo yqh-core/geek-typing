@@ -1,0 +1,28 @@
+# RunId: W3-DUAL-RUN-BOUNDARY-20260930-022635-R01
+# Command: node scripts/dual-run-boundary.mjs
+# Commit: 9ae0eeeb2a21166fa34a01e34af3ee50ab4b91cf
+# StartedAt: 2026-09-29T18:26:35.528Z
+# DurationMs: 1651
+# ExitCode: 0
+
+--- stdout+stderr ---
+== A-3 Phase 3 · Learning Boundary 回归（探针 6 例 + src 违规数快照）==
+  ℹ️ 正则 oracle 已按 Phase 3 删除；oracle = 探针对照组 + src 快照（见本文件头说明）
+  ✅ P1 静态值导入 → 判红 — 1 条：static-import(analytics)
+  ✅ P1 静态值导入 → 命中的语法种类齐备 — static-import
+  ✅ P2 动态 import() + require() → 判红 — 2 条：dynamic-import(analytics), require(memorizeStore)
+  ✅ P2 动态 import() + require() → 命中的语法种类齐备 — dynamic-import, require
+  ✅ P3 学习键族字面量 → 判红 — 3 条：key-literal(gt.learning.v2), key-literal(gt.learning.v2.backup), key-literal(gt.letterStats.v1)
+  ✅ P3 学习键族字面量 → 命中的语法种类齐备 — key-literal
+  ✅ P4 字符串常量折叠拼接路径 → 判红 — 2 条：dynamic-import(analytics), dynamic-import(reviewStore)
+  ✅ P4 字符串常量折叠拼接路径 → 命中的语法种类齐备 — dynamic-import
+  ✅ P5 export-from 再导出 + 再导出链 → 判红 — 2 条：export-from(analytics), export-from-chain(reviewStore)
+  ✅ P5 export-from 再导出 + 再导出链 → 命中的语法种类齐备 — export-from, export-from-chain
+  ✅ P6 type-only 放行 → 放行（type-only） — 零违规
+  ✅ 汇总：恰好 5 红 1 放行 — 红 5 / 放行 1
+  ✅ 对照组：探针目录确有 ≥6 个文件被判红（「恒放行」实现必失败） — 判红文件数 = 6
+  ✅ 对照组：P4 源码中无整字面量 import 路径（判红只能来自常量折叠）
+  ✅ 真实 src/ 违规总数 == 快照(0) — 实测 = 0（静态 0 / 动态 0 / 键族 0）
+  ✅ 扫描到消费者文件 > 0（扫描口径未被改坏） — 消费者文件数 = 29
+
+共 16 项，通过 16，失败 0

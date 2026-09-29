@@ -1,0 +1,35 @@
+# RunId: W3-TEST-BOUNDARY-AST-20260930-023207-R01
+# Command: node tests/boundary-ast.mjs
+# Commit: 743240a6f4be696e191b88dd94fa333da8ca0592
+# StartedAt: 2026-09-29T18:32:07.341Z
+# DurationMs: 1799
+# ExitCode: 0
+
+--- stdout+stderr ---
+== A-3 · Learning Boundary AST 判定验收（npm test:boundary-ast）==
+  ℹ️ 探针目录 = tests/fixtures/boundary-probe（6 例：5 红 1 放行）；src 快照 = 0/0/0
+  ✅ P1 静态值导入 → 判红 — 1 条：static-import(analytics)
+  ✅ P1 静态值导入 → 命中的语法种类齐备 — static-import
+  ✅ P2 动态 import() + require() → 判红 — 2 条：dynamic-import(analytics), require(memorizeStore)
+  ✅ P2 动态 import() + require() → 命中的语法种类齐备 — dynamic-import, require
+  ✅ P3 学习键族字面量 → 判红 — 3 条：key-literal(gt.learning.v2), key-literal(gt.learning.v2.backup), key-literal(gt.letterStats.v1)
+  ✅ P3 学习键族字面量 → 命中的语法种类齐备 — key-literal
+  ✅ P4 字符串常量折叠拼接路径 → 判红 — 2 条：dynamic-import(analytics), dynamic-import(reviewStore)
+  ✅ P4 字符串常量折叠拼接路径 → 命中的语法种类齐备 — dynamic-import
+  ✅ P5 export-from 再导出 + 再导出链 → 判红 — 2 条：export-from(analytics), export-from-chain(reviewStore)
+  ✅ P5 export-from 再导出 + 再导出链 → 命中的语法种类齐备 — export-from, export-from-chain
+  ✅ P6 type-only 放行 → 放行（type-only） — 零违规
+  ✅ 汇总：恰好 5 红 1 放行 — 红 5 / 放行 1
+  ✅ 对照组：探针目录确有 ≥6 个文件被判红（「恒放行」实现必失败） — 判红文件数 = 6
+  ✅ 对照组：P4 源码中无整字面量 import 路径（判红只能来自常量折叠）
+  ✅ 真实 src/ 违规总数 == 快照(0) — 实测 = 0（静态 0 / 动态 0 / 键族 0）
+  ✅ 扫描到消费者文件 > 0（扫描口径未被改坏） — 消费者文件数 = 29
+
+== 附加判据 ==
+  ✅ AST 判定执行耗时 ≤ 3s — 真实 src/ 扫描 29 个消费者文件，判定耗时 523ms（探针 89ms，合计 612ms）
+  ✅ package.json：gate:learning-boundary 仍指向 scripts/gate-learning-boundary.mjs（CLI 名不变） — 实测 = node scripts/gate-learning-boundary.mjs
+  ✅ package.json：test:boundary-ast 已注册 — 实测 = node tests/boundary-ast.mjs
+  ✅ Phase 3：正则实现已删除（repo 内无 boundary-regex-legacy.mjs） — 已删除（git 历史留档）
+──────────────────────────────────────────────────────
+共 20 项，通过 20，失败 0
+──────────────────────────────────────────────────────

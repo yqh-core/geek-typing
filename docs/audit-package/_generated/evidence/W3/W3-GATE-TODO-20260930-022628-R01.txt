@@ -1,0 +1,43 @@
+# RunId: W3-GATE-TODO-20260930-022628-R01
+# Command: node scripts/gate-todo.mjs
+# Commit: 9ae0eeeb2a21166fa34a01e34af3ee50ab4b91cf
+# StartedAt: 2026-09-29T18:26:28.175Z
+# DurationMs: 2064
+# ExitCode: 1
+
+--- stdout+stderr ---
+== P1.7-W3 · TODO Gate（§14 登记式 allowlist）==
+扫描范围：src / scripts / tests
+exclude（目录段）：node_modules / dist / coverage / _generated / fixtures / vendor / docs
+Tokens：TODO | FIXME | XXX | HACK | BLOCKED | UNIMPLEMENTED | TEMP（完整词匹配，大小写不敏感）
+文件：153 个 —— AST 通道(ts-morph) 91 / 降级通道(正则) 62
+allowlist：P1.7-DEFERRED.md —— 登记 16 条
+
+命中总数 18 处 —— 注释 9 / 标识符 9 / 类型·成员名 0
+已登记豁免 16 处，未登记违规 2 处
+
+---- 已登记（豁免）----
+  ⏸ scripts/build-cet-phonetics.mjs:111  XXX  （comment）
+  ⏸ scripts/content/normalize.mjs:93  BLOCKED  （identifier）
+  ⏸ scripts/content/normalize.mjs:102  BLOCKED  （identifier）
+  ⏸ scripts/content/normalize.mjs:103  BLOCKED  （identifier）
+  ⏸ scripts/content/normalize.mjs:162  BLOCKED  （identifier）
+  ⏸ scripts/content/normalize.mjs:180  BLOCKED  （identifier）
+  ⏸ scripts/content/normalize.mjs:181  BLOCKED  （identifier）
+  ⏸ scripts/gate-practice-engine.mjs:77  XXX  （comment）
+  ⏸ scripts/verify-release-gate.mjs:19  BLOCKED  （comment）
+  ⏸ scripts/verify-release-gate.mjs:23  BLOCKED  （comment）
+  ⏸ scripts/verify-release-gate.mjs:132  BLOCKED  （comment）
+  ⏸ src/components/ReviewPanel.tsx:85  TODO  （identifier）
+  ⏸ src/components/ReviewPanel.tsx:88  TODO  （identifier）
+  ⏸ src/components/ReviewPanel.tsx:90  TODO  （identifier）
+  ⏸ src/core/content/registry.ts:149  XXX  （comment）
+  ⏸ src/lib/customBanks.ts:58  XXX  （comment）
+
+---- 未登记违规（FAIL）----
+  ❌ scripts/evidence-run.mjs:149  TODO  [注释]  汇总门 + A-5 不变量 + §14 TODO 门） * * 本轮新增三项证据：GATE-ARCHITECTURE（一键串行汇总门）、GATE-T
+  ❌ scripts/evidence-run.mjs:151  TODO  [注释]  CTURE（一键串行汇总门）、GATE-TODO（待办标记门）、 * TEST-BOUNDARY-AST（探针 6 例 5 红 1 放行 + src 违规
+
+共 18 处命中：登记 16，违规 2
+
+❌ TODO Gate FAIL

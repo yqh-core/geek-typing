@@ -1,0 +1,25 @@
+# RunId: W3-GATE-ARCHITECTURE-20260930-023154-R01
+# Command: node scripts/gate-architecture.mjs
+# Commit: 743240a6f4be696e191b88dd94fa333da8ca0592
+# StartedAt: 2026-09-29T18:31:54.675Z
+# DurationMs: 4426
+# ExitCode: 0
+
+--- stdout+stderr ---
+== P1.7-W3 · Architecture Gate 汇总（A-4）==
+已接入子门 5 个，计划内待落地 2 个（PENDING 不计 FAIL，但必打印）
+
+  ✅ B02            learning-boundary  EXIT=0  UI→core/learning 唯一入口 / UI❌→lib/learning
+  ✅ G4             g4                 EXIT=0  G4-1/2/3① 静态侧（键族入口 + 零静默 catch）
+  ✅ A03            legacy-wordbank    EXIT=0  旧词库边界
+  ✅ persistence    persistence        EXIT=0  UI❌→localStorage；core/learning❌→browser storage 直触
+  ✅ practice-engine practice-engine    EXIT=0  练习引擎边界
+  ⏳ content-contract content-contract   PENDING（未接入：Wave 4 待落地）  Content 必须经 registry 注册
+  ⏳ perf           perf               PENDING（未接入：Wave 5 待落地）  新依赖必须过 bundle budget
+
+共 7 项：通过 5，失败 0，未接入 2
+失败子项：无
+未接入子项：content-contract(Wave 4) / perf(Wave 5)
+ℹ️ PENDING = 该门尚未到落地 Wave，不阻断当前 Wave 出口；落地后脚本出现即自动转为真实子门并计入 FAIL。
+
+✅ Architecture Gate PASS

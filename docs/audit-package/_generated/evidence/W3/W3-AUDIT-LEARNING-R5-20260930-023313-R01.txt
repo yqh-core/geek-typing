@@ -1,0 +1,41 @@
+# RunId: W3-AUDIT-LEARNING-R5-20260930-023313-R01
+# Command: node scripts/learning-consistency.mjs --user-store=_user-snapshot/real-user-localStorage.json
+# Commit: 743240a6f4be696e191b88dd94fa333da8ca0592
+# StartedAt: 2026-09-29T18:33:13.759Z
+# DurationMs: 662
+# ExitCode: 0
+
+--- stdout+stderr ---
+Learning Consistency Audit
+────────────────────────────
+source                user-store
+source detail         来自 --user-store=_user-snapshot/real-user-localStorage.json
+
+Content records       9,346
+Content distinct      6,713
+Review records        2
+Memorize records      4
+Analytics records     0
+Matched               5
+Orphan                0
+Case conflict         0
+Ambiguous             1
+Duplicate             0
+Invalid               0
+EXIT=0
+
+【抽样明细】
+  orphan: 0
+  caseConflict: 0
+  ambiguous (1):
+    memorize  "eagle"  → ielts, kaoyan
+  invalid: 0
+  matched (5):
+    review  "transformer"  ⊂ ai-core
+    review  "inapt"  ⊂ ielts
+    memorize  "transformer"  ⊂ ai-core
+    memorize  "attention"  ⊂ ai-core
+    memorize  "inapt"  ⊂ ielts
+
+【内容侧大小写冲突（same lowercase, multiple original forms）】
+  count = 0
