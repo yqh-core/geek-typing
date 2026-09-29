@@ -75,6 +75,16 @@ const TASKS = {
     { task: 'TEST-R5', command: 'node tests/r5.mjs' },
     { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
   ],
+  /** Wave 1-D · Orchestrator（Wave 1 出口整合：Journal + Lock + Guard + Recovery + R5 + 真实数据演练） */
+  W1D: [
+    { task: 'TSC', command: 'npx tsc -b --noEmit' },
+    { task: 'LINT', command: 'npx oxlint src/' },
+    { task: 'GATE-LEARNING-BOUNDARY', command: 'node scripts/gate-learning-boundary.mjs' },
+    { task: 'BUILD', command: 'npm run build' },
+    { task: 'TEST-ORCHESTRATOR', command: 'node tests/migration-orchestrator.mjs' },
+    { task: 'DRYRUN-REAL', command: 'node scripts/migration-dryrun-w1.mjs --user-store=_user-snapshot/real-user-localStorage.json' },
+    { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
+  ],
 }[WAVE]
 
 if (!TASKS) { console.error(`unknown wave: ${WAVE}`); process.exit(2) }
