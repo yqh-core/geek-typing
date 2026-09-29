@@ -1,0 +1,32 @@
+# RunId: W2C-TEST-ANALYTICS-IDENTITY-20260930-011952-R01
+# Command: node tests/analytics-identity.mjs
+# Commit: 3d24ea1bb59e59401230975f963c6cad9261dd2d
+# StartedAt: 2026-09-29T17:19:52.848Z
+# DurationMs: 6044
+# ExitCode: 0
+
+--- stdout+stderr ---
+
+【a+b】源码级：写入路径零 toLowerCase
+  ✅ recordWordDone 函数体内 toLowerCase 计数 = 0 — count=0
+  ✅ 全文件 toLowerCase 全部归属白名单（letter/wordStatOf/absorbLegacyWordKey/rankByWeakness） — 4 处全部合法
+
+【c】行为契约
+  ✅ recordWordDone 写入原词形键 — {"treeShaking":{"done":1,"wrong":0}}
+  ✅ 不再产生 lowercase 键
+  ✅ recordWordDone 纯函数（不改输入）
+  ✅ legacy lowercase 计数并入原词形键（done 3+1=4 / wrong 1+1=2） — {"treeShaking":{"done":4,"wrong":2}}
+  ✅ legacy lowercase 键消失
+  ✅ totalWords 只 +1（合并不虚增）
+  ✅ 全小写词正常累加（done=2, wrong=1）
+  ✅ wordStatOf 原词形优先（legacy 共存时取原词形） — {"done":2,"wrong":0}
+  ✅ wordStatOf miss 时 fallback legacy lowercase — {"done":3,"wrong":1}
+  ✅ fallback 是只读（lowercase 键不被写回/不消失）
+  ✅ wordStatOf 两边皆无 → {done:0,wrong:0}
+  ✅ wrongWords 返回原词形键 — treeShaking
+  ✅ Apple 与 apple 是两个独立身份键 — {"Apple":{"done":1,"wrong":1},"apple":{"done":1,"wrong":0}}
+  ✅ totalWords = 2（两个词都算）
+  ✅ 复合场景：原词形已有计数 + legacy 并入（done 1+5+1=7 / wrong 1+2+0=3） — {"treeShaking":{"done":7,"wrong":3}}
+──────────────────────────────────────────────────────
+共 17 项，通过 17，失败 0
+──────────────────────────────────────────────────────

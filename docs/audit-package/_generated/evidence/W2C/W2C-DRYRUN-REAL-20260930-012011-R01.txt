@@ -1,0 +1,26 @@
+# RunId: W2C-DRYRUN-REAL-20260930-012011-R01
+# Command: node scripts/migration-dryrun-w1.mjs --user-store=_user-snapshot/real-user-localStorage.json
+# Commit: 3d24ea1bb59e59401230975f963c6cad9261dd2d
+# StartedAt: 2026-09-29T17:20:11.196Z
+# DurationMs: 4757
+# ExitCode: 0
+
+--- stdout+stderr ---
+快照：16 键（真实用户数据，只读播种）
+
+== 编排器全流水线（真实数据） ==
+  ✅ committed=true / aborted=false
+  ✅ 恢复决策 = RUN
+  ✅ journal phase=committed
+
+== 独立验收（不信任编排器自报） ==
+  ✅ R5 五零 + identity set 相等（4 条） — {"duplicateCount":0,"danglingReferenceCount":0,"brokenRequiredRelationCount":0,"invalidEnumCount":0,"unexpectedLossCount":0}
+  ✅ 值无损：4 条记录 canonicalHash 全等（JCS+NFC 重编码 round-trip）
+  ✅ 旧键 gt.learning.v2 已移除（REMOVE OLD 在 COMMIT 后）
+  ✅ 其余 15 个非迁移键原样保留（零副作用）
+  ✅ 锁已释放（墓碑）
+  ✅ 重跑 → COMPLETE（幂等收口）
+  ✅ 重跑后 localStorage 状态不变
+──────────────────────────────────────────────────────
+共 10 项，通过 10，失败 0
+──────────────────────────────────────────────────────
