@@ -1,0 +1,104 @@
+{
+  "wave": "W1A",
+  "commit": "fa63d17991809bfe058e948f920084cefd6dadb8",
+  "generatedAt": "2026-09-29T06:59:06.258Z",
+  "summary": {
+    "total": 7,
+    "pass": 7,
+    "fail": 0
+  },
+  "note": "Status machine-generated from exit code; PASS is not manually writable (P1.7-PLAN v2.3.2 §15/§19-9).",
+  "entries": [
+    {
+      "task": "TSC",
+      "command": "npx tsc -b --noEmit",
+      "owner": "agent",
+      "runId": "W1A-TSC-20260929-145527-R01",
+      "exitCode": 0,
+      "commit": "fa63d17991809bfe058e948f920084cefd6dadb8",
+      "timestamp": "2026-09-29T06:55:27.098Z",
+      "durationMs": 7220,
+      "artifactSha256": "62728f4de7abb060f795545967d51e2109873149f308c741f6d4a32711387c31",
+      "evidence": "docs/audit-package/_generated/evidence/W1A/W1A-TSC-20260929-145527-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "LINT",
+      "command": "npx oxlint src/",
+      "owner": "agent",
+      "runId": "W1A-LINT-20260929-145534-R01",
+      "exitCode": 0,
+      "commit": "fa63d17991809bfe058e948f920084cefd6dadb8",
+      "timestamp": "2026-09-29T06:55:34.339Z",
+      "durationMs": 2563,
+      "artifactSha256": "2a223feccaff14e92711e19d63254263a6ab73c560250791d36947f0d2e4368c",
+      "evidence": "docs/audit-package/_generated/evidence/W1A/W1A-LINT-20260929-145534-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "GATE-LEARNING-BOUNDARY",
+      "command": "node scripts/gate-learning-boundary.mjs",
+      "owner": "agent",
+      "runId": "W1A-GATE-LEARNING-BOUNDARY-20260929-145536-R01",
+      "exitCode": 0,
+      "commit": "fa63d17991809bfe058e948f920084cefd6dadb8",
+      "timestamp": "2026-09-29T06:55:36.922Z",
+      "durationMs": 494,
+      "artifactSha256": "7d97c79bcc32168456945c447a2ae849aa24f50040063c6ef629189fdfe4d375",
+      "evidence": "docs/audit-package/_generated/evidence/W1A/W1A-GATE-LEARNING-BOUNDARY-20260929-145536-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "BUILD",
+      "command": "npm run build",
+      "owner": "agent",
+      "runId": "W1A-BUILD-20260929-145537-R01",
+      "exitCode": 0,
+      "commit": "fa63d17991809bfe058e948f920084cefd6dadb8",
+      "timestamp": "2026-09-29T06:55:37.436Z",
+      "durationMs": 13195,
+      "artifactSha256": "af9569a144d0ddc6343d8d67955987248c547fed72dc040f10235c5fd2398f80",
+      "evidence": "docs/audit-package/_generated/evidence/W1A/W1A-BUILD-20260929-145537-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "TEST-LOCK",
+      "command": "node tests/migration-lock.mjs",
+      "owner": "agent",
+      "runId": "W1A-TEST-LOCK-20260929-145550-R01",
+      "exitCode": 0,
+      "commit": "fa63d17991809bfe058e948f920084cefd6dadb8",
+      "timestamp": "2026-09-29T06:55:50.651Z",
+      "durationMs": 2300,
+      "artifactSha256": "4ddd62a156832237584fea4c560a615dca3412a98de67a7d1aa9153210997db4",
+      "evidence": "docs/audit-package/_generated/evidence/W1A/W1A-TEST-LOCK-20260929-145550-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "TEST-LOCK-BROWSER",
+      "command": "node tests/migration-lock-browser.mjs",
+      "owner": "agent",
+      "runId": "W1A-TEST-LOCK-BROWSER-20260929-145552-R01",
+      "exitCode": 0,
+      "commit": "fa63d17991809bfe058e948f920084cefd6dadb8",
+      "timestamp": "2026-09-29T06:55:52.971Z",
+      "durationMs": 33995,
+      "artifactSha256": "4c48bb57405237a01ddc5f9d624dfe69b2f79ccb96de16f019da4c1401c1435d",
+      "evidence": "docs/audit-package/_generated/evidence/W1A/W1A-TEST-LOCK-BROWSER-20260929-145552-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "TEST-E2E",
+      "command": "node tests/e2e.mjs",
+      "owner": "agent",
+      "runId": "W1A-TEST-E2E-20260929-145626-R01",
+      "exitCode": 0,
+      "commit": "fa63d17991809bfe058e948f920084cefd6dadb8",
+      "timestamp": "2026-09-29T06:56:26.986Z",
+      "durationMs": 159251,
+      "artifactSha256": "0b8fed9596b50c39772b2e2c6f7e91d3bdda25a1c3f912c2b191ff020e7d7172",
+      "evidence": "docs/audit-package/_generated/evidence/W1A/W1A-TEST-E2E-20260929-145626-R01.txt",
+      "status": "PASS"
+    }
+  ]
+}

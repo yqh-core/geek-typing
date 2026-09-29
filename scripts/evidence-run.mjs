@@ -41,6 +41,16 @@ const TASKS = {
     { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
     { task: 'AUDIT-LEARNING-R5', command: 'node scripts/learning-consistency.mjs --user-store=_user-snapshot/real-user-localStorage.json' },
   ],
+  /** Wave 1-A · Migration Lock（全协议 CAS + fencing） */
+  W1A: [
+    { task: 'TSC', command: 'npx tsc -b --noEmit' },
+    { task: 'LINT', command: 'npx oxlint src/' },
+    { task: 'GATE-LEARNING-BOUNDARY', command: 'node scripts/gate-learning-boundary.mjs' },
+    { task: 'BUILD', command: 'npm run build' },
+    { task: 'TEST-LOCK', command: 'node tests/migration-lock.mjs' },
+    { task: 'TEST-LOCK-BROWSER', command: 'node tests/migration-lock-browser.mjs' },
+    { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
+  ],
 }[WAVE]
 
 if (!TASKS) { console.error(`unknown wave: ${WAVE}`); process.exit(2) }

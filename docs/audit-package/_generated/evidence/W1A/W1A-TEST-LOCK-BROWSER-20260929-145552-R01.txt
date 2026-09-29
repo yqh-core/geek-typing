@@ -1,0 +1,23 @@
+# RunId: W1A-TEST-LOCK-BROWSER-20260929-145552-R01
+# Command: node tests/migration-lock-browser.mjs
+# Commit: fa63d17991809bfe058e948f920084cefd6dadb8
+# StartedAt: 2026-09-29T06:55:52.971Z
+# DurationMs: 33995
+# ExitCode: 0
+
+--- stdout+stderr ---
+== 1. 真 IDB：20 并发 acquire ==
+  ✅ 20 并发 acquire → 恰好 1 个成功 — okCount=1
+  ✅ 胜者 fencingToken = 1
+  ✅ 其余 19 个失败原因均为 held
+== 2. 跨页签 double writer ==
+  ✅ 页签 A acquire → 成功 token=1
+  ✅ 页签 B acquire（A 持有中）→ FAIL（跨页签可见）
+  ✅ 页签 B renew（伪造期望）→ FAIL
+  ✅ 页签 A renew（三元组匹配）→ 成功
+  ✅ 页签 A release → 成功（墓碑 token 保留）
+  ✅ A 释放后页签 B acquire → 成功 token=2（fencing 跨周期单调）
+  ✅ stale 页签 A 的 renew 与 release 均 FAIL（B 持 token=2）
+──────────────────────────────────────────────────────
+共 10 项，通过 10，失败 0
+──────────────────────────────────────────────────────
