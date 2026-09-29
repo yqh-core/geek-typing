@@ -1,0 +1,91 @@
+{
+  "wave": "W2A",
+  "commit": "e32a03a3375d5abe7a0d96a10c1d46ac6ff42f5b",
+  "generatedAt": "2026-09-29T15:42:12.947Z",
+  "summary": {
+    "total": 6,
+    "pass": 6,
+    "fail": 0
+  },
+  "note": "Status machine-generated from exit code; PASS is not manually writable (P1.7-PLAN v2.3.2 §15/§19-9).",
+  "entries": [
+    {
+      "task": "TSC",
+      "command": "npx tsc -b --noEmit",
+      "owner": "agent",
+      "runId": "W2A-TSC-20260929-233854-R01",
+      "exitCode": 0,
+      "commit": "e32a03a3375d5abe7a0d96a10c1d46ac6ff42f5b",
+      "timestamp": "2026-09-29T15:38:54.940Z",
+      "durationMs": 6712,
+      "artifactSha256": "019225283b9e1ba858a39956f9cdbcc45dc4c4468aa52de41a43b4226927c553",
+      "evidence": "docs/audit-package/_generated/evidence/W2A/W2A-TSC-20260929-233854-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "LINT",
+      "command": "npx oxlint src/",
+      "owner": "agent",
+      "runId": "W2A-LINT-20260929-233901-R01",
+      "exitCode": 0,
+      "commit": "e32a03a3375d5abe7a0d96a10c1d46ac6ff42f5b",
+      "timestamp": "2026-09-29T15:39:01.674Z",
+      "durationMs": 2600,
+      "artifactSha256": "cc6b8414a1f217d9fa25f8361cb16e7a30c746e92336f9d33ece830ab919ba41",
+      "evidence": "docs/audit-package/_generated/evidence/W2A/W2A-LINT-20260929-233901-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "GATE-LEARNING-BOUNDARY",
+      "command": "node scripts/gate-learning-boundary.mjs",
+      "owner": "agent",
+      "runId": "W2A-GATE-LEARNING-BOUNDARY-20260929-233904-R01",
+      "exitCode": 0,
+      "commit": "e32a03a3375d5abe7a0d96a10c1d46ac6ff42f5b",
+      "timestamp": "2026-09-29T15:39:04.294Z",
+      "durationMs": 485,
+      "artifactSha256": "b2e098586cd6e36a979510f9458a69d74664ecf1974e7c31f7d5cd34baf71ba2",
+      "evidence": "docs/audit-package/_generated/evidence/W2A/W2A-GATE-LEARNING-BOUNDARY-20260929-233904-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "BUILD",
+      "command": "npm run build",
+      "owner": "agent",
+      "runId": "W2A-BUILD-20260929-233904-R01",
+      "exitCode": 0,
+      "commit": "e32a03a3375d5abe7a0d96a10c1d46ac6ff42f5b",
+      "timestamp": "2026-09-29T15:39:04.800Z",
+      "durationMs": 13948,
+      "artifactSha256": "2419539508d7707b03356f729371d757db1faced0cb427c720658191a41745cf",
+      "evidence": "docs/audit-package/_generated/evidence/W2A/W2A-BUILD-20260929-233904-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "TEST-PERSISTENCE-BOUNDARY",
+      "command": "node tests/persistence-boundary.mjs",
+      "owner": "agent",
+      "runId": "W2A-TEST-PERSISTENCE-BOUNDARY-20260929-233918-R01",
+      "exitCode": 0,
+      "commit": "e32a03a3375d5abe7a0d96a10c1d46ac6ff42f5b",
+      "timestamp": "2026-09-29T15:39:18.768Z",
+      "durationMs": 4760,
+      "artifactSha256": "07be416239d846e169118e946b8a8f8a7af7fa55bdda3374aa9e0db34f637a71",
+      "evidence": "docs/audit-package/_generated/evidence/W2A/W2A-TEST-PERSISTENCE-BOUNDARY-20260929-233918-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "TEST-E2E",
+      "command": "node tests/e2e.mjs",
+      "owner": "agent",
+      "runId": "W2A-TEST-E2E-20260929-233923-R01",
+      "exitCode": 0,
+      "commit": "e32a03a3375d5abe7a0d96a10c1d46ac6ff42f5b",
+      "timestamp": "2026-09-29T15:39:23.547Z",
+      "durationMs": 169379,
+      "artifactSha256": "024528422f496969b537cc86bd481f11b36edca660e4a24a74f87d3be8fc43a6",
+      "evidence": "docs/audit-package/_generated/evidence/W2A/W2A-TEST-E2E-20260929-233923-R01.txt",
+      "status": "PASS"
+    }
+  ]
+}
