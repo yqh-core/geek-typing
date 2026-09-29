@@ -1,6 +1,6 @@
 import { Flame } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
-import { accuracyOf, weakLetters, wrongWords, type Analytics } from '../lib/analytics'
+import { accuracyOf, weakLetters, wrongWords, type Analytics } from '../core/learning'
 import { DAILY_GOAL, getRecentDays, type History } from '../lib/streak'
 import { useT } from '../i18n'
 

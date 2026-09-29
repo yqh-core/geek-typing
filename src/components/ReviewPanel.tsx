@@ -3,12 +3,8 @@ import { BookOpenCheck, ChevronDown, Crosshair } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
 import { type WordBank, type WordItem } from '../data/wordBanks'
 import { buildLoadedMap, resolveReviewWord } from '../lib/wordResolve'
-import { type Analytics, wordStatOf } from '../lib/analytics'
-import { loadReview, reviewItemViews, type ReviewItemView } from '../lib/reviewStore'
-import { masteryDistribution, masteryOf, type MasteryLevel } from '../lib/mastery'
-import { isV2Store } from '../lib/learning/upgrade'
-import { loadLearningV2 } from '../lib/learning/storage'
-import { masteryDistributionV2 } from '../lib/learning/insights'
+import { learningService, wordStatOf, type Analytics, type ReviewItemView } from '../core/learning'
+import { masteryOf, type MasteryLevel } from '../lib/mastery'
 import { useLang, useT } from '../i18n'
 
 interface ReviewPanelProps {
@@ -40,15 +36,15 @@ export default function ReviewPanel({ theme, banks, reviewVersion, analytics, on
   /** 复习条目视图（P1.5-S4：State B = (词,包) 对，含精确 contentId；State A = 词表） */
   const views = useMemo(() => {
     void reviewVersion
-    return reviewItemViews()
+    return learningService.getReviewItemViews()
   }, [reviewVersion])
 
   /** 掌握度分布。S4：State B 走 insights.masteryDistributionV2（legacy:* 不混入四档 ——
-   *  G6-2 语义；UI → insights → learning/storage 证据链）；
-   *  State A（升级前）仍按 v1 表计算，行为逐字节兼容。 */
+   *  G6-2 语义；UI → core/learning 门面 → insights → learning/storage 证据链）；
+   *  State A（升级前）仍按 v1 表计算，行为逐字节兼容。v2/legacy 分支下沉在门面。 */
   const dist = useMemo(() => {
     void reviewVersion
-    return isV2Store() ? masteryDistributionV2(loadLearningV2()).attributed : masteryDistribution(loadReview())
+    return learningService.getMasteryDistribution()
   }, [reviewVersion])
 
   const due = useMemo(() => views.filter((v) => v.entry.nextReviewAt <= Date.now()), [views])

@@ -30,11 +30,14 @@ import {
   recordWrong,
   recordCorrect,
   hasReviewRecord,
+  loadReview,
   reviewItemViews,
   reviewDueViews,
   reviewDueCount,
   reviewTotalCount,
 } from '../../lib/reviewStore'
+import { isV2Store, runStartupMigration } from '../../lib/learning/upgrade'
+import { masteryDistribution } from '../../lib/mastery'
 import {
   recordWordDoneV2 as recordWordDoneV2Lib,
   loadAnalytics,
@@ -214,6 +217,29 @@ function dispatchAnswer(
 }
 
 /** 门面单例：UI 一律 import { learningService } from '.../learning/service' */
+/* ---------------- P1.6-B+ 补强（白名单清零）：ReviewPanel 读路径下沉 ----------------
+ * 原逻辑内联在 ReviewPanel.tsx（直连 reviewStore / learning/upgrade / learning/storage /
+ * learning/insights），此处**逐字搬入、不改行为**：分支条件与返回值与原实现完全一致。 */
+
+/** 复习条目视图（(词,包) 对，含精确 contentId；State A = 词表）。仅转发既有视图函数。 */
+export function getReviewItemViews() {
+  return reviewItemViews()
+}
+
+/** 掌握度分布。State B 走 insights.masteryDistributionV2（legacy:* 不混入四档，G6-2 语义）；
+ *  State A（升级前）仍按 v1 表计算，行为逐字节兼容。 */
+export function getMasteryDistribution() {
+  return isV2Store()
+    ? masteryDistributionV2(loadLearningV2()).attributed
+    : masteryDistribution(loadReview())
+}
+
+/** 启动迁移（S4 硬耦合②：迁移必须在首屏渲染前完成或明确放弃）。
+ *  纯转发——原 main.tsx 直连 lib/learning/upgrade，P1.6-B+ 收口为经门面。 */
+export function startupMigration(): Promise<import('../../lib/learning/upgrade').UpgradeOutcome> {
+  return runStartupMigration()
+}
+
 export const learningService = {
   getState,
   getMemorizeView,
@@ -225,6 +251,9 @@ export const learningService = {
   getReviewDueCount,
   getReviewTotalCount,
   getReviewDueViews,
+  getReviewItemViews,
+  getMasteryDistribution,
+  startupMigration,
   getAnalytics,
   applyWordDone,
   applyKey,

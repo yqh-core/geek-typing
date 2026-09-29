@@ -6,10 +6,10 @@ import { speak } from '../lib/speech'
 import { sound } from '../lib/sound'
 import { celebrate } from '../lib/confetti'
 import {
+  learningService,
   type MemStatus,
   type MemStore,
-} from '../lib/memorizeStore'
-import { learningService } from '../core/learning/service'
+} from '../core/learning'
 import { practiceEngine } from '../core/practice'
 import { useT } from '../i18n'
 

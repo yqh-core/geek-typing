@@ -3,11 +3,10 @@ import { BarChart3, X, RotateCcw, Crosshair, Trash2, BookOpenCheck } from 'lucid
 import type { ThemeConfig } from '../lib/theme'
 import {
   accuracyOf,
-  resetAnalytics,
   weakLetters,
   wrongWords,
   type Analytics,
-} from '../lib/analytics'
+} from '../core/learning'
 import { useT, useLang } from '../i18n'
 
 interface StatsPanelProps {
@@ -215,5 +214,3 @@ export default function StatsPanel({
     </>
   )
 }
-
-export { resetAnalytics }
