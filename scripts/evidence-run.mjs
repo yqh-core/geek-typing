@@ -51,6 +51,17 @@ const TASKS = {
     { task: 'TEST-LOCK-BROWSER', command: 'node tests/migration-lock-browser.mjs' },
     { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
   ],
+  /** Wave 1-B · FencedWrite（MigrationWriteGuard + IDB staging + 单次同步切换 + kill-page） */
+  W1B: [
+    { task: 'TSC', command: 'npx tsc -b --noEmit' },
+    { task: 'LINT', command: 'npx oxlint src/' },
+    { task: 'GATE-LEARNING-BOUNDARY', command: 'node scripts/gate-learning-boundary.mjs' },
+    { task: 'BUILD', command: 'npm run build' },
+    { task: 'TEST-LOCK', command: 'node tests/migration-lock.mjs' },
+    { task: 'TEST-FENCED-WRITE', command: 'node tests/fenced-write.mjs' },
+    { task: 'TEST-FENCED-WRITE-BROWSER', command: 'node tests/fenced-write-browser.mjs' },
+    { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
+  ],
 }[WAVE]
 
 if (!TASKS) { console.error(`unknown wave: ${WAVE}`); process.exit(2) }
