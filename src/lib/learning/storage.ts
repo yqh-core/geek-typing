@@ -31,7 +31,7 @@ import type {
 import { isLearningRecord, isLegacyKey, isLegacyRecord } from './types'
 import { mapCodec } from './codec'
 import { reportDiag, emitSaveFailure, errorNameOf, isQuotaError, checkQuotaPressure } from './diagnostics'
-// P1.7-W2B：原生 localStorage 读写收口到 persistence 层 Repository（namespace 注册校验 + owner 域匹配）。
+// P1.7-W2B：原生存储读写收口到 persistence 层 Repository（namespace 注册校验 + owner 域匹配）。
 // 只走 getRaw/setRaw，写入字节与改造前完全一致，配额熔断 / 损坏告警 / diag 逻辑零改动。
 import { readKeyRaw, writeKeyRaw, removeKeyRaw } from '../../core/learning/storage-io'
 
@@ -81,7 +81,7 @@ function readRaw<T>(key: string, fallback: T, guard: (v: unknown) => v is T): { 
   try {
     raw = readKeyRaw(key) // P1.7-W2B：经 persistence Repository（namespace 校验 + owner 域匹配）
   } catch {
-    // 隐私模式 / localStorage 不可用 —— 这是**环境不支持**，不是数据损坏
+    // 隐私模式 / 存储不可用 —— 这是**环境不支持**，不是数据损坏
     return { value: fallback, corrupted: false }
   }
   if (raw === null) return { value: fallback, corrupted: false }
@@ -173,7 +173,7 @@ export function saveLearningV2(store: LearningStoreV2, protectedKey?: string): S
     for (const [k] of victims) delete working[k]
     evicted += victims.length
     console.warn(
-      `[learning/storage] localStorage 配额不足，熔断清洗第 ${round} 轮：清理 ${victims.length} 条（累计 ${evicted}）`,
+      `[learning/storage] 存储配额不足，熔断清洗第 ${round} 轮：清理 ${victims.length} 条（累计 ${evicted}）`,
     )
     try {
       writeKeyRaw(KEY_LEARNING_V2, JSON.stringify(working))
@@ -418,7 +418,7 @@ export function rollbackLearningV1(token: RollbackToken): RollbackOutcome {
 /* ---------------- diagnostics（§3.4 第 4 条） ---------------- */
 
 export interface LearningDiagnostics {
-  /** 已用 UTF-16 字节（localStorage 按字符 ×2 计费） */
+  /** 已用 UTF-16 字节（本机存储按字符 ×2 计费） */
   bytesUtf16: number
   learningRecords: number
   legacyRecords: number

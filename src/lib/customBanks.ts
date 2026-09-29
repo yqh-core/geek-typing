@@ -1,3 +1,4 @@
+import { contentChannel } from '../core/persistence/channels'
 import type { WordItem } from '../data/wordBanks'
 
 const KEY = 'gt.customBanks.v1'
@@ -11,7 +12,9 @@ export interface CustomBank {
 
 export function loadCustomBanks(): CustomBank[] {
   try {
-    const raw = localStorage.getItem(KEY)
+    // P1.7-W2C：原生读收口到 persistence 通道（content 域授权）。沿用原有降级语义 ——
+    // 通道抛出的 NamespaceError 与存储不可用同样被下面的 catch 吃掉并留痕，与 W2B upgrade.ts 同口径。
+    const raw = contentChannel.read(KEY)
     return raw ? (JSON.parse(raw) as CustomBank[]) : []
   } catch (e) {
     // G4-3 零静默失败：读取失败按空表处理但留痕（S4 迁移时移除）
@@ -22,7 +25,7 @@ export function loadCustomBanks(): CustomBank[] {
 
 function persist(banks: CustomBank[]) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(banks))
+    contentChannel.write(KEY, JSON.stringify(banks))
   } catch (e) {
     // G4-3 ② 无保护 setItem = 0：这里原先**直接抛** —— 异常会穿透 React 事件处理器
     // 打到 ErrorBoundary，整个词库面板因一次写失败白屏。改为留痕 + 静默返回，

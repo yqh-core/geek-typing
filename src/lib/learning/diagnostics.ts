@@ -21,10 +21,12 @@
  * ⚠️ 循环依赖说明：`storage.ts` 会 import 本文件（写完失败要上报）。
  *    因此本文件**绝不能** import `storage.ts` —— 否则形成
  *    `storage.ts → diagnostics.ts → storage.ts` 的循环。所以本文件里
- *    写 `gt.diag.v1` 时**直接**用 `localStorage.setItem` 并吞掉自己的异常。
+ *    写 `gt.diag.v1` 时**直接**用持久化通道落盘并吞掉自己的异常。
  *    这也是整个代码库里**唯一被设计文档允许的静默 catch**：观测者无法自我诊断，
  *    若 diag 自己的写入失败还要再写一条 diag，就是无限递归。
  */
+
+import { diagnosticsChannel } from '../../core/persistence/channels'
 
 /* ===========================================================================
  * §3.4 问题 4 —— DiagEntry
@@ -135,14 +137,16 @@ export function isDiagPersistenceEnabled(): boolean {
 /**
  * 把一条 diag 追加到 `gt.diag.v1`（仅当显式开启）。
  *
- * ⚠️ 本函数**直接**用 `localStorage.setItem`，不走 `storage.ts` —— 见文件头的循环依赖说明。
+ * ⚠️ 本函数**直接**经 `diagnosticsChannel` 落盘，不走 `storage.ts` —— 见文件头的循环依赖说明。
  *    且**任何写入失败都静默丢弃**：观测者不可能自我诊断（设计文档原文：
  *    「任何写入失败时静默丢弃（不可能自我诊断）」）。
  */
 function persistDiagIfEnabled(entry: DiagEntry): void {
   if (!diagPersistenceEnabled) return
   try {
-    const raw = localStorage.getItem(KEY_DIAG)
+    // P1.7-W2C：原生读收口到 persistence 诊断通道。沿用原有降级语义 ——
+    // 通道抛出的 NamespaceError 与存储不可用同样被下面的 catch 静默丢弃（观测者不自我诊断）。
+    const raw = diagnosticsChannel.read(KEY_DIAG)
     let list: DiagEntry[] = []
     if (raw) {
       try {
@@ -155,7 +159,7 @@ function persistDiagIfEnabled(entry: DiagEntry): void {
     }
     list.push(entry)
     if (list.length > DIAG_PERSIST_CAPACITY) list = list.slice(list.length - DIAG_PERSIST_CAPACITY)
-    localStorage.setItem(KEY_DIAG, JSON.stringify(list))
+    diagnosticsChannel.write(KEY_DIAG, JSON.stringify(list))
   } catch {
     /* 静默丢弃（设计文档明确允许）：观测者不能自我诊断 */
   }
@@ -164,7 +168,8 @@ function persistDiagIfEnabled(entry: DiagEntry): void {
 /** 读取落盘的 diag（供设置页「导出诊断信息」使用） */
 export function loadPersistedDiag(): DiagEntry[] {
   try {
-    const raw = localStorage.getItem(KEY_DIAG)
+    // P1.7-W2C：同 persistDiagIfEnabled —— 沿用原有降级语义（读不到即空列表）。
+    const raw = diagnosticsChannel.read(KEY_DIAG)
     if (!raw) return []
     const parsed: unknown = JSON.parse(raw)
     return Array.isArray(parsed) ? (parsed as DiagEntry[]) : []
@@ -261,7 +266,7 @@ export function isQuotaError(e: unknown): boolean {
  * 保守配额口径：5 MiB（§2.9 同款）。
  *
  * 为什么不用 `navigator.storage.estimate()`：它是异步的、且各浏览器给出的数字
- * 差异极大（Chrome 给整个 origin 的配额而不是 localStorage 的）。localStorage
+ * 差异极大（Chrome 给整个 origin 的配额而不是本机存储的）。本机存储
  * 的行业保守口径一直是 ~5 MiB，用它算百分比**只会高估占用**（提前告警），
  * 不会漏报 —— 对观测来说是安全的方向。
  */
@@ -281,15 +286,23 @@ export interface QuotaSnapshot {
   percent: number
 }
 
-/** 遍历 localStorage 的 `gt.*` 键算占用。存储不可用时返回零快照（不抛）。 */
+/** 遍历本机存储的 `gt.*` 键算占用。存储不可用时返回零快照（不抛）。 */
 export function snapshotQuota(): QuotaSnapshot {
   const perKeyBytes: Record<string, number> = {}
   let totalGtBytes = 0
   try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i)
+    // P1.7-W2C：全量枚举收口到诊断通道的 allKeys()（唯一被授权的全量枚举通道，
+    // 见 channel.ts 的 ALL_KEYS_LABEL）；沿用原有降级语义 —— 存储不可用时空快照、不抛。
+    // 未注册的 gt.* 键经通道读取会被判红（NamespaceError）：这里**逐键跳过**而不是让异常
+    // 冲掉整轮循环 —— 否则一个来历不明的 gt.* 键会让后面所有键都统计不到（半截快照）。
+    for (const k of diagnosticsChannel.allKeys()) {
       if (!k || !k.startsWith('gt.')) continue
-      const raw = localStorage.getItem(k)
+      let raw: string | null
+      try {
+        raw = diagnosticsChannel.read(k)
+      } catch {
+        continue // 未注册键：不经通道读不到，少算一条好过整轮截断
+      }
       const bytes = raw === null ? 0 : raw.length * 2
       perKeyBytes[k] = bytes
       totalGtBytes += bytes

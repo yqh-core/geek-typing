@@ -18,7 +18,7 @@ export function useAnalytics() {
     setAnalytics(next)
   }, [])
 
-  // 分析数据落盘（节流，避免每次击键都写 localStorage）
+  // 分析数据落盘（节流，避免每次击键都写本机存储）
   useEffect(() => {
     const t = window.setTimeout(() => learningService.persistAnalytics(analytics), 800)
     return () => window.clearTimeout(t)

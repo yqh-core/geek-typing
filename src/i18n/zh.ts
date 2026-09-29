@@ -87,7 +87,7 @@ export const zh: Record<string, string> = {
   'panel.weakPractice': '针对这些弱字母专攻一轮',
   'panel.wrongWords': '错词榜',
   'panel.noWrong': '暂无错词，干净得离谱 👏',
-  'panel.localOnly': '数据只保存在本机 localStorage',
+  'panel.localOnly': '数据只保存在本机浏览器',
   'panel.confirmClear': '确认清空',
   'panel.cancel': '取消',
   'panel.clear': '清空统计数据',
@@ -202,7 +202,7 @@ export const zh: Record<string, string> = {
   'streak.dayUnit': '天',
   'streak.today': '今日',
   'streak.wordsUnit': '词',
-  'streak.localOnly': '数据保存在本机 localStorage',
+  'streak.localOnly': '数据保存在本机浏览器',
 
   /* 页脚 */
   'footer.hint1': '别找输入框，直接在键盘上敲字母即可',

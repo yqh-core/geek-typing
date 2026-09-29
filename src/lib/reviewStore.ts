@@ -16,6 +16,7 @@
  * 排期 ±10% 抖动抗雪崩；Quota 熔断参数与 learning/storage.ts 同源。
  */
 
+import { legacyStoreChannel } from '../core/persistence/channels'
 import { getRecord, loadLearningV2, saveLearningV2 } from './learning/storage'
 import { isLearningRecord, isLegacyKey, type LearningRecord } from './learning/types'
 import { isV2Store } from './learning/upgrade'
@@ -49,7 +50,9 @@ const DAY = 24 * 60 * 60 * 1000
 /** 读取错题表（JSON 损坏 / 隐私模式返回空表）—— v1 路径；State B 由 gt.learning.v2 接管 */
 export function loadReview(): ReviewStore {
   try {
-    const raw = localStorage.getItem(KEY)
+    // P1.7-W2C：原生读收口到 persistence 通道（learning 域授权）。沿用原有降级语义 ——
+    // 通道抛出的 NamespaceError 与存储不可用同样被下面的 catch 吃掉并留痕，与 W2B upgrade.ts 同口径。
+    const raw = legacyStoreChannel.read(KEY)
     if (!raw) return {}
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
@@ -86,7 +89,7 @@ function isQuotaError(e: unknown): boolean {
 function saveV1(store: ReviewStore, protectedKey?: string): SaveResult {
   const json = JSON.stringify(store)
   try {
-    localStorage.setItem(KEY, json)
+    legacyStoreChannel.write(KEY, json)
     return { ok: true, evicted: 0 }
   } catch (e) {
     if (!isQuotaError(e)) return { ok: false, evicted: 0 }
@@ -108,10 +111,10 @@ function saveV1(store: ReviewStore, protectedKey?: string): SaveResult {
     for (const [k] of victims) delete working[k]
     evicted += victims.length
     console.warn(
-      `[reviewStore] localStorage 配额不足，熔断清洗第 ${round} 轮：清理 ${victims.length} 条接近毕业的错题（累计 ${evicted}）`,
+      `[reviewStore] 存储配额不足，熔断清洗第 ${round} 轮：清理 ${victims.length} 条接近毕业的错题（累计 ${evicted}）`,
     )
     try {
-      localStorage.setItem(KEY, JSON.stringify(working))
+      legacyStoreChannel.write(KEY, JSON.stringify(working))
       return { ok: true, evicted }
     } catch (e) {
       if (!isQuotaError(e)) return { ok: false, evicted }

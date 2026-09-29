@@ -32,7 +32,7 @@ import type { ContentProvider, MigrationReport, RawStoreDump } from './types'
 import { getVocabularyPackages, loadPackage } from '../../core/content/registry'
 import { readKeyRaw, writeKeyRaw } from '../../core/learning/storage-io'
 
-/** 迁移源键 → localStorage 原始键名（与 IN_SCOPE_KEYS 同序同源，勿增勿删） */
+/** 迁移源键 → 本机存储原始键名（与 IN_SCOPE_KEYS 同序同源，勿增勿删） */
 const SOURCE_RAW_KEYS: readonly string[] = IN_SCOPE_KEYS
 
 /* P1.7-W2B：迁移读写同样经 persistence Repository（namespace 注册校验 + owner 域匹配）。
@@ -63,7 +63,7 @@ export function isMigrated(): boolean {
   return loadMigrationMarker() !== null
 }
 
-/** State A 判据：四个迁移源键在 localStorage 里**一个字节的数据都没有**。
+/** State A 判据：四个迁移源键在本机存储里**一个字节的数据都没有**。
  *  键不存在 / 空串 = 没数据；`'{}'` 也按「有数据」处理（宁可多跑一次幂等迁移，
  *  不可误判新用户为老用户 —— 后者会让新用户的写入永远落在 v1 上）。 */
 function hasLegacyV1Data(): boolean {

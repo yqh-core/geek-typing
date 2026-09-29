@@ -1,8 +1,9 @@
 /**
  * 学习分析：记录每个字母的正确/错误次数、每个单词的掌握情况。
- * 数据落在 localStorage，纯前端；用于「错词分析面板」和「弱项专攻」出题。
+ * 数据落在本机存储（P1.7-W2C 起经 analytics 通道读写），纯前端；用于「错词分析面板」和「弱项专攻」出题。
  */
 
+import { analyticsChannel } from '../core/persistence/channels'
 import {
   loadLearningV2,
   loadLetterStats,
@@ -60,7 +61,9 @@ export function loadAnalytics(): Analytics {
   // P1.5-S4：State B（迁移已落地 / 无历史数据）从 v2 键族聚合；State A 保持 v1 读法
   if (isV2Store()) return loadAnalyticsV2()
   try {
-    const raw = localStorage.getItem(KEY)
+    // P1.7-W2C：原生读收口到 persistence 通道（analytics 域授权）。沿用原有降级语义 ——
+    // 通道抛出的 NamespaceError 与存储不可用同样被下面的 catch 吃掉并留痕，与 W2B upgrade.ts 同口径。
+    const raw = analyticsChannel.read(KEY)
     return raw ? { ...EMPTY, ...(JSON.parse(raw) as Analytics) } : EMPTY
   } catch (e) {
     // G4-3 零静默失败：读取失败（JSON 损坏 / 存储不可用）按空表处理，但必须留痕 ——
@@ -116,7 +119,7 @@ export function saveAnalytics(a: Analytics) {
     return
   }
   try {
-    localStorage.setItem(KEY, JSON.stringify(a))
+    analyticsChannel.write(KEY, JSON.stringify(a))
   } catch (e) {
     // G4-3 零静默失败：隐私模式 / 配额不足的写入失败必须可观测
     console.warn('[analytics] 写入失败，本次变更仅保留在内存', e)

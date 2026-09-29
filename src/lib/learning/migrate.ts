@@ -6,7 +6,7 @@
  * 不是另写一套，以便将来的 browser migration 与 CLI dry-run 共享同一判据。
  *
  * 三条硬性质（§2.6 幂等 / §2.7 回滚 / §2.8 报告）：
- *  - **Pure**：不碰 localStorage、不读时钟之外的外部状态（`Date.now` 只用于 report 时间戳，
+ *  - **Pure**：不碰本机存储、不读时钟之外的外部状态（`Date.now` 只用于 report 时间戳，
  *    且可被 `opts.now` 完全接管 —— 这是 G2 门禁能断言「两次调用逐字节相同」的前提）。
  *  - **Idempotent**：源指纹相等 ⇒ `pendingWrites` 为**空数组**（根本不产出待写项）。
  *    不是「重跑得相同结果」，而是「第二次 **0 次 setItem**」。
@@ -70,7 +70,7 @@ export function isValidWordKey(k: string): boolean {
 }
 
 /* ===========================================================================
- * splitSnapshot —— 把 localStorage 的原始字符串包解析成 SplitSnapshot
+ * splitSnapshot —— 把本机存储的原始字符串包解析成 SplitSnapshot
  * ======================================================================== */
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -166,7 +166,7 @@ export function splitSnapshot(raw: RawStoreDump): {
  * 源键记账 —— 全部字段从**真实序列化结果**算出，不估算（参考实现 FIX-5）。
  *
  * ⚠️ entries 用解析后的对象算、bytesUtf16 用**原始字符串**算，两者口径不同是有意的：
- *    「这条数据有多大的 Klein 语义」与「它在 localStorage 里占多少」是两件事，
+ *    「这条数据有多大的 Klein 语义」与「它在存储里占多少」是两件事，
  *    前者决定迁移工作量，后者决定配额风险 —— 混用一个数会让配额判断失去依据。
  */
 function buildSourceKeys(raw: RawStoreDump, snapshot: SplitSnapshot): SourceKeyInfo[] {
@@ -309,7 +309,7 @@ export function migrateV1toV2(
      * splitSnapshot 会把 gt.analytics.v1 重构为固定字段序（words 在前、letters 在后），
      * 直接 stringify 重构对象会让回滚写回的 analytics 键序 ≠ 迁移前原文 ——
      * G3-6 的「回滚后旧键逐字节还原」判据被破（review/memorize/customBanks 无重构不受影响）。
-     * 调用方能拿到原文（localStorage.getItem），注入后 backup.analytics 按**原文 parse**
+     * 调用方能拿到原文（存储原始字符串），注入后 backup.analytics 按**原文 parse**
      * （键序 = 原文，stringify 后逐字节还原）；不注入则退回重构对象（行为同旧，语义恢复）。
      */
     preserveBackupKeys?: Partial<Record<'analytics', string>>

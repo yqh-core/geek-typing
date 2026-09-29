@@ -1,6 +1,6 @@
 /**
  * Today's Practice 推荐（V3-P0a）：聚合错题本 / 学习分析 / 打卡数据，生成首页推荐快照。
- * 纯读取 localStorage 派生、无副作用；调用方在 reviewVersion 变化（及切回页签）时重建。
+ * 纯读取本机存储派生、无副作用；调用方在 reviewVersion 变化（及切回页签）时重建。
  */
 import { loadAnalytics, weakLetters, wrongWords } from './analytics'
 import { reviewDueViews } from './reviewStore'

@@ -32,7 +32,7 @@ const SWIPE_THRESHOLD = 60
 /**
  * 背单词卡片流：
  * 正面 = 单词 + 发音；翻面 = 释义；三键调度：unknown 追加 2 次、fuzzy 1 次、known 完成。
- * 进度存 localStorage，刷新不丢。
+ * 进度存本机存储，刷新不丢。
  */
 export default function Memorize({ theme, bank, paused = false, streakDays = 0 }: MemorizeProps) {
   const t = useT()

@@ -219,7 +219,7 @@ export interface SourceKeyInfo {
   present: boolean
   /** 源记录条数 */
   entries: number
-  /** UTF-16 字节数（localStorage 按字符 ×2 计费） */
+  /** UTF-16 字节数（本机存储按字符 ×2 计费） */
   bytesUtf16: number
   /** 是否参与迁移（gt.streak.v1 为 false：键是日期，不含词） */
   inScope: boolean
@@ -302,7 +302,7 @@ export function legacyEntries(store: LearningStoreV2): [string, LegacyRecord][] 
 
 /* ---------------- 迁移输入/输出 ---------------- */
 
-/** localStorage 全量导出形态：键名 → 原始字符串（可能缺键、可能为 null） */
+/** 本机存储全量导出形态：键名 → 原始字符串（可能缺键、可能为 null） */
 export type RawStoreDump = Record<string, string | null | undefined>
 
 /** analytics 键解析后的形状（四个全局标量 + words / letters 两个子表） */
@@ -320,7 +320,7 @@ export interface AnalyticsSnapshot {
  *
  * ⚠️ 为什么入参是解析后的对象而不是原始字符串：迁移逻辑要的是**语义**（这张表有哪些词、
  *    letters 里 hit 是多少），不是字节。把 JSON.parse 放在 `splitSnapshot` 里做，
- *    migrateV1toV2 才能保持「输入即业务对象」，也才能在 Node（无 localStorage）里被单测与
+ *    migrateV1toV2 才能保持「输入即业务对象」，也才能在 Node（无本机存储）里被单测与
  *    dry-run 复用 —— 这正是 §2.8.2 对参考实现的要求。
  */
 export interface SplitSnapshot {
@@ -365,7 +365,7 @@ export interface ContentProvider {
   isValidLocalId?(localId: string): boolean
 }
 
-/** 迁移产出：待写项 + 报告。调用方负责把它落盘（apply 阶段），本文件不碰 localStorage */
+/** 迁移产出：待写项 + 报告。调用方负责把它落盘（apply 阶段），本文件不碰本机存储 */
 export interface MigrationResult {
   next: {
     /** —— 键名与设计文档 §4 apply 伪代码逐字一致（`result.next.learning`）—— */

@@ -1,7 +1,10 @@
 /**
  * 每日打卡 / 学习热力图数据
- * 全部落在 localStorage，纯前端零后端；后续想同步可以平滑迁移到 Cloudflare D1。
+ * 全部落在本机存储（P1.7-W2C 起经 settings 之外的 learning 通道读写），纯前端零后端；
+ * 后续想同步可以平滑迁移到 Cloudflare D1。
  */
+
+import { legacyStoreChannel } from '../core/persistence/channels'
 
 const KEY = 'gt.streak.v1'
 
@@ -24,7 +27,9 @@ function todayKey(): string {
 
 export function loadHistory(): History {
   try {
-    const raw = localStorage.getItem(KEY)
+    // P1.7-W2C：原生读收口到 persistence 通道（learning 域授权）。沿用原有降级语义 ——
+    // 通道抛出的 NamespaceError 与存储不可用同样被下面的 catch 吃掉并留痕，与 W2B upgrade.ts 同口径。
+    const raw = legacyStoreChannel.read(KEY)
     return raw ? (JSON.parse(raw) as History) : {}
   } catch (e) {
     // G4-3 零静默失败：读取失败按空表处理但留痕（S4 迁移时移除）
@@ -35,7 +40,7 @@ export function loadHistory(): History {
 
 function saveHistory(h: History) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(h))
+    legacyStoreChannel.write(KEY, JSON.stringify(h))
   } catch (e) {
     // G4-3 零静默失败：隐私模式写入失败必须可观测（S4 迁移时移除）
     console.warn('[streak] 写入失败，本次变更仅保留在内存', e)

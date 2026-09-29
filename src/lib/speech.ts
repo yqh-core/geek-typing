@@ -1,8 +1,11 @@
 /**
  * 单词发音：使用浏览器内置 Web Speech API，零依赖零流量。
  * Chrome / Edge / Safari / Firefox 均支持，中文系统也能调用英文语音。
- * 发音口音偏好（en-US / en-GB）持久化到 localStorage 'gt.voice'，默认 en-US。
+ * 发音口音偏好（en-US / en-GB）持久化到本机存储键 'gt.voice'
+ * （P1.7-W2C 起经 settings 通道读写），默认 en-US。
  */
+
+import { settingsChannel } from '../core/persistence/channels'
 
 const VOICE_KEY = 'gt.voice'
 
@@ -12,7 +15,9 @@ let cachedVoice: SpeechSynthesisVoice | null = null
 
 function readVoicePref(): VoicePref {
   try {
-    return localStorage.getItem(VOICE_KEY) === 'en-GB' ? 'en-GB' : 'en-US'
+    // P1.7-W2C：原生读收口到 persistence 通道（settings 域授权）。沿用原有降级语义 ——
+    // 通道抛出的 NamespaceError 与存储不可用同样被下面的 catch 吃掉并留痕，与 W2B upgrade.ts 同口径。
+    return settingsChannel.read(VOICE_KEY) === 'en-GB' ? 'en-GB' : 'en-US'
   } catch (e) {
     // G4-3 零静默失败：读取失败按默认音色处理但留痕（S3 迁移时移除）
     console.warn('[speech] 音色读取失败，按默认处理', e)
@@ -32,7 +37,7 @@ export function setVoicePref(p: VoicePref) {
   voicePref = p
   cachedVoice = null // 让 pickVoice 按新偏好重选
   try {
-    localStorage.setItem(VOICE_KEY, p)
+    settingsChannel.write(VOICE_KEY, p)
   } catch (e) {
     // G4-3 零静默失败：隐私模式写入失败必须可观测（S3 迁移时移除）
     console.warn('[speech] 音色写入失败', e)

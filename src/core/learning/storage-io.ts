@@ -1,6 +1,6 @@
 /* P1.7 Wave 2-B · learning 键族的持久化接线（v2.3.2 §1 A-1）
  *
- * 目的：把 lib/learning 对 localStorage 的**原生读写**收口到 persistence 层的
+ * 目的：把 lib/learning 对本机存储的**原生读写**收口到 persistence 层的
  * Repository —— 之后 learning 域键的任何存取都过 namespace 注册校验 + owner 域匹配。
  *
  * 边界契约：

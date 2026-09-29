@@ -8,10 +8,13 @@ import type { SoundTheme } from '../lib/sound'
 import type { PracticeModeId } from '../lib/modes'
 import { DEFAULT_BANK_ID } from '../data/wordBanks'
 import { sound } from '../lib/sound'
+import { settingsChannel } from '../core/persistence/channels'
 
 export function readStorage<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(key)
+    // P1.7-W2C：原生读收口到 persistence 通道（settings 域授权）。沿用原有降级语义 ——
+    // 通道抛出的 NamespaceError 与存储不可用同样被下面的 catch 吃掉并留痕，与 W2B upgrade.ts 同口径。
+    const raw = settingsChannel.read(key)
     return raw ? (JSON.parse(raw) as T) : fallback
   } catch (e) {
     console.warn(`[settings] ${key} 读取失败，按默认值处理`, e)
@@ -21,7 +24,7 @@ export function readStorage<T>(key: string, fallback: T): T {
 
 export function writeStorage(key: string, value: unknown) {
   try {
-    localStorage.setItem(key, JSON.stringify(value))
+    settingsChannel.write(key, JSON.stringify(value))
   } catch (e) {
     console.warn(`[settings] ${key} 写入失败`, e)
   }

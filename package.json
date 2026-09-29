@@ -32,6 +32,7 @@
     "test:insights": "node tests/learning-insights.mjs",
     "test:analytics": "node tests/analytics-identity.mjs",
     "test:service": "node tests/learning-service.mjs",
+    "gate:persistence": "node scripts/gate-persistence.mjs",
     "gate:g4": "node scripts/gate-g4.mjs",
     "gate:legacy-wordbank": "node scripts/gate-legacy-wordbank.mjs",
     "gate:learning-boundary": "node scripts/gate-learning-boundary.mjs",

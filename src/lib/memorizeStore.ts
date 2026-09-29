@@ -13,6 +13,7 @@
  * 调用方只拿回自己包的视图。
  */
 
+import { legacyStoreChannel } from '../core/persistence/channels'
 import { loadLearningV2, saveLearningV2 } from './learning/storage'
 import { isLearningRecord, isLegacyKey, type LearningRecord } from './learning/types'
 import { isV2Store } from './learning/upgrade'
@@ -38,7 +39,9 @@ const KEY = 'gt.memorize.v1'
 /** v1 全表读取（State A 路径；损坏/隐私模式返回空表） */
 export function loadMemorize(): MemStore {
   try {
-    const raw = localStorage.getItem(KEY)
+    // P1.7-W2C：原生读收口到 persistence 通道（learning 域授权）。沿用原有降级语义 ——
+    // 通道抛出的 NamespaceError 与存储不可用同样被下面的 catch 吃掉并留痕，与 W2B upgrade.ts 同口径。
+    const raw = legacyStoreChannel.read(KEY)
     return raw ? (JSON.parse(raw) as MemStore) : {}
   } catch (e) {
     // G4-3 零静默失败：读取失败按空表处理但留痕（State B 由 learning/storage 的
@@ -75,7 +78,7 @@ export function recordMemorize(word: string, status: MemStatus, bankId?: string)
       [word]: { status, reviews: (prev?.reviews ?? 0) + 1, lastAt: Date.now() },
     }
     try {
-      localStorage.setItem(KEY, JSON.stringify(next))
+      legacyStoreChannel.write(KEY, JSON.stringify(next))
     } catch (e) {
       // G4-3 零静默失败：隐私模式 / 配额不足的写入失败必须可观测（State B 由 saveLearningV2 接管）
       console.warn('[memorizeStore] 写入失败，本次变更仅保留在内存', e)

@@ -15,7 +15,7 @@
  *   weakness / upgrade /（persistence 接线见 ./storage-io）
  *
  * ⚠️ 各域模块只做编排：内部调用既有的 lib/learning 写函数，不引入任何新的
- * localStorage 键、不重复写逻辑；learning 键族的原生读写自 W2B 起经
+ * 存储键、不重复写逻辑；learning 键族的原生读写自 W2B 起经
  * `./storage-io` → persistence Repository（namespace 注册校验 + owner 域匹配）。
  */
 import { getState, type LearningState } from './domains/state'
