@@ -1,0 +1,68 @@
+
+✓ main Build & Deploy to Cloudflare Pages · 36720827743
+Triggered via push about 5 minutes ago
+
+JOBS
+✓ 门禁① 静态与内容（无产物） in 12s (ID 109905210421)
+✓ 门禁③ 端到端（test:e2e） in 3m8s (ID 109905210708)
+✓ 门禁② 构建产物（体积 + 离线） in 1m9s (ID 109905210901)
+✓ 部署到 Cloudflare Pages in 36s (ID 109906517745)
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+门禁① 静态与内容（无产物）: .github#2
+
+! scripts/content/ingest.mjs:25:32: Identifier 'decideLicense' is imported but never used.
+门禁① 静态与内容（无产物）: scripts/content/ingest.mjs#25
+
+! scripts/content/ingest.mjs:24:46: Identifier 'CONTENT_TYPES' is imported but never used.
+门禁① 静态与内容（无产物）: scripts/content/ingest.mjs#24
+
+! scripts/content/asset-rules.mjs:60:9: Unexpected control characters
+门禁① 静态与内容（无产物）: scripts/content/asset-rules.mjs#60
+
+! scripts/content/asset-rules.mjs:51:16: Unexpected control characters
+门禁① 静态与内容（无产物）: scripts/content/asset-rules.mjs#51
+
+! scripts/content/normalize.mjs:56:22: Unexpected control characters
+门禁① 静态与内容（无产物）: scripts/content/normalize.mjs#56
+
+! scripts/build-cet-defs.mjs:137:7: Variable 'cet4' is declared but never used. Unused variables should start with a '_'.
+门禁① 静态与内容（无产物）: scripts/build-cet-defs.mjs#137
+
+! scripts/verify-p17-frozen.mjs:57:7: Variable 'ignore' is declared but never used. Unused variables should start with a '_'.
+门禁① 静态与内容（无产物）: scripts/verify-p17-frozen.mjs#57
+
+! scripts/gate-perf.mjs:152:7: Variable 'kib' is declared but never used. Unused variables should start with a '_'.
+门禁① 静态与内容（无产物）: scripts/gate-perf.mjs#152
+
+! src/core/content/model/content.ts:166:9: Unexpected control characters
+门禁① 静态与内容（无产物）: src/core/content/model/content.ts#166
+
+! src/core/content/model/content.ts:154:16: Unexpected control characters
+门禁① 静态与内容（无产物）: src/core/content/model/content.ts#154
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+门禁① 静态与内容（无产物）: .github#1
+
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+门禁③ 端到端（test:e2e）: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+门禁③ 端到端（test:e2e）: .github#1
+
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+门禁② 构建产物（体积 + 离线）: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+门禁② 构建产物（体积 + 离线）: .github#1
+
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4, cloudflare/wrangler-action@v3. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+部署到 Cloudflare Pages: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+部署到 Cloudflare Pages: .github#1
+
+
+For more information about a job, try: gh run view --job=<job-id>
+View this run on GitHub: https://github.com/yqh-core/geek-typing/actions/runs/36720827743
