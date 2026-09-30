@@ -364,6 +364,12 @@ const TASK_TABLE = {
     // 「不会失败的门等于没有门」—— 所以门的证伪必须是独立证据任务，不许只跑门本身。
     { task: 'GATE-LICENSE', command: 'node scripts/gate-license.mjs' },
     { task: 'FALSIFY-GATE-LICENSE', command: 'node scripts/gate-license.mjs --falsify' },
+    // P18-D：UI 内容契约棘轮门（INV-2）+ 它自己的证伪自检。
+    // 纯静态 AST 扫描（UI 域 ∪ src/lib/wordResolve.ts，不依赖 dist），基线落
+    // docs/p18/_generated/ui-contract-baseline.json。同纪律：不会失败的门等于没有门 ——
+    // 要证明的必须是「它能判红」，所以证伪是**独立证据任务**，不许只跑门本身。
+    { task: 'TEST-UI-CONTRACT', command: 'node tests/ui-contract.mjs' },
+    { task: 'FALSIFY-UI-CONTRACT', command: 'node tests/ui-contract.mjs --falsify' },
     { task: 'GATE-PERF', command: 'node scripts/gate-perf.mjs' },
     { task: 'CHECK-BUNDLE', command: 'node scripts/check-bundle.mjs' },
     // P18-C：体积门判据 4/5（manifest 投影 + lazy 反向校验）自带证伪，同上不许只跑门本身。

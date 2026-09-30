@@ -52,6 +52,13 @@ jobs:
       # 149 项：contract 断言。实测只读 content/ 与 src/，不触碰 dist。
       - name: 内容契约测试（test:content · 149 项）
         run: npm run test:content
+      # P18-D · INV-2：UI 内容契约棘轮门（纯静态 AST 扫描 —— 只读 src/ 与 content/ 的目录名，
+      # 不需要 dist，故属本条闸）。硬零 2 桶（直读词表 JSON / 内容包 id 分支）+ 棘轮 4 桶
+      # （只许降不许升，基线 docs/p18/_generated/ui-contract-baseline.json）+ 对照组探针双向钳制。
+      # 注意：`test:ui-contract:falsify` **不进 CI** —— 它做的是故障注入演练（证明门能判红），
+      # 属证据任务而非每次构建的门，已登记在 P18 证据任务表（FALSIFY-UI-CONTRACT）。
+      - name: UI 内容契约棘轮门（test:ui-contract · INV-2）
+        run: npm run test:ui-contract
       # oxlint：基线 0 error / 16 warning。只拦 error，不把既有 warning 变成阻塞。
       - name: Lint（oxlint）
         run: npm run lint
