@@ -1,0 +1,68 @@
+
+✓ main Build & Deploy to Cloudflare Pages · 36697690677
+Triggered via push about 4 minutes ago
+
+JOBS
+✓ 门禁③ 端到端（test:e2e） in 2m38s (ID 109829482833)
+✓ 门禁① 静态与内容（无产物） in 10s (ID 109829482986)
+✓ 门禁② 构建产物（体积 + 离线） in 40s (ID 109829483058)
+✓ 部署到 Cloudflare Pages in 34s (ID 109830391442)
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+门禁③ 端到端（test:e2e）: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+门禁③ 端到端（test:e2e）: .github#1
+
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+门禁① 静态与内容（无产物）: .github#2
+
+! scripts/learning-stress.mjs:90:7: Variable 'LETTER_KEYS' is declared but never used. Unused variables should start with a '_'.
+门禁① 静态与内容（无产物）: scripts/learning-stress.mjs#90
+
+! scripts/learning-consistency.mjs:126:7: Variable 'EMPTY_LEARNING' is declared but never used. Unused variables should start with a '_'.
+门禁① 静态与内容（无产物）: scripts/learning-consistency.mjs#126
+
+! scripts/content/ingest.mjs:25:32: Identifier 'decideLicense' is imported but never used.
+门禁① 静态与内容（无产物）: scripts/content/ingest.mjs#25
+
+! scripts/content/ingest.mjs:24:46: Identifier 'CONTENT_TYPES' is imported but never used.
+门禁① 静态与内容（无产物）: scripts/content/ingest.mjs#24
+
+! tests/fenced-write.mjs:62:3: Variable 'encodeStagedValue' is declared but never used. Unused variables should start with a '_'.
+门禁① 静态与内容（无产物）: tests/fenced-write.mjs#62
+
+! tests/browser-migration-e2e.mjs:220:22: eval can be harmful.
+门禁① 静态与内容（无产物）: tests/browser-migration-e2e.mjs#220
+
+! tests/browser-migration-e2e.mjs:161:22: eval can be harmful.
+门禁① 静态与内容（无产物）: tests/browser-migration-e2e.mjs#161
+
+! scripts/build-cet-defs.mjs:137:7: Variable 'cet4' is declared but never used. Unused variables should start with a '_'.
+门禁① 静态与内容（无产物）: scripts/build-cet-defs.mjs#137
+
+! scripts/verify-p17-frozen.mjs:57:7: Variable 'ignore' is declared but never used. Unused variables should start with a '_'.
+门禁① 静态与内容（无产物）: scripts/verify-p17-frozen.mjs#57
+
+! scripts/evidence-run.mjs:302:10: Function 'gitCommit' is declared but never used.
+门禁① 静态与内容（无产物）: scripts/evidence-run.mjs#302
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+门禁① 静态与内容（无产物）: .github#1
+
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+门禁② 构建产物（体积 + 离线）: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+门禁② 构建产物（体积 + 离线）: .github#1
+
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4, cloudflare/wrangler-action@v3. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+部署到 Cloudflare Pages: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+部署到 Cloudflare Pages: .github#1
+
+
+For more information about a job, try: gh run view --job=<job-id>
+View this run on GitHub: https://github.com/yqh-core/geek-typing/actions/runs/36697690677
