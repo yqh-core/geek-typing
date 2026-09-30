@@ -1491,6 +1491,19 @@ async function run() {
       tabsAllThere,
   )
 
+  // 16.0a P1.7-W5C：Home 组合展示内容目录汇总（仅组合、零新键，复用 nav.banks / bank.wordsUnit）
+  await waitForTestId(page, 'home-catalog-summary')
+  const catText = norm(await page.textContent('[data-testid="home-catalog-summary"]'))
+  check(
+    'Home 组合：内容目录汇总渲染（18 词库 · 9388 词，复用 nav.banks / bank.wordsUnit，零新键）',
+    (await page.locator('[data-testid="home-catalog-summary"]').count()) === 1 &&
+      catText.includes('18') &&
+      catText.includes('9388') &&
+      catText.includes('词库') &&
+      catText.includes('词'),
+    `text=${catText}`,
+  )
+
   // 16.1 Daily Goal + streak：预置今天 30 词、近 3 天连续打卡
   await page.evaluate(() => {
     const pad = (n) => String(n).padStart(2, '0')

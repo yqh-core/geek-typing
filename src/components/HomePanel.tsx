@@ -3,6 +3,13 @@ import type { ThemeConfig } from '../lib/theme'
 import type { TodayRecommendation } from '../lib/recommend'
 import { useLang, useT } from '../i18n'
 
+interface CatalogSummary {
+  /** 内容包总数（来自 catalog.packages.length） */
+  packages: number
+  /** 全部内容条目合计（来自 catalog.totalItems） */
+  items: number
+}
+
 interface HomePanelProps {
   theme: ThemeConfig
   recommendation: TodayRecommendation
@@ -10,6 +17,8 @@ interface HomePanelProps {
   bankName: string
   /** 当前词库词数 */
   bankCount: number
+  /** 内容目录汇总（P1.7-W5C：仅组合展示，复用 nav.banks / bank.wordsUnit，零新键） */
+  catalogSummary?: CatalogSummary
   onReviewRound: () => void
   onWeakRound: () => void
   onNewRound: () => void
@@ -21,6 +30,7 @@ export default function HomePanel({
   recommendation,
   bankName,
   bankCount,
+  catalogSummary,
   onReviewRound,
   onWeakRound,
   onNewRound,
@@ -51,6 +61,14 @@ export default function HomePanel({
             <CalendarDays size={13} />
             {dateText}
           </div>
+          {catalogSummary && (
+            <div
+              data-testid="home-catalog-summary"
+              className={`mt-1 text-xs ${theme.sub}`}
+            >
+              {catalogSummary.packages} {t('nav.banks')} · {catalogSummary.items} {t('bank.wordsUnit')}
+            </div>
+          )}
         </div>
         <div data-testid="home-streak" className="flex items-center gap-1.5 text-sm font-semibold">
           <Flame size={15} className="text-orange-400" />

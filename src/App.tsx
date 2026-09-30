@@ -32,6 +32,7 @@ import CommandPalette from './components/CommandPalette'
 import { THEMES } from './lib/theme'
 import { sound } from './lib/sound'
 import { practiceEngine, type PracticeSession } from './core/practice'
+import { getCatalog } from './core/content/catalog/catalog'
 import { speak, warmSpeech } from './lib/speech'
 import { Terminal } from 'lucide-react'
 import { useT, useLang } from './i18n'
@@ -47,6 +48,10 @@ import type { WordItem } from './data/wordBanks'
 
 /** CommandPalette 等外部消费者仍从 '../App' 取 TabId，此处保持再导出 */
 export type { TabId }
+
+/** P1.7-W5C：内容目录汇总（同步、只读 manifest，来自 registry 静态注册）。
+ *  仅组合展示用，计算一次即可，不触发任何词条加载。 */
+const contentCatalog = getCatalog()
 
 /** 页签 id / 面板 id：tabpanel 的 aria-labelledby 需指回页签 id，故两者成对生成 */
 const tabDomId = (id: TabId) => `tab-${id}`
@@ -310,6 +315,7 @@ export default function App() {
               recommendation={recommendation}
               bankName={lang === 'en' ? bank?.nameEn ?? bank?.name ?? '' : bank?.name ?? ''}
               bankCount={bank?.count ?? bank?.words.length ?? 0}
+              catalogSummary={{ packages: contentCatalog.packages.length, items: contentCatalog.totalItems }}
               onReviewRound={() => {
                 sound.tap()
                 void startReviewRound()
