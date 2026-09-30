@@ -103,6 +103,15 @@ function migrateSources(raw, id) {
 
 async function main() {
   if (!existsSync(VOCAB_DIR)) { console.error('content/vocabulary 不存在'); process.exit(1) }
+  // 类型守卫（P1.7-Wave4 B-1）：本构建器只处理 vocabulary 包（manifest 由 words.json 派生）。
+  // 其它类型目录（listening/reading/collection/...）没有 words.json，不适用 words 派生逻辑，
+  // 显式跳过并打印说明 —— 防止未来误跑把新类型包写坏。
+  const contentDir = path.dirname(VOCAB_DIR)
+  const otherTypes = (await readdir(contentDir, { withFileTypes: true }))
+    .filter((d) => d.isDirectory() && d.name !== 'vocabulary')
+    .map((d) => d.name)
+    .sort()
+  for (const t of otherTypes) console.log(`· 跳过 content/${t}/：非 vocabulary 类型，不走 words 派生构建（该类包不走本构建器）`)
   const ids = (await readdir(VOCAB_DIR, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name)
   let changed = 0
 

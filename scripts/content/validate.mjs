@@ -1,9 +1,11 @@
 /* V4.1 · content:validate —— 内容层门禁（CI 与 build 前置）。
  *
  * 检查项：
- *  1. manifest.json / words.json 存在且 JSON 合法
+ *  1. manifest.json / 载荷文件存在且 JSON 合法（载荷：vocabulary→words.json 必有；
+ *     其余类型→items.json 可选 —— 无载荷包的 offline.policy 必须为合法值且 registry 侧可解释）
  *  2. manifest 必填字段完整（id/type/version/title/sources/offline...）
- *  3. ContentId 4 段式规范：content:vocabulary:<namespace>:<目录名>
+ *  3. ContentId 4 段式规范：content:<目录类型>:<namespace>:<目录名>（P1.7-Wave4 B-1 泛化：
+ *     扫描 content/ 下全部类型子目录，目录名即类型，须在 ContentType 白名单内）
  *  4. 包内 duplicate word 检测（**跨包同词合法**：IELTS/CET/TOEFL 各有 abandon 是正常
  *     数据关系，是本平台刻意支持的能力，任何「跨包词唯一」规则都是错误的——见下方注释）
  *  5. stats.items 与 words 实际词数一致（漂移时跑 npm run content:build 自动同步）
@@ -32,12 +34,13 @@
  * 17. build 存在且 toolVersion 非空、builtAt 为合法时间、sourceChecksum === contentChecksum
  * 18. manifest 体积：单包 < 8 KiB 且全库 < 40 KiB（manifest 常驻主 chunk，必须永远「轻」；
  *     包数增长时只允许 O(包数) 线性小步涨，不允许随词数涨）
- * 19. inline 预算：policy=inline 的包 Σ stats.items ≤ 1000 且 Σ words.json ≤ 64 KiB
+ * 19. inline 预算：有载荷且 policy=inline 的包 Σ stats.items ≤ 1000 且 Σ 载荷 ≤ 64 KiB
  *     （实测 inline 词 1:1 全额传导进主 chunk：kaoyan 改 inline ⇒ 主 chunk +471.92 KiB，
- *      与 words.json 471.70 KiB 比值 1:1.0005，故 inline 是首屏体积的直通车，必须限量）
+ *      与 words.json 471.70 KiB 比值 1:1.0005，故 inline 是首屏体积的直通车，必须限量；
+ *      无载荷却声明 inline 属语义矛盾，直接判红）
  * 20. 策略一致性：manifest.offline.policy 必须与 registry.ts 里该包的实际加载方式一致
- *     （inline ⇔ 静态 import 走 words:；lazy ⇔ 动态 import 走 load:）。未知策略只提示跳过，
- *     不伪造通过
+ *     （inline ⇔ 静态 import 走 words:/data:；lazy ⇔ 动态 import 走 load:/loadData:）。
+ *     未知策略只提示跳过，不伪造通过；无载荷包的未知策略判红（见第 1 项）
  *
  * 用法：node scripts/content/validate.mjs   → 全绿 exit 0，任一 FAIL exit 1
  */
@@ -47,9 +50,19 @@ import path from 'node:path'
 import { sha256Canonical } from './canonical.mjs'
 
 const ROOT = path.resolve(process.cwd())
-const VOCAB_DIR = path.join(ROOT, 'content', 'vocabulary')
+const CONTENT_DIR = path.join(ROOT, 'content')
 /** 第 20 项比对对象：包的「实际加载方式」只在这里定义，Node 跑不了 TS，只能扫文本 */
 const REGISTRY_TS = path.join(ROOT, 'src', 'core', 'content', 'registry.ts')
+
+/** ContentType 白名单 —— P1.7-Wave4 B-1 泛化的判定基准。
+ *  ⚠️ 同步责任：必须与 src/core/content/model/content.ts 的 ContentType 联合类型
+ *  一字不差（本脚本是 Node 无法 import TS，按字面量镜像）；任一侧增删类型时两处同改。 */
+const CONTENT_TYPES = new Set([
+  'vocabulary', 'word', 'topic', 'listening', 'audio', 'reading',
+  'writing', 'speaking', 'grammar', 'document', 'collection', 'exercise',
+])
+/** 载荷文件名：vocabulary 包固定 words.json；其余类型统一 items.json（可选） */
+const payloadNameOf = (type) => (type === 'vocabulary' ? 'words.json' : 'items.json')
 
 /* —— 第 18/19 项阈值：Package = manifest（永远轻、常驻）+ words（按需） —— */
 /** 单包 manifest 字节上限。实测最大 1.40 KiB（ts-code），8 KiB 是「永远轻」的硬边界 */
@@ -67,8 +80,8 @@ const kib = (b) => (b / 1024).toFixed(2)
 
 /**
  * 第 20 项：从 registry.ts 文本里解析某个包的实际加载方式。
- * 先定位 `localId: '<id>'`，再在该注册对象块内找 `words:`（静态 import ⇒ inline）或
- * `load:`（动态 import ⇒ lazy）。
+ * 先定位 `localId: '<id>'`，再在该注册对象块内找 `words:`/`data:`（静态 import ⇒ inline）
+ * 或 `load:`/`loadData:`（动态 import ⇒ lazy）。
  * 注意：registry 里可能存在「已声明但未被注册项使用」的 `<id>Words` 静态 import（死代码），
  * 只扫 import 段会把 lazy 包误判成 inline，故必须以注册对象块为准。
  */
@@ -79,8 +92,8 @@ function registryLoadMode(src, id) {
   if (hits.length === 0) return { mode: 'missing' }
   if (hits.length > 1) return { mode: 'ambiguous', count: hits.length }
   const block = hits[0][0]
-  const hasWords = /\bwords\s*:/.test(block)
-  const hasLoad = /\bload\s*:/.test(block)
+  const hasWords = /\b(?:words|data)\s*:/.test(block)
+  const hasLoad = /\bload(?:Data)?\s*:/.test(block)
   if (hasWords && hasLoad) return { mode: 'conflict' }
   if (hasWords) return { mode: 'inline' }
   if (hasLoad) return { mode: 'lazy' }
@@ -105,20 +118,37 @@ const fail = (msg) => { fails++; console.error(`  ✗ ${msg}`) }
 const ok = (msg) => console.log(`  ✓ ${msg}`)
 
 async function main() {
-  if (!existsSync(VOCAB_DIR)) { console.error('content/vocabulary 不存在'); process.exit(1) }
-  const ids = (await readdir(VOCAB_DIR, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name)
-  console.log(`[content:validate] ${ids.length} 个 vocabulary 包`)
+  if (!existsSync(CONTENT_DIR)) { console.error('content/ 不存在'); process.exit(1) }
+  /* —— B-1 泛化：扫描 content/ 下全部类型子目录，目录名即内容类型 —— */
+  const typeDirs = (await readdir(CONTENT_DIR, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name).sort()
+  for (const t of typeDirs) {
+    if (!CONTENT_TYPES.has(t)) fail(`未知内容类型目录 content/${t}/：不在 ContentType 白名单（须与 src/core/content/model/content.ts 联合类型一致）`)
+  }
+  const knownTypes = typeDirs.filter((t) => CONTENT_TYPES.has(t))
+  const pkgsByType = new Map() // type → 包目录 id 列表
+  let totalPkgs = 0
+  for (const type of knownTypes) {
+    const ids = (await readdir(path.join(CONTENT_DIR, type), { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name).sort()
+    pkgsByType.set(type, ids)
+    totalPkgs += ids.length
+  }
+  console.log(`[content:validate] ${knownTypes.length} 个类型目录 / ${totalPkgs} 个包：${knownTypes.map((t) => `${t}×${pkgsByType.get(t).length}`).join(' ')}`)
 
   // —— 预扫描：第 12 项 (c) 跨包 ContentId、(e) relation 端点存在性都需要「全库视角」，
   //     单包循环内部看不到其它包，故先静默建一次索引（不可解析的包由主循环报错）。——
-  const registry = new Map() // 包目录 id → { ns, contentId, normWords:Set }
-  for (const id of ids) {
-    try {
-      const mf = JSON.parse(await readFile(path.join(VOCAB_DIR, id, 'manifest.json'), 'utf8'))
-      const ws = JSON.parse(await readFile(path.join(VOCAB_DIR, id, 'words.json'), 'utf8'))
-      const ns = /^content:vocabulary:([a-z0-9-]+):/.exec(mf.id ?? '')?.[1] ?? '?'
-      registry.set(id, { ns, contentId: mf.id, normWords: new Set(ws.map((w) => normKey(w?.word))) })
-    } catch { /* 主循环会 FAIL，这里跳过 */ }
+  const registry = new Map() // 包目录 id → { type, ns, contentId, normWords:Set }
+  for (const [type, ids] of pkgsByType) {
+    for (const id of ids) {
+      try {
+        const mf = JSON.parse(await readFile(path.join(CONTENT_DIR, type, id, 'manifest.json'), 'utf8'))
+        const pPath = path.join(CONTENT_DIR, type, id, payloadNameOf(type))
+        const payload = existsSync(pPath) ? JSON.parse(await readFile(pPath, 'utf8')) : null
+        const ns = new RegExp(`^content:${type}:([a-z0-9-]+):`).exec(mf.id ?? '')?.[1] ?? '?'
+        // 词级端点可达性只认 vocabulary 包的词形集合（content:word:<ns>:<词形> 须落在某词表里）
+        const normWords = new Set(type === 'vocabulary' && Array.isArray(payload) ? payload.map((w) => normKey(w?.word)) : [])
+        registry.set(id, { type, ns, contentId: mf.id, normWords })
+      } catch { /* 主循环会 FAIL，这里跳过 */ }
+    }
   }
 
   // 第 20 项：registry.ts 只读一次（Node 无法 import TS）
@@ -132,58 +162,84 @@ async function main() {
 
   const seenIds = new Map()
   const seenNs = new Map()
-  const globalIds = new Map() // `${namespace}|${normalized word}` → Set<包 id>（12c 跨包兜底）
+  const globalIds = new Map() // `${namespace}|${normalized word}` → Set<包 id>（12c 跨包兜底，仅 vocabulary 词级 id）
   let totalWords = 0
-  for (const id of ids) {
-    const dir = path.join(VOCAB_DIR, id)
-    console.log(`▸ ${id}`)
-    let manifest
-    try {
-      manifest = JSON.parse(await readFile(path.join(dir, 'manifest.json'), 'utf8'))
-    } catch (e) { fail(`manifest.json 不可解析：${e.message}`); continue }
-    let words
-    try {
-      words = JSON.parse(await readFile(path.join(dir, 'words.json'), 'utf8'))
-    } catch (e) { fail(`words.json 不可解析：${e.message}`); continue }
+  for (const [type, ids] of pkgsByType) {
+    for (const id of ids) {
+      const dir = path.join(CONTENT_DIR, type, id)
+      console.log(`▸ ${type}/${id}`)
+      let manifest
+      try {
+        manifest = JSON.parse(await readFile(path.join(dir, 'manifest.json'), 'utf8'))
+      } catch (e) { fail(`manifest.json 不可解析：${e.message}`); continue }
 
-    // 18. manifest 体积取样（UTF-8 文件字节数，不是 JSON.stringify 长度）
-    manifestSizes.push({ id, bytes: (await readFile(path.join(dir, 'manifest.json'))).length })
+      // 0. 类型一致性：manifest.type 必须与所在目录名一致（放错目录 = ContentId 类型段说谎）
+      if (manifest.type !== type) fail(`manifest.type="${manifest.type}" 与所在目录类型 "${type}" 不一致 → 移到 content/${manifest.type}/ 或修正 type`)
 
-    // 19. inline 预算取样：只有 inline 包的 words 会 1:1 全额进主 chunk，lazy 包不占首屏
-    const policy = manifest.offline?.policy
-    policyList.push({ id, policy })
-    if (policy === 'inline') {
-      inlinePkgs.push({ id, items: manifest.stats?.items ?? 0, bytes: (await readFile(path.join(dir, 'words.json'))).length })
-    }
+      // 载荷：vocabulary 必有 words.json；其余类型 items.json 可选（无载荷包走 policy/registry 判据）
+      const pName = payloadNameOf(type)
+      const payloadPath = path.join(dir, pName)
+      let payload = null
+      if (existsSync(payloadPath)) {
+        try { payload = JSON.parse(await readFile(payloadPath, 'utf8')) } catch (e) { fail(`${pName} 不可解析：${e.message}`); continue }
+        if (!Array.isArray(payload)) { fail(`${pName} 必须为数组，实际 ${typeof payload}`); continue }
+      } else if (type === 'vocabulary') {
+        fail('words.json 缺失（vocabulary 包必须有词表载荷）'); continue
+      } else {
+        console.log(`  · 无 ${pName}（非 vocabulary 包允许无载荷：policy 须合法且 registry 侧可解释）`)
+      }
+      const dup = [] // 12(a) 包内重复 key（第 4 项判定后回显）
+      const keyOf = (it) => (type === 'vocabulary' ? it?.word : it?.id ?? it?.word)
 
-    // 内容指纹（第 6/15 项共用）：必须走 canonical —— 只取决于数据语义，与文件排版无关
-    const canonicalSum = sha256Canonical(words)
+      // 18. manifest 体积取样（UTF-8 文件字节数，不是 JSON.stringify 长度）
+      manifestSizes.push({ id, bytes: (await readFile(path.join(dir, 'manifest.json'))).length })
+
+      // 19. inline 预算取样：只有 inline 包的载荷会 1:1 全额进主 chunk，lazy 包不占首屏
+      const policy = manifest.offline?.policy
+      policyList.push({ id, policy })
+      if (policy === 'inline' && payload === null) {
+        fail(`offline.policy=inline 但无 ${pName} 载荷：inline 语义是载荷静态进主 chunk，无载荷可进属语义矛盾`)
+      } else if (policy === 'inline') {
+        inlinePkgs.push({ id, items: manifest.stats?.items ?? 0, bytes: (await readFile(payloadPath)).length })
+      }
+      if (payload === null && !KNOWN_POLICIES.has(policy)) {
+        fail(`无载荷包 offline.policy=${policy ?? '缺失'} 非法（须 inline/lazy，registry 侧才可解释）`)
+      }
+
+      // 内容指纹（第 6/15 项共用）：必须走 canonical —— 只取决于数据语义，与文件排版无关
+      const canonicalSum = payload === null ? null : sha256Canonical(payload)
 
     // 2. 必填字段
     const missing = REQUIRED_FIELDS.filter((f) => manifest[f] === undefined)
     if (missing.length === 0) ok('必填字段完整')
     else fail(`manifest 缺字段：${missing.join(', ')}`)
 
-    // 3. ContentId 4 段式（namespace 消歧：ecdict / curated / 未来导入源）
-    const idOk = /^content:vocabulary:[a-z0-9-]+:.+$/.test(manifest.id ?? '') && manifest.id.endsWith(`:${id}`)
+    // 3. ContentId 4 段式（B-1 泛化：类型段 = 所在目录名；namespace 消歧来源族）
+    const idOk = new RegExp(`^content:${type}:[a-z0-9-]+:.+$`).test(manifest.id ?? '') && manifest.id.endsWith(`:${id}`)
     if (idOk) ok(`ContentId 规范（${manifest.id}）`)
-    else fail(`id 应为 content:vocabulary:<namespace>:${id}，实际 "${manifest.id}"`)
+    else fail(`id 应为 content:${type}:<namespace>:${id}，实际 "${manifest.id}"`)
 
-    // 4. 包内重复词（跨包同词刻意允许，不做任何跨包唯一性约束）
-    const seen = new Set()
-    const dup = words.filter((w) => { const k = w?.word; if (seen.has(k)) return true; seen.add(k); return false })
-    if (dup.length === 0) ok(`无包内重复词条（${words.length} 词）`)
-    else fail(`包内重复词条 ${dup.length} 个：${dup.slice(0, 5).map((w) => w.word).join(', ')}...`)
+    // 4. 包内重复 key（vocabulary=词形；其余类型=条目 id。跨包同词刻意允许，不做跨包唯一性约束）
+    if (payload !== null) {
+      const seen = new Set()
+      for (const it of payload) { const k = keyOf(it); if (seen.has(k)) dup.push(k); else seen.add(k) }
+      if (dup.length === 0) ok(type === 'vocabulary' ? `无包内重复词条（${payload.length} 词）` : `无包内重复条目 id（${payload.length} 条）`)
+      else fail(`包内重复 ${dup.length} 个：${dup.slice(0, 5).join(', ')}...`)
+    } else {
+      console.log('  · 无载荷，跳过包内重复检测')
+    }
 
-    // 5. stats 一致（漂移 → content:build 自动同步）
-    if (manifest.stats?.items === words.length) ok(`stats.items 与实际一致（${words.length}）`)
-    else fail(`stats.items=${manifest.stats?.items} ≠ 实际 ${words.length} → 运行 npm run content:build 同步`)
+    // 5. stats 一致（漂移 → content:build 自动同步；仅 vocabulary 走构建器，其余类型手工保证）
+    if (payload === null) console.log('  · 无载荷，跳过 stats 比对')
+    else if (manifest.stats?.items === payload.length) ok(`stats.items 与实际一致（${payload.length}）`)
+    else fail(`stats.items=${manifest.stats?.items} ≠ 实际 ${payload.length} → vocabulary 包运行 npm run content:build 同步`)
 
     // 6. checksum（第 6 项 = 来源原始数据指纹，走 canonical 序列化而非文件原文）
     const sources = manifest.sources ?? []
     if (sources.length === 0) fail('sources 为空（V4.1 起为数组，至少一条来源）')
+    else if (payload === null) console.log('  · 无载荷，跳过 checksum 比对（无实测基准，不判通过）')
     else if (sources.every((s) => s.checksum === canonicalSum)) ok('checksum 一致（canonical SHA-256）')
-    else fail('checksum 漂移：sources[].checksum 与 words.json 不符 → 运行 npm run content:build')
+    else fail('checksum 漂移：sources[].checksum 与载荷不符 → vocabulary 包运行 npm run content:build')
 
     // 7. License 门禁（结构化 + 外部来源须有 SPDX）
     let licenseOk = true
@@ -215,7 +271,7 @@ async function main() {
     //    因此只要两个包共用 namespace，同名词的 ContentId 就必然撞车，无法作为学习记录主键。
     //    （曾踩坑：cet4/toefl/ielts 共用 namespace `ecdict` → abandon 三包同 id。
     //     由 V4.1 契约测试 tests/content-query.mjs 实测捕获，规则固化为 `${来源族}-${包 id}`。）
-    const ns = /^content:vocabulary:([a-z0-9-]+):/.exec(manifest.id ?? '')?.[1]
+    const ns = new RegExp(`^content:${type}:([a-z0-9-]+):`).exec(manifest.id ?? '')?.[1]
     if (!ns) fail('无法从 id 解析 namespace')
     else if (seenNs.has(ns)) fail(`namespace "${ns}" 与包 ${seenNs.get(ns)} 重复：词级 ContentId 将撞车，namespace 必须每包唯一`)
     else { seenNs.set(ns, id); ok(`namespace 唯一（${ns}）`) }
@@ -233,7 +289,7 @@ async function main() {
       fail(`namespace="${manifest.namespace}" ≠ id 解析出的 "${ns}"：两者必须同源 → 运行 npm run content:build`)
     } else ok(`namespace 与 id 同源（${manifest.namespace}）`)
 
-    totalWords += words.length
+    if (type === 'vocabulary' && payload !== null) totalWords += payload.length
 
     // 10. schemaVersion —— 结构版本，由 content:build 写入，改结构才递增
     if (manifest.schemaVersion === SCHEMA_VERSION) ok(`schemaVersion=${manifest.schemaVersion}`)
@@ -244,7 +300,8 @@ async function main() {
     else fail(`contentVersion 必须为正整数，实际 ${manifest.contentVersion ?? '缺失'} → 运行 npm run content:build`)
 
     // 15. contentChecksum —— 入库内容的 canonical 指纹（与文件排版无关）
-    if (manifest.contentChecksum === canonicalSum) ok(`contentChecksum 一致（${canonicalSum.slice(7, 15)}…）`)
+    if (payload === null) console.log('  · 无载荷，跳过 contentChecksum 实测比对（三元组自洽由第 16 项覆盖）')
+    else if (manifest.contentChecksum === canonicalSum) ok(`contentChecksum 一致（${canonicalSum.slice(7, 15)}…）`)
     else fail(`contentChecksum 漂移：manifest=${manifest.contentChecksum ?? '缺失'} ≠ 实际 ${canonicalSum} → 运行 npm run content:build`)
 
     // 16. 版本三元组自洽：revision / version 正整数，且能在 contentHistory 里找到
@@ -283,30 +340,34 @@ async function main() {
     //   (a) 包内 duplicate localId（精确词形）：第 4 项已覆盖并报错，此处只回显，避免重复计数
     //   (g) orphan learning record：学习记录挂在 ContentId 上、随用户练习产生，
     //       属运行时一致性问题，由 Learning 层（src/core/review/*）负责，脚本不校验。
-    if (dup.length === 0) ok('duplicate localId：无（第 4 项已判定）')
+    if (payload !== null && dup.length === 0) ok('duplicate localId：无（第 4 项已判定）')
 
-    //   (b) 包内 duplicate normalized word：NFC+lowercase+空白折叠后同 key 即撞车
-    const normSeen = new Map()
-    const normDup = []
-    words.forEach((w, i) => {
-      const k = normKey(w?.word)
-      if (!k) return
-      if (normSeen.has(k)) normDup.push(`"${w?.word}"（#${normSeen.get(k)} ↔ #${i}）`)
-      else normSeen.set(k, i)
-    })
-    if (normDup.length === 0) ok('无 duplicate normalized word（大小写/空白差异已并入 key）')
-    else fail(`duplicate normalized word ${normDup.length} 个：${normDup.slice(0, 5).join('；')}`)
+    //   (b) 包内 duplicate normalized key：NFC+lowercase+空白折叠后同 key 即撞车
+    if (payload !== null) {
+      const normSeen = new Map()
+      const normDup = []
+      payload.forEach((it, i) => {
+        const k = normKey(keyOf(it))
+        if (!k) return
+        if (normSeen.has(k)) normDup.push(`"${keyOf(it)}"（#${normSeen.get(k)} ↔ #${i}）`)
+        else normSeen.set(k, i)
+      })
+      if (normDup.length === 0) ok('无 duplicate normalized key（大小写/空白差异已并入 key）')
+      else fail(`duplicate normalized key ${normDup.length} 个：${normDup.slice(0, 5).join('；')}`)
+    }
 
     //   (c) 跨包 duplicate ContentId：key = namespace + normalized localId。
     //       只统计「同一个 key 出现在 ≥2 个包」，包内重复由 12(b) 负责，不在这里重复计数。
     //       namespace 每包唯一（第 9 项）后理论上不可能撞车，这里作兜底回归检测，
-    //       结果在所有包循环结束后统一判定。
-    for (const w of words) {
-      const k = normKey(w?.word)
-      if (!k) continue
-      const gk = `${ns ?? '?'}|${k}`
-      if (!globalIds.has(gk)) globalIds.set(gk, new Set())
-      globalIds.get(gk).add(id)
+    //       结果在所有包循环结束后统一判定。词级 id 只存在于 vocabulary 包，故只扫 vocabulary。
+    if (type === 'vocabulary' && payload !== null) {
+      for (const w of payload) {
+        const k = normKey(w?.word)
+        if (!k) continue
+        const gk = `${ns ?? '?'}|${k}`
+        if (!globalIds.has(gk)) globalIds.set(gk, new Set())
+        globalIds.get(gk).add(id)
+      }
     }
 
     //   (d) duplicate source：同一 origin 在 sources[] 里出现两次
@@ -354,6 +415,7 @@ async function main() {
       const broken = manifest.assets.filter((a) => !a?.url || !/^(https?:\/\/|\/)/.test(a.url))
       if (broken.length === 0) ok(`assets ${manifest.assets.length} 项 url 合法`)
       else fail(`broken asset ${broken.length} 项：${broken.slice(0, 3).map((a) => a?.url).join(', ')}`)
+    }
     }
   }
 
@@ -413,7 +475,7 @@ async function main() {
       if (r.mode === 'missing') fail(`策略不一致：${id} manifest policy=${policy}，但 registry.ts 中找不到 localId: '${id}' 的注册项`)
       else if (r.mode === 'ambiguous') fail(`策略不一致：${id} 在 registry.ts 中匹配到 ${r.count} 个注册项，无法判定实际加载方式`)
       else if (r.mode === 'conflict') fail(`策略不一致：${id} 在 registry.ts 中同时存在 words: 与 load:，无法判定实际加载方式`)
-      else if (r.mode === 'unknown') fail(`策略不一致：${id} manifest policy=${policy}，但 registry.ts 注册项里既无 words: 也无 load:`)
+      else if (r.mode === 'unknown') fail(`策略不一致：${id} manifest policy=${policy}，但 registry.ts 注册项里既无 words:/data: 也无 load:/loadData:`)
       else fail(`策略不一致：${id} manifest policy=${policy}，registry.ts 实际为 ${r.mode}（${r.mode === 'inline' ? '静态 import ⇒ 进主 chunk' : '动态 import ⇒ 独立 chunk'}）：两边须同改`)
     }
     if (skipped.length > 0) {
@@ -427,7 +489,7 @@ async function main() {
   }
 
   if (fails > 0) { console.error(`\n[content:validate] FAIL：${fails} 项`); process.exit(1) }
-  console.log(`\n[content:validate] PASS：${ids.length} 包全部通过`)
+  console.log(`\n[content:validate] PASS：${totalPkgs} 包全部通过`)
 }
 
 main().catch((e) => { console.error('[content:validate] 异常：', e.message); process.exit(1) })
