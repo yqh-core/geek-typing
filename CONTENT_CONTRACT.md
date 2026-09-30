@@ -443,6 +443,29 @@ interface ContentRevisionEntry {
 {"build":{"builtAt":"2026-09-26T13:59:06.663Z","sourceChecksum":"sha256:ae689a16…","toolVersion":"content-build/1.1"},"contentChecksum":"sha256:ae689a16…","contentHistory":[{"checksum":"sha256:ae689a16…","publishedAt":"2026-09-26","revision":1,"version":1}],"contentPublishedAt":"2026-09-26","contentRevision":1,"contentVersion":1,"id":"content:vocabulary:curated-frontend:frontend","namespace":"curated-frontend","packageId":"frontend","schemaVersion":4,…}
 ```
 
+### 7.5 ⚠️ runtime 侧是**投影后的 manifest**（P18-C）
+
+**源码 `content/**/manifest.json` 始终是完整的**（上面 7.4 的形状，含 `sources` / `contentHistory` / `build`）。
+门禁与构建脚本直读原文件，看到的是全量。
+
+**runtime 拿到的是投影后的子集**：`registry.ts` 以 `manifest.json?runtime` 导入，由 Vite 插件
+`scripts/vite-plugin-manifest-runtime.mjs` 在构建期按**白名单**投影后再进 chunk。TS 侧对应类型是
+`RuntimePackageManifest`（`Pick` 掉 `sources` / `contentHistory` / `build`）。
+
+理由：这三个字段合计 12.04 KiB（18 包），在 `src/` 内**零运行时读取**，纯属构建期/审计数据，
+却经 `?raw` 全额进主 chunk，是主 chunk 贴预算悬崖的主要可裁项。
+
+- **白名单的唯一事实源**：`scripts/content/manifest-runtime.mjs` 的 `RUNTIME_MANIFEST_FIELDS`
+  （+ `DROPPED_MANIFEST_FIELDS` / `DROPPED_MANIFEST_PROBES` / `projectManifest`）。
+  **白名单式而非黑名单式** —— 黑名单会让新增字段默认进 runtime，体积随时间无声回涨。
+- **守卫**：`check-bundle` 判据 4（J1 白名单自洽 + `src/` 不得回退 `?raw`；J2 被裁字段不得出现在主 chunk；
+  J3 保留字段必须出现，作防假绿对照组）与判据 5（lazy 包反向校验），自带 `--falsify`。
+- ⚠️ **别按 JSON 源码形态写探测串**：投影后 manifest 是 JS 对象字面量，打包器会**去掉安全键名的引号**
+  （`stats:` 而非 `"stats":`）。两种形态都要探，各自覆盖一类故障 —— 详见
+  `docs/p18/P1.8-DESIGN-RULINGS-v1.0.md` §⑦-6a。
+- **`contentChecksum` / `contentVersion` 不在裁剪集里**：它们被 learning 层 runtime 消费
+  （`src/lib/learning/attribute.ts`、`upgrade.ts`）。别按"名字像构建期数据"就裁。
+
 ---
 
 ## 8. `words.json` / `relations.json` 契约
@@ -458,7 +481,8 @@ interface ContentRevisionEntry {
 - 学习状态**绝不挂在这里**（mastery / streak / nextReviewAt 属 Learning 层）。
 - 落盘格式 = `canonicalFile(words)`：紧凑单行 + 尾随换行。
 - `contentChecksum === sha256Canonical(words)`（**必须走 canonical**，门禁第 15 项）。
-- 大 JSON 经 `?raw` + 运行时 `JSON.parse` 导入（tsconfig 未开 `resolveJsonModule`）。
+- 载荷大 JSON（`words.json` 等）经 `?raw` + 运行时 `JSON.parse` 导入（tsconfig 未开 `resolveJsonModule`）；
+  `manifest.json` **不走 `?raw`**，走 §7.5 的 `?runtime` 构建期投影。
 
 ### 8.2 relations.json（**可选**，当前无包产出）
 
