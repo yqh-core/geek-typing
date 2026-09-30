@@ -29,10 +29,19 @@ export const LICENSE_POLICY_VERSION = 'license-policy-1'
 /** 自有内容哨兵值（与 provenance.ts 同源） */
 export const PROVIDER_ORIGINAL = 'geek-typing original'
 
-/** ContentType 白名单 —— 必须与 src/core/content/model/content.ts 联合类型一字不差 */
+/** 内容**包级**类型白名单（= `content/<type>/` 合法目录名）。
+ *
+ *  权威是 `src/core/content/types/registry.ts` 的 `packageLevelTypes()`（13 项）。
+ *  本文件是 Node 侧唯一的副本（`validate.mjs` 已改为从这里 import，不再各写一份），
+ *  由 `gate:content-type-contract` 判据 H 对着契约逐项强制相等 —— 契约加类型而这里没跟上，
+ *  门禁立刻判红（P18-A 实测确实漂过一次：契约扩到 14 项时两处 Node 白名单都停在 12 项）。
+ *
+ *  为什么不含 `word`：`word` 是**条目级**类型（packageLevel=false），其条目住在 vocabulary 包里，
+ *  不存在 `content/word/` 目录。含它会让"未知类型目录"判据放过一个不该存在的目录。 */
 export const CONTENT_TYPES = new Set([
-  'vocabulary', 'word', 'topic', 'listening', 'audio', 'reading',
-  'writing', 'speaking', 'grammar', 'document', 'collection', 'exercise',
+  'vocabulary', 'listening', 'audio', 'reading', 'topic', 'exercise',
+  'writing', 'speaking', 'grammar', 'document', 'collection',
+  'course', 'lesson',
 ])
 
 /** 载荷文件名：vocabulary 固定 words.json；其余类型统一 items.json（可选） */

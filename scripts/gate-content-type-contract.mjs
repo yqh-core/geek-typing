@@ -20,6 +20,11 @@
  *                       ② 联合 ⊆ 数组：`TypeListExhaustive = AssertNever<Exclude<…>>`
  *                       ③ 注册表完整：`Record<ContentType, ContentTypeDescriptor>`
  *                       A–F 全部是运行时判据，**抓不到**只在类型层存在的漂移，所以 G 必须存在。
+ *   H 构建侧白名单   —— Node 脚本（`scripts/content/license-policy.mjs` 的 `CONTENT_TYPES`）
+ *                       必须 == `packageLevelTypes()`，且 `validate.mjs` 不得再自建副本。
+ *                       Node 跑不了 TS，构建/入库/校验都得靠一份 JS 白名单；没有 H，
+ *                       契约加类型后 `content:ingest` / `content:validate` 会静默不认新类型。
+ *                       （P18-A 实测漂过一次：契约扩到 14 项时两处 Node 白名单都停在 12 项。）
  *
  * 退出码（与本仓其它门同族）：
  *   0 = PASS；1 = FAIL；2 = 脚本自身错误（模块加载失败 / 关键声明解析不出 —— **绝不降级成 PASS**）
@@ -52,7 +57,7 @@ import {
   mkdirSync,
   renameSync,
 } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, resolve, join, basename } from 'node:path'
 import { createHash } from 'node:crypto'
 
@@ -68,6 +73,10 @@ const F_ASSET = 'src/core/content/model/asset.ts'
 const F_CATALOG = 'src/core/content/catalog/catalog.ts'
 const F_ZH = 'src/i18n/zh.ts'
 const F_QUERY = 'src/core/content/query/content-query.ts'
+/** Node 侧（构建/入库/校验链路）的类型白名单唯一副本 */
+const F_LICENSE_POLICY = 'scripts/content/license-policy.mjs'
+/** 不得再自建白名单副本的脚本 */
+const F_VALIDATE = 'scripts/content/validate.mjs'
 
 /** G 判据的编译单元：契约本身 + 它的两个类型依赖（独立小程序，不必跑全项目 tsc） */
 const CONTRACT_UNITS = [F_REGISTRY, F_CONTENT, F_ASSET]
@@ -401,6 +410,43 @@ async function runChecks() {
         if (diags.length > 6) errors.push(`      …另有 ${diags.length - 6} 条`)
       }
     }
+
+    /* ---------- H. 构建侧类型白名单（Node 脚本）⟷ 契约 ---------- */
+    {
+      let buildTypes
+      try {
+        // 带内容哈希查询串：绕开 ESM 模块缓存，证伪模式里改了文件才能真读到新内容
+        const mod = await import(`${pathToFileURL(abs(F_LICENSE_POLICY)).href}?v=${sha(F_LICENSE_POLICY)}`)
+        if (!(mod.CONTENT_TYPES instanceof Set)) {
+          throw new Error('未导出 Set 形态的 CONTENT_TYPES')
+        }
+        buildTypes = [...mod.CONTENT_TYPES]
+      } catch (e) {
+        throw new Fatal(`无法加载 ${F_LICENSE_POLICY} 的 CONTENT_TYPES — ${e.message}`)
+      }
+      const expectedPkg = packageLevelTypes()
+      if (sameSet(buildTypes, expectedPkg)) {
+        ok(`H1 构建侧类型白名单 == packageLevelTypes()（${expectedPkg.length} 个；源 ${F_LICENSE_POLICY}）`)
+      } else {
+        fail(
+          'H',
+          `H1 构建侧白名单与契约不一致：license-policy=[${sorted(buildTypes).join(', ')}] vs registry=[${sorted(expectedPkg).join(', ')}]`,
+        )
+        errors.push('    契约加类型后必须同步 Node 侧白名单，否则 content:ingest / content:validate 不认新类型')
+      }
+
+      let vsrc
+      try {
+        vsrc = readFileSync(abs(F_VALIDATE), 'utf8')
+      } catch (e) {
+        throw new Fatal(`无法读取 ${F_VALIDATE} — ${e.message}`)
+      }
+      if (/^[ \t]*const[ \t]+CONTENT_TYPES[ \t]*=/m.test(vsrc)) {
+        fail('H', `H2 ${F_VALIDATE} 又自建了 CONTENT_TYPES 副本 —— Node 侧白名单只允许一份（从 license-policy.mjs import）`)
+      } else {
+        ok(`H2 ${F_VALIDATE} 未自建类型白名单副本（单一副本）`)
+      }
+    }
   } finally {
     await server.close()
   }
@@ -474,6 +520,16 @@ const CASES = [
     file: F_CONTENT,
     from: "  | 'lesson'\n",
     to: "  | 'lesson'\n  | 'quiz'\n",
+  },
+  {
+    letter: 'H',
+    expect: ['H'],
+    why: 'Node 侧白名单只被 H 看见（契约/查询层/catalog/i18n 都不受它影响）',
+    name: '从 license-policy.mjs 摘掉 lesson（契约加了类型、Node 构建/入库/校验不认）',
+    kind: 'edit',
+    file: F_LICENSE_POLICY,
+    from: "  'course', 'lesson',\n])",
+    to: "  'course',\n])",
   },
 ]
 

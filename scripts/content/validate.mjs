@@ -48,19 +48,17 @@ import { readdir, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { sha256Canonical } from './canonical.mjs'
+/* 类型白名单**只从 license-policy.mjs 取**，本文件不再自建副本 ——
+ * P1.8-A 之前这里是第二份手写镜像，注释写着"任一侧增删类型时两处同改"，
+ * 而实际结果就是漂移：契约把 `ContentType` 扩到 14 时，两处 Node 白名单都停在 12。
+ * 现在单一副本由 gate:content-type-contract 判据 H 对着契约上锁。 */
+import { CONTENT_TYPES } from './license-policy.mjs'
 
 const ROOT = path.resolve(process.cwd())
 const CONTENT_DIR = path.join(ROOT, 'content')
 /** 第 20 项比对对象：包的「实际加载方式」只在这里定义，Node 跑不了 TS，只能扫文本 */
 const REGISTRY_TS = path.join(ROOT, 'src', 'core', 'content', 'registry.ts')
 
-/** ContentType 白名单 —— P1.7-Wave4 B-1 泛化的判定基准。
- *  ⚠️ 同步责任：必须与 src/core/content/model/content.ts 的 ContentType 联合类型
- *  一字不差（本脚本是 Node 无法 import TS，按字面量镜像）；任一侧增删类型时两处同改。 */
-const CONTENT_TYPES = new Set([
-  'vocabulary', 'word', 'topic', 'listening', 'audio', 'reading',
-  'writing', 'speaking', 'grammar', 'document', 'collection', 'exercise',
-])
 /** 载荷文件名：vocabulary 包固定 words.json；其余类型统一 items.json（可选） */
 const payloadNameOf = (type) => (type === 'vocabulary' ? 'words.json' : 'items.json')
 
