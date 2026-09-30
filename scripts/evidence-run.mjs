@@ -6,18 +6,27 @@
  * Artifact(sha256, 落盘) → Evidence(本矩阵) → CLOSED。禁止人工填 PASS。
  *
  * 用法：node scripts/evidence-run.mjs --wave=W0
- * 产物：W* 波   → docs/audit-package/_generated/evidence/<wave>/
- *       P18* 波 → docs/p18/_generated/evidence/<wave>/（P1.8 证据树，**不进 P1.7 冻结区** —— 见 verify-p17-frozen.mjs INV-1）
+ *      node scripts/evidence-run.mjs --wave=P18-A      （P1.8 按波次独立证据根）
+ * 产物根：W* 波   → docs/audit-package/_generated/evidence/<WAVE>/
+ *         P18* 波 → docs/p18/_generated/evidence/<WAVE>/（P1.8 证据树，**不进 P1.7 冻结区** —— 见 verify-p17-frozen.mjs INV-1）
  *   ├── <RunId>.txt          每条命令的原始输出（stdout+stderr）
  *   ├── evidence-matrix.json 机器矩阵（含 RunId/ExitCode/Commit/ArtifactHash）
- *   └── evidence-matrix.md   人工可读版
- * RunId = W<wave>-<TASK>-<yyyymmdd>-<hhmmss>-R<attempt>（§15 秒级+attempt）
+ *   ├── evidence-matrix.md   人工可读版
+ *   └── _superseded/         本波次被取代的历史轮（同任务旧产物，rename 归档，不参与 verify 判定）
+ * RunId = <WAVE>-<TASK>-<yyyymmdd>-<hhmmss>-R<attempt>（§15 秒级 + attempt）
+ *
+ * 任务表按「族」共用、证据根按「波次」独立：
+ *   FAMILY = WAVE.split('-')[0]（P18-A → P18；W0/W5C 无短横线 → 自身）。
+ *   任务表查找 TASK_TABLE[WAVE] ?? TASK_TABLE[FAMILY] —— 于是 P18-A/P18-B/… 共用 P18 那份
+ *   通用回归清单，但各自落 docs/p18/_generated/evidence/P18-A、…/P18-B 独立证据根。
+ *   每次运行前把本波次同任务的旧产物 rename 进 _superseded/（不是删除），并让 RunId 的
+ *   attempt 按代递增 —— 这样波次目录顶层恒等于 matrix 引用的那批文件，orphan 才是严格判据。
  *
  * 实现：async spawn（本机 shim 环境下 spawnSync 返回 EBUSY，async spawn 正常）。
  */
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync, readdirSync, renameSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -25,7 +34,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const waveArg = process.argv.find((a) => a.startsWith('--wave=')) || '--wave=W0'
 const WAVE = waveArg.split('=')[1].toUpperCase()
 
-const TASKS = {
+const TASK_TABLE = {
   W0: [
     { task: 'BUILD', command: 'npm run build' },
     { task: 'TSC', command: 'npx tsc -b --noEmit' },
@@ -275,7 +284,8 @@ const TASKS = {
    *  已并入：
    *    18-0 —— scripts/verify-p17-frozen.mjs（INV-1 门，主判据）
    *    18-A —— scripts/gate-content-type-contract.mjs（INV-6 门）+ 其 --falsify 证伪自检
-   *  证据根落 docs/p18/_generated/evidence/（**不进 P1.7 冻结区** —— 见 verify-p17-frozen.mjs INV-1）。
+   *  证据根落 docs/p18/_generated/evidence/<WAVE>/（**不进 P1.7 冻结区** —— 见 verify-p17-frozen.mjs INV-1）：
+   *  任务表按族共用（本键 P18 服务 P18-A/P18-B/…），证据根按波次独立（P18-A → …/evidence/P18-A）。
    *  BUILD 排在 dist 依赖门禁之前（W4 教训：先清 dist 再跑体积门会三连假红；
    *  本条尤其关键 —— 量到旧 dist 会让体积门假绿，实测踩过一次）。 */
   P18: [
@@ -295,9 +305,15 @@ const TASKS = {
     { task: 'GATE-LEARNING-BOUNDARY', command: 'node scripts/gate-learning-boundary.mjs' },
     { task: 'TEST-CONTENT-QUERY', command: 'node tests/content-query.mjs' },
   ],
-}[WAVE]
+}
 
-if (!TASKS) { console.error(`unknown wave: ${WAVE}`); process.exit(2) }
+// 族键查找：P18-A/P18-B/… 各自独立证据根，但共用 P18 那份任务表；W0/W5C（无短横线）FAMILY 即自身。
+const FAMILY = WAVE.split('-')[0]
+const TASKS = TASK_TABLE[WAVE] ?? TASK_TABLE[FAMILY]
+if (!TASKS) {
+  console.error(`unknown wave: ${WAVE}（已尝试任务表键：WAVE=${WAVE}，FAMILY=${FAMILY}）`)
+  process.exit(2)
+}
 
 function gitCommit() {
   // 用 async spawn 的同步等价场景在 shim 下不可用，这里从 environment 取，
@@ -340,11 +356,29 @@ const EVIDENCE_REL = /^P18/.test(WAVE)
 const EVIDENCE_REL_PATH = EVIDENCE_REL.join('/')
 const OUT = join(ROOT, ...EVIDENCE_REL, WAVE)
 mkdirSync(OUT, { recursive: true })
+// 本波次被取代的历史轮归档目录（子目录，verify 的 orphan 扫描只读顶层，天然不受影响）。
+const SUPERSEDED = join(OUT, '_superseded')
+mkdirSync(SUPERSEDED, { recursive: true })
+
+/** 匹配「本波次 + 本任务」的产物文件名：用带尾随 `-` 的精确前缀，避免
+ *  GATE-CONTENT-CONTRACT 被误判成 GATE-CONTENT-TYPE-CONTRACT 的前缀。 */
+const artifactName = (f, task) => f.endsWith('.txt') && f.startsWith(`${WAVE}-${task}-`)
 
 const entries = []
 let failed = 0
 for (const { task, command } of TASKS) {
-  const runId = `${WAVE}-${task}-${stamp()}-R01`
+  // 生成前先把同任务的旧产物退役：rename（不删 —— 本机 safe-delete shim 会拦 unlink）。
+  for (const f of readdirSync(OUT)) {
+    if (artifactName(f, task)) {
+      renameSync(join(OUT, f), join(SUPERSEDED, f))
+      console.log(`↩ 退役上一轮产物 → _superseded/：${f}`)
+    }
+  }
+  // attempt 按代递增：顶层 + _superseded 里同任务产物总数 + 1（全新波次 count=0 → R01，兼容 P1.7 既有产物）。
+  const priors = readdirSync(OUT).filter((f) => artifactName(f, task)).length
+    + readdirSync(SUPERSEDED).filter((f) => artifactName(f, task)).length
+  const attempt = String(priors + 1).padStart(2, '0')
+  const runId = `${WAVE}-${task}-${stamp()}-R${attempt}`
   const startedAt = new Date().toISOString()
   const { code, out, ms } = await run(command)
   const raw = [
