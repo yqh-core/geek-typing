@@ -1,0 +1,30 @@
+# RunId: P18-F-CHECK-BUNDLE-20261001-005440-R01
+# Command: node scripts/check-bundle.mjs
+# Commit: 1e5542190e3204e5ebd5d679b15c8b609437ad57
+# StartedAt: 2026-09-30T16:54:40.925Z
+# DurationMs: 2004
+# ExitCode: 0
+
+--- stdout+stderr ---
+[check-bundle] dist/assets：13 个文件
+  1. ✓ PASS   主 chunk index-DXQgLpDB.js：432.15 KiB raw / 136.13 KiB gzip ≤ 439.45/141.60 KiB（余量 1.7% / 3.9%；来源 absolute / absolute）
+  2. ✓ PASS   数据 chunk 11 个（words 3 + items 8）≥ registry lazy 包 11 个
+  3. ✓ PASS   预热预算（ielts→words-CZ5ER7rC.js(166.87 KiB)，kaoyan→words-2QG2Fjtl.js(166.85 KiB)，toefl→words-uy6NfwIr.js(163.17 KiB)）：gzip 合计 496.89 KiB ≤ 600 KiB（余量 17.2%）
+  4. ✓ PASS   manifest runtime 投影（J1 PASS / J2 PASS / J3 PASS）
+        J1 ✓ PASS   白名单 25 字段 ∪ 裁剪 3 字段 = 28；PackageManifest 28 字段；content 并集 25 字段；src/ 无 manifest.json?raw 回退
+        J2 ✓ PASS   被裁字段 [sources, contentHistory, build] 的 10 个探测串在主 chunk 命中 0 次
+        J3 ✓ PASS   保留字段探测串 5/5 命中（≥4，对照组有效）："stats:"=22, "description:"=20, "contentChecksum:"=20, "features:"=19, "offline:"=19
+  5. ✓ PASS   lazy 语义（registry 声明 lazy 的包不得 inline 进主 chunk）：registry 全部 11 个 lazy 包的探测串在主 chunk 命中 0 次
+      · ielts (vocabulary/load) probes=8 → ✓ 未进主 chunk
+      · kaoyan (vocabulary/load) probes=8 → ✓ 未进主 chunk
+      · toefl (vocabulary/load) probes=8 → ✓ 未进主 chunk
+      · demo-listening-01 (items/loadData) probes=8 → ✓ 未进主 chunk
+      · demo-audio-01 (items/loadData) probes=8 → ✓ 未进主 chunk
+      · demo-reading-01 (items/loadData) probes=8 → ✓ 未进主 chunk
+      · demo-topic-01 (items/loadData) probes=8 → ✓ 未进主 chunk
+      · demo-exercise-01 (items/loadData) probes=8 → ✓ 未进主 chunk
+      · demo-writing-01 (items/loadData) probes=8 → ✓ 未进主 chunk
+      · demo-speaking-01 (items/loadData) probes=8 → ✓ 未进主 chunk
+      · demo-study-set (items/loadData) probes=8 → ✓ 未进主 chunk
+
+[check-bundle] PASS：5 项全部通过

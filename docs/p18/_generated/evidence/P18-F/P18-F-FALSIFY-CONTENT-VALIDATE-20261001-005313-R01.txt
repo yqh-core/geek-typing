@@ -1,0 +1,18 @@
+# RunId: P18-F-FALSIFY-CONTENT-VALIDATE-20261001-005313-R01
+# Command: node scripts/content/validate.mjs --falsify
+# Commit: 1e5542190e3204e5ebd5d679b15c8b609437ad57
+# StartedAt: 2026-09-30T16:53:13.955Z
+# DurationMs: 9037
+# ExitCode: 0
+
+--- stdout+stderr ---
+[content:validate] 证伪自检 —— 证明 INV-4 二进制媒体判据能判红（不会失败的门等于没有门）
+  隔离副本：C:\Users\ADMINI~1\AppData\Local\Temp\p18f-falsify-M45uXz（系统临时目录；真 content/ 只读、绝不被写）
+  注入：fake-audio.mp3（mp3 扩展名 + NUL 字节）+ fake.json（合法 JSON 尾部追加 NUL —— 专证改扩展名伪装）
+
+  ✓ 断言 1：offenders 恰好 = 2（多一个少一个都算失败）
+  ✓ 断言 2：两类 why 都在（ext 白名单通道 / nul 嗅探通道）
+  ✓ 断言 3：两个注入样本均被点名
+  ✓ 断言 4：真实 content/ 零 offender 且零 error（注入未污染真实内容）
+──────────────────────────────────────────────────────
+content:validate Falsification：✅ PASS —— 4/4 断言通过，隔离副本已清理，真 content/ 未被写入
