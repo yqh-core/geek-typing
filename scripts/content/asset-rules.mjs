@@ -178,8 +178,8 @@ export function checkAssetLicense(asset, packageLicenses) {
  *   review_required               → FAIL（**取舍见下**）
  *   rejected                      → FAIL
  *
- * 为什么 review_required 判 FAIL：本仓对「未定的门」口径是 `PENDING ⇒ BLOCKED，不得粉饰为 PASS`
- * （见 P1.8 裁定 ②）。资产许可是一条**入库前置硬门**的判据，"需人工复核"在无人值守的
+ * 为什么 review_required 判 FAIL：本仓对「未定的门」口径是 PENDING ⇒ 未通过
+ * （与 release:gate 的整体状态同一语义：PENDING 不得记作 PASS，见 P1.8 裁定 ②）。资产许可是一条**入库前置硬门**的判据，"需人工复核"在无人值守的
  * 门/校验器里无法自动达成 —— 若判 PASS，等于让 CC-BY-SA / GPL 这类待复核许可静默入库。
  * 故在自动门语境下 review_required 与 rejected 同为 FAIL，只是 code 分开以便人工分诊。
  */
