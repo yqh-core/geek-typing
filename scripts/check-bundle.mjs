@@ -7,8 +7,12 @@
  * （+471.92 KiB）、gzip 118.89 → 285.30 KiB（+166.41 KiB），增量与 kaoyan words.json
  * 471.70 KiB 的比值 1:1.0005 —— inline 是全额直通车，所以必须有一条「构建后」的红线。
  *
+ * 阈值来源 = gate-perf 预算表（P1.7-Wave5 D-2，scripts/gate-perf.mjs，单一事实来源，
+ * effective = min-strict(baseline×1.15, absolute)）；本文件的历史硬编码值
+ * 430,080 B / 138,240 B 已废弃。WARM_GZIP_MAX 与 words-* chunk 数判据保持不变。
+ *
  * 检查项：
- *   1. 主 chunk dist/assets/index-*.js：raw ≤ 420 KiB 且 gzip ≤ 135 KiB
+ *   1. 主 chunk dist/assets/index-*.js：raw 与 gzip ≤ gate-perf 预算表 effective
  *   2. dist/assets/words-*.js chunk 数量 ≥ registry.ts 里 lazy 包的数量（独立 chunk 没被打回主包）
  *   3. 预热预算：warmUpVocabulary 列入的包，其 words chunk gzip 总和 ≤ 600 KiB
  *
@@ -21,6 +25,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { gzipSync } from 'node:zlib'
+import { computeEffective, loadBundleBaselines, PLANNED_BASELINE, ABSOLUTE_BUDGET } from './gate-perf.mjs'
 
 const ROOT = process.cwd()
 const DIST = path.join(ROOT, 'dist')
@@ -28,10 +33,16 @@ const ASSETS = path.join(DIST, 'assets')
 const VOCAB_DIR = path.join(ROOT, 'content', 'vocabulary')
 const REGISTRY_TS = path.join(ROOT, 'src', 'core', 'content', 'registry.ts')
 
-/** 阈值（字节）。余量按 10 包基线留：主 chunk 10.2% / 12.0%，预热 17.2% */
-const MAIN_RAW_MAX = 420 * 1024
-const MAIN_GZIP_MAX = 135 * 1024
+/** 预热阈值（字节）。预热预算不在 gate-perf 预算表管辖内，保留本文件常量 */
 const WARM_GZIP_MAX = 600 * 1024
+
+/** 主 chunk 阈值从 gate-perf 预算表读取（双基线取更严；输入缺失返回 null 由调用方判 UNKNOWN） */
+function mainChunkBudgets() {
+  const base = loadBundleBaselines()
+  const raw = computeEffective(PLANNED_BASELINE['main-chunk-raw'], base.mainRaw, ABSOLUTE_BUDGET['main-chunk-raw'])
+  const gzip = computeEffective(PLANNED_BASELINE['main-chunk-gzip'], base.mainGzip, ABSOLUTE_BUDGET['main-chunk-gzip'])
+  return { rawMax: raw.effective, gzipMax: gzip.effective, source: { raw: raw.source, gzip: gzip.source } }
+}
 
 /** 归属探测用的「独有词」数量：越多越不容易误判，8 个足够压掉偶然命中 */
 const PROBE_COUNT = 8
@@ -146,8 +157,11 @@ function main() {
   const gzipOf = (f) => gzipSync(readFileSync(path.join(ASSETS, f)), { level: 9 }).length
   const rawOf = (f) => statSync(path.join(ASSETS, f)).size
 
-  /* —— 1. 主 chunk 体积 —— */
-  if (mainChunks.length === 0) {
+  /* —— 1. 主 chunk 体积（阈值来自 gate-perf 预算表） —— */
+  const budget = mainChunkBudgets()
+  if (budget.rawMax == null || budget.gzipMax == null) {
+    record('UNKNOWN', 1, ` 无法确定主 chunk 预算（perf-baseline.json 缺 bundle 基线）：先跑 node scripts/gate-perf.mjs --record-baseline 并提交该文件`)
+  } else if (mainChunks.length === 0) {
     record('FAIL', 1, ` dist/assets 下找不到 index-*.js：构建产物结构变了，门禁需要更新（比静默放行安全）`)
   } else if (mainChunks.length > 1) {
     record('UNKNOWN', 1, ` 主 chunk 不唯一（${mainChunks.join(', ')}）：无法确定首屏口径`)
@@ -155,11 +169,13 @@ function main() {
     const f = mainChunks[0]
     const raw = rawOf(f)
     const gz = gzipOf(f)
+    const MAIN_RAW_MAX = budget.rawMax
+    const MAIN_GZIP_MAX = budget.gzipMax
     if (raw > MAIN_RAW_MAX || gz > MAIN_GZIP_MAX) {
-      const why = [raw > MAIN_RAW_MAX ? `raw ${kib(raw)} KiB > ${MAIN_RAW_MAX / 1024} KiB` : null, gz > MAIN_GZIP_MAX ? `gzip ${kib(gz)} KiB > ${MAIN_GZIP_MAX / 1024} KiB` : null].filter(Boolean).join('；')
+      const why = [raw > MAIN_RAW_MAX ? `raw ${kib(raw)} KiB > ${kib(MAIN_RAW_MAX)} KiB` : null, gz > MAIN_GZIP_MAX ? `gzip ${kib(gz)} KiB > ${kib(MAIN_GZIP_MAX)} KiB` : null].filter(Boolean).join('；')
       record('FAIL', 1, ` 主 chunk ${f}：${kib(raw)} KiB raw / ${kib(gz)} KiB gzip —— ${why}（很可能有人把 lazy 包写成了 inline：inline 词 1:1 全额进主 chunk）`)
     } else {
-      record('PASS', 1, ` 主 chunk ${f}：${kib(raw)} KiB raw / ${kib(gz)} KiB gzip ≤ ${MAIN_RAW_MAX / 1024}/${MAIN_GZIP_MAX / 1024} KiB（余量 ${pct(raw, MAIN_RAW_MAX)} / ${pct(gz, MAIN_GZIP_MAX)}）`)
+      record('PASS', 1, ` 主 chunk ${f}：${kib(raw)} KiB raw / ${kib(gz)} KiB gzip ≤ ${kib(MAIN_RAW_MAX)}/${kib(MAIN_GZIP_MAX)} KiB（余量 ${pct(raw, MAIN_RAW_MAX)} / ${pct(gz, MAIN_GZIP_MAX)}；来源 ${budget.source.raw} / ${budget.source.gzip}）`)
     }
   }
 

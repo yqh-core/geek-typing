@@ -82,7 +82,7 @@
 
 | # | 不变量 | 方向 | 现行落点 | 断言方式 |
 |---|--------|------|----------|----------|
-| D-1 | 新依赖必须过 bundle budget | 依赖准入 | **无自动落点（Wave 5 待建）**：`scripts/gate-perf.mjs` 未落地。当前只有 `npm run check:bundle`（`scripts/check-bundle.mjs`）做体积检查，**不是准入门**，不拦新依赖 | 计划要求 `gate:perf`——待 Wave 5 |
+| D-1 | 新依赖必须过 bundle budget | 依赖准入 | **`gate-perf`（Wave 5 已落地）+ `check:bundle`**：`scripts/gate-perf.mjs` 预算表（effective = min-strict(baseline×1.15, absolute)，双基线取更严，每行带 reason）是主 chunk raw/gzip 阈值的单一事实来源，`scripts/check-bundle.mjs` 改为从该表读取（历史硬编码 430,080/138,240 已废弃）；`gate:perf` 已接入 `gate:architecture` 汇总门。boot/content 行为 baseline-only（CI 测不了，供本机 `bench:boot` / `bench:content` 对照） | 超预算打印五元组（指标/基线/当前/effective/来源）EXIT=1；基线存 `docs/audit-package/_generated/perf-baseline.json`（随仓库提交） |
 
 ### 交付
 
@@ -102,10 +102,12 @@
 | persistence | Wave 2-C | `scripts/gate-persistence.mjs` | ✅ 已接入 |
 | practice-engine | Wave 2 | `scripts/gate-practice-engine.mjs` | ✅ 已接入 |
 | **content-contract** | **Wave 4** | `scripts/gate-content-contract.mjs` | ⏳ **PENDING（未接入）** |
-| **perf** | **Wave 5** | `scripts/gate-perf.mjs` | ⏳ **PENDING（未接入）** |
+| **perf** | **Wave 5** | `scripts/gate-perf.mjs` | ✅ 已接入（D-2/D-3 预算门） |
 
-`gate:architecture` 对这两个未落地的门**显式打印 PENDING 行且不计入 FAIL**，
-并在结尾固定输出一行「未接入子项：content-contract(Wave 4) / perf(Wave 5)」。
+`gate:architecture` 对仍未落地的门（现仅剩 content-contract）**显式打印 PENDING 行且
+不计入 FAIL**，并在结尾固定输出一行「未接入子项：content-contract(Wave 4)」。
+perf 门已于 Wave 5 落地（`scripts/gate-perf.mjs`），按「脚本文件出现即自动转正」的
+机制转入真实执行并计入 FAIL。
 
 取舍理由（同一取舍也写在 `scripts/gate-architecture.mjs` 文件头）：
 
