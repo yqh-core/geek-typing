@@ -14,7 +14,10 @@
  */
 import type { ContentLicense } from './content'
 
-export type AssetKind = 'audio' | 'image' | 'document' | 'subtitle' | 'other'
+/* P1.8-A 新增 `video`：ContentType 早有 listening/audio，但 AssetKind 缺 video，
+ * 导致"视频"在类型契约里无处安放（P1.8 计划要支持视频+字幕）。此处只补枚举值，
+ * 资产实体化（AssetManifest / 校验 / 远程托管）在 P18-B / P18-F。 */
+export type AssetKind = 'audio' | 'video' | 'image' | 'document' | 'subtitle' | 'other'
 
 /** 资产引用：只描述文件本身，不含任何内容语义，也**不含**学习状态 */
 export interface AssetRef {

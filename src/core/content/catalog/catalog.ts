@@ -12,7 +12,7 @@
  * 真实数字；新类型要扩展照此办理。宁可让 UI 显示「暂未开放」，也不要拿假数字骗过验收。
  */
 import { getAllPackages, getPackage } from '../registry'
-import { SCHEMA_VERSION } from '../model/content'
+import { SCHEMA_VERSION, type ContentType } from '../model/content'
 import type { PackageManifest } from '../schema'
 
 export interface CatalogTypeEntry {
@@ -47,13 +47,22 @@ export interface ContentCatalog {
   totalItems: number
 }
 
-/** 规划中的内容类型槽位（含已接入的 vocabulary）：目录页据此展示「哪些还没有」。
- *  'word' 是条目级类型（词条不属于任何包的子类型），故不在目录的类型维度里列出。 */
-const PLANNED_TYPES = [
+/** 目录的**类型槽位**（app 侧的运行时投影）。
+ *
+ * 权威是 `src/core/content/types/registry.ts` 的 `packageLevelTypes()`；这里是它的**精简副本**，
+ * 存在的唯一理由是**体积**（P1.8-A 实测）：注册表含 14 条富描述（fields / query / learning / note），
+ * 整表进主 chunk 会让主 chunk 从 436.45 涨到 444.94 KiB，越过 439.45 KiB 预算（INV-3 禁上调预算）。
+ * 而目录的类型维度**当前没有任何 UI 消费**（App 只读 `packages.length` / `totalItems`）——
+ * 让 app 为一个没人读的字段背上整张富描述表不划算。
+ *
+ * 口径因此定为：**权威在注册表，副本在此，由门禁判据 D 强制逐项相等**（不等即 FAIL）。
+ * 新增包级类型时改完注册表，门禁立刻指出这里漏了谁 —— 不靠人记，也不靠注释提醒。
+ * 条目级类型（word）的 `packageLevel=false`，故不在本表内。顺序与注册表一致，便于人读比对。 */
+const PLANNED_TYPES: ContentType[] = [
   'vocabulary',
   'listening',
-  'reading',
   'audio',
+  'reading',
   'topic',
   'exercise',
   'writing',
@@ -61,6 +70,8 @@ const PLANNED_TYPES = [
   'grammar',
   'document',
   'collection',
+  'course',
+  'lesson',
 ]
 
 function toEntry(m: PackageManifest, localId: string): CatalogPackageEntry {

@@ -269,12 +269,15 @@ const TASKS = {
     { task: 'DRYRUN-REAL', command: 'node scripts/migration-dryrun-w1.mjs --user-store=_user-snapshot/real-user-localStorage.json' },
     { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
   ],
-  /** P1.8 · Wave 18-0 —— 基线冻结与保护上线（P1.8-PLAN v1.0 §6）
-   *  变更面：新增 scripts/verify-p17-frozen.mjs（INV-1 门）+ package.json 脚本名
-   *  + docs/p18/P1.8-PLAN-v1.0-FROZEN.md + docs/ARCHITECTURE-INVARIANTS.md（补 INV-1 机器落点）
-   *  + scripts/evidence-run.mjs / evidence-verify.mjs（证据根按波次分流，W* 行为不变）。
-   *  不触碰 content / learning / persistence 子系统；**INV-1 门是本 Wave 的主判据**。
-   *  BUILD 排在 dist 依赖门禁之前（W4 教训：先清 dist 再跑体积门会三连假红）。 */
+  /** P1.8 · Wave 18-* —— 内容与学习基础（P1.8-PLAN v1.0 §6）。
+   *  本任务集由**整个 P1.8 系列共用**（18-0 基线冻结 / 18-A 类型契约 / 18-B 资产与许可 / …），
+   *  每个 Wave 跑同一套通用回归，Wave 专属判据由该 Wave 新增的门脚本承担。
+   *  已并入：
+   *    18-0 —— scripts/verify-p17-frozen.mjs（INV-1 门，主判据）
+   *    18-A —— scripts/gate-content-type-contract.mjs（INV-6 门）+ 其 --falsify 证伪自检
+   *  证据根落 docs/p18/_generated/evidence/（**不进 P1.7 冻结区** —— 见 verify-p17-frozen.mjs INV-1）。
+   *  BUILD 排在 dist 依赖门禁之前（W4 教训：先清 dist 再跑体积门会三连假红；
+   *  本条尤其关键 —— 量到旧 dist 会让体积门假绿，实测踩过一次）。 */
   P18: [
     { task: 'TSC', command: 'npx tsc -b --noEmit' },
     { task: 'LINT', command: 'npx oxlint src/' },
@@ -283,11 +286,14 @@ const TASKS = {
     { task: 'VERIFY-MANIFESTS', command: 'node scripts/verify-manifest-hashes.mjs' },
     { task: 'CONTENT-VALIDATE', command: 'node scripts/content/validate.mjs' },
     { task: 'GATE-CONTENT-CONTRACT', command: 'node scripts/gate-content-contract.mjs' },
+    { task: 'GATE-CONTENT-TYPE-CONTRACT', command: 'node scripts/gate-content-type-contract.mjs' },
+    { task: 'FALSIFY-CONTENT-TYPE-CONTRACT', command: 'node scripts/gate-content-type-contract.mjs --falsify' },
     { task: 'GATE-PERF', command: 'node scripts/gate-perf.mjs' },
     { task: 'CHECK-BUNDLE', command: 'node scripts/check-bundle.mjs' },
     { task: 'GATE-ARCHITECTURE', command: 'node scripts/gate-architecture.mjs' },
     { task: 'GATE-TODO', command: 'node scripts/gate-todo.mjs' },
     { task: 'GATE-LEARNING-BOUNDARY', command: 'node scripts/gate-learning-boundary.mjs' },
+    { task: 'TEST-CONTENT-QUERY', command: 'node tests/content-query.mjs' },
   ],
 }[WAVE]
 

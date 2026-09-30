@@ -44,6 +44,9 @@ export type ContentType =
   | 'document'
   | 'collection'
   | 'exercise'
+  /* P1.8-A 新增：课程 / 学习单元（契约先立，内容后进；见 content/types/registry.ts） */
+  | 'course'
+  | 'lesson'
 
 /** 内容命名空间：${来源族}-${包 id}（ecdict-ielts / curated-ai-core …），每包唯一 */
 export type ContentNamespace = string

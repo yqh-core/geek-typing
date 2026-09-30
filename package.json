@@ -49,6 +49,8 @@
     "gate:architecture": "node scripts/gate-architecture.mjs",
     "gate:todo": "node scripts/gate-todo.mjs",
     "gate:content-contract": "node scripts/gate-content-contract.mjs",
+    "gate:content-type-contract": "node scripts/gate-content-type-contract.mjs",
+    "gate:content-type-contract:falsify": "node scripts/gate-content-type-contract.mjs --falsify",
     "audit:a11y": "node scripts/audit-a11y-viewports.mjs",
     "release:gate": "node scripts/verify-release-gate.mjs"
   },
