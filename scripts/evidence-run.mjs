@@ -5,8 +5,20 @@
  * Status 只能由 Command 产生：Plan → Command → Machine Result(exit code) →
  * Artifact(sha256, 落盘) → Evidence(本矩阵) → CLOSED。禁止人工填 PASS。
  *
- * 用法：node scripts/evidence-run.mjs --wave=W0
- *      node scripts/evidence-run.mjs --wave=P18-A      （P1.8 按波次独立证据根）
+ * 用法：node scripts/evidence-run.mjs --wave=W0 [--allow-frozen] [--dry-run]
+ *      node scripts/evidence-run.mjs --wave=P18-A --dry-run   （只看计划，不写任何文件）
+ *      node scripts/evidence-run.mjs --help                   （打印用法后 exit 0）
+ *
+ * 参数（白名单；**未知参数 = exit 2，绝不降级为执行**）：
+ *   --wave=<WAVE>   目标波次（缺省 W0）。族键 = WAVE.split('-')[0]；任务表按族共用，
+ *                   证据根按波次独立：W0 → docs/audit-package/_generated/evidence/W0/，
+ *                   P18-A → docs/p18/_generated/evidence/P18-A/。
+ *   --dry-run       只打印计划（wave / family / 任务数 / 证据根 / 退役上一轮 / commit）
+ *                   后 exit 0 —— 不 mkdir、不 spawn 任务、不写 matrix。
+ *   --allow-frozen  显式允许写入 docs/audit-package/（INV-1 冻结区）。缺省下证据根落在
+ *                   该区域一律 exit 2，且**在产生任何文件前**退出。对非冻结区为 no-op。
+ *   --help, -h      打印本用法到 stdout 后 exit 0，不写任何文件。
+ *
  * 产物根：W* 波   → docs/audit-package/_generated/evidence/<WAVE>/
  *         P18* 波 → docs/p18/_generated/evidence/<WAVE>/（P1.8 证据树，**不进 P1.7 冻结区** —— 见 verify-p17-frozen.mjs INV-1）
  *   ├── <RunId>.txt          每条命令的原始输出（stdout+stderr）
@@ -22,6 +34,12 @@
  *   每次运行前把本波次同任务的旧产物 rename 进 _superseded/（不是删除），并让 RunId 的
  *   attempt 按代递增 —— 这样波次目录顶层恒等于 matrix 引用的那批文件，orphan 才是严格判据。
  *
+ * ⚠️ 历史事故：本脚本默认 --wave=W0，而 --wave=W0 的证据根落在 INV-1 冻结区
+ *   （docs/audit-package/**）。一次 `node scripts/evidence-run.mjs --help` 误触直接退役了
+ *   24 个已提交产物、又写入 11 个新产物，污染了冻结区。根因是「危险脚本带破坏性默认值」。
+ *   故：参数校验与冻结区守卫必须先于任何写路径，且脚本自身必须能证明「作用在预期对象上」
+ *   （P1.8-DESIGN-RULINGS v1.0 ⑥ 第 7 条）。
+ *
  * 实现：async spawn（本机 shim 环境下 spawnSync 返回 EBUSY，async spawn 正常）。
  */
 import { spawn } from 'node:child_process'
@@ -31,8 +49,52 @@ import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const waveArg = process.argv.find((a) => a.startsWith('--wave=')) || '--wave=W0'
-const WAVE = waveArg.split('=')[1].toUpperCase()
+
+const USAGE = [
+  '用法：node scripts/evidence-run.mjs --wave=<WAVE> [--allow-frozen] [--dry-run]',
+  '',
+  '参数（白名单；之外任何参数一律 exit 2，绝不降级为执行）：',
+  '  --wave=<WAVE>    目标波次（缺省 W0）。族键 = WAVE.split(\'-\')[0]，任务表按族共用，',
+  '                   证据根按波次独立：W0 → docs/audit-package/_generated/evidence/W0/，',
+  '                   P18-A → docs/p18/_generated/evidence/P18-A/。',
+  '  --dry-run        只打印计划（wave / family / 任务数 / 证据根 / 退役上一轮 / commit）',
+  '                   后 exit 0，不写任何文件（不 mkdir、不 spawn 任务、不写 matrix）。',
+  '  --allow-frozen   显式允许写入 docs/audit-package/（INV-1 冻结区）；缺省下写入该区域',
+  '                   的证据根一律 exit 2。对非冻结区为 no-op。',
+  '  --help, -h       打印本用法到 stdout 后 exit 0，不写任何文件。',
+  '',
+  '未知参数 = exit 2，绝不降级为执行。',
+].join('\n')
+
+const listDir = (dir) => {
+  try { return readdirSync(dir) } catch { return [] }
+}
+
+// --- 参数白名单解析：未知 flag / --help 一律在这里终结，绝不进入任何写路径 ---
+let WAVE = null
+let allowFrozen = false
+let dryRun = false
+for (const arg of process.argv.slice(2)) {
+  if (arg === '--help' || arg === '-h') {
+    console.log(USAGE)
+    process.exit(0)
+  }
+  if (arg === '--allow-frozen') { allowFrozen = true; continue }
+  if (arg === '--dry-run') { dryRun = true; continue }
+  if (arg.startsWith('--wave=')) {
+    const value = arg.slice('--wave='.length).trim()
+    if (!value) {
+      console.error(`invalid --wave: 缺少波次值\n\n${USAGE}`)
+      process.exit(2)
+    }
+    WAVE = value.toUpperCase()
+    continue
+  }
+  console.error(`unknown argument: ${arg}\n\n${USAGE}`)
+  process.exit(2)
+}
+// 保留既有行为：未显式给 --wave 时缺省 W0（该波次证据根落在 INV-1 冻结区，由下方守卫拦截）。
+if (WAVE === null) WAVE = 'W0'
 
 const TASK_TABLE = {
   W0: [
@@ -315,11 +377,6 @@ if (!TASKS) {
   process.exit(2)
 }
 
-function gitCommit() {
-  // 用 async spawn 的同步等价场景在 shim 下不可用，这里从 environment 取，
-  // 若缺失则由主流程第一条命令前用 async git 获取。
-  return process.env.EVIDENCE_COMMIT || 'pending'
-}
 function stamp(d = new Date()) {
   const p = (n, w = 2) => String(n).padStart(w, '0')
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
@@ -347,7 +404,6 @@ async function gitCommitAsync() {
   return out.trim().split('\n')[0] || 'unknown'
 }
 
-const COMMIT = (await gitCommitAsync())
 /** 证据根目录按波次分流（与 evidence-verify.mjs 同口径）：
  *  P1.7 Wave（W*）保持历史路径；P1.8 Wave（P18*）落 docs/p18，避免写入 P1.7 冻结区。 */
 const EVIDENCE_REL = /^P18/.test(WAVE)
@@ -355,14 +411,50 @@ const EVIDENCE_REL = /^P18/.test(WAVE)
   : ['docs', 'audit-package', '_generated', 'evidence']
 const EVIDENCE_REL_PATH = EVIDENCE_REL.join('/')
 const OUT = join(ROOT, ...EVIDENCE_REL, WAVE)
-mkdirSync(OUT, { recursive: true })
 // 本波次被取代的历史轮归档目录（子目录，verify 的 orphan 扫描只读顶层，天然不受影响）。
 const SUPERSEDED = join(OUT, '_superseded')
-mkdirSync(SUPERSEDED, { recursive: true })
 
 /** 匹配「本波次 + 本任务」的产物文件名：用带尾随 `-` 的精确前缀，避免
  *  GATE-CONTENT-CONTRACT 被误判成 GATE-CONTENT-TYPE-CONTRACT 的前缀。 */
 const artifactName = (f, task) => f.endsWith('.txt') && f.startsWith(`${WAVE}-${task}-`)
+
+// ---- INV-1 冻结区守卫：必须在任何 mkdir / 写文件 / renameSync 之前通过 ----
+// 判据用 path.resolve 后的绝对路径做前缀比较（分隔符统一为 `/`），
+// 避免相对路径 / 大小写 / `..` 之类的字符串绕过。
+const FROZEN_ROOT = resolve(ROOT, 'docs', 'audit-package')
+const normPath = (p) => resolve(p).replace(/\\/g, '/').toLowerCase()
+const OUT_NORM = normPath(OUT)
+const FROZEN_NORM = normPath(FROZEN_ROOT)
+const isFrozen = OUT_NORM === FROZEN_NORM || OUT_NORM.startsWith(`${FROZEN_NORM}/`)
+if (isFrozen && !allowFrozen) {
+  console.error('拒绝写入冻结区（INV-1）：解析出的证据根落在 docs/audit-package/ 之下。')
+  console.error(`  证据根：${OUT}`)
+  console.error(`  冻结区：${FROZEN_ROOT}（由 scripts/verify-p17-frozen.mjs 逐字节冻结）`)
+  console.error('  本次未写任何文件。确需写入请显式加 --allow-frozen。')
+  process.exit(2)
+}
+
+const COMMIT = (await gitCommitAsync())
+
+// ---- --dry-run：打印计划后 exit 0，不 mkdir / 不 spawn 任务 / 不写 matrix ----
+if (dryRun) {
+  const outFiles = listDir(OUT)
+  const retired = TASKS
+    .filter(({ task }) => outFiles.some((f) => artifactName(f, task)))
+    .map(({ task }) => task)
+  console.log('--- dry-run 计划（不写任何文件）---')
+  console.log(`wave        : ${WAVE}`)
+  console.log(`family      : ${FAMILY}`)
+  console.log(`任务数      : ${TASKS.length}`)
+  console.log(`证据根      : ${OUT}`)
+  console.log(`冻结区      : ${isFrozen ? '是（已由 --allow-frozen 显式放行）' : '否'}`)
+  console.log(`退役上一轮  : ${retired.length ? `${retired.length} 个任务：${retired.join(', ')}` : '无（本波次顶层无同任务旧产物）'}`)
+  console.log(`commit      : ${COMMIT}`)
+  process.exit(0)
+}
+
+mkdirSync(OUT, { recursive: true })
+mkdirSync(SUPERSEDED, { recursive: true })
 
 const entries = []
 let failed = 0
