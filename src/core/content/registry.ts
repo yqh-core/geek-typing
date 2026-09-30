@@ -7,22 +7,35 @@
  *  - 词条以 `?raw` 导入 + 运行时 JSON.parse，规避 tsc 对大 JSON 的字面量类型推断；
  *  - 加载结果单份缓存（loadPackage），兼容层与查询层共享，不重复占用内存。
  *
- * 新增内容包：content/vocabulary/<id>/ 放 manifest.json + words.json → 本文件登记 →
- * content:validate 校验 → content:build 自动同步 stats/checksum。
+ * 新增内容包：vocabulary → content/vocabulary/<id>/ 放 manifest.json + words.json；
+ * 其它类型 → content/<type>/<id>/ 放 manifest.json + items.json（可选载荷）。
+ * 均在本文件登记 → content:validate 校验 → vocabulary 包再跑 content:build 同步 stats/checksum。
  */
 import type { PackageManifest, WordPayload } from './schema'
 import { parseContentId } from './model/content'
 import type { ContentRelation } from './relation/relation'
 
-export interface VocabularyPackage {
+/**
+ * 内容包统一注册形状（P1.7-Wave4 B-2 泛化）：
+ *  - vocabulary 包走 words?/load? 词条通道（与既有口径一致）；
+ *  - 其余类型包走 data?/loadData? 条目通道（items.json，试金石包一律 lazy）。
+ * VocabularyPackage 保留为别名，既有调用方（wordBanks / learning / query 层）不受影响。
+ */
+export interface ContentPackage {
   manifest: PackageManifest
-  /** ContentId 的第 4 段（裸词库 id），与 UI/持久化键一致 */
+  /** ContentId 的第 4 段（裸包 id），与 UI/持久化键一致 */
   localId: string
-  /** inline 策略：词条同步可用 */
+  /** vocabulary inline 策略：词条同步可用 */
   words?: WordPayload[]
-  /** lazy 策略：词条异步加载器 */
+  /** vocabulary lazy 策略：词条异步加载器 */
   load?: () => Promise<WordPayload[]>
+  /** 非 vocabulary inline 策略：条目同步可用 */
+  data?: unknown[]
+  /** 非 vocabulary lazy 策略：条目异步加载器（items.json 动态 import，独立 chunk） */
+  loadData?: () => Promise<unknown[]>
 }
+export type VocabularyPackage = ContentPackage
+export type ContentPackageEntry = ContentPackage
 
 /* ---------------- manifest（?raw + parse，规避 resolveJsonModule） ---------------- */
 import ieltsManifest from '../../../content/vocabulary/ielts/manifest.json?raw'
@@ -54,8 +67,31 @@ const loadIelts = async () => parseWords((await import('../../../content/vocabul
 const loadKaoyan = async () => parseWords((await import('../../../content/vocabulary/kaoyan/words.json?raw')).default)
 const loadToefl = async () => parseWords((await import('../../../content/vocabulary/toefl/words.json?raw')).default)
 
-/* ---------------- 注册表（vocabulary 槽位；其余类型上线时扩展） ---------------- */
-const packages: VocabularyPackage[] = [
+/* ---------------- 非 vocabulary 试金石包（P1.7-Wave4 B-2） ----------------
+ * manifest 静态 import（常驻主 chunk，单个 ~1.2 KiB，O(包数) 线性小步涨）；
+ * items.json 一律动态 import（独立 items-*.js chunk，绝不进主 chunk），
+ * 与 words-*.js 同一判据口径（构建后体积门禁按 (words|items)-*.js 计数）。 */
+import listeningManifest from '../../../content/listening/demo-listening-01/manifest.json?raw'
+import audioManifest from '../../../content/audio/demo-audio-01/manifest.json?raw'
+import readingManifest from '../../../content/reading/demo-reading-01/manifest.json?raw'
+import topicManifest from '../../../content/topic/demo-topic-01/manifest.json?raw'
+import exerciseManifest from '../../../content/exercise/demo-exercise-01/manifest.json?raw'
+import writingManifest from '../../../content/writing/demo-writing-01/manifest.json?raw'
+import speakingManifest from '../../../content/speaking/demo-speaking-01/manifest.json?raw'
+import collectionManifest from '../../../content/collection/demo-study-set/manifest.json?raw'
+
+const parseData = (raw: string): unknown[] => JSON.parse(raw) as unknown[]
+const loadListeningDemo = async () => parseData((await import('../../../content/listening/demo-listening-01/items.json?raw')).default)
+const loadAudioDemo = async () => parseData((await import('../../../content/audio/demo-audio-01/items.json?raw')).default)
+const loadReadingDemo = async () => parseData((await import('../../../content/reading/demo-reading-01/items.json?raw')).default)
+const loadTopicDemo = async () => parseData((await import('../../../content/topic/demo-topic-01/items.json?raw')).default)
+const loadExerciseDemo = async () => parseData((await import('../../../content/exercise/demo-exercise-01/items.json?raw')).default)
+const loadWritingDemo = async () => parseData((await import('../../../content/writing/demo-writing-01/items.json?raw')).default)
+const loadSpeakingDemo = async () => parseData((await import('../../../content/speaking/demo-speaking-01/items.json?raw')).default)
+const loadCollectionDemo = async () => parseData((await import('../../../content/collection/demo-study-set/items.json?raw')).default)
+
+/* ---------------- 注册表（10 vocabulary + 7 类型试金石 + 1 collection = 18 包） ---------------- */
+const packages: ContentPackage[] = [
   { manifest: parseManifest(aiCoreManifest), localId: 'ai-core', words: parseWords(aiCoreWords) },
   { manifest: parseManifest(cloudNativeManifest), localId: 'cloud-native', words: parseWords(cloudNativeWords) },
   { manifest: parseManifest(frontendManifest), localId: 'frontend', words: parseWords(frontendWords) },
@@ -66,28 +102,46 @@ const packages: VocabularyPackage[] = [
   { manifest: parseManifest(toeflManifest), localId: 'toefl', load: loadToefl },
   { manifest: parseManifest(tsCodeManifest), localId: 'ts-code', words: parseWords(tsCodeWords) },
   { manifest: parseManifest(goCodeManifest), localId: 'go-code', words: parseWords(goCodeWords) },
+  { manifest: parseManifest(listeningManifest), localId: 'demo-listening-01', loadData: loadListeningDemo },
+  { manifest: parseManifest(audioManifest), localId: 'demo-audio-01', loadData: loadAudioDemo },
+  { manifest: parseManifest(readingManifest), localId: 'demo-reading-01', loadData: loadReadingDemo },
+  { manifest: parseManifest(topicManifest), localId: 'demo-topic-01', loadData: loadTopicDemo },
+  { manifest: parseManifest(exerciseManifest), localId: 'demo-exercise-01', loadData: loadExerciseDemo },
+  { manifest: parseManifest(writingManifest), localId: 'demo-writing-01', loadData: loadWritingDemo },
+  { manifest: parseManifest(speakingManifest), localId: 'demo-speaking-01', loadData: loadSpeakingDemo },
+  { manifest: parseManifest(collectionManifest), localId: 'demo-study-set', loadData: loadCollectionDemo },
 ]
+
+/** vocabulary 槽位（既有 API 口径：UI / 持久化 / 学习层只看词库包） */
+const vocabularyPackages = packages.filter((p) => p.manifest.type === 'vocabulary')
 
 const byLocalId = new Map(packages.map((p) => [p.localId, p]))
 const byManifestId = new Map(packages.map((p) => [p.manifest.id, p]))
 
 /** 包级加载缓存（单份数据，兼容层与查询层共享） */
 const loadedCache = new Map<string, WordPayload[]>()
+/** 非 vocabulary 包条目缓存（loadPackageData 专用，与词条缓存分离） */
+const dataCache = new Map<string, unknown[]>()
 
 /* ---------------- 查询 API ---------------- */
 
-/** 全部 vocabulary 包（按注册序，即 UI 下拉序） */
-export function getVocabularyPackages(): VocabularyPackage[] {
+/** 全部内容包（18 个：10 vocabulary + 8 试金石/组合，按注册序） */
+export function getAllPackages(): ContentPackage[] {
   return packages
 }
 
-/** 按裸 id（ai-core / ielts ...）取包 */
-export function getVocabularyPackage(localId: string): VocabularyPackage | undefined {
+/** 全部 vocabulary 包（按注册序，即 UI 下拉序；既有 API 口径不变） */
+export function getVocabularyPackages(): ContentPackage[] {
+  return vocabularyPackages
+}
+
+/** 按裸 id（ai-core / ielts / demo-listening-01 ...）取包（含全部类型） */
+export function getVocabularyPackage(localId: string): ContentPackage | undefined {
   return byLocalId.get(localId)
 }
 
-/** 按包 id（裸 id 或 4 段式 ContentId）取包 */
-export function getPackage(id: string): VocabularyPackage | undefined {
+/** 按包 id（裸 id 或 4 段式 ContentId）取包（含全部类型） */
+export function getPackage(id: string): ContentPackage | undefined {
   return byManifestId.get(id) ?? byLocalId.get(id) ?? byLocalId.get(parseContentId(id)?.localId ?? '')
 }
 
@@ -135,10 +189,23 @@ export async function getContent<T = WordPayload>(contentId: string): Promise<T 
   } as T
 }
 
-/** 按类型列出内容包清单（listening 等类型当前为空数组） */
+/** 按类型列出内容包 manifest（B-2 泛化：按注册表实际类型过滤，未接入的类型自然为空数组） */
 export function listContent(type: string): PackageManifest[] {
-  if (type !== 'vocabulary') return []
-  return packages.map((p) => p.manifest)
+  return packages.filter((p) => p.manifest.type === type).map((p) => p.manifest)
+}
+
+/**
+ * 加载非 vocabulary 包的条目（data/loadData 通道，单份缓存，语义对齐 loadPackage）。
+ * vocabulary 包条目请走 loadPackage（词条通道）。
+ */
+export async function loadPackageData(id: string): Promise<unknown[]> {
+  const pkg = getPackage(id)
+  if (!pkg) return []
+  const hit = dataCache.get(pkg.localId)
+  if (hit) return hit
+  const rows = pkg.data ?? (pkg.loadData ? await pkg.loadData() : [])
+  dataCache.set(pkg.localId, rows)
+  return rows
 }
 
 /** 关系查询：当前无 relations.json，恒为空数组（关系模型已就位，接入内容即产出） */
@@ -146,7 +213,7 @@ export function getRelations(_contentId: string): ContentRelation[] {
   return []
 }
 
-/** Capability 查询：业务代码用它替代 if (bank === 'xxx') 分支 */
+/** Capability 查询：业务代码用它替代「按包 id 硬编码分支」，统一走 features 声明 */
 export function hasFeature(packageId: string, feature: string): boolean {
   return getPackage(packageId)?.manifest.features[feature] === true
 }

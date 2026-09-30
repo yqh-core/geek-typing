@@ -7,11 +7,11 @@
  * 目录页 / 设置页 / 能力探测只读 Catalog，不触发任何词条加载。
  *
  * 诚实原则：**未接入的内容类型一律返回 packages=0 / items=0，不许编造数字**。
- * listening / audio / reading / topic / exercise 目前只是规划槽位，数据接入后（放进
- * content/<type>/<id>/manifest.json 并在 registry 登记）会自动出现在 types 里，
- * 本文件无需改动。宁可让 UI 显示「暂未开放」，也不要拿假数字骗过验收。
+ * P1.7-Wave4 B-2 起 listening/audio/reading/topic/exercise/writing/speaking/collection
+ * 各接入 1 个结构探针 demo 包（registry 登记 + items.json 懒加载），目录页会出现
+ * 真实数字；新类型要扩展照此办理。宁可让 UI 显示「暂未开放」，也不要拿假数字骗过验收。
  */
-import { getPackage, getVocabularyPackages } from '../registry'
+import { getAllPackages, getPackage } from '../registry'
 import { SCHEMA_VERSION } from '../model/content'
 import type { PackageManifest } from '../schema'
 
@@ -76,9 +76,11 @@ function toEntry(m: PackageManifest, localId: string): CatalogPackageEntry {
   }
 }
 
-/** 全站内容目录：同步、只读 manifest（不加载任何词条），可放心在首屏调用。 */
+/** 全站内容目录：同步、只读 manifest（不加载任何词条/条目载荷），可放心在首屏调用。
+ *  P1.7-Wave4 B-2：喂全部注册包（getVocabularyPackages → getAllPackages），新类型
+ *  demo 包登记即自然出现；诚实原则不变 —— 只报真实数字。 */
 export function getCatalog(): ContentCatalog {
-  const pkgs = getVocabularyPackages()
+  const pkgs = getAllPackages()
   const byType = new Map<string, CatalogTypeEntry>()
   for (const t of PLANNED_TYPES) byType.set(t, { type: t, packages: 0, items: 0 })
   for (const p of pkgs) {

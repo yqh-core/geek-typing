@@ -54,7 +54,7 @@ ok(
 )
 ok('getPackage 未知 id 返回 undefined', registry.getPackage('content:vocabulary:ecdict:nope') === undefined)
 ok('listContent("vocabulary") 返回全部 manifest', registry.listContent('vocabulary').length === 10)
-ok('listContent("listening") 返回空（类型未接入）', registry.listContent('listening').length === 0)
+ok('listContent("listening") 返回 1 个结构探针包（B-2 已接入）', registry.listContent('listening').length === 1)
 ok('hasFeature 未知 feature 为 false 且不崩溃', registry.hasFeature('ai-core', 'nope') === false)
 ok('getRelations 恒为数组（关系模型就位、无数据）', Array.isArray(registry.getRelations('content:vocabulary:ecdict-ielts:ielts')))
 ok('getPackage 支持「来源族-包」namespace 反查', registry.getPackage('content:vocabulary:ecdict-cet4:cet4')?.localId === 'cet4')
@@ -203,13 +203,35 @@ ok('list hasPhonetic 过滤生效', phUni.every((h) => !!h.phonetic) && phNone.l
 
 console.log('\n【9】Catalog + Content Index')
 const catalog = cat.getCatalog()
+// B-2 起 catalog 喂全注册包（getAllPackages）；以 registry 为独立真值，证明 catalog 不编造数字。
+// 这里用「注册表派生期望值」做自洽校验 —— catalog 任一项与注册表对不上即 FAIL（同时拦截 content 漂移）。
+const allPkgs = registry.getAllPackages()
+const expectedTotal = allPkgs.reduce((s, p) => s + p.manifest.stats.items, 0)
+const byTypeExpected = {}
+for (const p of allPkgs) {
+  const e = (byTypeExpected[p.manifest.type] ||= { packages: 0, items: 0 })
+  e.packages += 1
+  e.items += p.manifest.stats.items
+}
 const voc = catalog.types.find((t) => t.type === 'vocabulary')
 ok('catalog.types vocabulary = 10 包', voc?.packages === 10, `${voc?.packages}`)
 ok('catalog.types vocabulary items = manifest 真值', voc?.items === manifestTotal, `${voc?.items} vs ${manifestTotal}`)
-ok('catalog 未接入类型（listening）packages/items 均为 0', catalog.types.find((t) => t.type === 'listening')?.packages === 0 && catalog.types.find((t) => t.type === 'listening')?.items === 0)
-ok('catalog 未接入类型（audio/reading/topic/exercise）全为 0', ['audio', 'reading', 'topic', 'exercise'].every((t) => { const e = catalog.types.find((x) => x.type === t); return e && e.packages === 0 && e.items === 0 }))
-ok('catalog.totalItems = manifest 真值', catalog.totalItems === manifestTotal, `${catalog.totalItems}`)
-ok('catalog.packages 覆盖 10 个包', catalog.packages.length === 10)
+ok(
+  'catalog 已接入 listening（B-2 结构探针包，真实数字）',
+  (() => { const e = catalog.types.find((t) => t.type === 'listening'); return !!e && e.packages === byTypeExpected.listening.packages && e.items === byTypeExpected.listening.items && e.packages >= 1 && e.items > 0 })(),
+  `listening packages=${catalog.types.find((t) => t.type === 'listening')?.packages} items=${catalog.types.find((t) => t.type === 'listening')?.items}`,
+)
+ok(
+  'catalog 已接入 audio/reading/topic/exercise/writing/speaking/collection（B-2 各 1 探针包，真实数字）',
+  ['audio', 'reading', 'topic', 'exercise', 'writing', 'speaking', 'collection'].every((t) => {
+    const e = catalog.types.find((x) => x.type === t)
+    const exp = byTypeExpected[t]
+    return !!e && !!exp && e.packages === exp.packages && e.items === exp.items && e.packages >= 1 && e.items > 0
+  }),
+  ['audio', 'reading', 'topic', 'exercise', 'writing', 'speaking', 'collection'].map((t) => `${t}=${catalog.types.find((x) => x.type === t)?.packages}p/${catalog.types.find((x) => x.type === t)?.items}i`).join(' '),
+)
+ok('catalog.totalItems = 全类型 manifest 真值合计', catalog.totalItems === expectedTotal, `${catalog.totalItems} vs ${expectedTotal}`)
+ok('catalog.packages 覆盖 18 个包（10 vocabulary + 8 探针/组合）', catalog.packages.length === allPkgs.length && catalog.packages.length === 18, `${catalog.packages.length}`)
 ok('catalog.schemaVersion 为数字', typeof catalog.schemaVersion === 'number', `${catalog.schemaVersion}`)
 const pc = cat.getPackageCatalog('ielts')
 ok(

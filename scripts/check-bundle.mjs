@@ -9,11 +9,12 @@
  *
  * 阈值来源 = gate-perf 预算表（P1.7-Wave5 D-2，scripts/gate-perf.mjs，单一事实来源，
  * effective = min-strict(baseline×1.15, absolute)）；本文件的历史硬编码值
- * 430,080 B / 138,240 B 已废弃。WARM_GZIP_MAX 与 words-* chunk 数判据保持不变。
+ * 430,080 B / 138,240 B 已废弃。WARM_GZIP_MAX 与懒加载数据 chunk（words/items）数判据保持不变。
  *
  * 检查项：
  *   1. 主 chunk dist/assets/index-*.js：raw 与 gzip ≤ gate-perf 预算表 effective
- *   2. dist/assets/words-*.js chunk 数量 ≥ registry.ts 里 lazy 包的数量（独立 chunk 没被打回主包）
+ *   2. dist/assets 懒加载数据 chunk（words-*.js / items-*.js，P1.7-Wave4 B-2 扩展）
+ *      数量 ≥ registry.ts 里 lazy 包的数量（独立 chunk 没被打回主包）
  *   3. 预热预算：warmUpVocabulary 列入的包，其 words chunk gzip 总和 ≤ 600 KiB
  *
  * 三态判定：PASS / FAIL / UNKNOWN。**UNKNOWN 视为不通过**（exit 1）——
@@ -64,6 +65,7 @@ const record = (status, no, msg) => {
 /**
  * 解析注册表里每个包的 localId 与加载方式。
  * 注册对象形如：{ manifest: parseManifest(ieltsManifest), localId: 'ielts', load: loadIelts }
+ * 非 vocabulary 包（P1.7-Wave4 B-2）形如：{ ..., localId: 'demo-listening-01', loadData: loadListeningDemo }
  * 注意：只看 import 段会被「已声明但未使用的 <id>Words 静态 import」误导，必须以对象块为准。
  */
 function parseRegistryEntries(src) {
@@ -72,8 +74,8 @@ function parseRegistryEntries(src) {
   for (const m of src.matchAll(re)) {
     const block = m[0]
     const id = /localId:\s*['"`]([^'"`]+)['"`]/.exec(block)?.[1]
-    const loader = /\bload:\s*([A-Za-z_$][\w$]*)/.exec(block)?.[1]
-    const hasWords = /\bwords\s*:/.test(block)
+    const loader = /\bload(?:Data)?:\s*([A-Za-z_$][\w$]*)/.exec(block)?.[1]
+    const hasWords = /\b(?:words|data)\s*:/.test(block)
     if (!id) continue
     out.push({ id, loader: loader ?? null, mode: loader ? 'lazy' : hasWords ? 'inline' : 'unknown' })
   }
@@ -152,6 +154,7 @@ function main() {
 
   const mainChunks = files.filter((f) => /^index-.*\.js$/.test(f))
   const wordsChunks = files.filter((f) => /^words-.*\.js$/.test(f))
+  const itemsChunks = files.filter((f) => /^items-.*\.js$/.test(f))
 
   const readText = (f) => readFileSync(path.join(ASSETS, f), 'utf8')
   const gzipOf = (f) => gzipSync(readFileSync(path.join(ASSETS, f)), { level: 9 }).length
@@ -196,14 +199,15 @@ function main() {
     }
   }
 
-  /* —— 2. words chunk 数量 ≥ lazy 包数量 —— */
+  /* —— 2. 懒加载数据 chunk（words-* / items-*，P1.7-Wave4 B-2 扩展）数量 ≥ lazy 包数量 —— */
   const lazyCount = entries ? entries.filter((e) => e.mode === 'lazy').length : null
+  const dataChunks = wordsChunks.length + itemsChunks.length
   if (lazyCount === null) {
-    record('UNKNOWN', 2, ` 无法确定 registry 中 lazy 包数量，无法校验 words-* chunk 数量（实测 ${wordsChunks.length} 个）`)
-  } else if (wordsChunks.length < lazyCount) {
-    record('FAIL', 2, ` words-* chunk ${wordsChunks.length} 个 < registry lazy 包 ${lazyCount} 个：有 lazy 包没产出独立 chunk（多半被写成 inline 并进了主 chunk）`)
+    record('UNKNOWN', 2, ` 无法确定 registry 中 lazy 包数量，无法校验数据 chunk 数量（实测 ${dataChunks} 个：words ${wordsChunks.length} + items ${itemsChunks.length}）`)
+  } else if (dataChunks < lazyCount) {
+    record('FAIL', 2, ` 数据 chunk ${dataChunks} 个（words ${wordsChunks.length} + items ${itemsChunks.length}）< registry lazy 包 ${lazyCount} 个：有 lazy 包没产出独立 chunk（多半被写成 inline 并进了主 chunk）`)
   } else {
-    record('PASS', 2, ` words-* chunk ${wordsChunks.length} 个 ≥ registry lazy 包 ${lazyCount} 个（${wordsChunks.join(', ')}）`)
+    record('PASS', 2, ` 数据 chunk ${dataChunks} 个（words ${wordsChunks.length} + items ${itemsChunks.length}）≥ registry lazy 包 ${lazyCount} 个`)
   }
 
   /* —— 3. 预热预算 —— */
