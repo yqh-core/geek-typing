@@ -627,7 +627,7 @@ Oxford 30000 词 → **1854 KiB（×13.4）**。
 | **P1 词汇产品化** | Catalog → Package Explorer → Search → Word List → Word Detail → Start Learning，把已有的 Query Layer 接到 UI 上（守 §12 防腐层，不破坏 §13 懒加载边界） |
 | **P1.5 Learning ContentId 迁移** | 运行时键从**裸 `word`** 迁到 `contentId`（+ version/checksum）；**存在不可逆信息损失**（2323 个跨包同名词无法定归属），按契约 §10.1 三档规则执行 |
 | **P2 内容规模化 / 导入体系** | 大词库批量接入（GRE / Oxford / Cambridge…），全部走 lazy；先解决 `warmUpVocabulary` 预热预算 |
-| **P3 Audio / Reading / Asset** | Topic / Audio / Reading 接入 + AssetManifest |
+| **P3 Audio / Reading / Asset** | Topic / Audio / Reading 接入 + Asset 实体落地（模型已在 P1.8-B 定稿，见后置项） |
 
 **P1 的硬原则：不再造新的抽象 / 目录 / Framework / Repository / Service。**
 Catalog、Index、Query、Scope、Sort 都已经就位，P1 的工作是**接线** ——
@@ -637,8 +637,13 @@ Catalog、Index、Query、Scope、Sort 都已经就位，P1 的工作是**接线
 
 - **近似重复（possible duplicate，如 `car` vs `automobile`）**：语义相近 ≠ 数据重复，
   门禁不判，也**禁止自动删**；只允许人工 review 后决定。
-- **AssetManifest**（`assets/manifest.json`：checksum / mime / bytes / duration / language / source / license / storage）：推到 **P3**，随内容类型扩展一起做。
+- **AssetManifest 的实体落地**：**模型已于 P1.8-B 定稿**（`src/core/content/model/asset.ts`，见 §7 与
+  `docs/p18/P1.8-DESIGN-RULINGS-v1.0.md` ③④），许可/资产规则也已入库前置硬门（`gate:license`）。
+  尚未落地的是**实体**：16 个包目前 `assets[]` 全为空、`assets/` 无数据，
+  真实素材托管（`/media/*` 同源代理 + R2）位列 **P18-F**。
 - `relations.json` 与 `assets/` 目前尚无数据 → 门禁 (e) / (f) 打印「跳过」，不伪造通过。
+  ⚠️ 注意：**(f) 的"跳过"只发生在 `manifest.assets` 缺失时**；一旦某包声明了非空 `assets[]`，
+  assetId 语法 / 归属 / checksum / url / 许可 / provenance 与包级两件套会被逐条校验（判据 12(f) 与 21）。
 
 ## 16. 契约冻结
 
