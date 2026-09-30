@@ -1,0 +1,57 @@
+# RunId: P18-G0-FALSIFY-GATE-LICENSE-20261001-074525-R01
+# Command: node scripts/gate-license.mjs --falsify
+# Commit: 7312f9ed9b87e7fec486e9015df2261768cd9a7e
+# StartedAt: 2026-09-30T23:45:25.799Z
+# DurationMs: 3214
+# ExitCode: 0
+
+--- stdout+stderr ---
+[gate:license] 证伪自检 —— 证明每条判据都能判红（不会失败的门等于没有门）
+  用例 21 条（含 2 条判绿对照组）；每条：注入故障 → 断言"命中集恰好等于预期" → 字节还原 → 复验复绿
+  隔离副本：D:\work\geek-typing\node_modules\.tmp\gate-license-falsify\content（gitignore；真 content/ 只读、绝不被写）
+  边界用例 1 条改的是**真冻结 Plan**（.\docs\p18\P1.8-PLAN-v1.0-FROZEN.md，不在 INV-1 冻结区）：改完立刻按 sha256 字节还原，运行后 `git diff` 必须为空
+
+  ✓ CTRL 恰好判绿（对照组）；还原=bytes；复验复绿 ✓
+      对照组：合法资产 + 合法许可（本门**必须判绿**）
+  ✓ S1 恰好判红（命中 {SOURCE_LICENSE_UNSTRUCTURED}）；还原=bytes；复验复绿 ✓
+      source 无结构化 license（删掉 sources[0].license）
+  ✓ S2 恰好判红（命中 {LICENSE_REJECTED}）；还原=bytes；复验复绿 ✓
+      外部来源无 SPDX（provider 改外部、license 去掉 spdx）
+  ✓ S3 恰好判红（命中 {LICENSE_REJECTED}）；还原=bytes；复验复绿 ✓
+      CC-BY-NC（非商用 ⇒ rejected）
+  ✓ S4 恰好判红（命中 {LICENSE_REVIEW_REQUIRED}）；还原=bytes；复验复绿 ✓
+      CC-BY-SA（review_required ⇒ 在自动门里同判 FAIL）
+  ✓ A1 恰好判红（命中 {ASSET_LICENSE_XOR}）；还原=bytes；复验复绿 ✓
+      asset 缺许可（既无 license 也无 licenseRef）
+  ✓ A2 恰好判红（命中 {ASSET_LICENSE_XOR}）；还原=bytes；复验复绿 ✓
+      asset 双写许可（license 与 licenseRef 同时存在）
+  ✓ A3 恰好判红（命中 {ASSET_LICENSE_REF_UNRESOLVED}）；还原=bytes；复验复绿 ✓
+      licenseRef 解析不到（指向包级 licenses 里不存在的 id）
+  ✓ A4 恰好判红（命中 {ASSET_ID_SHAPE}）；还原=bytes；复验复绿 ✓
+      assetId 非法（无 #a: 分隔符）
+  ✓ A5 恰好判红（命中 {ASSET_NOT_OWNED}）；还原=bytes；复验复绿 ✓
+      asset 归属他人（宿主段是另一个包）
+  ✓ A6 恰好判红（命中 {ASSET_URL_NOT_HTTPS}）；还原=bytes；复验复绿 ✓
+      url 非 https（http 明文）
+  ✓ A7 恰好判红（命中 {ASSET_CHECKSUM_SHAPE}）；还原=bytes；复验复绿 ✓
+      checksum 形状错（非 sha256:<64 hex>）
+  ✓ P1 恰好判红（命中 {PACKAGE_LICENSES_REQUIRED}）；还原=bytes；复验复绿 ✓
+      有 assets 但缺包级 licenses 表
+  ✓ P2 恰好判红（命中 {LICENSE_REJECTED}）；还原=bytes；复验复绿 ✓
+      包级 licenses 表某条判红（CC-BY-NC）
+  ✓ S5 恰好判红（命中 {LICENSE_REJECTED}）；还原=bytes；复验复绿 ✓
+      source license.commercialUse=false（自有内容也一样拦）
+  ✓ S5b 恰好判红（命中 {LICENSE_REJECTED}）；还原=bytes；复验复绿 ✓
+      source license.commercialUse 字段缺失（缺失 = 不 true）
+  ✓ S6 恰好判红（命中 {LICENSE_REJECTED}）；还原=bytes；复验复绿 ✓
+      attributionRequired=true 但无署名文本（外部 MIT）
+  ✓ S6b 恰好判绿（对照组）；还原=bytes；复验复绿 ✓
+      对照组：attributionRequired=true **且**给出署名文本 → 复绿
+  ✓ S7 恰好判红（命中 {SOURCE_PROVENANCE_MISSING}）；还原=bytes；复验复绿 ✓
+      source 缺 provenance.origin（删掉 sources[0].origin）
+  ✓ S8 恰好判红（命中 {SOURCE_CHECKSUM_MISMATCH}）；还原=bytes；复验复绿 ✓
+      sources[].checksum 格式合法但与载荷实体不符
+  ✓ M1 恰好判红（命中 {PLAN_4_1_COVERAGE_MISMATCH}）；还原=bytes；复验复绿 ✓
+      给冻结 Plan §4.1 表格临时加一行「新规则（本波不应存在）」
+──────────────────────────────────────────────────────
+License Gate Falsification：✅ PASS —— 21/21 用例恰好判红（含 2 条判绿对照组），隔离副本已字节还原，真 content/ 未被写入

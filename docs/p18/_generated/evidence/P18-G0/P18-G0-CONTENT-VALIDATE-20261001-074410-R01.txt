@@ -1,0 +1,394 @@
+# RunId: P18-G0-CONTENT-VALIDATE-20261001-074410-R01
+# Command: node scripts/content/validate.mjs
+# Commit: 7312f9ed9b87e7fec486e9015df2261768cd9a7e
+# StartedAt: 2026-09-30T23:44:10.085Z
+# DurationMs: 666
+# ExitCode: 0
+
+--- stdout+stderr ---
+[content:validate] 9 个类型目录 / 18 个包：audio×1 collection×1 exercise×1 listening×1 reading×1 speaking×1 topic×1 vocabulary×10 writing×1
+▸ audio/demo-audio-01
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:audio:demo-demo-audio-01:demo-audio-01）
+  ✓ 无包内重复条目 id（5 条）
+  ✓ stats.items 与实际一致（5）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（self）
+  ✓ namespace 唯一（demo-demo-audio-01）
+  ✓ packageId=demo-audio-01（与目录名一致）
+  ✓ namespace 与 id 同源（demo-demo-audio-01）
+  ✓ schemaVersion=4
+  ✓ contentVersion=1
+  ✓ contentChecksum 一致（2ecf5d3b…）
+  ✓ 版本三元组自洽（revision=1 version=1 history=1 条，命中 revision=1）
+  ✓ build 溯源完整（hand-authored/1.0 @ 2026-09-30T00:00:00.000Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ collection/demo-study-set
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:collection:demo-demo-study-set:demo-study-set）
+  ✓ 无包内重复条目 id（5 条）
+  ✓ stats.items 与实际一致（5）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（self）
+  ✓ namespace 唯一（demo-demo-study-set）
+  ✓ packageId=demo-study-set（与目录名一致）
+  ✓ namespace 与 id 同源（demo-demo-study-set）
+  ✓ schemaVersion=4
+  ✓ contentVersion=1
+  ✓ contentChecksum 一致（04ec8496…）
+  ✓ 版本三元组自洽（revision=1 version=1 history=1 条，命中 revision=1）
+  ✓ build 溯源完整（hand-authored/1.0 @ 2026-09-30T00:00:00.000Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  ✓ relations.json 5 条：端点合法且可达
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ exercise/demo-exercise-01
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:exercise:demo-demo-exercise-01:demo-exercise-01）
+  ✓ 无包内重复条目 id（5 条）
+  ✓ stats.items 与实际一致（5）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（self）
+  ✓ namespace 唯一（demo-demo-exercise-01）
+  ✓ packageId=demo-exercise-01（与目录名一致）
+  ✓ namespace 与 id 同源（demo-demo-exercise-01）
+  ✓ schemaVersion=4
+  ✓ contentVersion=1
+  ✓ contentChecksum 一致（eba19d13…）
+  ✓ 版本三元组自洽（revision=1 version=1 history=1 条，命中 revision=1）
+  ✓ build 溯源完整（hand-authored/1.0 @ 2026-09-30T00:00:00.000Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ listening/demo-listening-01
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:listening:demo-demo-listening-01:demo-listening-01）
+  ✓ 无包内重复条目 id（6 条）
+  ✓ stats.items 与实际一致（6）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（self）
+  ✓ namespace 唯一（demo-demo-listening-01）
+  ✓ packageId=demo-listening-01（与目录名一致）
+  ✓ namespace 与 id 同源（demo-demo-listening-01）
+  ✓ schemaVersion=4
+  ✓ contentVersion=1
+  ✓ contentChecksum 一致（a29d9535…）
+  ✓ 版本三元组自洽（revision=1 version=1 history=1 条，命中 revision=1）
+  ✓ build 溯源完整（hand-authored/1.0 @ 2026-09-30T00:00:00.000Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ reading/demo-reading-01
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:reading:demo-demo-reading-01:demo-reading-01）
+  ✓ 无包内重复条目 id（6 条）
+  ✓ stats.items 与实际一致（6）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（self）
+  ✓ namespace 唯一（demo-demo-reading-01）
+  ✓ packageId=demo-reading-01（与目录名一致）
+  ✓ namespace 与 id 同源（demo-demo-reading-01）
+  ✓ schemaVersion=4
+  ✓ contentVersion=1
+  ✓ contentChecksum 一致（47fcb01c…）
+  ✓ 版本三元组自洽（revision=1 version=1 history=1 条，命中 revision=1）
+  ✓ build 溯源完整（hand-authored/1.0 @ 2026-09-30T00:00:00.000Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ speaking/demo-speaking-01
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:speaking:demo-demo-speaking-01:demo-speaking-01）
+  ✓ 无包内重复条目 id（5 条）
+  ✓ stats.items 与实际一致（5）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（self）
+  ✓ namespace 唯一（demo-demo-speaking-01）
+  ✓ packageId=demo-speaking-01（与目录名一致）
+  ✓ namespace 与 id 同源（demo-demo-speaking-01）
+  ✓ schemaVersion=4
+  ✓ contentVersion=1
+  ✓ contentChecksum 一致（149700fa…）
+  ✓ 版本三元组自洽（revision=1 version=1 history=1 条，命中 revision=1）
+  ✓ build 溯源完整（hand-authored/1.0 @ 2026-09-30T00:00:00.000Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ topic/demo-topic-01
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:topic:demo-demo-topic-01:demo-topic-01）
+  ✓ 无包内重复条目 id（5 条）
+  ✓ stats.items 与实际一致（5）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（self）
+  ✓ namespace 唯一（demo-demo-topic-01）
+  ✓ packageId=demo-topic-01（与目录名一致）
+  ✓ namespace 与 id 同源（demo-demo-topic-01）
+  ✓ schemaVersion=4
+  ✓ contentVersion=1
+  ✓ contentChecksum 一致（d45684a7…）
+  ✓ 版本三元组自洽（revision=1 version=1 history=1 条，命中 revision=1）
+  ✓ build 溯源完整（hand-authored/1.0 @ 2026-09-30T00:00:00.000Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ vocabulary/ai-core
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:vocabulary:curated-ai-core:ai-core）
+  ✓ 无包内重复词条（43 词）
+  ✓ stats.items 与实际一致（43）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（self）
+  ✓ namespace 唯一（curated-ai-core）
+  ✓ packageId=ai-core（与目录名一致）
+  ✓ namespace 与 id 同源（curated-ai-core）
+  ✓ schemaVersion=4
+  ✓ contentVersion=1
+  ✓ contentChecksum 一致（f3b2be10…）
+  ✓ 版本三元组自洽（revision=1 version=1 history=1 条，命中 revision=1）
+  ✓ build 溯源完整（content-build/1.1 @ 2026-09-26T13:59:06.551Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ vocabulary/cet4
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:vocabulary:ecdict-cet4:cet4）
+  ✓ 无包内重复词条（84 词）
+  ✓ stats.items 与实际一致（84）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（MIT）
+  ✓ namespace 唯一（ecdict-cet4）
+  ✓ packageId=cet4（与目录名一致）
+  ✓ namespace 与 id 同源（ecdict-cet4）
+  ✓ schemaVersion=4
+  ✓ contentVersion=2
+  ✓ contentChecksum 一致（3a59d975…）
+  ✓ 版本三元组自洽（revision=2 version=2 history=2 条，命中 revision=2）
+  ✓ build 溯源完整（content-build/1.1 @ 2026-09-28T17:47:50.117Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ vocabulary/cet6
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:vocabulary:ecdict-cet6:cet6）
+  ✓ 无包内重复词条（69 词）
+  ✓ stats.items 与实际一致（69）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（MIT）
+  ✓ namespace 唯一（ecdict-cet6）
+  ✓ packageId=cet6（与目录名一致）
+  ✓ namespace 与 id 同源（ecdict-cet6）
+  ✓ schemaVersion=4
+  ✓ contentVersion=2
+  ✓ contentChecksum 一致（4560e3f9…）
+  ✓ 版本三元组自洽（revision=2 version=2 history=2 条，命中 revision=2）
+  ✓ build 溯源完整（content-build/1.1 @ 2026-09-28T17:47:50.161Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ vocabulary/cloud-native
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:vocabulary:curated-cloud-native:cloud-native）
+  ✓ 无包内重复词条（30 词）
+  ✓ stats.items 与实际一致（30）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（self）
+  ✓ namespace 唯一（curated-cloud-native）
+  ✓ packageId=cloud-native（与目录名一致）
+  ✓ namespace 与 id 同源（curated-cloud-native）
+  ✓ schemaVersion=4
+  ✓ contentVersion=1
+  ✓ contentChecksum 一致（cddaa3d0…）
+  ✓ 版本三元组自洽（revision=1 version=1 history=1 条，命中 revision=1）
+  ✓ build 溯源完整（content-build/1.1 @ 2026-09-26T13:59:06.638Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ vocabulary/frontend
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:vocabulary:curated-frontend:frontend）
+  ✓ 无包内重复词条（20 词）
+  ✓ stats.items 与实际一致（20）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（self）
+  ✓ namespace 唯一（curated-frontend）
+  ✓ packageId=frontend（与目录名一致）
+  ✓ namespace 与 id 同源（curated-frontend）
+  ✓ schemaVersion=4
+  ✓ contentVersion=1
+  ✓ contentChecksum 一致（ae689a16…）
+  ✓ 版本三元组自洽（revision=1 version=1 history=1 条，命中 revision=1）
+  ✓ build 溯源完整（content-build/1.1 @ 2026-09-26T13:59:06.663Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ vocabulary/go-code
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:vocabulary:curated-go-code:go-code）
+  ✓ 无包内重复词条（50 词）
+  ✓ stats.items 与实际一致（50）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（self）
+  ✓ namespace 唯一（curated-go-code）
+  ✓ packageId=go-code（与目录名一致）
+  ✓ namespace 与 id 同源（curated-go-code）
+  ✓ schemaVersion=4
+  ✓ contentVersion=1
+  ✓ contentChecksum 一致（6b22c0d9…）
+  ✓ 版本三元组自洽（revision=1 version=1 history=1 条，命中 revision=1）
+  ✓ build 溯源完整（content-build/1.1 @ 2026-09-26T13:59:06.689Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ vocabulary/ielts
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:vocabulary:ecdict-ielts:ielts）
+  ✓ 无包内重复词条（3000 词）
+  ✓ stats.items 与实际一致（3000）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（MIT）
+  ✓ namespace 唯一（ecdict-ielts）
+  ✓ packageId=ielts（与目录名一致）
+  ✓ namespace 与 id 同源（ecdict-ielts）
+  ✓ schemaVersion=4
+  ✓ contentVersion=5
+  ✓ contentChecksum 一致（bd904d23…）
+  ✓ 版本三元组自洽（revision=5 version=5 history=4 条，命中 revision=5）
+  ✓ build 溯源完整（content-build/1.1 @ 2026-09-28T18:33:12.616Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ vocabulary/kaoyan
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:vocabulary:ecdict-kaoyan:kaoyan）
+  ✓ 无包内重复词条（3000 词）
+  ✓ stats.items 与实际一致（3000）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（MIT）
+  ✓ namespace 唯一（ecdict-kaoyan）
+  ✓ packageId=kaoyan（与目录名一致）
+  ✓ namespace 与 id 同源（ecdict-kaoyan）
+  ✓ schemaVersion=4
+  ✓ contentVersion=4
+  ✓ contentChecksum 一致（fa6a9126…）
+  ✓ 版本三元组自洽（revision=4 version=4 history=3 条，命中 revision=4）
+  ✓ build 溯源完整（content-build/1.1 @ 2026-09-28T18:22:47.249Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ vocabulary/toefl
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:vocabulary:ecdict-toefl:toefl）
+  ✓ 无包内重复词条（3000 词）
+  ✓ stats.items 与实际一致（3000）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（MIT）
+  ✓ namespace 唯一（ecdict-toefl）
+  ✓ packageId=toefl（与目录名一致）
+  ✓ namespace 与 id 同源（ecdict-toefl）
+  ✓ schemaVersion=4
+  ✓ contentVersion=5
+  ✓ contentChecksum 一致（19f1dac9…）
+  ✓ 版本三元组自洽（revision=5 version=5 history=4 条，命中 revision=5）
+  ✓ build 溯源完整（content-build/1.1 @ 2026-09-28T18:33:12.666Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ vocabulary/ts-code
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:vocabulary:curated-ts-code:ts-code）
+  ✓ 无包内重复词条（50 词）
+  ✓ stats.items 与实际一致（50）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（self）
+  ✓ namespace 唯一（curated-ts-code）
+  ✓ packageId=ts-code（与目录名一致）
+  ✓ namespace 与 id 同源（curated-ts-code）
+  ✓ schemaVersion=4
+  ✓ contentVersion=1
+  ✓ contentChecksum 一致（9f34b063…）
+  ✓ 版本三元组自洽（revision=1 version=1 history=1 条，命中 revision=1）
+  ✓ build 溯源完整（content-build/1.1 @ 2026-09-26T13:59:06.896Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+▸ writing/demo-writing-01
+  ✓ 必填字段完整
+  ✓ ContentId 规范（content:writing:demo-demo-writing-01:demo-writing-01）
+  ✓ 无包内重复条目 id（5 条）
+  ✓ stats.items 与实际一致（5）
+  ✓ checksum 一致（canonical SHA-256）
+  ✓ license 结构化（self）
+  ✓ namespace 唯一（demo-demo-writing-01）
+  ✓ packageId=demo-writing-01（与目录名一致）
+  ✓ namespace 与 id 同源（demo-demo-writing-01）
+  ✓ schemaVersion=4
+  ✓ contentVersion=1
+  ✓ contentChecksum 一致（a0032e0a…）
+  ✓ 版本三元组自洽（revision=1 version=1 history=1 条，命中 revision=1）
+  ✓ build 溯源完整（hand-authored/1.0 @ 2026-09-30T00:00:00.000Z）
+  ✓ duplicate localId：无（第 4 项已判定）
+  ✓ 无 duplicate normalized key（大小写/空白差异已并入 key）
+  ✓ 无 duplicate source（1 条来源）
+  · 无 relations.json，跳过 relation 校验（V4.1-P0 尚不产出该文件）
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 跨包无 duplicate ContentId（全库 9346 词扫描，namespace 唯一 ⇒ 兜底回归）
+  ✓ manifest 体积（最大 1.78 KiB「ielts」，全库 24.29 KiB < 8/40 KiB）
+  ✓ inline 预算（7 包：ai-core(43词/2.27KiB), cet4(84词/12.06KiB), cet6(69词/9.61KiB), cloud-native(30词/1.55KiB), frontend(20词/0.97KiB), go-code(50词/4.54KiB), ts-code(50词/5.17KiB) | Σ 346 词 / 36.17 KiB ≤ 1000 词 / 64 KiB）
+  ✓ 策略一致性（manifest ↔ registry）：18 包一致（inline 7 / lazy 11）
+  ✓ 二进制媒体检查（扫描 39 个文件，二进制媒体文件数 = 0）：扩展名白名单 + NUL 嗅探双通道通过
+
+[content:validate] PASS：18 包全部通过
