@@ -98,7 +98,7 @@ CI run 36734600260        四 job 全 success（含部署）
 
 | 项 | 实测 | 口径 |
 |---|---|---|
-| 主 chunk `index-VHayP_Hy.js` | **434433 B / 424.25 KiB / gzip 136771 B** | **逐字节未变**（P18-D 只动 UI 取数路径与脚本，不动内容数据） |
+| 主 chunk `index-VHayP_Hy.js` | **434433 B / 424.25 KiB / gzip 134.21 KiB** | **逐字节未变**（P18-D 只动 UI 取数路径与脚本，不动内容数据） |
 | `check:bundle` | **5 项全 PASS** | 判据 5 覆盖 registry 全部 **11 个** lazy 包，探测串命中 0 次 |
 | `gate:architecture` | **10 项：通过 10，失败 0，未接入 0** | ui-contract 由 `FUTURE_GATES` PENDING → **真实子门** |
 | `gate:legacy-wordbank` | 2/2 PASS（**12 导入点**） | 修 `lastIndex` 假阴性后补 `useSettings.ts` 白名单（11→12） |
@@ -119,6 +119,11 @@ CI run 36734600260        四 job 全 success（含部署）
    下只有 `catalog.ts`、**没有 `index.ts`**，TS(`moduleResolution: bundler`) 与 Vite **双路 UNRESOLVED**。
    最终目标写法定为 `'./core/content'`（门面 barrel）—— 也是 `bypassFacadeImports` 由 3 降为 2 的原因。
 3. **CI 步骤文案与脚本实际判据数**漂移（**本轮新发现，见下节**）。
+4. **本索引自身的一处数字错误（已修正，留痕）**：初稿把主 chunk 的 gzip 写成 `136771 B`，
+   与 `docs/p18/_generated/evidence/P18-D/P18-D-CHECK-BUNDLE-*.txt` 的原文
+   `424.25 KiB raw / 134.21 KiB gzip` 不符（`134.21 KiB = 137431 B`）。raw 数（`434433 B`）是对的。
+   已在本行改正（随 P18-E 的文档提交一并修正）。记录在此是因为**它本身就是本波教训的实例**：
+   索引/文档里重述的数字会漂，**只有从证据原文抄、或干脆不重述**才安全（同 §「CI 步骤文案漂移」的处置理由）。
 
 ## CI 步骤文案漂移（本轮发现 → 下一提交修复）
 
