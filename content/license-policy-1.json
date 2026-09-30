@@ -1,20 +1,20 @@
 {
   "policyVersion": "license-policy-1",
-  "generatedAt": "2026-09-30T01:44:21.098Z",
+  "generatedAt": "2026-09-30T02:33:18.810Z",
   "summary": {
     "total": 18,
     "allowed": 18,
     "allowedAttribution": 0,
     "reviewRequired": 0,
-    "blocked": 0
+    "rejected": 0
   },
   "matrix": {
     "MIT / Apache*": "allowed",
     "CC-BY-* (non-SA/NC)": "allowed+attribution",
     "CC-BY-SA* / GPL*": "review_required",
-    "CC-BY-NC*": "blocked",
+    "CC-BY-NC*": "rejected",
     "NOASSERTION": "review_required",
-    "external w/o SPDX (unknown)": "blocked",
+    "external w/o SPDX (unknown)": "rejected",
     "original (provider sentinel)": "allowed"
   },
   "packages": [
