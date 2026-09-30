@@ -194,6 +194,17 @@ const TASKS = {
    * CHECK-BUNDLE 自本轮起进固定证据清单（W2C/W3 对照图披露的缺口就此闭合）。
    * BENCH-* 在 BUILD 之后跑（需要 dist）；不进 CI，理由见 bench 脚本头注释。
    */
+  /** Wave 5 · C · Home composition only（§12：仅组合、e2e ≤6 条、零新键）。
+   *  变更面：src/App.tsx（注入 catalog 汇总）+ src/components/HomePanel.tsx（展示）
+   *  + tests/e2e.mjs（≤6 条断言）。不触碰 content/learning/persistence 子系统，
+   *  故证据清单聚焦 TSC / LINT / BUILD / TEST-E2E 四项；其余门禁由 W5D 全量覆盖。
+   *  BUILD 提前到 LINT 之后，保证 TEST-E2E 自举 preview 前有合法 dist。 */
+  W5C: [
+    { task: 'TSC', command: 'npx tsc -b --noEmit' },
+    { task: 'LINT', command: 'npx oxlint src/' },
+    { task: 'BUILD', command: 'npm run build' },
+    { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
+  ],
   W5D: [
     { task: 'TSC', command: 'npx tsc -b --noEmit' },
     { task: 'LINT', command: 'npx oxlint src/' },
