@@ -17,6 +17,8 @@
     "test:prod": "node tests/offline-audit.mjs --prod",
     "test:e2e:prod": "node tests/e2e.mjs --prod",
     "test:smoke": "node tests/prod-smoke.mjs",
+    "verify:prod-catalog": "node tests/prod-catalog-check.mjs",
+    "verify:aggregate": "node scripts/evidence-aggregate.mjs",
     "stress:review": "node scripts/stress-review.mjs",
     "icons": "node scripts/gen-icons.mjs",
     "content:validate": "node scripts/content/validate.mjs",

@@ -13,6 +13,8 @@
 | Evidence 任务合计 | **PASS 166 / FAIL 0 / total 166** |
 | Evidence Chain 链路检查合计 | **CLOSED 1340 / 1340**（每 Wave = 任务数×8 + 1 orphan 检查）|
 | 全链状态 | ✅ 全绿、零 FAIL、零 orphan 噪声（W0/W1* 的 orphan 早期曾有噪声，已在其 verify 报告中说明，不影响 CLOSED 判定）|
+| 生产部署 | ✅ **CLOSED** —— CI run `36662592547`（门禁①②③ + 部署 4 job 全 success，headSha `deecb10` == 部署提交）+ 生产实测 `home-catalog-summary`=`"18 词库 · 9388 词"`（HTTP 200，0 运行时错误，详见 §3）|
+| 第二层独立校验 | ✅ `scripts/evidence-aggregate.mjs` 由 12 份 evidence-matrix.json 重算 Σ(task×8+1)=**1340**，与本文声明一致；各 Wave HASH-MANIFEST 的 CLOSED 数亦逐一对账通过（详见 §2.5）|
 
 ## 1. 逐 Wave 对照表
 
@@ -33,6 +35,32 @@
 | W5C | `7826fb4` | 4/0/4 | 33 | `b5babadf25592bfa` | `8cb62e24640c981b` |
 | W5D | `eacd9a6` | 26/0/26 | 209 | `a0bd8388dea613b7` | `e4d1567a802818c9` |
 
+## 1.5 第二层独立校验（aggregate verifier）
+
+W6 的「1340 / 1340 CLOSED」不是手写汇总，而是由 `scripts/evidence-aggregate.mjs` 从各 Wave 规范产物
+`evidence-matrix.json`（机器唯一事实）**独立重算**后交叉确认：
+
+- 每 Wave 链路检查数 = `任务数 × 8 + 1`（orphan）；全量合计 = Σ(任务数 × 8 + 1)
+- 逐 Wave 重算结果（节选）：W0=113, W1A=57, W1B=65, W1C=81, W1D=57, W2A=49, W2B=97,
+  W2C=153, W3=185, W4=241, W5C=33, W5D=209 → **合计 1340**
+- 交叉验证：① 各 Wave `pass == total`（0 FAIL）；② 有 HASH-MANIFEST 的 Wave 其「CLOSED N/M」的
+  N、M 均 == 重算值；③ 从本文动态读取的声明合计（1340）== 重算合计；④ 重算合计 == 1340（既定口径）。
+
+实测运行（`node scripts/evidence-aggregate.mjs`）：
+
+```
+聚合：
+  任务合计     = 166
+  PASS/FAIL    = 166/0
+  链路检查重算 = 1340
+  W6 声明合计   = 1340
+聚合校验：✅ PASS —— 1340/1340 由 evidence-matrix.json 独立重算确认
+AGGREGATE_TASKS=166 AGGREGATE_CHECKS=1340 AGGREGATE_FAIL=0
+```
+
+> 由此 MASTER MANIFEST 的形成链为：**各 Wave matrix → aggregate verifier → W6-MASTER-MANIFEST**，
+> 而非单一人工汇总，满足「第二层独立校验」要求。
+
 ## 2. CI 三闸映射（`.github/workflows/deploy.yml`）
 
 每个 push 到 `main` 触发同一 workflow 的「同文件三闸 + deploy」，依赖真实生效：
@@ -46,14 +74,50 @@
 
 `deploy` 仅在 `push && ref==main` 时执行，且显式判三闸 `result == 'success'`；Secret `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 由仓库 Settings 注入，`wrangler.toml` 声明 `pages_build_output_dir = "dist"`。
 
-## 3. 部署目标
+## 3. 部署结果（已验收 · Production Deployment CLOSED）
 
-- 项目：`geek-typing`（Cloudflare Pages，生产域名 `https://geek-typing.pages.dev`）
-- 触发：本仓库 `main` 分支 push（即本次 `git push origin main`，领先远程 11 个提交）
-- 产物：`dist/`（vite build 输出）
-- 验收：push 后 `gh run list` 观察三闸 + deploy 全绿；部署成功后在 `https://geek-typing.pages.dev` 实地确认首页渲染「词库 18 · 9388 词」。
+本段记录**实际发生的部署链路**，而非计划。触发：`git push origin main`（commit `deecb10`，
+领先远程 11 个提交）。
+
+### 3.1 GitHub Actions 实际运行证据
+
+- **Run ID**：`36662592547`
+- **Run URL**：`https://github.com/yqh-core/geek-typing/actions/runs/36662592547`
+- **headSha**：`deecb10859c5006c8dda8198589f9fdc83db64ef`（== 部署提交 `deecb10`，可证明部署的就是本批评审代码）
+- **四 job 结论（均 success）**：
+
+| Job | 结论 |
+|-----|------|
+| 门禁① 静态与内容（content:validate · test:content · lint） | ✅ success |
+| 门禁② 构建产物（build · check:bundle · test:offline） | ✅ success |
+| 门禁③ 端到端（build · test:e2e） | ✅ success |
+| 部署到 Cloudflare Pages | ✅ success |
+
+- **部署命令**（deploy job 实际执行）：`wrangler pages deploy dist --project-name=geek-typing --commit-dirty=true`
+  （Secret `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 均由仓库 Settings 注入，自检通过）
+
+### 3.2 生产环境实测证据（post-deploy live check）
+
+由 `tests/prod-catalog-check.mjs`（真实浏览器打生产域名 `https://geek-typing.pages.dev`）独立实测：
+
+```
+  ✅ 生产环境 home-catalog-summary 渲染（词库 18 · 9388 词） — text="18 词库 · 9388 词"
+  ✅ 生产环境无 console / page 运行时错误
+生产实测：共 2 项，通过 2，失败 0
+```
+
+另：`curl -I https://geek-typing.pages.dev/` 返回 **HTTP 200**（size=2007B），站点可达。
+
+> 此实测直接回应 W5C 的「词库 18 · 9388 词」断言，证明该业务内容**确已渲染到线上**，
+> 而非仅 CI 部署 job 退出码为 0。
+
+### 3.3 结论
+
+**Production Deployment：CLOSED ✅** —— CI 三闸 + 部署 job 全绿（run `36662592547`，headSha `deecb10`），
+且生产域名实测渲染 `18 词库 · 9388 词`、HTTP 200、0 运行时错误。
 
 ## 4. 收口声明
 
-P1.7 冻结基线（v2.3.2 FROZEN）全 12 Wave 证据链已 CLOSED：实现 commit 先于证据、matrix commit == 当时 HEAD、verify 链路无断点。
-本文件与 `W5C-*` 交付包、`W4-*` 交付包一并构成最终交付物。后续动作：推送远程并确认 Cloudflare Pages 上线。
+P1.7 冻结基线（v2.3.2 FROZEN）全 12 Wave 证据链已 CLOSED：实现 commit 先于证据、matrix commit == 当时 HEAD、verify 链路无断点；并经 `scripts/evidence-aggregate.mjs` 第二层独立重算确认（1340/1340）。
+生产部署经 CI run `36662592547`（四 job 全 success，headSha `deecb10`）+ 生产实测（HTTP 200、渲染 `18 词库 · 9388 词`、0 运行时错误）确认为 **CLOSED**。
+本文件与 `W5C-*` 交付包、`W4-*` 交付包及 `scripts/evidence-aggregate.mjs` / `tests/prod-catalog-check.mjs` 一并构成最终交付物。

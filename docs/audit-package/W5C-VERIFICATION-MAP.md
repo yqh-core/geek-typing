@@ -38,5 +38,5 @@
 
 ## 3. 披露
 
-- W5C 不重复运行 content / learning / persistence 门禁，理由见 §0/§1：变更面仅为 Home 组合层，其余子系统零改动，已由 W5D 全量覆盖；本波四项聚焦任务的目的就是证明「组合层改动本身不破坏编译/构建/首页 e2e」。
+- W5C 不重复运行 content / learning / persistence 门禁，理由见 §0/§1：变更面仅为 Home 组合层，其余子系统零改动。**W5D 是后续一个独立的全量 Wave**（26 任务、自有 evidence matrix + HASH-MANIFEST），其覆盖 content/learning/persistence 全量门禁是「对那一波变更面的完整证据」，而非本波 W5C 四项 Evidence 的替代品或子集**——两者是并列的全量证据，不是相互替代关系。W5C 四项聚焦任务的目的仅是证明「组合层改动本身不破坏编译/构建/首页 e2e」，不试图为未改动的子系统背书。
 - 若后续需在 Home 展示未接入类型提示，应扩展 `getCatalog()` 或新增独立组件，不在本波范围内。
