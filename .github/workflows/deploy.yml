@@ -39,18 +39,20 @@ jobs:
           cache: 'npm'
       - name: 安装依赖
         run: npm ci
-      # 21 项：manifest 三元组自洽、跨包 ContentId 唯一（全库 9346 词）、
-      # inline 预算、manifest↔registry 策略一致性、资产契约（21：assets[] 非空 ⇒ 包级 licenses/provenance 必填）。
+      # 判据清单（21 项：manifest 三元组自洽、跨包 ContentId 唯一、inline 预算、
+      # manifest↔registry 策略一致性、资产契约……）= scripts/content/validate.mjs 头部，
+      # **单一事实源，此处不重述**（重述过的数字会漂，见 P18-D CI 索引）。
       # 实测不依赖 dist。
-      - name: 内容门禁（content:validate · 21 项）
+      - name: 内容门禁（content:validate）
         run: npm run content:validate
       # 许可硬门（INV-5 / Plan §4.2）：内容入库**前置**硬门 —— 复用 asset-rules.mjs 与 license-policy.mjs，
       # 不复制任何规则；未过门的内容不得落盘到 content/**。自带 --falsify（N 条用例 + 判绿对照组），
       # 本地跑 `npm run gate:license:falsify` 可复核这道门确实会判红。
       - name: License Gate（asset-rules + license-policy · INV-5）
         run: npm run gate:license
-      # 149 项：contract 断言。实测只读 content/ 与 src/，不触碰 dist。
-      - name: 内容契约测试（test:content · 149 项）
+      # 契约断言清单 = tests/content-query.mjs，**单一事实源，此处不重述计数**。
+      # 实测只读 content/ 与 src/，不触碰 dist。
+      - name: 内容契约测试（test:content）
         run: npm run test:content
       # P18-D · INV-2：UI 内容契约棘轮门（纯静态 AST 扫描 —— 只读 src/ 与 content/ 的目录名，
       # 不需要 dist，故属本条闸）。硬零 2 桶（直读词表 JSON / 内容包 id 分支）+ 棘轮 4 桶
@@ -81,16 +83,19 @@ jobs:
       # 夹带 tsc -b 类型检查（build = tsc -b && vite build）
       - name: 类型检查 & 构建
         run: npm run build
-      # 3 项：主 chunk raw ≤420KiB / gzip ≤135KiB、words-* chunk 数 ≥ lazy 包数、
-      # 预热 gzip 合计 ≤600KiB。三态判定，UNKNOWN 视为不通过。
-      - name: 体积门禁（check:bundle · 3 项）
+      # 判据清单与阈值 = scripts/check-bundle.mjs 头部 + scripts/gate-perf.mjs 预算表
+      # （**单一事实源，此处不重述计数与数字** —— 判据 4/5 是 P18-C 新增的，
+      #   重述的步名曾经停在「3 项 / raw ≤420KiB」，见 P18-D CI 索引）。
+      # 三态判定，UNKNOWN 视为不通过。
+      - name: 体积门禁（check:bundle）
         run: npm run check:bundle
       - name: 安装 Chromium
         run: npx playwright@1.49.1 install chromium --with-deps
-      # 20 项：态1/1.5/2/3/4/4b。offline-audit.mjs 经 preview-server.mjs 自举
+      # 场景 态1/1.5/2/3/4/4b（判据清单 = tests/offline-audit.mjs，此处不重述计数）。
+      # offline-audit.mjs 经 preview-server.mjs 自举
       # vite preview（127.0.0.1:4173），自带生命周期，无需额外起服务。
       # 只打本机地址 —— 打生产的是 test:prod，见文件末尾说明。
-      - name: 离线审计（test:offline · 20 项）
+      - name: 离线审计（test:offline）
         run: npm run test:offline
 
   # ── 闸门 3：真实浏览器端到端（原仅 PR 触发，现补齐 push main）─────────────
