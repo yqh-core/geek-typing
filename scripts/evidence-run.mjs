@@ -381,6 +381,13 @@ const TASK_TABLE = {
     { task: 'GATE-TODO', command: 'node scripts/gate-todo.mjs' },
     { task: 'GATE-LEARNING-BOUNDARY', command: 'node scripts/gate-learning-boundary.mjs' },
     { task: 'TEST-CONTENT-QUERY', command: 'node tests/content-query.mjs' },
+    // P18-G0：relations 端点可达性契约测试 —— 非 word 端点扩展 + 三处调用点共用共享模块的静态断言。
+    // 「不会失败的门等于没有门」：该测试在实施前先跑过一次，实测第 ② 条（reading 条目端点可达）
+    // **判红**；扩展后转绿 —— 否则它就是一条恒真断言。它是 P18-G 产出首个 relations.json 的前置。
+    { task: 'TEST-RELATIONS', command: 'node tests/relations.mjs' },
+    // 裁定 ② 给 RELEASE-GATE 定的入表触发条件已达成：P18-F 落地后 P18-G4 由 PENDING 翻 PASS，
+    // 实测 43 PASS / 0 FAIL / **0 PENDING** ⇒ 它不再恒 exit 1，进表不会让每个 P18 波次的矩阵判 FAIL。
+    { task: 'RELEASE-GATE', command: 'node scripts/verify-release-gate.mjs' },
   ],
 }
 

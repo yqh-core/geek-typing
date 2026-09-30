@@ -64,13 +64,36 @@ export const payloadNameOf = (type) => (type === 'vocabulary' ? 'words.json' : '
 export const CONTENT_ID_RE = /^content:([a-z]+):([a-z0-9-]+):(.+)$/
 
 const ROOT = path.resolve(process.cwd())
-const CONTENT_DIR = path.join(ROOT, 'content')
 
 /**
- * 发现并解析 content/ 下全部内容包。
+ * `--root=<dir>` 解析（P18-G0）：**仅**覆盖「内容包目录」，ROOT / registry.ts / i18n 等一律不变。
+ *
+ * 为什么需要它（不是为便利，是为可验证）：relations 端点判据必须对**隔离副本**做端到端验证
+ * （往副本里注入合法 / 非法 relations.json，看判据能否分别判绿与判红）。而本机 node 进程内
+ * spawn 一律 EBUSY ⇒ 测试脚本**起不了子进程去跑门** ⇒ 只能让门自己支持 `--root`，
+ * 由人 / CI 指向临时副本跑一次并留档（见裁定 §⑪-4）。
+ * 三种形态与 validate.mjs 原实现一致：`--root=<dir>` / `--root <dir>` / 缺省 ROOT/content。
+ *
+ * @param {string[]} argv
+ * @param {string} root 仓库根（缺省 process.cwd()）
+ * @returns {string} 内容包目录绝对路径
+ */
+export function resolveContentDir(argv = process.argv.slice(2), root = path.resolve(process.cwd())) {
+  let raw = null
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i].startsWith('--root=')) { raw = argv[i].slice('--root='.length); break }
+    if (argv[i] === '--root') { raw = argv[i + 1] ?? null; break }
+  }
+  return raw === null || raw === '' ? path.join(root, 'content') : path.resolve(root, raw)
+}
+
+/**
+ * 发现并解析内容包目录下全部包。
+ * @param {string} contentDir 内容包目录（缺省 resolveContentDir()）
  * @returns {Promise<Array<{type,id,dir,manifest,payloadName,payloadExists,payload}>>}
  */
-export async function loadPackages() {
+export async function loadPackages(contentDir = resolveContentDir()) {
+  const CONTENT_DIR = contentDir
   if (!existsSync(CONTENT_DIR)) return []
   const out = []
   const typeDirs = (await readdir(CONTENT_DIR, { withFileTypes: true }))

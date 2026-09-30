@@ -72,6 +72,10 @@ import os from 'node:os'
  * 而实际结果就是漂移：契约把 `ContentType` 扩到 14 时，两处 Node 白名单都停在 12。
  * 现在单一副本由 gate:content-type-contract 判据 H 对着契约上锁。 */
 import { CONTENT_TYPES, checksumPayload } from './license-policy.mjs'
+/* relations 端点可达性**只从 relations.mjs 取**（P18-G0 裁定 §⑪-3）：本文件不得再有第二份实现。
+ * 历史上这里是第三份（registry Map + normWords，只认 type === 'word'），与
+ * gate-content-contract.mjs / ingest.mjs 的逐字复制互不同步。 */
+import { buildReachability, isReachable } from './relations.mjs'
 /* 资产规则**只从 asset-rules.mjs 取**（P1.8 裁定 ③/④-7）：本文件不得内联任何资产规则逻辑。
  * 资产规则的第二份副本由 gate:content-type-contract 判据 H3 上锁，与 CONTENT_TYPES 的 H1/H2 同一手法。 */
 import { checkManifestAssets, checkPackageAssetDeclarations, checkLicenseDecision } from './asset-rules.mjs'
@@ -225,20 +229,20 @@ async function main() {
 
   // —— 预扫描：第 12 项 (c) 跨包 ContentId、(e) relation 端点存在性都需要「全库视角」，
   //     单包循环内部看不到其它包，故先静默建一次索引（不可解析的包由主循环报错）。——
-  const registry = new Map() // 包目录 id → { type, ns, contentId, normWords:Set }
+  // 喂给共享模块的是与 loadPackages() **同形状**的记录（type/manifest/payload）—— 唯一实现，
+  // 本文件不再自建 registry Map + normWords（旧实现只认 type === 'word'，非 word 端点恒判孤儿）。
+  const reachInput = []
   for (const [type, ids] of pkgsByType) {
     for (const id of ids) {
       try {
         const mf = JSON.parse(await readFile(path.join(CONTENT_DIR, type, id, 'manifest.json'), 'utf8'))
         const pPath = path.join(CONTENT_DIR, type, id, payloadNameOf(type))
         const payload = existsSync(pPath) ? JSON.parse(await readFile(pPath, 'utf8')) : null
-        const ns = new RegExp(`^content:${type}:([a-z0-9-]+):`).exec(mf.id ?? '')?.[1] ?? '?'
-        // 词级端点可达性只认 vocabulary 包的词形集合（content:word:<ns>:<词形> 须落在某词表里）
-        const normWords = new Set(type === 'vocabulary' && Array.isArray(payload) ? payload.map((w) => normKey(w?.word)) : [])
-        registry.set(id, { type, ns, contentId: mf.id, normWords })
+        reachInput.push({ type, id, dir: path.join(CONTENT_DIR, type, id), manifest: mf, payload })
       } catch { /* 主循环会 FAIL，这里跳过 */ }
     }
   }
+  const reach = buildReachability(reachInput)
 
   // 第 20 项：registry.ts 只读一次（Node 无法 import TS）
   const registrySrc = existsSync(REGISTRY_TS) ? await readFile(REGISTRY_TS, 'utf8') : null
@@ -511,11 +515,7 @@ async function main() {
             for (const e of ends) {
               const m2 = typeof e === 'string' ? CONTENT_ID_RE.exec(e) : null
               if (!m2) { problems.push(`#${i} 端点非法：${JSON.stringify(e)}`); continue }
-              const [, type, ns2, local] = m2
-              const reachable = [...registry.values()].some(
-                (p) => p.contentId === e || (type === 'word' && p.ns === ns2 && p.normWords.has(normKey(local))),
-              )
-              if (!reachable) problems.push(`#${i} 孤儿端点：${e}`)
+              if (!isReachable(reach, e)) problems.push(`#${i} 孤儿端点：${e}`)
             }
           })
           if (problems.length === 0) ok(`relations.json ${list.length} 条：端点合法且可达`)

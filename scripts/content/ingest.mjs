@@ -15,20 +15,45 @@
  * 决策 + 引用完整性」，产出机器可读的 License Policy Matrix 供 gate-content-contract 复核。
  * 两处 SPDX→决策口径共用 scripts/content/license-policy.mjs，禁止各写一份。
  *
- * 用法：node scripts/content/ingest.mjs
+ * 用法：node scripts/content/ingest.mjs [--root=<内容包目录>]
+ *       node scripts/content/ingest.mjs --help
+ *
+ * `--root` 默认 `content/`，**仅**覆盖"内容包目录"（ROOT / registry / i18n 等一律不变），
+ * 用于对隔离副本做 relations 判据的端到端验证（本机 spawn 一律 EBUSY，测试脚本起不了子进程
+ * 跑门，只能靠门自己支持 --root；详见 license-policy.mjs 的 resolveContentDir）。
+ * License Policy Matrix 的落盘路径随之进入该内容目录（默认仍是 content/license-policy-1.json）。
  */
 import { writeFile, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import {
-  LICENSE_POLICY_VERSION, PROVIDER_ORIGINAL, CONTENT_TYPES, CONTENT_ID_RE,
-  loadPackages, decidePackage, decideLicense, checksumPayload,
+  LICENSE_POLICY_VERSION, PROVIDER_ORIGINAL, CONTENT_TYPES,
+  loadPackages, decidePackage, decideLicense, checksumPayload, resolveContentDir,
 } from './license-policy.mjs'
+/* relations 端点可达性**只从 relations.mjs 取**（P18-G0 裁定 §⑪-3）：本文件不得再有第二份实现。
+ * 历史上这里与 scripts/gate-content-contract.mjs 是**逐字复制**，与 validate.mjs 是第三份。 */
+import { buildReachability, isReachable } from './relations.mjs'
 
-const ROOT = path.resolve(process.cwd())
-const OUT = path.join(ROOT, 'content', `${LICENSE_POLICY_VERSION}.json`)
+/* —— CLI 参数校验（对齐 validate.mjs：--help exit 0；未知参数 exit 2，不猜语义）—— */
+const HELP_TEXT = `用法：
+  node scripts/content/ingest.mjs [--root=<内容包目录>]   内容接入八段流水线，全绿 exit 0 / 任一 FAIL exit 1
+  node scripts/content/ingest.mjs --help                  本帮助（exit 0）
+  · \`--root\` 仅覆盖内容包目录，用于对隔离副本做 relations 判据的端到端验证。`
+{
+  const args = process.argv.slice(2)
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]
+    if (a === '--help' || a.startsWith('--root=')) continue
+    if (a === '--root') { i++; continue } // 空格形式：值在下一个 argv（与 resolveContentDir 同语义）
+    console.error(`未知参数 ${JSON.stringify(a)} —— 本脚本不接受未知 flag，也不猜测其语义\n`)
+    console.error(HELP_TEXT)
+    process.exit(2)
+  }
+  if (args.includes('--help')) { console.log(HELP_TEXT); process.exit(0) }
+}
+const CONTENT_DIR = resolveContentDir()
+const OUT = path.join(CONTENT_DIR, `${LICENSE_POLICY_VERSION}.json`)
 
-const normKey = (raw) => String(raw ?? '').normalize('NFC').toLowerCase().replace(/[\s\u00A0]+/g, ' ').trim()
 const stage = (n, name) => console.log(`\n[ingest] 阶段 ${n}/8 · ${name}`)
 let failures = 0
 const fail = (msg) => { failures++; console.error(`  ✗ ${msg}`) }
@@ -37,7 +62,7 @@ const ok = (msg) => console.log(`  ✓ ${msg}`)
 async function main() {
   /* —— 1. DISCOVER —— */
   stage(1, 'DISCOVER')
-  const pkgs = await loadPackages()
+  const pkgs = await loadPackages(CONTENT_DIR)
   if (pkgs.length === 0) { console.error('未发现任何内容包（content/ 为空？）'); process.exit(1) }
   const byType = new Map()
   for (const p of pkgs) byType.set(p.type, (byType.get(p.type) ?? 0) + 1)
@@ -104,26 +129,9 @@ async function main() {
 
   /* —— 7. REFERENCE（坏引用检测） —— */
   stage(7, 'REFERENCE')
-  // 可达性索引：全部包 ContentId + vocabulary 词级 key
-  const pkgIds = new Set(pkgs.map((p) => p.manifest?.id).filter(Boolean))
-  const vocabWords = new Map() // namespace → Set<normKey>
-  for (const p of pkgs) {
-    if (p.type === 'vocabulary' && Array.isArray(p.payload)) {
-      const ns = CONTENT_ID_RE.exec(p.manifest?.id ?? '')?.[2]
-      if (ns) {
-        if (!vocabWords.has(ns)) vocabWords.set(ns, new Set())
-        for (const w of p.payload) vocabWords.get(ns).add(normKey(w?.word))
-      }
-    }
-  }
-  const reachable = (cid) => {
-    if (pkgIds.has(cid)) return true
-    const m = CONTENT_ID_RE.exec(cid)
-    if (!m) return false
-    const [, type, ns, local] = m
-    if (type === 'word') return vocabWords.get(ns)?.has(normKey(local)) ?? false
-    return false
-  }
+  // 可达性索引：全部包 ContentId + 各类型的条目级端点（共享模块，唯一实现）
+  const reach = buildReachability(pkgs)
+  const reachable = (cid) => isReachable(reach, cid)
   for (const p of pkgs) {
     const m = p.manifest
     // 7a. 载荷引用：stats.items>0 但无载荷文件 ⇒ 坏引用
