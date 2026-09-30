@@ -19,6 +19,7 @@
     "test:smoke": "node tests/prod-smoke.mjs",
     "verify:prod-catalog": "node tests/prod-catalog-check.mjs",
     "verify:aggregate": "node scripts/evidence-aggregate.mjs",
+    "verify:manifests": "node scripts/verify-manifest-hashes.mjs",
     "stress:review": "node scripts/stress-review.mjs",
     "icons": "node scripts/gen-icons.mjs",
     "content:validate": "node scripts/content/validate.mjs",

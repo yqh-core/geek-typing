@@ -12,13 +12,14 @@
 | Wave 数 | **12**（W0, W1A, W1B, W1C, W1D, W2A, W2B, W2C, W3, W4, W5C, W5D）|
 | Evidence 任务合计 | **PASS 166 / FAIL 0 / total 166** |
 | Evidence Chain 链路检查合计 | **CLOSED 1340 / 1340**（每 Wave = 任务数×8 + 1 orphan 检查）|
-| 全链状态 | ✅ 全绿、零 FAIL、零 orphan 噪声（W0/W1* 的 orphan 早期曾有噪声，已在其 verify 报告中说明，不影响 CLOSED 判定）|
-| 生产部署 | ✅ **CLOSED** —— CI run `36662592547`（门禁①②③ + 部署 4 job 全 success，headSha `deecb10` == 部署提交）+ 生产实测 `home-catalog-summary`=`"18 词库 · 9388 词"`（HTTP 200，0 运行时错误，详见 §3）|
-| 第二层独立校验 | ✅ `scripts/evidence-aggregate.mjs` 由 12 份 evidence-matrix.json 重算 Σ(task×8+1)=**1340**，与本文声明一致；各 Wave HASH-MANIFEST 的 CLOSED 数亦逐一对账通过（详见 §2.5）|
+| 全链状态 | ✅ 全绿、零 FAIL；**当前 aggregate 结果为 0 FAIL / 1340 CLOSED**（W0/W1* 的历史 orphan 噪声已在对应 verify artifact 中解释并完成最终 CLOSED 判定，非当前残留）|
+| 生产部署 | ✅ **CLOSED** —— CI run `36662592547`（门禁①②③ + 部署 4 job 全 success，headSha `deecb10` == 部署提交）+ 生产实测 `home-catalog-summary`=`"18 词库 · 9388 词"`（HTTP 200，0 运行时错误，详见 §4）|
+| 第二层独立校验 | ✅ `scripts/evidence-aggregate.mjs` 由 12 份 evidence-matrix.json 重算 Σ(task×8+1)=**1340**，与本文声明一致；各 Wave HASH-MANIFEST 的 CLOSED 数亦逐一对账通过（详见 §2）|
 
 ## 1. 逐 Wave 对照表
 
 > `matrix.json SHA256` 为各 Wave 规范产物（机器唯一事实）；`HASH-MANIFEST SHA256` 仅 W2B 起引入（此前 Wave 用 VERIFICATION-MAP 或纯矩阵）。
+> 本表仅示 SHA256 **前 16 位索引**；完整值见各 Wave `HASH-MANIFEST` 与原始 artifact —— **W6 是审计索引，不是 hash 真值仓库**。
 
 | Wave | matrix commit | 任务 PASS/FAIL/total | verify CLOSED | matrix.json SHA256(前16) | HASH-MANIFEST SHA256(前16) |
 |------|---------------|----------------------|---------------|---------------------------|----------------------------|
@@ -32,10 +33,10 @@
 | W2C | `3d24ea1` | 19/0/19 | 153 | `bf9b320fb4b81746` | `842dbf665bbe2576` |
 | W3 | `743240a` | 23/0/23 | 185 | `436f922e961394cf` | `60dc3f75a56ea99f` |
 | W4 | `410f17b` | 30/0/30 | 241 | `4a0cc04b57b14380` | `d3d8c6f08d700002` |
-| W5C | `7826fb4` | 4/0/4 | 33 | `b5babadf25592bfa` | `8cb62e24640c981b` |
+| W5C | `7826fb4` | 4/0/4 | 33 | `b5babadf25592bfa` | `7bda75616a8f0dc4` |
 | W5D | `eacd9a6` | 26/0/26 | 209 | `a0bd8388dea613b7` | `e4d1567a802818c9` |
 
-## 1.5 第二层独立校验（aggregate verifier）
+## 2. 第二层独立校验（aggregate verifier）
 
 W6 的「1340 / 1340 CLOSED」不是手写汇总，而是由 `scripts/evidence-aggregate.mjs` 从各 Wave 规范产物
 `evidence-matrix.json`（机器唯一事实）**独立重算**后交叉确认：
@@ -61,7 +62,7 @@ AGGREGATE_TASKS=166 AGGREGATE_CHECKS=1340 AGGREGATE_FAIL=0
 > 由此 MASTER MANIFEST 的形成链为：**各 Wave matrix → aggregate verifier → W6-MASTER-MANIFEST**，
 > 而非单一人工汇总，满足「第二层独立校验」要求。
 
-## 2. CI 三闸映射（`.github/workflows/deploy.yml`）
+## 3. CI 三闸映射（`.github/workflows/deploy.yml`）
 
 每个 push 到 `main` 触发同一 workflow 的「同文件三闸 + deploy」，依赖真实生效：
 
@@ -70,16 +71,16 @@ AGGREGATE_TASKS=166 AGGREGATE_CHECKS=1340 AGGREGATE_FAIL=0
 | ① 静态与内容 | `gate-static` | `content:validate`(20) · `test:content`(163) · `lint`(0 err) | W4/W5D 同款；本波前端已复跑：validate PASS 18 包、test:content 163/163、lint 0 error |
 | ② 构建产物 | `gate-build` | `build`(tsc -b && vite build) · `check:bundle`(3) · `test:offline`(20) | 本波复跑：build PASS、check:bundle 3/3、test:offline ✅ 全部通过 |
 | ③ 端到端 | `gate-e2e` | `build` · `test:e2e` | 本波 W5C：170/170（含新增 `home-catalog-summary` 断言）|
-| 部署 | `deploy` | `needs:[gate-static,gate-build,gate-e2e]` 三闸全 success → `wrangler pages deploy dist --project-name=geek-typing` | 见 §3 |
+| 部署 | `deploy` | `needs:[gate-static,gate-build,gate-e2e]` 三闸全 success → `wrangler pages deploy dist --project-name=geek-typing` | 见 §4 |
 
 `deploy` 仅在 `push && ref==main` 时执行，且显式判三闸 `result == 'success'`；Secret `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 由仓库 Settings 注入，`wrangler.toml` 声明 `pages_build_output_dir = "dist"`。
 
-## 3. 部署结果（已验收 · Production Deployment CLOSED）
+## 4. 部署结果（已验收 · Production Deployment CLOSED）
 
 本段记录**实际发生的部署链路**，而非计划。触发：`git push origin main`（commit `deecb10`，
 领先远程 11 个提交）。
 
-### 3.1 GitHub Actions 实际运行证据
+### 4.1 GitHub Actions 实际运行证据
 
 - **Run ID**：`36662592547`
 - **Run URL**：`https://github.com/yqh-core/geek-typing/actions/runs/36662592547`
@@ -96,7 +97,7 @@ AGGREGATE_TASKS=166 AGGREGATE_CHECKS=1340 AGGREGATE_FAIL=0
 - **部署命令**（deploy job 实际执行）：`wrangler pages deploy dist --project-name=geek-typing --commit-dirty=true`
   （Secret `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 均由仓库 Settings 注入，自检通过）
 
-### 3.2 生产环境实测证据（post-deploy live check）
+### 4.2 生产环境实测证据（post-deploy live check）
 
 由 `tests/prod-catalog-check.mjs`（真实浏览器打生产域名 `https://geek-typing.pages.dev`）独立实测：
 
@@ -111,12 +112,19 @@ AGGREGATE_TASKS=166 AGGREGATE_CHECKS=1340 AGGREGATE_FAIL=0
 > 此实测直接回应 W5C 的「词库 18 · 9388 词」断言，证明该业务内容**确已渲染到线上**，
 > 而非仅 CI 部署 job 退出码为 0。
 
-### 3.3 结论
+### 4.3 结论
 
 **Production Deployment：CLOSED ✅** —— CI 三闸 + 部署 job 全绿（run `36662592547`，headSha `deecb10`），
 且生产域名实测渲染 `18 词库 · 9388 词`、HTTP 200、0 运行时错误。
 
-## 4. 收口声明
+### 4.4 复核部署（本交付包自身的再上线）
+
+本轮把上述证据回填进 W6/W5C 交付包并新增两个 verifier 脚本后，再次推送（commit `3e29263`），
+触发第二次 CI run **`36663983631`**（num 55）：门禁①②③ + 部署 **四 job 全 success**，headSha `3e29263`
+== 当时 HEAD，生产随之重新上线。App 运行时内容与 `deecb10` 一致（本次仅新增文档与 dev 脚本，不入 `dist`），
+故生产业务行为不变，`18 词库 · 9388 词` 结论继续成立。当前 `origin/main` == 本地 HEAD == `3e29263`。
+
+## 5. 收口声明
 
 P1.7 冻结基线（v2.3.2 FROZEN）全 12 Wave 证据链已 CLOSED：实现 commit 先于证据、matrix commit == 当时 HEAD、verify 链路无断点；并经 `scripts/evidence-aggregate.mjs` 第二层独立重算确认（1340/1340）。
 生产部署经 CI run `36662592547`（四 job 全 success，headSha `deecb10`）+ 生产实测（HTTP 200、渲染 `18 词库 · 9388 词`、0 运行时错误）确认为 **CLOSED**。
