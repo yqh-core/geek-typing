@@ -226,6 +226,9 @@ const TASKS = {
   W4: [
     { task: 'TSC', command: 'npx tsc -b --noEmit' },
     { task: 'LINT', command: 'npx oxlint src/' },
+    // BUILD 提前：为 dist 依赖门禁（GATE-PERF / CHECK-BUNDLE / GATE-ARCHITECTURE 内 perf 子门）提供产物，
+    // 使证据链自包含（不依赖预先存在的 dist）。原顺序把 BUILD 排在 GATE-PERF 之后，dist 缺失时三道门全 FAIL。
+    { task: 'BUILD', command: 'npm run build' },
     { task: 'CONTENT-VALIDATE', command: 'node scripts/content/validate.mjs' },
     { task: 'CONTENT-BUILD', command: 'node scripts/content/build.mjs' },
     { task: 'CONTENT-INGEST', command: 'node scripts/content/ingest.mjs' },
@@ -239,7 +242,6 @@ const TASKS = {
     { task: 'GATE-G4', command: 'node scripts/gate-g4.mjs' },
     { task: 'GATE-LEGACY-WORDBANK', command: 'node scripts/gate-legacy-wordbank.mjs' },
     { task: 'GATE-PRACTICE-ENGINE', command: 'node scripts/gate-practice-engine.mjs' },
-    { task: 'BUILD', command: 'npm run build' },
     { task: 'BENCH-CONTENT', command: 'node scripts/bench-content.mjs' },
     { task: 'BENCH-BOOT', command: 'node scripts/bench-boot.mjs' },
     { task: 'TEST-PERSISTENCE-BOUNDARY', command: 'node tests/persistence-boundary.mjs' },
