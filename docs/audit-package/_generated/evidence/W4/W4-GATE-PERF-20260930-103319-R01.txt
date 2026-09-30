@@ -1,0 +1,22 @@
+# RunId: W4-GATE-PERF-20260930-103319-R01
+# Command: node scripts/gate-perf.mjs
+# Commit: 410f17b04d805b8a45e54094962f8ae26919de2e
+# StartedAt: 2026-09-30T02:33:19.570Z
+# DurationMs: 561
+# ExitCode: 0
+
+--- stdout+stderr ---
+== P1.7-Wave5 · D-2/D-3 Budget Gate（gate-perf）==
+规则：effective = min-strict(baseline×1.15, absolute)，双基线（计划 a8d10c0 / 当前实测）取更严
+
+  ✅ 主 chunk index-*.js raw       当前 445931 B ≤ effective 450000 B（来源 absolute；基线 计划 428324 B / 实测 445931 B）
+  ✅ 主 chunk index-*.js gzip      当前 138249 B ≤ effective 145000 B（来源 absolute；基线 计划 — / 实测 138249 B）
+  ✅ words-*.js 单个最大 raw          当前 483087 B ≤ effective 550000 B（来源 absolute；基线 计划 483087 B / 实测 483087 B）
+
+---- baseline-only 行（D-3：Mobile 独立不共享桌面值；CI 不判红，供本机 bench 对照）----
+  ℹ️ searchWords P95    基线 33.334 ms → derived(×1.15) 预算 38.335 ms
+  ℹ️ queryWord P95      基线 0.004 ms → derived(×1.15) 预算 0.005 ms
+  ℹ️ Boot Desktop P95   基线 98.3 ms → derived(×1.15) 预算 113.045 ms
+  ℹ️ Boot Mobile P95    基线 349.9 ms → derived(×1.15) 预算 402.385 ms
+
+✅ gate-perf PASS：3 行 bundle 预算全部通过

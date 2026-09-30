@@ -1,0 +1,28 @@
+# RunId: W4-CONTENT-BUILD-20260930-103317-R01
+# Command: node scripts/content/build.mjs
+# Commit: 410f17b04d805b8a45e54094962f8ae26919de2e
+# StartedAt: 2026-09-30T02:33:17.301Z
+# DurationMs: 798
+# ExitCode: 0
+
+--- stdout+stderr ---
+· 跳过 content/audio/：非 vocabulary 类型，不走 words 派生构建（该类包不走本构建器）
+· 跳过 content/collection/：非 vocabulary 类型，不走 words 派生构建（该类包不走本构建器）
+· 跳过 content/exercise/：非 vocabulary 类型，不走 words 派生构建（该类包不走本构建器）
+· 跳过 content/listening/：非 vocabulary 类型，不走 words 派生构建（该类包不走本构建器）
+· 跳过 content/reading/：非 vocabulary 类型，不走 words 派生构建（该类包不走本构建器）
+· 跳过 content/speaking/：非 vocabulary 类型，不走 words 派生构建（该类包不走本构建器）
+· 跳过 content/topic/：非 vocabulary 类型，不走 words 派生构建（该类包不走本构建器）
+· 跳过 content/writing/：非 vocabulary 类型，不走 words 派生构建（该类包不走本构建器）
+▸ ai-core: 无变化
+▸ cet4: 无变化
+▸ cet6: 无变化
+▸ cloud-native: 无变化
+▸ frontend: 无变化
+▸ go-code: 无变化
+▸ ielts: 无变化
+▸ kaoyan: 无变化
+▸ toefl: 无变化
+▸ ts-code: 无变化
+
+[content:build] 10 包，回写 0 个

@@ -1,0 +1,14 @@
+# RunId: W4-CHECK-BUNDLE-20260930-103320-R01
+# Command: node scripts/check-bundle.mjs
+# Commit: 410f17b04d805b8a45e54094962f8ae26919de2e
+# StartedAt: 2026-09-30T02:33:20.151Z
+# DurationMs: 830
+# ExitCode: 0
+
+--- stdout+stderr ---
+[check-bundle] dist/assets：13 个文件
+  1. ✓ PASS   主 chunk index-CXA9m-G5.js：435.48 KiB raw / 135.01 KiB gzip ≤ 439.45/141.60 KiB（余量 0.9% / 4.7%；来源 absolute / absolute）
+  2. ✓ PASS   数据 chunk 11 个（words 3 + items 8）≥ registry lazy 包 11 个
+  3. ✓ PASS   预热预算（ielts→words-CZ5ER7rC.js(166.87 KiB)，kaoyan→words-2QG2Fjtl.js(166.85 KiB)，toefl→words-uy6NfwIr.js(163.17 KiB)）：gzip 合计 496.89 KiB ≤ 600 KiB（余量 17.2%）
+
+[check-bundle] PASS：3 项全部通过

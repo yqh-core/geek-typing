@@ -1,0 +1,35 @@
+# RunId: W4-GATE-G4-20260930-103329-R01
+# Command: node scripts/gate-g4.mjs
+# Commit: 410f17b04d805b8a45e54094962f8ae26919de2e
+# StartedAt: 2026-09-30T02:33:29.210Z
+# DurationMs: 701
+# ExitCode: 0
+
+--- stdout+stderr ---
+== G4-1 · Learning 持久化模块齐备 ==
+  ✅ src/lib/learning/ 存在 8 个模块 — attribute.ts codec.ts diagnostics.ts insights.ts migrate.ts storage.ts types.ts upgrade.ts
+  ✅   含 storage.ts
+  ✅   含 codec.ts
+  ✅   含 diagnostics.ts
+  ✅   含 types.ts
+  ✅   含 migrate.ts
+  ✅   含 insights.ts
+  ✅   含 upgrade.ts
+  ✅   含 attribute.ts
+  ✅ tsc 判定通道：见全量 sweep（本脚本不重复跑） — 最近实测 EXIT=0（见 P1.5-RELEASE-GATE.md D.8）
+
+== G4-2 · Learning v2 键族唯一入口 ==
+  ✅ 'gt.learning.v2*' 代码级字面量只在允许文件（注释不计） — 出现于 src/core/persistence/namespace.ts, src/lib/learning/storage.ts
+  ✅ 'gt.letterStats.v1*' 代码级字面量只在允许文件（注释不计） — 出现于 src/core/persistence/namespace.ts, src/lib/learning/storage.ts
+  ✅ 'gt.totals.v1*' 代码级字面量只在允许文件（注释不计） — 出现于 src/core/persistence/namespace.ts, src/lib/learning/storage.ts
+  ✅ 'gt.migration.v1*' 代码级字面量只在允许文件（注释不计） — 出现于 src/core/persistence/namespace.ts, src/lib/learning/storage.ts
+  ✅ 'gt.diag.v1*' 代码级字面量只在允许文件（注释不计） — 出现于 src/core/persistence/namespace.ts, src/lib/learning/diagnostics.ts
+  ℹ️ localStorage 接触文件共 7 个（S3/S4 收编 backlog，见门禁文档）：src/core/persistence/adapter.ts, src/core/persistence/codec.ts, src/core/persistence/migration-lock.ts, src/core/persistence/migration-orchestrator.ts, src/core/persistence/migration-write-guard.ts, src/core/persistence/recovery.ts, src/core/persistence/repository.ts
+
+== G4-3① · 零静默 catch ==
+  ✅ 静默 catch（空体 / 纯注释）= 0 — 无
+  ✅ 白名单静默 = diagnostics.ts 恒 5 处 + main.tsx 恒 1 处（多了说明有人滥写） — 实际 6 处：src/lib/learning/diagnostics.ts:99, src/lib/learning/diagnostics.ts:163, src/lib/learning/diagnostics.ts:234, src/lib/learning/diagnostics.ts:310, src/lib/learning/diagnostics.ts:367, src/main.tsx:54
+  ℹ️ 白名单依据：src/lib/learning/diagnostics.ts —— 观测者不能自我诊断（文件头明文允许）；src/main.tsx —— SW 环境探测的预期环境态 fallback，非写路径（main.tsx:47）
+  ✅ customBanks.persist() 有 try/catch 保护（不再直接抛）
+
+共 18 项，通过 18，失败 0

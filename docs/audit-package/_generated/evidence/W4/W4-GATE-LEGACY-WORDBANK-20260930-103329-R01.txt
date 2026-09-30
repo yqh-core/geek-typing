@@ -1,0 +1,13 @@
+# RunId: W4-GATE-LEGACY-WORDBANK-20260930-103329-R01
+# Command: node scripts/gate-legacy-wordbank.mjs
+# Commit: 410f17b04d805b8a45e54094962f8ae26919de2e
+# StartedAt: 2026-09-30T02:33:29.930Z
+# DurationMs: 618
+# ExitCode: 0
+
+--- stdout+stderr ---
+== P1.6-A03 · 禁止新增 Legacy WordBank 依赖 ==
+  ✅ 导入 wordBanks 的文件数未超出白名单 — 11 个
+  ✅ 所有 wordBanks 导入点均落在已知白名单内（无新增依赖） — 当前 11 个：src/App.tsx, src/components/BankManager.tsx, src/components/CommandPalette.tsx, src/components/Header.tsx, src/components/Memorize.tsx, src/components/ReviewPanel.tsx, src/hooks/useBank.ts, src/hooks/useReviewFlow.ts, src/hooks/useTypingRound.ts, src/lib/customBanks.ts, src/lib/wordResolve.ts
+
+共 2 项，通过 2，失败 0

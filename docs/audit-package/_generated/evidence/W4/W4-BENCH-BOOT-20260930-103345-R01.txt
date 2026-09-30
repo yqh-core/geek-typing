@@ -1,0 +1,15 @@
+# RunId: W4-BENCH-BOOT-20260930-103345-R01
+# Command: node scripts/bench-boot.mjs
+# Commit: 410f17b04d805b8a45e54094962f8ae26919de2e
+# StartedAt: 2026-09-30T02:33:45.221Z
+# DurationMs: 207907
+# ExitCode: 0
+
+--- stdout+stderr ---
+🚀 vite preview 已就绪（127.0.0.1:4182，pid 26544）
+[bench-boot] CDP：Chrome/153.0.8010.53
+[bench-boot] Desktop 1280×800：预热 2 次（丢弃）+ 采样 12 次
+[bench-boot] Desktop 1280×800：P50 90 ms / P95 112.6 ms
+[bench-boot] Mobile 412×915 CPU×4：预热 2 次（丢弃）+ 采样 12 次
+[bench-boot] Mobile 412×915 CPU×4：P50 245.6 ms / P95 316.6 ms
+[bench-boot] 已写出 D:\work\geek-typing\docs\audit-package\_generated\perf-baseline.json

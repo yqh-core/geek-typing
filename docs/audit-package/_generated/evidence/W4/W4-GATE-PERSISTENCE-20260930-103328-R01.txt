@@ -1,0 +1,22 @@
+# RunId: W4-GATE-PERSISTENCE-20260930-103328-R01
+# Command: node scripts/gate-persistence.mjs
+# Commit: 410f17b04d805b8a45e54094962f8ae26919de2e
+# StartedAt: 2026-09-30T02:33:28.522Z
+# DurationMs: 668
+# ExitCode: 0
+
+--- stdout+stderr ---
+== P1.7-W2C · Persistence Boundary Gate ==
+扫描文件 93 个（src/ 全量，豁免前缀 src/core/persistence/）
+
+  ✅ 无越界直连（违规 0 处）
+  ✅ 豁免文件 7 个 / 提及 29 处（唯一豁免前缀 src/core/persistence/）
+     - src/core/persistence/adapter.ts（11 处）
+     - src/core/persistence/codec.ts（1 处）
+     - src/core/persistence/migration-lock.ts（1 处）
+     - src/core/persistence/migration-orchestrator.ts（3 处）
+     - src/core/persistence/migration-write-guard.ts（10 处）
+     - src/core/persistence/recovery.ts（2 处）
+     - src/core/persistence/repository.ts（1 处）
+
+共 1 项判据，通过 1，失败 0

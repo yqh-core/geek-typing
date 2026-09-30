@@ -1,0 +1,103 @@
+# RunId: W4-CONTENT-INGEST-20260930-103318-R01
+# Command: node scripts/content/ingest.mjs
+# Commit: 410f17b04d805b8a45e54094962f8ae26919de2e
+# StartedAt: 2026-09-30T02:33:18.119Z
+# DurationMs: 749
+# ExitCode: 0
+
+--- stdout+stderr ---
+
+[ingest] 阶段 1/8 · DISCOVER
+  ✓ 18 个包：audio×1 collection×1 exercise×1 listening×1 reading×1 speaking×1 topic×1 vocabulary×10 writing×1
+
+[ingest] 阶段 2/8 · PARSE
+  ✓ manifest 全部解析（载荷：18/18 有）
+
+[ingest] 阶段 3/8 · CONTRACT
+  ✓ audio/demo-audio-01 契约字段完整 + license 结构化
+  ✓ collection/demo-study-set 契约字段完整 + license 结构化
+  ✓ exercise/demo-exercise-01 契约字段完整 + license 结构化
+  ✓ listening/demo-listening-01 契约字段完整 + license 结构化
+  ✓ reading/demo-reading-01 契约字段完整 + license 结构化
+  ✓ speaking/demo-speaking-01 契约字段完整 + license 结构化
+  ✓ topic/demo-topic-01 契约字段完整 + license 结构化
+  ✓ vocabulary/ai-core 契约字段完整 + license 结构化
+  ✓ vocabulary/cet4 契约字段完整 + license 结构化
+  ✓ vocabulary/cet6 契约字段完整 + license 结构化
+  ✓ vocabulary/cloud-native 契约字段完整 + license 结构化
+  ✓ vocabulary/frontend 契约字段完整 + license 结构化
+  ✓ vocabulary/go-code 契约字段完整 + license 结构化
+  ✓ vocabulary/ielts 契约字段完整 + license 结构化
+  ✓ vocabulary/kaoyan 契约字段完整 + license 结构化
+  ✓ vocabulary/toefl 契约字段完整 + license 结构化
+  ✓ vocabulary/ts-code 契约字段完整 + license 结构化
+  ✓ writing/demo-writing-01 契约字段完整 + license 结构化
+
+[ingest] 阶段 4/8 · CHECKSUM
+  ✓ audio/demo-audio-01 contentChecksum 一致
+  ✓ collection/demo-study-set contentChecksum 一致
+  ✓ exercise/demo-exercise-01 contentChecksum 一致
+  ✓ listening/demo-listening-01 contentChecksum 一致
+  ✓ reading/demo-reading-01 contentChecksum 一致
+  ✓ speaking/demo-speaking-01 contentChecksum 一致
+  ✓ topic/demo-topic-01 contentChecksum 一致
+  ✓ vocabulary/ai-core contentChecksum 一致
+  ✓ vocabulary/cet4 contentChecksum 一致
+  ✓ vocabulary/cet6 contentChecksum 一致
+  ✓ vocabulary/cloud-native contentChecksum 一致
+  ✓ vocabulary/frontend contentChecksum 一致
+  ✓ vocabulary/go-code contentChecksum 一致
+  ✓ vocabulary/ielts contentChecksum 一致
+  ✓ vocabulary/kaoyan contentChecksum 一致
+  ✓ vocabulary/toefl contentChecksum 一致
+  ✓ vocabulary/ts-code contentChecksum 一致
+  ✓ writing/demo-writing-01 contentChecksum 一致
+
+[ingest] 阶段 5/8 · PROVENANCE
+  ✓ audio/demo-audio-01 溯源：1 自有 / 0 外部
+  ✓ collection/demo-study-set 溯源：1 自有 / 0 外部
+  ✓ exercise/demo-exercise-01 溯源：1 自有 / 0 外部
+  ✓ listening/demo-listening-01 溯源：1 自有 / 0 外部
+  ✓ reading/demo-reading-01 溯源：1 自有 / 0 外部
+  ✓ speaking/demo-speaking-01 溯源：1 自有 / 0 外部
+  ✓ topic/demo-topic-01 溯源：1 自有 / 0 外部
+  ✓ vocabulary/ai-core 溯源：1 自有 / 0 外部
+  ✓ vocabulary/cet4 溯源：0 自有 / 1 外部
+  ✓ vocabulary/cet6 溯源：0 自有 / 1 外部
+  ✓ vocabulary/cloud-native 溯源：1 自有 / 0 外部
+  ✓ vocabulary/frontend 溯源：1 自有 / 0 外部
+  ✓ vocabulary/go-code 溯源：1 自有 / 0 外部
+  ✓ vocabulary/ielts 溯源：0 自有 / 1 外部
+  ✓ vocabulary/kaoyan 溯源：0 自有 / 1 外部
+  ✓ vocabulary/toefl 溯源：0 自有 / 1 外部
+  ✓ vocabulary/ts-code 溯源：1 自有 / 0 外部
+  ✓ writing/demo-writing-01 溯源：1 自有 / 0 外部
+
+[ingest] 阶段 6/8 · LICENSE-MATRIX
+  ✓ audio/demo-audio-01 许可决策 allowed
+  ✓ collection/demo-study-set 许可决策 allowed
+  ✓ exercise/demo-exercise-01 许可决策 allowed
+  ✓ listening/demo-listening-01 许可决策 allowed
+  ✓ reading/demo-reading-01 许可决策 allowed
+  ✓ speaking/demo-speaking-01 许可决策 allowed
+  ✓ topic/demo-topic-01 许可决策 allowed
+  ✓ vocabulary/ai-core 许可决策 allowed
+  ✓ vocabulary/cet4 许可决策 allowed
+  ✓ vocabulary/cet6 许可决策 allowed
+  ✓ vocabulary/cloud-native 许可决策 allowed
+  ✓ vocabulary/frontend 许可决策 allowed
+  ✓ vocabulary/go-code 许可决策 allowed
+  ✓ vocabulary/ielts 许可决策 allowed
+  ✓ vocabulary/kaoyan 许可决策 allowed
+  ✓ vocabulary/toefl 许可决策 allowed
+  ✓ vocabulary/ts-code 许可决策 allowed
+  ✓ writing/demo-writing-01 许可决策 allowed
+
+[ingest] 阶段 7/8 · REFERENCE
+  ✓ collection/demo-study-set relations.json 5 条端点全部可达
+
+[ingest] 阶段 8/8 · EMIT
+  ✓ License Policy Matrix 已落盘：D:\work\geek-typing\content\license-policy-1.json
+  · 汇总：allowed=18 allowed+attribution=0 review_required=0 rejected=0
+
+[ingest] PASS

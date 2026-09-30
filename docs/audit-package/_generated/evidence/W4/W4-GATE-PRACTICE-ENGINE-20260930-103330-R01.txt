@@ -1,0 +1,12 @@
+# RunId: W4-GATE-PRACTICE-ENGINE-20260930-103330-R01
+# Command: node scripts/gate-practice-engine.mjs
+# Commit: 410f17b04d805b8a45e54094962f8ae26919de2e
+# StartedAt: 2026-09-30T02:33:30.568Z
+# DurationMs: 602
+# ExitCode: 0
+
+--- stdout+stderr ---
+== P1.6-C · Practice Engine Gate ==
+  ✅ 非白名单文件无「完成三连」直调（防倒退） — 无
+
+共 1 项，通过 1，失败 0
