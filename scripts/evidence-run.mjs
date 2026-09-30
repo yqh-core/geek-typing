@@ -183,6 +183,45 @@ const TASKS = {
     { task: 'DRYRUN-REAL', command: 'node scripts/migration-dryrun-w1.mjs --user-store=_user-snapshot/real-user-localStorage.json' },
     { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
   ],
+  /**
+   * Wave 5-D · 性能基线（D-1）+ 预算门（D-2/D-3）
+   *
+   * 交付三件：bench-content / bench-boot（产 perf-baseline.json）、gate-perf（预算表
+   * effective = min-strict(derived ×1.15, absolute) + reason）、check-bundle 改为读
+   * 预算表（单一事实来源）。本轮同时解除 CI 部署阻断（主 chunk 434,385 B 超旧硬编码
+   * 430,080 B；raw 预算按计划 D-2 absolute 450,000 B 处理，reason 双记录，gzip 不抬）。
+   *
+   * CHECK-BUNDLE 自本轮起进固定证据清单（W2C/W3 对照图披露的缺口就此闭合）。
+   * BENCH-* 在 BUILD 之后跑（需要 dist）；不进 CI，理由见 bench 脚本头注释。
+   */
+  W5D: [
+    { task: 'TSC', command: 'npx tsc -b --noEmit' },
+    { task: 'LINT', command: 'npx oxlint src/' },
+    { task: 'GATE-PERF', command: 'node scripts/gate-perf.mjs' },
+    { task: 'CHECK-BUNDLE', command: 'node scripts/check-bundle.mjs' },
+    { task: 'GATE-ARCHITECTURE', command: 'node scripts/gate-architecture.mjs' },
+    { task: 'GATE-TODO', command: 'node scripts/gate-todo.mjs' },
+    { task: 'GATE-LEARNING-BOUNDARY', command: 'node scripts/gate-learning-boundary.mjs' },
+    { task: 'GATE-PERSISTENCE', command: 'node scripts/gate-persistence.mjs' },
+    { task: 'GATE-G4', command: 'node scripts/gate-g4.mjs' },
+    { task: 'GATE-LEGACY-WORDBANK', command: 'node scripts/gate-legacy-wordbank.mjs' },
+    { task: 'GATE-PRACTICE-ENGINE', command: 'node scripts/gate-practice-engine.mjs' },
+    { task: 'BUILD', command: 'npm run build' },
+    { task: 'BENCH-CONTENT', command: 'node scripts/bench-content.mjs' },
+    { task: 'BENCH-BOOT', command: 'node scripts/bench-boot.mjs' },
+    { task: 'TEST-PERSISTENCE-BOUNDARY', command: 'node tests/persistence-boundary.mjs' },
+    { task: 'TEST-LEARNING-BOUNDARY-WIRING', command: 'node tests/learning-boundary-wiring.mjs' },
+    { task: 'TEST-LEARNING-STORAGE', command: 'node tests/learning-storage.mjs' },
+    { task: 'TEST-LEARNING-SERVICE', command: 'node tests/learning-service.mjs' },
+    { task: 'TEST-LEARNING-INSIGHTS', command: 'node tests/learning-insights.mjs' },
+    { task: 'TEST-ANALYTICS-IDENTITY', command: 'node tests/analytics-identity.mjs' },
+    { task: 'TEST-MIGRATION-GUARDS', command: 'node tests/migration-guards.mjs' },
+    { task: 'TEST-CONTENT-QUERY', command: 'node tests/content-query.mjs' },
+    { task: 'TEST-BOUNDARY-AST', command: 'node tests/boundary-ast.mjs' },
+    { task: 'AUDIT-LEARNING-R5', command: 'node scripts/learning-consistency.mjs --user-store=_user-snapshot/real-user-localStorage.json' },
+    { task: 'DRYRUN-REAL', command: 'node scripts/migration-dryrun-w1.mjs --user-store=_user-snapshot/real-user-localStorage.json' },
+    { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
+  ],
 }[WAVE]
 
 if (!TASKS) { console.error(`unknown wave: ${WAVE}`); process.exit(2) }
