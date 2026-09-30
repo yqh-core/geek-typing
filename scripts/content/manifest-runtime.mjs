@@ -35,6 +35,30 @@ export const RUNTIME_MANIFEST_FIELDS = Object.freeze([
 export const DROPPED_MANIFEST_FIELDS = Object.freeze(['sources', 'contentHistory', 'build'])
 
 /**
+ * 被裁字段在主 chunk 里的探测串（供构建后判据 J2 使用）。
+ *
+ * ⚠️ 探测串的**形态**由打包器的实际产出决定，不能凭直觉写。本仓 Vite 底层是 rolldown，
+ *   实测（dist/assets/）：
+ *     · **投影后的主 chunk**：manifest 是 JS 对象字面量，标识符安全的键名**被去掉引号** ——
+ *       出现的是 `sources:`（裸键名 + 冒号），`"sources"` 在此世界恒为 0；字符串值用反引号模板字面量。
+ *     · **`?raw` 的 JSON chunk**（如 dist/assets/words-*.js / items-*.js，同一打包器）：
+ *       JSON 文本以**模板字面量**进 chunk，内层引号**不转义** —— 出现的是 `"word":` 这种带引号形态。
+ *   ⇒ 两种形态各自对应一种真实故障，任一命中即判红（只写一种就是漏网）：
+ *     · 裸键名（`sources:`）—— 抓「被裁字段进了投影对象」：有人把它写回 RUNTIME 白名单，
+ *       或投影根本没裁掉它。
+ *     · 带引号（`"sources"`）—— 抓「投影被撤销、manifest 退回 `?raw`」：回退后整段 JSON
+ *       字符串进主 chunk，带引号形态即出现。
+ *   ⚠️ J3 对照组**必须**用裸键名形态（`stats:`）：带引号形态在投影正确时恒为 0，
+ *   照抄成 `"stats"` 会让 J3 恒假。
+ *   `build` 不能用自身当探测串（在别处太常见），必须用其独有子字段名。
+ */
+export const DROPPED_MANIFEST_PROBES = Object.freeze({
+  sources: ['sources:', '"sources"'],
+  contentHistory: ['contentHistory:', '"contentHistory"'],
+  build: ['toolVersion:', '"toolVersion"', 'builtAt:', '"builtAt"', 'sourceChecksum:', '"sourceChecksum"'],
+})
+
+/**
  * 按 RUNTIME_MANIFEST_FIELDS 的顺序挑键，源对象缺失的键跳过。
  * 纯投影，不做任何派生/校验（schema 合法性由 content:validate 负责）。
  */
