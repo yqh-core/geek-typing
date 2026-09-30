@@ -13,7 +13,7 @@
  */
 import { getAllPackages, getPackage } from '../registry'
 import { SCHEMA_VERSION, type ContentType } from '../model/content'
-import type { PackageManifest } from '../schema'
+import type { RuntimePackageManifest } from '../schema'
 
 export interface CatalogTypeEntry {
   /** 内容类型（vocabulary / listening / audio ...） */
@@ -74,7 +74,7 @@ const PLANNED_TYPES: ContentType[] = [
   'lesson',
 ]
 
-function toEntry(m: PackageManifest, localId: string): CatalogPackageEntry {
+function toEntry(m: RuntimePackageManifest, localId: string): CatalogPackageEntry {
   return {
     localId,
     contentId: m.id,

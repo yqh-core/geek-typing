@@ -89,6 +89,11 @@ export interface PackageManifest {
   assets?: AssetManifest[]
 }
 
+/** runtime 侧拿到的 manifest：sources / contentHistory / build 三个字段在构建期被投影掉，
+ *  只存在于源码 JSON 与门禁侧（见 scripts/content/manifest-runtime.mjs 与
+ *  docs/p18/P1.8-DESIGN-RULINGS-v1.0.md §⑦）。 */
+export type RuntimePackageManifest = Omit<PackageManifest, 'sources' | 'contentHistory' | 'build'>
+
 /** 词条载荷（与 V3 WordItem 形状一致；V4.1 起定义在 model/vocabulary）。
  *  学习状态（mastery/streak/nextReviewAt）绝不挂在这里，见 Content/Learning 边界。 */
 export interface WordItem {

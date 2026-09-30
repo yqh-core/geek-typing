@@ -11,7 +11,7 @@
  * 其它类型 → content/<type>/<id>/ 放 manifest.json + items.json（可选载荷）。
  * 均在本文件登记 → content:validate 校验 → vocabulary 包再跑 content:build 同步 stats/checksum。
  */
-import type { PackageManifest, WordPayload } from './schema'
+import type { RuntimePackageManifest, WordPayload } from './schema'
 import { parseContentId } from './model/content'
 import type { ContentRelation } from './relation/relation'
 
@@ -22,7 +22,7 @@ import type { ContentRelation } from './relation/relation'
  * VocabularyPackage 保留为别名，既有调用方（wordBanks / learning / query 层）不受影响。
  */
 export interface ContentPackage {
-  manifest: PackageManifest
+  manifest: RuntimePackageManifest
   /** ContentId 的第 4 段（裸包 id），与 UI/持久化键一致 */
   localId: string
   /** vocabulary inline 策略：词条同步可用 */
@@ -37,19 +37,17 @@ export interface ContentPackage {
 export type VocabularyPackage = ContentPackage
 export type ContentPackageEntry = ContentPackage
 
-/* ---------------- manifest（?raw + parse，规避 resolveJsonModule） ---------------- */
-import ieltsManifest from '../../../content/vocabulary/ielts/manifest.json?raw'
-import kaoyanManifest from '../../../content/vocabulary/kaoyan/manifest.json?raw'
-import toeflManifest from '../../../content/vocabulary/toefl/manifest.json?raw'
-import cet4Manifest from '../../../content/vocabulary/cet4/manifest.json?raw'
-import cet6Manifest from '../../../content/vocabulary/cet6/manifest.json?raw'
-import aiCoreManifest from '../../../content/vocabulary/ai-core/manifest.json?raw'
-import cloudNativeManifest from '../../../content/vocabulary/cloud-native/manifest.json?raw'
-import frontendManifest from '../../../content/vocabulary/frontend/manifest.json?raw'
-import tsCodeManifest from '../../../content/vocabulary/ts-code/manifest.json?raw'
-import goCodeManifest from '../../../content/vocabulary/go-code/manifest.json?raw'
-
-const parseManifest = (raw: string): PackageManifest => JSON.parse(raw) as PackageManifest
+/* ---------------- manifest（构建期 ?runtime 投影 → 对象；规则见 scripts/content/manifest-runtime.mjs） ---------------- */
+import ieltsManifest from '../../../content/vocabulary/ielts/manifest.json?runtime'
+import kaoyanManifest from '../../../content/vocabulary/kaoyan/manifest.json?runtime'
+import toeflManifest from '../../../content/vocabulary/toefl/manifest.json?runtime'
+import cet4Manifest from '../../../content/vocabulary/cet4/manifest.json?runtime'
+import cet6Manifest from '../../../content/vocabulary/cet6/manifest.json?runtime'
+import aiCoreManifest from '../../../content/vocabulary/ai-core/manifest.json?runtime'
+import cloudNativeManifest from '../../../content/vocabulary/cloud-native/manifest.json?runtime'
+import frontendManifest from '../../../content/vocabulary/frontend/manifest.json?runtime'
+import tsCodeManifest from '../../../content/vocabulary/ts-code/manifest.json?runtime'
+import goCodeManifest from '../../../content/vocabulary/go-code/manifest.json?runtime'
 
 /* ---------------- inline 小库词条（同步 parse，体积小无负担） ---------------- */
 import aiCoreWords from '../../../content/vocabulary/ai-core/words.json?raw'
@@ -71,14 +69,14 @@ const loadToefl = async () => parseWords((await import('../../../content/vocabul
  * manifest 静态 import（常驻主 chunk，单个 ~1.2 KiB，O(包数) 线性小步涨）；
  * items.json 一律动态 import（独立 items-*.js chunk，绝不进主 chunk），
  * 与 words-*.js 同一判据口径（构建后体积门禁按 (words|items)-*.js 计数）。 */
-import listeningManifest from '../../../content/listening/demo-listening-01/manifest.json?raw'
-import audioManifest from '../../../content/audio/demo-audio-01/manifest.json?raw'
-import readingManifest from '../../../content/reading/demo-reading-01/manifest.json?raw'
-import topicManifest from '../../../content/topic/demo-topic-01/manifest.json?raw'
-import exerciseManifest from '../../../content/exercise/demo-exercise-01/manifest.json?raw'
-import writingManifest from '../../../content/writing/demo-writing-01/manifest.json?raw'
-import speakingManifest from '../../../content/speaking/demo-speaking-01/manifest.json?raw'
-import collectionManifest from '../../../content/collection/demo-study-set/manifest.json?raw'
+import listeningManifest from '../../../content/listening/demo-listening-01/manifest.json?runtime'
+import audioManifest from '../../../content/audio/demo-audio-01/manifest.json?runtime'
+import readingManifest from '../../../content/reading/demo-reading-01/manifest.json?runtime'
+import topicManifest from '../../../content/topic/demo-topic-01/manifest.json?runtime'
+import exerciseManifest from '../../../content/exercise/demo-exercise-01/manifest.json?runtime'
+import writingManifest from '../../../content/writing/demo-writing-01/manifest.json?runtime'
+import speakingManifest from '../../../content/speaking/demo-speaking-01/manifest.json?runtime'
+import collectionManifest from '../../../content/collection/demo-study-set/manifest.json?runtime'
 
 const parseData = (raw: string): unknown[] => JSON.parse(raw) as unknown[]
 const loadListeningDemo = async () => parseData((await import('../../../content/listening/demo-listening-01/items.json?raw')).default)
@@ -92,24 +90,24 @@ const loadCollectionDemo = async () => parseData((await import('../../../content
 
 /* ---------------- 注册表（10 vocabulary + 7 类型试金石 + 1 collection = 18 包） ---------------- */
 const packages: ContentPackage[] = [
-  { manifest: parseManifest(aiCoreManifest), localId: 'ai-core', words: parseWords(aiCoreWords) },
-  { manifest: parseManifest(cloudNativeManifest), localId: 'cloud-native', words: parseWords(cloudNativeWords) },
-  { manifest: parseManifest(frontendManifest), localId: 'frontend', words: parseWords(frontendWords) },
-  { manifest: parseManifest(cet4Manifest), localId: 'cet4', words: parseWords(cet4Words) },
-  { manifest: parseManifest(cet6Manifest), localId: 'cet6', words: parseWords(cet6Words) },
-  { manifest: parseManifest(ieltsManifest), localId: 'ielts', load: loadIelts },
-  { manifest: parseManifest(kaoyanManifest), localId: 'kaoyan', load: loadKaoyan },
-  { manifest: parseManifest(toeflManifest), localId: 'toefl', load: loadToefl },
-  { manifest: parseManifest(tsCodeManifest), localId: 'ts-code', words: parseWords(tsCodeWords) },
-  { manifest: parseManifest(goCodeManifest), localId: 'go-code', words: parseWords(goCodeWords) },
-  { manifest: parseManifest(listeningManifest), localId: 'demo-listening-01', loadData: loadListeningDemo },
-  { manifest: parseManifest(audioManifest), localId: 'demo-audio-01', loadData: loadAudioDemo },
-  { manifest: parseManifest(readingManifest), localId: 'demo-reading-01', loadData: loadReadingDemo },
-  { manifest: parseManifest(topicManifest), localId: 'demo-topic-01', loadData: loadTopicDemo },
-  { manifest: parseManifest(exerciseManifest), localId: 'demo-exercise-01', loadData: loadExerciseDemo },
-  { manifest: parseManifest(writingManifest), localId: 'demo-writing-01', loadData: loadWritingDemo },
-  { manifest: parseManifest(speakingManifest), localId: 'demo-speaking-01', loadData: loadSpeakingDemo },
-  { manifest: parseManifest(collectionManifest), localId: 'demo-study-set', loadData: loadCollectionDemo },
+  { manifest: aiCoreManifest, localId: 'ai-core', words: parseWords(aiCoreWords) },
+  { manifest: cloudNativeManifest, localId: 'cloud-native', words: parseWords(cloudNativeWords) },
+  { manifest: frontendManifest, localId: 'frontend', words: parseWords(frontendWords) },
+  { manifest: cet4Manifest, localId: 'cet4', words: parseWords(cet4Words) },
+  { manifest: cet6Manifest, localId: 'cet6', words: parseWords(cet6Words) },
+  { manifest: ieltsManifest, localId: 'ielts', load: loadIelts },
+  { manifest: kaoyanManifest, localId: 'kaoyan', load: loadKaoyan },
+  { manifest: toeflManifest, localId: 'toefl', load: loadToefl },
+  { manifest: tsCodeManifest, localId: 'ts-code', words: parseWords(tsCodeWords) },
+  { manifest: goCodeManifest, localId: 'go-code', words: parseWords(goCodeWords) },
+  { manifest: listeningManifest, localId: 'demo-listening-01', loadData: loadListeningDemo },
+  { manifest: audioManifest, localId: 'demo-audio-01', loadData: loadAudioDemo },
+  { manifest: readingManifest, localId: 'demo-reading-01', loadData: loadReadingDemo },
+  { manifest: topicManifest, localId: 'demo-topic-01', loadData: loadTopicDemo },
+  { manifest: exerciseManifest, localId: 'demo-exercise-01', loadData: loadExerciseDemo },
+  { manifest: writingManifest, localId: 'demo-writing-01', loadData: loadWritingDemo },
+  { manifest: speakingManifest, localId: 'demo-speaking-01', loadData: loadSpeakingDemo },
+  { manifest: collectionManifest, localId: 'demo-study-set', loadData: loadCollectionDemo },
 ]
 
 /** vocabulary 槽位（既有 API 口径：UI / 持久化 / 学习层只看词库包） */
@@ -190,7 +188,7 @@ export async function getContent<T = WordPayload>(contentId: string): Promise<T 
 }
 
 /** 按类型列出内容包 manifest（B-2 泛化：按注册表实际类型过滤，未接入的类型自然为空数组） */
-export function listContent(type: string): PackageManifest[] {
+export function listContent(type: string): RuntimePackageManifest[] {
   return packages.filter((p) => p.manifest.type === type).map((p) => p.manifest)
 }
 
