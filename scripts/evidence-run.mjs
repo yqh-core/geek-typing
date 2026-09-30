@@ -357,6 +357,9 @@ const TASK_TABLE = {
     { task: 'VERIFY-P17-FROZEN', command: 'node scripts/verify-p17-frozen.mjs' },
     { task: 'VERIFY-MANIFESTS', command: 'node scripts/verify-manifest-hashes.mjs' },
     { task: 'CONTENT-VALIDATE', command: 'node scripts/content/validate.mjs' },
+    // P18-F：INV-4（content/ 二进制媒体 = 0，双通道：扩展名白名单 + NUL 嗅探）+ 它自己的证伪自检，
+    // 同上「不会失败的门等于没有门」纪律：证伪是独立证据任务，不许只跑门本身。
+    { task: 'FALSIFY-CONTENT-VALIDATE', command: 'node scripts/content/validate.mjs --falsify' },
     { task: 'GATE-CONTENT-CONTRACT', command: 'node scripts/gate-content-contract.mjs' },
     { task: 'GATE-CONTENT-TYPE-CONTRACT', command: 'node scripts/gate-content-type-contract.mjs' },
     { task: 'FALSIFY-CONTENT-TYPE-CONTRACT', command: 'node scripts/gate-content-type-contract.mjs --falsify' },

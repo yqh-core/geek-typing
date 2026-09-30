@@ -47,14 +47,23 @@
  * 21. 资产契约（P1.8-B）：包声明了非空 `assets[]` ⇒ 包级 `licenses`（非空具名表）与
  *     包级 `provenance`（含非空 provider）**必填**（⇔ 关系，见 P1.8 裁定 ④-3）。
  *     规则实现在 scripts/content/asset-rules.mjs 的 checkPackageAssetDeclarations（唯一）。
+ * 22. 二进制媒体检查（P18-F · INV-4）：content/ 内不得出现二进制媒体文件（媒体一律走远程）。
+ *     「url 必须远程 https」已在资产声明层由 asset-rules.mjs:117 的 checkAssetUrl() 强制（P18-B），
+ *     本判据关掉**文件层缺口** —— 防「manifest 声明远程、实体却塞进仓库」的声明 ⟷ 实体脱钩绕过。
+ *     双通道（裁定 ⑩-3）：① 扩展名白名单 .json/.md/.txt；② NUL 字节嗅探（前 8192 B 含 0x00
+ *     即二进制，专抓改扩展名伪装）。fail-closed：遍历/读取异常 ⇒ 判 FAIL，绝不当作 0。
  *
  * 用法：node scripts/content/validate.mjs [--root=<内容包目录>]   → 全绿 exit 0，任一 FAIL exit 1
+ *       node scripts/content/validate.mjs --falsify              → 证伪自检（系统临时副本双注入，
+ *           4 断言；exit 0=全过 / 1=断言失败 / 2=自身异常，同 gate-license.mjs 三态惯例）
+ *       node scripts/content/validate.mjs --help                 → usage（exit 0）；未知参数 exit 2
  *       `--root` 默认 `content/`，**仅**覆盖"内容包目录"（ROOT / registry / i18n 等一律不变），
  *       用于对隔离副本做证伪（后续 scripts/gate-license.mjs 复用同一开关）。
  */
 import { readdir, readFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync, openSync, readSync, closeSync, mkdtempSync, cpSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import os from 'node:os'
 /* 内容指纹**只走 license-policy.mjs 的 checksumPayload**（它内部 = canonical.mjs 的 sha256Canonical）。
  * P18-B 之前本文件自己又调了一次 sha256Canonical，是同一算法的**第二份调用点**；现与
  * `gate-license.mjs` 的 `sourceChecksum` 判据共用同一个 helper —— 消灭第二份哈希实现。 */
@@ -78,6 +87,25 @@ const CONTENT_DIR = (() => {
   }
   return raw === null || raw === '' ? path.join(ROOT, 'content') : path.resolve(ROOT, raw)
 })()
+
+/* —— CLI 参数校验（P18-F）：未知参数 exit 2、--help exit 0。危险脚本不得带静默默认值 ——
+ *    未知 flag 一律拒绝（同 gate-license.mjs parseArgs / evidence-run 事故教训），不猜测语义。—— */
+const HELP_TEXT = `用法：
+  node scripts/content/validate.mjs [--root=<内容包目录>]   全绿 exit 0，任一 FAIL exit 1
+  node scripts/content/validate.mjs --falsify               证伪自检（系统临时副本双注入，4 断言；exit 0=全过 / 1=断言失败 / 2=自身异常）
+  node scripts/content/validate.mjs --help                  本帮助（exit 0）`
+{
+  const args = process.argv.slice(2)
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]
+    if (a === '--falsify' || a === '--help' || a.startsWith('--root=')) continue
+    if (a === '--root') { i++; continue } // 空格形式：值在下一个 argv（CONTENT_DIR 解析器同语义）
+    console.error(`未知参数 ${JSON.stringify(a)} —— 本脚本不接受未知 flag，也不猜测其语义\n`)
+    console.error(HELP_TEXT)
+    process.exit(2)
+  }
+  if (args.includes('--help')) { console.log(HELP_TEXT); process.exit(0) }
+}
 /** 第 20 项比对对象：包的「实际加载方式」只在这里定义，Node 跑不了 TS，只能扫文本 */
 const REGISTRY_TS = path.join(ROOT, 'src', 'core', 'content', 'registry.ts')
 
@@ -132,6 +160,47 @@ const normKey = (raw) => String(raw ?? '').normalize('NFC').toLowerCase().replac
 
 /** 端点 ContentId 解析：content:<type>:<namespace>:<localId> */
 const CONTENT_ID_RE = /^content:([a-z]+):([a-z0-9-]+):(.+)$/
+
+/* ===== 22. 二进制媒体检查（P18-F · INV-4）判据本体 =====
+ * 双通道（裁定 ⑩-3）：① 扩展名白名单（.json/.md/.txt）—— 抓任何媒体扩展；
+ * ② NUL 字节嗅探（读前 8192 B，含 0x00 即二进制）—— 专抓「改扩展名伪装」的二进制。
+ * 抽成独立函数供 main() 与 --falsify 共用同一条实现 —— 证伪跑的不是"另一份逻辑"。
+ * fail-closed：任何遍历/读取异常 ⇒ error 置为异常消息，主流程判 FAIL，绝不当作 0。 */
+const BINARY_MEDIA_WHITELIST = new Set(['.json', '.md', '.txt'])
+/** NUL 嗅探只读文件头部，不整文件读入（大文件也不拖慢门禁） */
+const NUL_SNIFF_BYTES = 8192
+
+function checkBinaryMedia(dir) {
+  const offenders = []
+  let scanned = 0
+  try {
+    const walk = (d) => {
+      for (const ent of readdirSync(d, { withFileTypes: true })) {
+        const full = path.join(d, ent.name)
+        if (ent.isDirectory()) { walk(full); continue }
+        scanned++
+        const rel = path.relative(dir, full).split(path.sep).join('/')
+        const ext = path.extname(ent.name).toLowerCase()
+        // 通道 1：扩展名白名单。两类 why 互斥（扩展名已越界就不再嗅探），断言好归因
+        if (!BINARY_MEDIA_WHITELIST.has(ext)) { offenders.push({ rel, why: 'ext' }); continue }
+        // 通道 2：NUL 字节嗅探 —— 白名单扩展名也可能藏着二进制实体（改扩展名伪装）
+        let fd = null
+        try {
+          fd = openSync(full, 'r')
+          const buf = Buffer.alloc(NUL_SNIFF_BYTES)
+          const n = readSync(fd, buf, 0, NUL_SNIFF_BYTES, 0)
+          if (buf.subarray(0, n).includes(0)) offenders.push({ rel, why: 'nul' })
+        } finally {
+          if (fd !== null) closeSync(fd)
+        }
+      }
+    }
+    walk(dir)
+    return { scanned, offenders, error: null }
+  } catch (e) {
+    return { scanned, offenders, error: e.message } // fail-closed：error 非空 ⇒ 主流程判 FAIL
+  }
+}
 
 let fails = 0
 const fail = (msg) => { fails++; console.error(`  ✗ ${msg}`) }
@@ -553,8 +622,87 @@ async function main() {
     }
   }
 
+  /* ===== 22. 二进制媒体检查（P18-F · INV-4）=====
+   * INV-4：content/ 内不得出现二进制媒体文件，媒体一律走远程。「url 必须远程 https」已在
+   * 资产声明层由 asset-rules.mjs:117 的 checkAssetUrl() 强制（P18-B），本判据关掉**文件层缺口**
+   * —— 防「manifest 声明远程、实体却塞进仓库」的声明 ⟷ 实体脱钩绕过（裁定 ⑩-2）。
+   * 双通道：扩展名白名单 + NUL 字节嗅探（详见 checkBinaryMedia 注释）；fail-closed：
+   * error 非空也判 FAIL。输出字面量「二进制媒体文件数 = 0」供 P18-G4 期望输出对账（裁定 ⑩-3）。 */
+  {
+    const r = checkBinaryMedia(CONTENT_DIR) // 继承 --root 语义（证伪对隔离副本跑同一条判据）
+    if (r.error) fail(`二进制媒体检查本身失败（fail-closed）：${r.error}`)
+    const whyText = (why) => (why === 'ext' ? '扩展名不在白名单 .json/.md/.txt' : 'NUL 字节命中（疑似改扩展名伪装的二进制）')
+    for (const o of r.offenders) {
+      fail(`二进制媒体文件：${o.rel}（${whyText(o.why)}）→ INV-4：媒体一律走远程 https，实体不得进 content/`)
+    }
+    if (r.offenders.length > 0) {
+      const nExt = r.offenders.filter((o) => o.why === 'ext').length
+      const nNul = r.offenders.filter((o) => o.why === 'nul').length
+      fail(`二进制媒体文件数 = ${r.offenders.length}（INV-4 要求 = 0；扫描 ${r.scanned} 个文件：ext ${nExt} / nul ${nNul}）`)
+    } else if (!r.error) {
+      ok(`二进制媒体检查（扫描 ${r.scanned} 个文件，二进制媒体文件数 = 0）：扩展名白名单 + NUL 嗅探双通道通过`)
+    }
+  }
+
   if (fails > 0) { console.error(`\n[content:validate] FAIL：${fails} 项`); process.exit(1) }
   console.log(`\n[content:validate] PASS：${totalPkgs} 包全部通过`)
 }
 
-main().catch((e) => { console.error('[content:validate] 异常：', e.message); process.exit(1) })
+/* ===== P18-F 证伪自检（裁定 ⑩-4）：不会失败的门等于没有门 =====
+ * 隔离副本 = os.tmpdir()/p18f-falsify-*（系统临时目录，容器即弃；真 content/ 只读、绝不被写）。
+ * 双注入：(a) fake-audio.mp3 —— 媒体扩展名 + NUL 字节 ⇒ 白名单通道抓；
+ *         (b) fake.json —— 合法 JSON 尾部追加 NUL ⇒ 嗅探通道抓（专证「改扩展名伪装」绕不过）。
+ * 断言 4 条（精确等于，不是"包含"），全部满足才 exit 0；断言失败 exit 1；自身异常 exit 2
+ * （三态对齐 gate-license.mjs 的 --falsify 惯例，UNKNOWN/异常一律视为不通过）。
+ * 必须同进程完成：本机 node 进程内 spawn 一律 EBUSY（见 gate-license.mjs 实现注记），
+ * **禁止 spawnSync/execSync** —— 判据本体直接调 checkBinaryMedia()，证伪跑的不是"另一份逻辑"。 */
+function falsifyBinaryMedia() {
+  console.log('[content:validate] 证伪自检 —— 证明 INV-4 二进制媒体判据能判红（不会失败的门等于没有门）')
+  let tmp = null
+  let verdict = null // true=断言全过 / false=断言失败 / null=自身异常（fail-closed）
+  let bad = 0
+  try {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'p18f-falsify-'))
+    cpSync(CONTENT_DIR, tmp, { recursive: true })
+    console.log(`  隔离副本：${tmp}（系统临时目录；真 content/ 只读、绝不被写）`)
+    writeFileSync(path.join(tmp, 'fake-audio.mp3'), Buffer.from([0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00]))
+    writeFileSync(path.join(tmp, 'fake.json'), Buffer.concat([Buffer.from('{"falsify":true}\n', 'utf8'), Buffer.from([0x00])]))
+    console.log('  注入：fake-audio.mp3（mp3 扩展名 + NUL 字节）+ fake.json（合法 JSON 尾部追加 NUL —— 专证改扩展名伪装）\n')
+
+    const injected = checkBinaryMedia(tmp)
+    const whys = new Set(injected.offenders.map((o) => o.why))
+    const rels = new Set(injected.offenders.map((o) => o.rel))
+    const real = checkBinaryMedia(CONTENT_DIR)
+    const assertions = [
+      [`断言 1：offenders 恰好 = 2（多一个少一个都算失败）`, injected.offenders.length === 2, `实际 ${injected.offenders.length}`],
+      [`断言 2：两类 why 都在（ext 白名单通道 / nul 嗅探通道）`, whys.has('ext') && whys.has('nul'), `实际 {${[...whys].join(', ') || '∅'}}`],
+      [`断言 3：两个注入样本均被点名`, rels.has('fake-audio.mp3') && rels.has('fake.json'), `实际 {${[...rels].join(', ') || '∅'}}`],
+      [`断言 4：真实 content/ 零 offender 且零 error（注入未污染真实内容）`, real.offenders.length === 0 && real.error === null, `offenders=${real.offenders.length} error=${real.error ?? 'null'}`],
+    ]
+    for (const [name, pass, actual] of assertions) {
+      if (pass) console.log(`  ✓ ${name}`)
+      else { bad++; console.error(`  ✗ ${name} —— ${actual}`) }
+    }
+    verdict = bad === 0
+  } catch (e) {
+    console.error(`  ‼ 证伪自检自身异常（fail-closed，绝不当作通过）：${e?.message ?? e}`)
+  } finally {
+    if (tmp !== null) {
+      try { rmSync(tmp, { recursive: true, force: true }) }
+      catch (e) { console.warn(`  ⚠ 隔离副本清理失败（系统临时目录，容器即弃，不影响判定）：${tmp} — ${e?.message ?? e}`) }
+    }
+  }
+  console.log('──────────────────────────────────────────────────────')
+  if (verdict === true) {
+    console.log(`content:validate Falsification：✅ PASS —— 4/4 断言通过，隔离副本已清理，真 content/ 未被写入`)
+    process.exit(0)
+  }
+  if (verdict === false) {
+    console.error(`content:validate Falsification：❌ FAIL —— ${bad}/4 断言未过 ⇒ 本判据不可信`)
+    process.exit(1)
+  }
+  process.exit(2)
+}
+
+if (process.argv.slice(2).includes('--falsify')) falsifyBinaryMedia()
+else main().catch((e) => { console.error('[content:validate] 异常：', e.message); process.exit(1) })

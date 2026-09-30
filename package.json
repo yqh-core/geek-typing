@@ -24,6 +24,7 @@
     "stress:review": "node scripts/stress-review.mjs",
     "icons": "node scripts/gen-icons.mjs",
     "content:validate": "node scripts/content/validate.mjs",
+    "content:validate:falsify": "node scripts/content/validate.mjs --falsify",
     "content:check": "node scripts/content/validate.mjs",
     "content:build": "node scripts/content/build.mjs",
     "content:ingest": "node scripts/content/ingest.mjs",
