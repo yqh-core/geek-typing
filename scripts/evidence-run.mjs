@@ -366,6 +366,8 @@ const TASK_TABLE = {
     { task: 'FALSIFY-GATE-LICENSE', command: 'node scripts/gate-license.mjs --falsify' },
     { task: 'GATE-PERF', command: 'node scripts/gate-perf.mjs' },
     { task: 'CHECK-BUNDLE', command: 'node scripts/check-bundle.mjs' },
+    // P18-C：体积门判据 4/5（manifest 投影 + lazy 反向校验）自带证伪，同上不许只跑门本身。
+    { task: 'FALSIFY-CHECK-BUNDLE', command: 'node scripts/check-bundle.mjs --falsify' },
     { task: 'GATE-ARCHITECTURE', command: 'node scripts/gate-architecture.mjs' },
     { task: 'GATE-TODO', command: 'node scripts/gate-todo.mjs' },
     { task: 'GATE-LEARNING-BOUNDARY', command: 'node scripts/gate-learning-boundary.mjs' },
