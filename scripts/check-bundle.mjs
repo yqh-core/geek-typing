@@ -382,9 +382,9 @@ function checkJ1(inp) {
 
   if (inp.contentKeys) {
     const orphan = [...inp.contentKeys].filter((k) => !union.has(k))
-    if (orphan.length) hard.push(`content/**\/manifest.json 出现但白名单未覆盖：${orphan.join(', ')}`)
+    if (orphan.length) hard.push(`content/**/manifest.json 出现但白名单未覆盖：${orphan.join(', ')}`)
   } else {
-    unknown.push('无法收集 content/**\/manifest.json 的键并集')
+    unknown.push('无法收集 content/**/manifest.json 的键并集')
   }
 
   if (inp.srcRawHits === null) {
