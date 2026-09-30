@@ -1,0 +1,13 @@
+# RunId: W5D-BENCH-CONTENT-20260930-081954-R01
+# Command: node scripts/bench-content.mjs
+# Commit: eacd9a619178bf238bc32d20436c753bfef492d1
+# StartedAt: 2026-09-30T00:19:54.441Z
+# DurationMs: 17406
+# ExitCode: 0
+
+--- stdout+stderr ---
+[bench-content] 查询词（cet4 前 20）：abandon, absolute, abstract, academic, accelerate ...
+[bench-content] searchWords × 200：P50 32.947 ms
+[bench-content] queryWord × 200：P50 0.003 ms
+[bench-content] index 构建 × 200：P50 11.069 ms（entries=9346）
+[bench-content] 已写出 D:\work\geek-typing\docs\audit-package\_generated\perf-baseline.json
