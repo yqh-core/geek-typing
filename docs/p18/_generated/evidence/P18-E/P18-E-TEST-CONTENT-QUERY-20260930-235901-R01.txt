@@ -1,0 +1,223 @@
+# RunId: P18-E-TEST-CONTENT-QUERY-20260930-235901-R01
+# Command: node tests/content-query.mjs
+# Commit: 963082c0de0d65b12f59d140a6e7c33c962e848c
+# StartedAt: 2026-09-30T15:59:01.446Z
+# DurationMs: 8911
+# ExitCode: 0
+
+--- stdout+stderr ---
+
+【1】registry 契约
+  ✅ 注册 10 个 vocabulary 包 — ai-core,cloud-native,frontend,cet4,cet6,ielts,kaoyan,toefl,ts-code,go-code
+  ✅ 全库 Σitems = 契约基准（词数变化必须显式确认） — 9346 vs 9346
+  ✅ getPackage 支持裸 id
+  ✅ getPackage 支持 4 段式 ContentId
+  ✅ getPackage 未知 id 返回 undefined
+  ✅ listContent("vocabulary") 返回全部 manifest
+  ✅ listContent("listening") 返回 1 个结构探针包（B-2 已接入）
+  ✅ hasFeature 未知 feature 为 false 且不崩溃
+  ✅ getRelations 恒为数组（关系模型就位、无数据）
+  ✅ getPackage 支持「来源族-包」namespace 反查
+
+【2】ContentId 规范（V4.1 4 段式 + namespace 每包唯一）
+  ✅ ielts 包 id 为 content:vocabulary:ecdict-ielts:ielts — content:vocabulary:ecdict-ielts:ielts
+  ✅ parseContentId 可逆解析
+  ✅ wordId 保留原词形（与 buildHits 同源，禁止在 id 侧 lowercase）
+  ✅ wordId 与 buildHits 生成口径一致（大写词不分歧）
+  ✅ 非法 ContentId 解析为 null
+  ✅ 10 个包 namespace 两两不同（词级 id 唯一性前提） — curated-ai-core,curated-cloud-native,curated-frontend,ecdict-cet4,ecdict-cet6,ecdict-ielts,ecdict-kaoyan,ecdict-toefl,curated-ts-code,curated-go-code
+
+【3】加载缓存共享（兼容层与查询层同一份数据）
+  ✅ 重复 loadPackage 返回同一引用（单份内存）
+  ✅ ielts 实际词条数 = manifest.stats.items — 3000
+
+【4】countWords
+  ✅ countWords() 全库合计 = manifest 真值 — 9346 vs 9346
+  ✅ countWords("ielts") = 3000
+
+【5】searchWords
+  ✅ 跨包检索 abandon 有多条来源 — cet4,toefl,ielts
+  ✅ 精确命中 ContentId 落在自身包 namespace 下 — content:word:ecdict-cet4:abandon
+  ✅ 跨包同词各自不同 ContentId（全局唯一） — 3 条命中 3 个 id
+  ✅ 每条命中带包上下文
+  ✅ 限定包检索只返回该包
+  ✅ packageId 支持 4 段式
+  ✅ 精确优先：首位为词形全等命中
+  ✅ exact=true 不返回前缀命中 — 0
+  ✅ exact=false 返回前缀命中 — abandon
+  ✅ 空查询返回空数组
+  ✅ limit 生效
+  ✅ 中文按释义/翻译命中 — abandon=放弃；抛弃
+
+【6】getWord（Word Detail 前置接口）
+  ✅ 按 ContentId 取到词条 — content:word:ecdict-ielts:abbreviation → abbreviation
+  ✅ 词条带翻译 — n. 缩写词, 缩写, 缩短, 节略
+  ✅ 词条唯一归属 ielts 包 — content:vocabulary:ecdict-ielts:ielts
+  ✅ 跨包同词 "considerate" 各自可寻址且归属不同包 — ielts / cet4
+  ✅ 不存在的词返回 null
+  ✅ 错误 type 返回 null
+  ✅ 非 ContentId 返回 null
+
+【7】listWords（分页 + 过滤）
+  ✅ 第 1 页 10 条
+  ✅ 第 2 页与第 1 页无交集
+  ✅ id 落在包 namespace 内
+  ✅ 未知包返回空数组
+  ✅ hasPhonetic 过滤生效 — 84 条带音标
+
+【8】contentQuery 统一 API
+  ✅ contentQuery 暴露 search/list/get/count
+  ✅ search({type:"word"}) 与 searchWords 结果一致 — 3 条
+  ✅ type:'all' 包含 word 与 reading 两族结果（id 集合包含关系，不比长度） — word=53 reading=1 all=54
+  ✅ type:'listening'（仍未放开）返回空数组
+  ✅ search 默认 type 为 word
+  ✅ search 精确排序保持：首位为词形全等 — abandon
+  ✅ search 支持 4 段式 packageId
+  ✅ contentQuery.get(contentId) 命中 — content:word:ecdict-ielts:abbreviation
+  ✅ contentQuery.get 未放开类型返回 null
+  ✅ contentQuery.get(reading ContentId) 命中且 type/itemId 正确（P18-E 放开） — content:reading:demo-demo-reading-01:reading-item-01
+  ✅ contentQuery.get 非法 id 返回 null
+  ✅ count({type:"word"}) = 全库合计 — 9346 vs 9346
+  ✅ count({type:"listening"}) = 0
+  ✅ count({packageId:"ielts"}) = 3000
+  ✅ count({tags:["ielts"]}) = 3000
+  ✅ list 分页生效（page1/page2 各 5 条且无交集）
+  ✅ list tags 过滤生效 — 5 条
+  ✅ list 未知 tag 返回空
+  ✅ list 未知包返回空
+  ✅ list 未放开类型返回空
+  ✅ list hasPhonetic 过滤生效 — 0/43
+
+【9】Catalog + Content Index
+  ✅ catalog.types vocabulary = 10 包 — 10
+  ✅ catalog.types vocabulary items = manifest 真值 — 9346 vs 9346
+  ✅ catalog 已接入 listening（B-2 结构探针包，真实数字） — listening packages=1 items=6
+  ✅ catalog 已接入 audio/reading/topic/exercise/writing/speaking/collection（B-2 各 1 探针包，真实数字） — audio=1p/5i reading=1p/6i topic=1p/5i exercise=1p/5i writing=1p/5i speaking=1p/5i collection=1p/5i
+  ✅ catalog.totalItems = 全类型 manifest 真值合计 — 9388 vs 9388
+  ✅ catalog.packages 覆盖 18 个包（10 vocabulary + 8 探针/组合） — 18
+  ✅ catalog.schemaVersion 为数字 — 4
+  ✅ getPackageCatalog("ielts") 字段正确 — {"localId":"ielts","contentId":"content:vocabulary:ecdict-ielts:ielts","title":"雅思核心 IELTS","type":"vocabulary","items":3000,"tags":["ielts","vocabulary"],"features":["phonetic","definition"],"offline":"lazy"}
+  ✅ getPackageCatalog 未知 id 返回 null
+  ✅ getCatalog 不加载词条（只读 manifest）
+  ✅ ensureIndex() 后 entries = 全库（含 demo 包）合计 — 9388 vs 9388
+  ✅ ensureIndex() 后 packages = 注册包数（省略参数 = 覆盖全库） — 18 vs 18
+  ✅ ensureIndex 幂等（二次调用 entries 不变）
+  ✅ byWord 收录词条的归一化 key — abbreviation
+  ✅ byWord 归一：大写 / 首尾空格落到同一 key
+  ✅ byPackage 按包聚合
+  ✅ byTag 收录包级 tag
+  ✅ invalidateIndex("ielts") 后 entries 降该包 items 数 — 6388 vs 6388
+  ✅ invalidateIndex("ielts") 后 packages = 注册包数 - 1 — 17 vs 17
+  ✅ 失效后 byPackage 不再含 ielts
+  ✅ 失效后 byWord 不再含 ielts 词条
+  ✅ 失效后 byTag 不再含 ielts 词条
+  ✅ 重新 ensureIndex 恢复全量 — 9388 vs 9388
+  ✅ 重建后 byWord 恢复 ielts 词条
+  ✅ invalidateIndex() 全清
+  ✅ ensureIndex(["ielts"]) 只建目标包
+  ✅ 查询在部分索引下仍可用
+  ✅ findByPackage("cet4") 与 byPackage 表一致 — 84 vs 84
+  ✅ idsByPackage("cet4") 与 byPackage 表逐 id 一致
+  ✅ findById(id) 命中同一对象（与 byId 引用相等） — content:word:ecdict-ielts:abbreviation
+  ✅ findById 未知 id 返回 null
+  ✅ findByWord 与 byWord 表一致 — abbreviation
+  ✅ findByWord 未知词形返回空数组
+  ✅ findByNamespace("ecdict-cet4") 命中 cet4 全包 — 84
+  ✅ findByNamespace 未知 namespace 返回空数组
+  ✅ findByTag("code") 与 byTag 表一致 — 100
+
+【10】id 自洽性（生成侧 vs 寻址侧大小写口径）
+   —— V4.1-P0.5 独立复核实测捕获：id 生成保留原词形大小写，若 get 用 lowercase 反查，
+      9346 条里 93 条会「search 查得到、get 取不回」（go-code 41/50、ts-code 34/50）
+  ✅ 全库 9346 条 id 均可按自身 id 取回（get ⇄ list 自洽） — 零漏取
+  ✅ ts-code（大小写敏感）50 条全部可按自身 id 取回 — 漏 0
+  ✅ go-code（大小写敏感）50 条全部可按自身 id 取回 — 漏 0
+  ✅ ielts（大小写敏感）3000 条全部可按自身 id 取回 — 漏 0
+  ✅ 大写词条按自身 id 命中（Oxford） — content:word:ecdict-ielts:Oxford
+  ✅ lowercase id 走兜底仍可命中（兼容历史/手写 id）
+
+【11】Query Scope（首页 / 搜索页 / 词库页 / Detail / 收藏页共用一套作用域）
+  ✅ scope{type,packageId} 与平铺 packageId 结果一致 — 1 条：ielts
+  ✅ scope.namespace:'ecdict-ielts' 只命中 ielts — 3000 条
+  ✅ scope.tags:['code'] 命中 ts-code + go-code = 100 — 100 条 / go-code,ts-code
+  ✅ 平铺参数覆盖 scope（packageId:cet4 胜出） — 84 条 / cet4
+  ✅ count({scope:{namespace:'curated-ai-core'}}) = 43
+  ✅ 空 scope 视为全库（缺省 = 无过滤） — 9346
+  ✅ scope 未知包返回空
+
+【12】Search Sort 契约（deterministic ⇒ 翻页不重不漏）
+  ✅ sort:"word" 前 20 条按词形非降序 — abbreviation,abnormal,abolish,aboriginal,abort
+  ✅ sort:"word" 前 20 条原始词形亦非降序（该区间无大小写混排）
+  ✅ deterministic：同一 query 连续两次 id 序列完全相同 — 1000 条
+  ✅ 分页不重不漏：page1..10 拼接 === pageSize:1000 一次取回的前 100 条
+  ✅ 默认 sort 为 relevance：精确命中排在最前且不与其它组混排 — 1 条精确命中 / 共 3 条
+  ✅ sort:"relevance" 显式与默认一致
+  ✅ sort:"updated" 不报错、条数正确、顺序 deterministic（当前退化为包内数据顺序） — 84 条
+  ✅ sort:{field:'word',order:'desc'} 降序生效 — zoology,zoo,zest,zero,youngster
+  ✅ desc 顺序同样 deterministic，且与 asc 命中同一集合（翻页不漏项） — 3000 条双向一致
+  ✅ sort:{field:'updated',order:'desc'} 不报错且条数不变 — 84 条
+
+【13】ContentSnapshot 契约（V4.1-P0.6：哪个实体的哪个快照）
+  ✅ snapshotOf 字段齐全（contentId/contentVersion/checksum/publishedAt 对得上） — {"contentId":"content:vocabulary:ecdict-cet4:cet4","contentVersion":7,"checksum":"sha256:aaa","schemaVersion":4,"publishedAt":"2026-09-26"}
+  ✅ snapshotOf 带出 schemaVersion — schemaVersion=4
+  ✅ snapshotOf 省略 publishedAt 时结果不含该键 — contentId,contentVersion,checksum,schemaVersion
+  ✅ snapshotOf publishedAt 显式 undefined 时同样不含该键
+  ✅ schemaVersion 省略时取 SCHEMA_VERSION 常量
+  ✅ schemaVersion 为正整数且两次省略调用结果相同 — 4
+  ✅ schemaVersion 可显式指定（覆盖常量）
+  ✅ isSameSnapshot 同一对象 → true
+  ✅ isSameSnapshot 内容完全相同的两份 → true
+  ✅ isSameSnapshot checksum 不同 → false
+  ✅ isSameSnapshot contentVersion 不同 → false
+  ✅ isSameSnapshot contentId 不同 → false
+  ✅ isSameSnapshot 仅 version+checksum 同但 contentId 不同 → false（不能只比 version/checksum）
+  ✅ isSameSnapshot 任一侧为 null/undefined → false（宁可重学也不误判相同）
+  ✅ findRevision 同一 checksum 出现两次 → 返回 revision 最大的那条（倒序扫描） — {"revision":3,"version":1,"checksum":"sha256:X","publishedAt":"2026-01-01"}
+  ✅ findRevision 结果与正序第一条不同（证明口径不再是「首条命中」） — 倒序=3 / 正序=1
+  ✅ findRevision 多条 history 中命中唯一 checksum 的条目
+  ✅ findRevision 单条正常命中
+  ✅ findRevision 空 history → null
+  ✅ findRevision 非数组 history → null
+  ✅ findRevision 无匹配 → null
+  ✅ findRevision 空字符串 checksum → null
+  ✅ cet4 manifest 已写入版本三元组（读不到即 FAIL，不跳过） — revision=2 version=2
+  ✅ findRevision(cet4 history, contentChecksum).version === manifest.contentVersion — 2 vs 2
+  ✅ findRevision(cet4 history, contentChecksum).revision === manifest.contentRevision — 2 vs 2
+  ✅ cet4 contentHistory 按 revision 升序追加（findRevision 倒序扫描的前提） — 1,2
+
+【14】queryWord —— UI 唯一需要的单条寻址入口
+  ✅ 命中：返回 WordHit，id = content:word:<namespace>:<原词形> — content:word:ecdict-cet4:abandon
+  ✅ 命中：translation 非空（证明拿到的不是「空释义占位对象」） — 放弃；抛弃
+  ✅ 未命中：**严格返回 null**（不是空词条对象）—— 这是消灭静默空释义的前提 — got=null
+  ✅ 对照组：换个存在的词立刻非 null（证明上面的 null 来自未命中，而非恒返回 null） — w=absolute
+  ✅ 包不存在：返回 null 而不抛异常（C-5 口径：非法 id 返回 null，不抛）
+  ✅ 空词形 / 纯空白：返回 null
+  ✅ queryWord 与 getWord 口径一致（同一 id、同一 word、同一 translation） — content:word:ecdict-cet4:abandon === content:word:ecdict-cet4:abandon
+  ✅ 大小写①：原词形精确命中（保留大写） — Oxford
+  ✅ 大小写②：传 lowercase 仍命中同一 ContentId（norm 兜底生效） — content:word:ecdict-ielts:Oxford
+  ✅ 大小写③：传全大写同样命中 — content:word:ecdict-ielts:Oxford
+  ✅ 对照组：仓库里确实存在 lazy 包（否则下一条结论无意义） — ielts,kaoyan,toefl
+  ✅ lazy 包 ielts：queryWord 结果与 loadPackage 数据一致（懒加载自证见 queryword-lazy.mjs） — eagle
+  ✅ 二次调用：结果逐字节相同（索引缓存不改变语义）
+  ✅ 已挂进 contentQuery 聚合导出（设计文档 §4.2 第 5 条）
+
+【15】P18-E reading 放开（启用集 / 包路由 / 索引 / 结果形状）
+  ✅ count({type:'reading'}) = reading 包 stats.items(6) — 6 vs 6
+  ✅ list({type:'reading'}) 非空且每条 type='reading' / 归属 demo-reading-01 / title 为 string — 6 条
+  ✅ list({type:'reading', hasPhonetic:true}) == list({type:'reading'})（非 word 族不参与音标筛选） — 6 vs 6
+  ✅ count({type:'reading', hasPhonetic:true}) = readingItems（count 与 list 同源）
+  ✅ list({type:'reading', sort:{field:'word',order:'desc'}}) == list({type:'reading'})（词形主序对非 word 族中性） — desc=reading-item-05,reading-item-02,reading-item-03,reading-item-04,reading-item-06,reading-item-01 / 默认=reading-item-05,reading-item-02,reading-item-03,reading-item-04,reading-item-06,reading-item-01
+  ✅ list({type:'word', packageId:'demo-reading-01'}) = [] 且 count = 0（异族包被滤掉）
+  ✅ list({type:'reading', packageId:'ielts'}) = []（反向同样不外溢）
+  ✅ search({type:'reading', query:'tea'}) 非空且全部 type='reading' — 1 条：reading-item-01
+  ✅ search({type:'reading', query:'zzz-not-present'}) = []
+  ✅ search({type:'reading', query:'reading-item-02', exact:true}) 命中该条目（index.exact 走 id） — 1 条
+  ✅ list({type:"reading",pageSize:2}) 两次调用 id 序列完全一致 — content:reading:demo-demo-reading-01:reading-item-05|content:reading:demo-demo-reading-01:reading-item-02
+  ✅ page1 / page2 无交集 — 2/2
+  ✅ index.byWord 不含任何 'content:reading:' 开头的 id（非 word 族不进倒排表） — byWord 共 9346 项
+  ✅ 对照组：index.byId 含 reading 条目（证明索引确实覆盖 reading，上条非空转） — 6
+  ✅ get(条目自身 ContentId) 命中同一条，且 parseContentId 解析出的 type = reading — content:reading:demo-demo-reading-01:reading-item-05
+
+──────────────────────────────────────────────────────
+共 179 项，通过 179，失败 0
+──────────────────────────────────────────────────────
