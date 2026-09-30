@@ -1,0 +1,14 @@
+# RunId: P18-CHECK-BUNDLE-20260930-170852-R01
+# Command: node scripts/check-bundle.mjs
+# Commit: 6ecbb06af7041539babe913ea3c45b656c8b7579
+# StartedAt: 2026-09-30T09:08:52.071Z
+# DurationMs: 1461
+# ExitCode: 0
+
+--- stdout+stderr ---
+[check-bundle] dist/assets：13 个文件
+  1. ✓ PASS   主 chunk index-BeWnJF_v.js：436.45 KiB raw / 135.42 KiB gzip ≤ 439.45/141.60 KiB（余量 0.7% / 4.4%；来源 absolute / absolute）
+  2. ✓ PASS   数据 chunk 11 个（words 3 + items 8）≥ registry lazy 包 11 个
+  3. ✓ PASS   预热预算（ielts→words-CZ5ER7rC.js(166.87 KiB)，kaoyan→words-2QG2Fjtl.js(166.85 KiB)，toefl→words-uy6NfwIr.js(163.17 KiB)）：gzip 合计 496.89 KiB ≤ 600 KiB（余量 17.2%）
+
+[check-bundle] PASS：3 项全部通过
