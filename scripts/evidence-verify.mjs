@@ -20,7 +20,11 @@ const waveArg = process.argv.find((a) => a.startsWith('--wave='))
 if (!waveArg) { console.error('usage: --wave=W0'); process.exit(2) }
 const WAVE = waveArg.split('=')[1].toUpperCase()
 
-const dir = join(ROOT, 'docs', 'audit-package', '_generated', 'evidence', WAVE)
+// 证据根目录与 evidence-run.mjs 同口径：P1.7 Wave（W*）→ docs/audit-package/_generated/evidence；
+// P1.8 Wave（P18*）→ docs/p18/_generated/evidence（不进 P1.7 冻结区，见 P1.8 INV-1）。
+const dir = /^P18/.test(WAVE)
+  ? join(ROOT, 'docs', 'p18', '_generated', 'evidence', WAVE)
+  : join(ROOT, 'docs', 'audit-package', '_generated', 'evidence', WAVE)
 const matrixPath = join(dir, 'evidence-matrix.json')
 if (!existsSync(matrixPath)) { console.error(`matrix not found: ${matrixPath}`); process.exit(2) }
 const matrix = JSON.parse(readFileSync(matrixPath, 'utf8'))
@@ -40,7 +44,8 @@ function currentCommit() {
   }
 }
 const HEAD = currentCommit()
-const RUNID_RE = /^W\d+[A-Z]?-[A-Z0-9-]+-\d{8}-\d{6}-R\d{2}$/
+// W0..W5D（P1.7）与 P18（P1.8）两种 Wave 前缀都接受——**只放宽、不收紧**（既有 RunId 全部仍匹配）。
+const RUNID_RE = /^(?:W\d+[A-Z]?|P\d+)-[A-Z0-9-]+-\d{8}-\d{6}-R\d{2}$/
 
 const checks = []
 function check(name, cond, detail = '') {

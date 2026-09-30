@@ -6,7 +6,8 @@
  * Artifact(sha256, 落盘) → Evidence(本矩阵) → CLOSED。禁止人工填 PASS。
  *
  * 用法：node scripts/evidence-run.mjs --wave=W0
- * 产物：docs/audit-package/_generated/evidence/<wave>/
+ * 产物：W* 波   → docs/audit-package/_generated/evidence/<wave>/
+ *       P18* 波 → docs/p18/_generated/evidence/<wave>/（P1.8 证据树，**不进 P1.7 冻结区** —— 见 verify-p17-frozen.mjs INV-1）
  *   ├── <RunId>.txt          每条命令的原始输出（stdout+stderr）
  *   ├── evidence-matrix.json 机器矩阵（含 RunId/ExitCode/Commit/ArtifactHash）
  *   └── evidence-matrix.md   人工可读版
@@ -268,6 +269,26 @@ const TASKS = {
     { task: 'DRYRUN-REAL', command: 'node scripts/migration-dryrun-w1.mjs --user-store=_user-snapshot/real-user-localStorage.json' },
     { task: 'TEST-E2E', command: 'node tests/e2e.mjs' },
   ],
+  /** P1.8 · Wave 18-0 —— 基线冻结与保护上线（P1.8-PLAN v1.0 §6）
+   *  变更面：新增 scripts/verify-p17-frozen.mjs（INV-1 门）+ package.json 脚本名
+   *  + docs/p18/P1.8-PLAN-v1.0-FROZEN.md + docs/ARCHITECTURE-INVARIANTS.md（补 INV-1 机器落点）
+   *  + scripts/evidence-run.mjs / evidence-verify.mjs（证据根按波次分流，W* 行为不变）。
+   *  不触碰 content / learning / persistence 子系统；**INV-1 门是本 Wave 的主判据**。
+   *  BUILD 排在 dist 依赖门禁之前（W4 教训：先清 dist 再跑体积门会三连假红）。 */
+  P18: [
+    { task: 'TSC', command: 'npx tsc -b --noEmit' },
+    { task: 'LINT', command: 'npx oxlint src/' },
+    { task: 'BUILD', command: 'npm run build' },
+    { task: 'VERIFY-P17-FROZEN', command: 'node scripts/verify-p17-frozen.mjs' },
+    { task: 'VERIFY-MANIFESTS', command: 'node scripts/verify-manifest-hashes.mjs' },
+    { task: 'CONTENT-VALIDATE', command: 'node scripts/content/validate.mjs' },
+    { task: 'GATE-CONTENT-CONTRACT', command: 'node scripts/gate-content-contract.mjs' },
+    { task: 'GATE-PERF', command: 'node scripts/gate-perf.mjs' },
+    { task: 'CHECK-BUNDLE', command: 'node scripts/check-bundle.mjs' },
+    { task: 'GATE-ARCHITECTURE', command: 'node scripts/gate-architecture.mjs' },
+    { task: 'GATE-TODO', command: 'node scripts/gate-todo.mjs' },
+    { task: 'GATE-LEARNING-BOUNDARY', command: 'node scripts/gate-learning-boundary.mjs' },
+  ],
 }[WAVE]
 
 if (!TASKS) { console.error(`unknown wave: ${WAVE}`); process.exit(2) }
@@ -305,7 +326,13 @@ async function gitCommitAsync() {
 }
 
 const COMMIT = (await gitCommitAsync())
-const OUT = join(ROOT, 'docs', 'audit-package', '_generated', 'evidence', WAVE)
+/** 证据根目录按波次分流（与 evidence-verify.mjs 同口径）：
+ *  P1.7 Wave（W*）保持历史路径；P1.8 Wave（P18*）落 docs/p18，避免写入 P1.7 冻结区。 */
+const EVIDENCE_REL = /^P18/.test(WAVE)
+  ? ['docs', 'p18', '_generated', 'evidence']
+  : ['docs', 'audit-package', '_generated', 'evidence']
+const EVIDENCE_REL_PATH = EVIDENCE_REL.join('/')
+const OUT = join(ROOT, ...EVIDENCE_REL, WAVE)
 mkdirSync(OUT, { recursive: true })
 
 const entries = []
@@ -330,7 +357,7 @@ for (const { task, command } of TASKS) {
   entries.push({
     task, command, owner: 'agent', runId, exitCode: code, commit: COMMIT,
     timestamp: startedAt, durationMs: ms, artifactSha256: artifactHash,
-    evidence: `docs/audit-package/_generated/evidence/${WAVE}/${runId}.txt`, status,
+    evidence: `${EVIDENCE_REL_PATH}/${WAVE}/${runId}.txt`, status,
   })
   console.log(`[${status}] ${runId}  (${(ms / 1000).toFixed(1)}s)`)
 }

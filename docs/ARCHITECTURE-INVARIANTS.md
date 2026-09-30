@@ -156,3 +156,23 @@ perf 门已于 Wave 5 落地（`scripts/gate-perf.mjs`），按「脚本文件�
 **Wave 3 首次全量清点结果**：命中 24 处 → 8 处是门禁脚本自身的说明性注释（已改写注释消除），
 剩余 **16 处逐条人工核对，全部是词法误伤**（占位符 `xxx`、计数器 `blocked`、
 发布门状态值 `RELEASE=BLOCKED`、局部变量 `todo`），**无一处真实遗留待办**。16 条已全部登记。
+
+---
+
+## 5. P1.8 新增不变量（阶段边界类）
+
+> 依据：`docs/p18/P1.8-PLAN-v1.0-FROZEN.md` §1.2。本节按本文件规则登记——**每条都写明"违反时谁会拦住它"**。
+
+| # | 不变量 | 机器落点 | 断言方式 | 生效 Wave |
+|---|--------|----------|----------|-----------|
+| **INV-1** | **P1.7 冻结交付物零改动**（P1.8 提交必须 additive） | **闸门**：`npm run verify:p17-frozen`（`scripts/verify-p17-frozen.mjs`） | 冻结 HEAD 存在 + `merge-base --is-ancestor` + `git diff <P1.7_HEAD>..HEAD -- docs/audit-package/` 为空 + `verify-manifest-hashes` 逐字节 0 不符 | P18-0 |
+| INV-2 | UI 只经 Catalog / Query / Learning 访问数据 | **闸门**：`tests/ui-contract.mjs`（**待建**，棘轮只许降） | 静态扫描 + 基线比对 | P18-D |
+| INV-3 | 体积/配额预算**不得上调** | **闸门**：`gate:perf` + `check:bundle`（预算表为单一事实源） | 预算表变更即 FAIL | 已有，P1.8 沿用 |
+| INV-4 | 媒体一律远程，库内出现二进制即 FAIL | `content:validate` **新判据**（**待建**） | 内容仓扫二进制/大文件 | P18-F |
+| INV-5 | 真实素材必须过来源/版权**硬门** | **闸门**：`gate:license`（**待建**，复用 `license-policy.mjs`） | 缺必填/未知 SPDX/非商用 → 拒 | P18-B |
+| INV-6 | 类型契约唯一，禁止 per-type 散落文件 | **闸门**：`gate-content-type-contract`（**待建**） | `CONTENT_TYPE_REGISTRY` 覆盖性 + model 目录无散落 | P18-A/E |
+
+> **INV-1 的实施期裁定（P18-0）**：证据根目录按波次分流 —— P1.7 的 `W*` 波继续写
+> `docs/audit-package/_generated/evidence/`（**行为零变化**），P1.8 的 `P18*` 波写
+> `docs/p18/_generated/evidence/`。否则 P1.8 一跑证据就会写入冻结区，与 INV-1 自相矛盾。
+> 分流判定同时施加于 `scripts/evidence-run.mjs` 与 `scripts/evidence-verify.mjs`。
