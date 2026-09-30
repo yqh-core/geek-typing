@@ -21,7 +21,9 @@
  *     (c) 跨包 duplicate ContentId —— 全库兜底回归检测
  *     (d) duplicate source —— 同一 origin 在 sources[] 出现两次
  *     (e) invalid / orphan relation —— 仅当 relations.json 存在时校验，否则打印跳过
- *     (f) broken asset —— 仅当 manifest.assets 存在时校验，否则打印跳过
+ *     (f) broken asset —— 仅当 manifest.assets 存在时，按 asset-rules.mjs 的**全规则**校验
+ *         （assetId 语法/归属 · checksum · url · 许可 · provenance）；否则打印跳过。
+ *         ⚠️ 规则实现在 scripts/content/asset-rules.mjs（唯一），本判据不含规则逻辑，只取汇总结果。
  *     (g) orphan learning record —— 运行时检查，由 Learning 层负责，脚本不校验
  * 13. packageId 存在且 === 目录名（一词三表：manifest.packageId / 目录 / ContentId 第 4 段）
  * 14. namespace 存在，且与从 manifest.id 解析出的第 3 段严格相等（两者必须同源；
@@ -41,8 +43,13 @@
  * 20. 策略一致性：manifest.offline.policy 必须与 registry.ts 里该包的实际加载方式一致
  *     （inline ⇔ 静态 import 走 words:/data:；lazy ⇔ 动态 import 走 load:/loadData:）。
  *     未知策略只提示跳过，不伪造通过；无载荷包的未知策略判红（见第 1 项）
+ * 21. 资产契约（P1.8-B）：包声明了非空 `assets[]` ⇒ 包级 `licenses`（非空具名表）与
+ *     包级 `provenance`（含非空 provider）**必填**（⇔ 关系，见 P1.8 裁定 ④-3）。
+ *     规则实现在 scripts/content/asset-rules.mjs 的 checkPackageAssetDeclarations（唯一）。
  *
- * 用法：node scripts/content/validate.mjs   → 全绿 exit 0，任一 FAIL exit 1
+ * 用法：node scripts/content/validate.mjs [--root=<内容包目录>]   → 全绿 exit 0，任一 FAIL exit 1
+ *       `--root` 默认 `content/`，**仅**覆盖"内容包目录"（ROOT / registry / i18n 等一律不变），
+ *       用于对隔离副本做证伪（后续 scripts/gate-license.mjs 复用同一开关）。
  */
 import { readdir, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
@@ -53,9 +60,21 @@ import { sha256Canonical } from './canonical.mjs'
  * 而实际结果就是漂移：契约把 `ContentType` 扩到 14 时，两处 Node 白名单都停在 12。
  * 现在单一副本由 gate:content-type-contract 判据 H 对着契约上锁。 */
 import { CONTENT_TYPES } from './license-policy.mjs'
+/* 资产规则**只从 asset-rules.mjs 取**（P1.8 裁定 ③/④-7）：本文件不得内联任何资产规则逻辑。
+ * 资产规则的第二份副本由 gate:content-type-contract 判据 H3 上锁，与 CONTENT_TYPES 的 H1/H2 同一手法。 */
+import { checkManifestAssets, checkPackageAssetDeclarations, checkLicenseDecision } from './asset-rules.mjs'
 
 const ROOT = path.resolve(process.cwd())
-const CONTENT_DIR = path.join(ROOT, 'content')
+/** 内容包目录：默认 content/；`--root=<dir>` 可指向隔离副本（证伪用）。仅覆盖此项，其余路径不变。 */
+const CONTENT_DIR = (() => {
+  const args = process.argv.slice(2)
+  let raw = null
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith('--root=')) { raw = args[i].slice('--root='.length); break }
+    if (args[i] === '--root') { raw = args[i + 1] ?? null; break }
+  }
+  return raw === null || raw === '' ? path.join(ROOT, 'content') : path.resolve(ROOT, raw)
+})()
 /** 第 20 项比对对象：包的「实际加载方式」只在这里定义，Node 跑不了 TS，只能扫文本 */
 const REGISTRY_TS = path.join(ROOT, 'src', 'core', 'content', 'registry.ts')
 
@@ -240,6 +259,8 @@ async function main() {
     else fail('checksum 漂移：sources[].checksum 与载荷不符 → vocabulary 包运行 npm run content:build')
 
     // 7. License 门禁（结构化 + 外部来源须有 SPDX）
+    //    P18-B：资产规则汇总（规则实现在 asset-rules.mjs，唯一）—— 此处只取分组结果，不含任何规则逻辑。
+    const assetsResult = checkManifestAssets(manifest)
     let licenseOk = true
     for (const s of sources) {
       const lic = s.license
@@ -258,6 +279,30 @@ async function main() {
         licenseOk = false
       }
     }
+    // 7b. P18-B：包级 licenses 表（"id → 许可"具名表）逐条许可判定。
+    //     判定矩阵唯一位于 license-policy.mjs 的 decideLicense；此处只调用（经 asset-rules 的
+    //     checkLicenseDecision 映射成 PASS/FAIL），不复制矩阵。
+    if (manifest.licenses !== undefined) {
+      const table = manifest.licenses
+      if (table === null || typeof table !== 'object' || Array.isArray(table)) {
+        fail('manifest.licenses 必须为「id → 许可」对象（具名许可表）')
+        licenseOk = false
+      } else {
+        for (const [lid, entry] of Object.entries(table)) {
+          if (!entry || typeof entry !== 'object' || typeof entry.name !== 'string' || !entry.name) {
+            fail(`licenses.${lid} 许可非结构化（需 {name, spdx?, attributionRequired}）`)
+            licenseOk = false
+            continue
+          }
+          const v = checkLicenseDecision({ provider: manifest.provenance?.provider, license: entry })
+          if (!v.ok) { fail(`[${v.code}] licenses.${lid}：${v.message}`); licenseOk = false }
+          else ok(`licenses.${lid} 许可判定 ${v.decision}（${v.reason}）`)
+        }
+      }
+    }
+    // 7c. P18-B：每个 asset 的许可判定（presence/XOR · licenseRef 解析 · decideLicense）同样走
+    //     asset-rules.mjs，但它已包含在 12(f) 的"asset 全规则"里（checkManifestAssets 汇总），
+    //     故本判据**不重复计数** —— 单一实现约束满足（规则只有一份），报告点也只有一处。
     if (licenseOk && sources.length > 0) ok(`license 结构化（${sources.map((s) => s.license?.spdx ?? 'self').join(', ')}）`)
 
     // 8. 包 id 唯一（注意：这里校验的是包 ContentId，不是词——跨包同词合法）
@@ -404,15 +449,31 @@ async function main() {
       }
     }
 
-    //   (f) broken asset —— 只有 manifest 存在 assets 字段才校验
-    if (manifest.assets === undefined) {
+    //   (f) broken asset —— 只有 manifest 存在 assets 字段才校验；通过条件 = **asset 全规则通过**
+    //       （assetId 语法/归属 · checksum · url · 许可 · provenance）。规则实现在 asset-rules.mjs（唯一），
+    //       本判据只取汇总结果（assetViolations + assetLicenseViolations），不含规则逻辑。
+    if (!assetsResult.hasAssets) {
       console.log('  · manifest 无 assets 字段，跳过 asset 校验')
-    } else if (!Array.isArray(manifest.assets)) {
-      fail('manifest.assets 必须为数组')
     } else {
-      const broken = manifest.assets.filter((a) => !a?.url || !/^(https?:\/\/|\/)/.test(a.url))
-      if (broken.length === 0) ok(`assets ${manifest.assets.length} 项 url 合法`)
-      else fail(`broken asset ${broken.length} 项：${broken.slice(0, 3).map((a) => a?.url).join(', ')}`)
+      const assetProblems = [...assetsResult.assetViolations, ...assetsResult.assetLicenseViolations]
+      if (assetProblems.length === 0) {
+        ok(`assets ${assetsResult.assetCount} 项全规则通过（assetId 语法/归属 · checksum · url · 许可 · provenance）`)
+      } else {
+        for (const v of assetProblems) fail(`[${v.code}] ${v.message}`)
+      }
+    }
+
+    // 21. 资产契约（P1.8-B）—— 包级 licenses/provenance 条件必填（⇔ 声明了非空 assets[]）。
+    //     规则实现在 asset-rules.mjs 的 checkPackageAssetDeclarations（唯一），本判据只调用。
+    {
+      const decl = checkPackageAssetDeclarations(manifest)
+      if (decl.ok) {
+        ok(decl.required
+          ? '资产契约：assets[] 非空 ⇒ 包级 licenses/provenance 齐备'
+          : '资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）')
+      } else {
+        for (const v of decl.violations) fail(`[${v.code}] ${v.message}`)
+      }
     }
     }
   }
