@@ -1,0 +1,65 @@
+{
+  "wave": "W5C",
+  "commit": "7826fb4cc080f258a5cb36b3609f15285fa7ec3d",
+  "generatedAt": "2026-09-30T02:54:29.298Z",
+  "summary": {
+    "total": 4,
+    "pass": 4,
+    "fail": 0
+  },
+  "note": "Status machine-generated from exit code; PASS is not manually writable (P1.7-PLAN v2.3.2 §15/§19-9).",
+  "entries": [
+    {
+      "task": "TSC",
+      "command": "npx tsc -b --noEmit",
+      "owner": "agent",
+      "runId": "W5C-TSC-20260930-105118-R01",
+      "exitCode": 0,
+      "commit": "7826fb4cc080f258a5cb36b3609f15285fa7ec3d",
+      "timestamp": "2026-09-30T02:51:18.543Z",
+      "durationMs": 6842,
+      "artifactSha256": "4534e6be9dcd4d49c4e48141c566ab0c1a0f557f9167ad81df1a7eb7c0566928",
+      "evidence": "docs/audit-package/_generated/evidence/W5C/W5C-TSC-20260930-105118-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "LINT",
+      "command": "npx oxlint src/",
+      "owner": "agent",
+      "runId": "W5C-LINT-20260930-105125-R01",
+      "exitCode": 0,
+      "commit": "7826fb4cc080f258a5cb36b3609f15285fa7ec3d",
+      "timestamp": "2026-09-30T02:51:25.406Z",
+      "durationMs": 2576,
+      "artifactSha256": "47982b3fe5aed6c11368191ab5f1f8a43b3f6db45de49000ad24f72310d11dec",
+      "evidence": "docs/audit-package/_generated/evidence/W5C/W5C-LINT-20260930-105125-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "BUILD",
+      "command": "npm run build",
+      "owner": "agent",
+      "runId": "W5C-BUILD-20260930-105128-R01",
+      "exitCode": 0,
+      "commit": "7826fb4cc080f258a5cb36b3609f15285fa7ec3d",
+      "timestamp": "2026-09-30T02:51:28.002Z",
+      "durationMs": 10007,
+      "artifactSha256": "62ef2db3bb2fcbb35712e54475b412d1a731383ff399cc25f363f4949205672c",
+      "evidence": "docs/audit-package/_generated/evidence/W5C/W5C-BUILD-20260930-105128-R01.txt",
+      "status": "PASS"
+    },
+    {
+      "task": "TEST-E2E",
+      "command": "node tests/e2e.mjs",
+      "owner": "agent",
+      "runId": "W5C-TEST-E2E-20260930-105138-R01",
+      "exitCode": 0,
+      "commit": "7826fb4cc080f258a5cb36b3609f15285fa7ec3d",
+      "timestamp": "2026-09-30T02:51:38.029Z",
+      "durationMs": 171249,
+      "artifactSha256": "0a45727f0d378d61829f72167adee2abfe1e5a9c4ff55b690e89fa2e907195af",
+      "evidence": "docs/audit-package/_generated/evidence/W5C/W5C-TEST-E2E-20260930-105138-R01.txt",
+      "status": "PASS"
+    }
+  ]
+}
