@@ -360,6 +360,10 @@ const TASK_TABLE = {
     { task: 'GATE-CONTENT-CONTRACT', command: 'node scripts/gate-content-contract.mjs' },
     { task: 'GATE-CONTENT-TYPE-CONTRACT', command: 'node scripts/gate-content-type-contract.mjs' },
     { task: 'FALSIFY-CONTENT-TYPE-CONTRACT', command: 'node scripts/gate-content-type-contract.mjs --falsify' },
+    // P18-B：许可/资产入库前置硬门（INV-5，冻结 Plan §4.1 全表）+ 它自己的证伪自检。
+    // 「不会失败的门等于没有门」—— 所以门的证伪必须是独立证据任务，不许只跑门本身。
+    { task: 'GATE-LICENSE', command: 'node scripts/gate-license.mjs' },
+    { task: 'FALSIFY-GATE-LICENSE', command: 'node scripts/gate-license.mjs --falsify' },
     { task: 'GATE-PERF', command: 'node scripts/gate-perf.mjs' },
     { task: 'CHECK-BUNDLE', command: 'node scripts/check-bundle.mjs' },
     { task: 'GATE-ARCHITECTURE', command: 'node scripts/gate-architecture.mjs' },
