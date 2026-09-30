@@ -1,0 +1,25 @@
+# RunId: P18-A-GATE-ARCHITECTURE-20260930-195901-R03
+# Command: node scripts/gate-architecture.mjs
+# Commit: 2437f8062d48458322c428098fef442e4af4f319
+# StartedAt: 2026-09-30T11:59:01.097Z
+# DurationMs: 9651
+# ExitCode: 0
+
+--- stdout+stderr ---
+== P1.7-W3 · Architecture Gate 汇总（A-4）==
+已接入子门 5 个，计划内待落地 3 个（PENDING 不计 FAIL，但必打印）
+
+  ✅ B02            learning-boundary  EXIT=0  UI→core/learning 唯一入口 / UI❌→lib/learning
+  ✅ G4             g4                 EXIT=0  G4-1/2/3① 静态侧（键族入口 + 零静默 catch）
+  ✅ A03            legacy-wordbank    EXIT=0  旧词库边界
+  ✅ persistence    persistence        EXIT=0  UI❌→localStorage；core/learning❌→browser storage 直触
+  ✅ practice-engine practice-engine    EXIT=0  练习引擎边界
+  ✅ content-contract content-contract   EXIT=0  （已从 PENDING 转为已接入）Content 必须经 registry 注册
+  ✅ content-type-contract content-type-contract EXIT=0  （已从 PENDING 转为已接入）类型契约唯一 / 禁 per-type 散落 / 注册表⟷查询层对账（INV-6）
+  ✅ perf           perf               EXIT=0  （已从 PENDING 转为已接入）新依赖必须过 bundle budget
+
+共 8 项：通过 8，失败 0，未接入 0
+失败子项：无
+未接入子项：无
+
+✅ Architecture Gate PASS

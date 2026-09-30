@@ -1,0 +1,21 @@
+# RunId: P18-A-GATE-CONTENT-TYPE-CONTRACT-20260930-195814-R03
+# Command: node scripts/gate-content-type-contract.mjs
+# Commit: 2437f8062d48458322c428098fef442e4af4f319
+# StartedAt: 2026-09-30T11:58:14.570Z
+# DurationMs: 6313
+# ExitCode: 0
+
+--- stdout+stderr ---
+[gate:content-type-contract] 契约类型 14 个：word, vocabulary, listening, audio, reading, topic, exercise, writing, speaking, grammar, document, collection, course, lesson
+  ✓ A 注册表穷尽 CONTENT_TYPES（14 个）
+  ✓ B model/ 无类型散落（白名单 content.ts, vocabulary.ts, asset.ts, snapshot.ts）
+  ✓ C1 zh/en 词条逐一对齐（各 217 条）
+  ✓ C2 注册表引用的 28 个 i18n 键全部存在且无重复
+  ✓ D Catalog 类型维度 == packageLevelTypes()（13 个）
+  ✓ E queryEnabledTypes() == 查询层实际启用集（word）
+  ✓ F 注册表自洽（type 键一致 / itemType 已注册 / i18n 键声明完整）
+  ✓ G 契约单元编译期零诊断（3 个文件；选项源=tsconfig.app.json；双向穷尽锁 + 注册表完整性锁成立）
+  ✓ H1 构建侧类型白名单 == packageLevelTypes()（13 个；源 scripts/content/license-policy.mjs）
+  ✓ H2 scripts/content/validate.mjs 未自建类型白名单副本（单一副本）
+──────────────────────────────────────────────────────
+Content Type Contract：✅ PASS —— 类型契约唯一、无散落、i18n 完整、启用集一致、编译期穷尽

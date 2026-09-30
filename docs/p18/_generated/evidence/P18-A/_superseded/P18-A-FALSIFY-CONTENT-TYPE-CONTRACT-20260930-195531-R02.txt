@@ -1,0 +1,31 @@
+# RunId: P18-A-FALSIFY-CONTENT-TYPE-CONTRACT-20260930-195531-R02
+# Command: node scripts/gate-content-type-contract.mjs --falsify
+# Commit: 3e1b221c858af11c360d5301e0e8f23000974723
+# StartedAt: 2026-09-30T11:55:31.521Z
+# DurationMs: 40164
+# ExitCode: 0
+
+--- stdout+stderr ---
+[gate:content-type-contract] 证伪自检 —— 证明每条判据都能判红（不会失败的门等于没有门）
+  用例 7 条；每条：植入故障 → 断言"命中集恰好等于预期" → 字节还原 → 逐条核对
+
+  ✓ A 恰好判红（命中 {A,G}；还原=bytes）
+      从运行时清单 CONTENT_TYPES 摘掉 lesson（注册表多出一个类型）
+      ↳ 预期耦合：CONTENT_TYPES 摘掉成员同时破坏运行时穷尽(A) 与编译期"联合⊆数组"锁(G) —— 两把锁本就该同时响
+  ✓ B 恰好判红（命中 {B}；还原=unlink）
+      在 model/ 下新建 per-type 散落文件 audio.ts
+  ✓ C 恰好判红（命中 {C}；还原=bytes）
+      从 zh.ts 摘掉 type.reading.label 一行（en 仍有 → 不对齐 + 注册表引用落空）
+  ✓ D 恰好判红（命中 {D}；还原=bytes）
+      让 catalog 的类型维度多出 word（与 packageLevelTypes() 不一致）
+  ✓ E 恰好判红（命中 {E}；还原=bytes）
+      把 audio 的 queryEnabled 翻成 true（注册表说能查、查询层没开）
+  ✓ G 恰好判红（命中 {G}；还原=bytes）
+      给 ContentType 联合加未同步到 CONTENT_TYPES 的成员 quiz（只有编译期锁能抓）
+  ✓ H 恰好判红（命中 {H}；还原=bytes）
+      从 license-policy.mjs 摘掉 lesson（契约加了类型、Node 构建/入库/校验不认）
+
+  对照组（还原后复绿）
+  ✓ 全部判据复绿（还原后零命中）—— 证明上面每一轮的判红都来自植入，而非环境残留
+──────────────────────────────────────────────────────
+Falsification：✅ PASS —— 7/7 判据均恰好判红，工作树已字节还原，对照组复绿
