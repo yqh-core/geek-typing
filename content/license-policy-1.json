@@ -1,0 +1,328 @@
+{
+  "policyVersion": "license-policy-1",
+  "generatedAt": "2026-09-30T01:44:21.098Z",
+  "summary": {
+    "total": 18,
+    "allowed": 18,
+    "allowedAttribution": 0,
+    "reviewRequired": 0,
+    "blocked": 0
+  },
+  "matrix": {
+    "MIT / Apache*": "allowed",
+    "CC-BY-* (non-SA/NC)": "allowed+attribution",
+    "CC-BY-SA* / GPL*": "review_required",
+    "CC-BY-NC*": "blocked",
+    "NOASSERTION": "review_required",
+    "external w/o SPDX (unknown)": "blocked",
+    "original (provider sentinel)": "allowed"
+  },
+  "packages": [
+    {
+      "type": "audio",
+      "id": "content:audio:demo-demo-audio-01:demo-audio-01",
+      "packageId": "demo-audio-01",
+      "namespace": "demo-demo-audio-01",
+      "sources": [
+        {
+          "origin": "curated in-repo (B-2 试金石)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "collection",
+      "id": "content:collection:demo-demo-study-set:demo-study-set",
+      "packageId": "demo-study-set",
+      "namespace": "demo-demo-study-set",
+      "sources": [
+        {
+          "origin": "curated in-repo (B-2 试金石)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "exercise",
+      "id": "content:exercise:demo-demo-exercise-01:demo-exercise-01",
+      "packageId": "demo-exercise-01",
+      "namespace": "demo-demo-exercise-01",
+      "sources": [
+        {
+          "origin": "curated in-repo (B-2 试金石)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "listening",
+      "id": "content:listening:demo-demo-listening-01:demo-listening-01",
+      "packageId": "demo-listening-01",
+      "namespace": "demo-demo-listening-01",
+      "sources": [
+        {
+          "origin": "curated in-repo (B-2 试金石)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "reading",
+      "id": "content:reading:demo-demo-reading-01:demo-reading-01",
+      "packageId": "demo-reading-01",
+      "namespace": "demo-demo-reading-01",
+      "sources": [
+        {
+          "origin": "curated in-repo (B-2 试金石)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "speaking",
+      "id": "content:speaking:demo-demo-speaking-01:demo-speaking-01",
+      "packageId": "demo-speaking-01",
+      "namespace": "demo-demo-speaking-01",
+      "sources": [
+        {
+          "origin": "curated in-repo (B-2 试金石)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "topic",
+      "id": "content:topic:demo-demo-topic-01:demo-topic-01",
+      "packageId": "demo-topic-01",
+      "namespace": "demo-demo-topic-01",
+      "sources": [
+        {
+          "origin": "curated in-repo (B-2 试金石)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "vocabulary",
+      "id": "content:vocabulary:curated-ai-core:ai-core",
+      "packageId": "ai-core",
+      "namespace": "curated-ai-core",
+      "sources": [
+        {
+          "origin": "curated in-repo (2026 AI 核心词库)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "vocabulary",
+      "id": "content:vocabulary:ecdict-cet4:cet4",
+      "packageId": "cet4",
+      "namespace": "ecdict-cet4",
+      "sources": [
+        {
+          "origin": "ECDICT",
+          "provider": "ecdict",
+          "spdx": "MIT",
+          "decision": "allowed",
+          "reason": "SPDX=MIT ⇒ allowed"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "SPDX=MIT ⇒ allowed"
+    },
+    {
+      "type": "vocabulary",
+      "id": "content:vocabulary:ecdict-cet6:cet6",
+      "packageId": "cet6",
+      "namespace": "ecdict-cet6",
+      "sources": [
+        {
+          "origin": "ECDICT",
+          "provider": "ecdict",
+          "spdx": "MIT",
+          "decision": "allowed",
+          "reason": "SPDX=MIT ⇒ allowed"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "SPDX=MIT ⇒ allowed"
+    },
+    {
+      "type": "vocabulary",
+      "id": "content:vocabulary:curated-cloud-native:cloud-native",
+      "packageId": "cloud-native",
+      "namespace": "curated-cloud-native",
+      "sources": [
+        {
+          "origin": "curated in-repo (云原生词库)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "vocabulary",
+      "id": "content:vocabulary:curated-frontend:frontend",
+      "packageId": "frontend",
+      "namespace": "curated-frontend",
+      "sources": [
+        {
+          "origin": "curated in-repo (前端词库)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "vocabulary",
+      "id": "content:vocabulary:curated-go-code:go-code",
+      "packageId": "go-code",
+      "namespace": "curated-go-code",
+      "sources": [
+        {
+          "origin": "curated in-repo (Go 代码词库)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "vocabulary",
+      "id": "content:vocabulary:ecdict-ielts:ielts",
+      "packageId": "ielts",
+      "namespace": "ecdict-ielts",
+      "sources": [
+        {
+          "origin": "ECDICT",
+          "provider": "ecdict",
+          "spdx": "MIT",
+          "decision": "allowed",
+          "reason": "SPDX=MIT ⇒ allowed"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "SPDX=MIT ⇒ allowed"
+    },
+    {
+      "type": "vocabulary",
+      "id": "content:vocabulary:ecdict-kaoyan:kaoyan",
+      "packageId": "kaoyan",
+      "namespace": "ecdict-kaoyan",
+      "sources": [
+        {
+          "origin": "ECDICT",
+          "provider": "ecdict",
+          "spdx": "MIT",
+          "decision": "allowed",
+          "reason": "SPDX=MIT ⇒ allowed"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "SPDX=MIT ⇒ allowed"
+    },
+    {
+      "type": "vocabulary",
+      "id": "content:vocabulary:ecdict-toefl:toefl",
+      "packageId": "toefl",
+      "namespace": "ecdict-toefl",
+      "sources": [
+        {
+          "origin": "ECDICT",
+          "provider": "ecdict",
+          "spdx": "MIT",
+          "decision": "allowed",
+          "reason": "SPDX=MIT ⇒ allowed"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "SPDX=MIT ⇒ allowed"
+    },
+    {
+      "type": "vocabulary",
+      "id": "content:vocabulary:curated-ts-code:ts-code",
+      "packageId": "ts-code",
+      "namespace": "curated-ts-code",
+      "sources": [
+        {
+          "origin": "curated in-repo (TS 代码词库)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "writing",
+      "id": "content:writing:demo-demo-writing-01:demo-writing-01",
+      "packageId": "demo-writing-01",
+      "namespace": "demo-demo-writing-01",
+      "sources": [
+        {
+          "origin": "curated in-repo (B-2 试金石)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    }
+  ]
+}

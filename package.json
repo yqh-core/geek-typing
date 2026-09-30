@@ -22,6 +22,7 @@
     "content:validate": "node scripts/content/validate.mjs",
     "content:check": "node scripts/content/validate.mjs",
     "content:build": "node scripts/content/build.mjs",
+    "content:ingest": "node scripts/content/ingest.mjs",
     "content:normalize": "node scripts/content/normalize.mjs",
     "content:list": "node scripts/content/list.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",
@@ -43,6 +44,7 @@
     "test:boundary-ast": "node tests/boundary-ast.mjs",
     "gate:architecture": "node scripts/gate-architecture.mjs",
     "gate:todo": "node scripts/gate-todo.mjs",
+    "gate:content-contract": "node scripts/gate-content-contract.mjs",
     "audit:a11y": "node scripts/audit-a11y-viewports.mjs",
     "release:gate": "node scripts/verify-release-gate.mjs"
   },
