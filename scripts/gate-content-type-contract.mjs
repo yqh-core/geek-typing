@@ -25,18 +25,26 @@
  *                       Node 跑不了 TS，构建/入库/校验都得靠一份 JS 白名单；没有 H，
  *                       契约加类型后 `content:ingest` / `content:validate` 会静默不认新类型。
  *                       （P18-A 实测漂过一次：契约扩到 14 项时两处 Node 白名单都停在 12 项。）
+ *   H3 资产规则一致性 —— `scripts/content/asset-rules.mjs` 的 `parseAssetId` / `isAssetOwnedBy`
+ *                       必须与 `src/core/content/model/asset.ts` 的同名导出在**语料**上逐例一致。
+ *                       asset-rules.mjs 的注释里一直写着"一致性由判据 H3 在语料上证明"，但 H3
+ *                       此前**并不存在** —— 这是"注释承诺了机器上锁、实际没上锁"的悬空引用，
+ *                       本波（P18-B）兑现（同 H1/H2 手法：权威只有一处，一致性由机器证明）。
+ *                       语料带**手写字面真值**：判定 = TS == 真值 **且** .mjs == 真值
+ *                       （三条独立来源对齐 —— 不是"TS == mjs"两两互证，两边同错就永远测不出来）。
  *
  * 退出码（与本仓其它门同族）：
  *   0 = PASS；1 = FAIL；2 = 脚本自身错误（模块加载失败 / 关键声明解析不出 —— **绝不降级成 PASS**）
  *
  * 用法：
- *   npm run gate:content-type-contract              # 常规判据 A–G
+ *   npm run gate:content-type-contract              # 常规判据 A–H（含 H3）
  *   npm run gate:content-type-contract -- --falsify # 证伪自检（见下）
  *
  * 为什么自带 --falsify：**不会失败的门等于没有门**。
  *   常规模式只证明"当前代码通过"；--falsify 逐条植入故障、断言**恰好该判据判红**、
  *   再字节级还原并跑对照组复绿 —— 证明这些判据不是恒真的空转。
  *   断言用"命中集精确等于 {该判据}"而非"包含"：既证明它能判红，也证明它不越界误伤。
+ *   用例共 **8 条**：A/B/C/D/E/G/H 各一条 + H3 追加一条（把 asset-rules 的判断改坏）。
  *
  * 实现注记（本机环境，两条都踩过并已加固）：
  *   ① 本脚本**不 spawn 任何子进程**。本机 Node 预加载了 node-language-shim（safe-delete /
@@ -75,6 +83,8 @@ const F_ZH = 'src/i18n/zh.ts'
 const F_QUERY = 'src/core/content/query/content-query.ts'
 /** Node 侧（构建/入库/校验链路）的类型白名单唯一副本 */
 const F_LICENSE_POLICY = 'scripts/content/license-policy.mjs'
+/** Node 侧资产规则唯一实现（H3 比对：必须与 TS 侧 asset.ts 的 parseAssetId/isAssetOwnedBy 逐例一致） */
+const F_ASSET_RULES = 'scripts/content/asset-rules.mjs'
 /** 不得再自建白名单副本的脚本 */
 const F_VALIDATE = 'scripts/content/validate.mjs'
 
@@ -87,6 +97,44 @@ const abs = (rel) => join(ROOT, rel)
 const sha = (rel) => createHash('sha256').update(readFileSync(abs(rel))).digest('hex')
 const sorted = (a) => [...a].sort()
 const sameSet = (a, b) => a.length === b.length && sorted(a).every((x, i) => x === sorted(b)[i])
+
+/* ------------------------------------------------------------------ *
+ * H3 语料：**手写字面真值**（不是从任一侧代码推出来的）
+ *   判定口径：TS 结果 == 真值 **且** .mjs 结果 == 真值 —— 三条独立来源对齐。
+ *   若不写死真值、只断言 "TS == .mjs"，两侧同错（例如分隔符一起改错）就永远测不出来。
+ *   覆盖：合法若干 / 无 `#a:` / `#a:` 后为空 / 大写 `#A:` / 含两个 `#a:` /
+ *         host 段数不对 / host 段含非法字符 / 前后空白 / local 段含非法字符。
+ * ------------------------------------------------------------------ */
+const H3_HOST = 'content:vocabulary:ecdict-ielts:ielts'
+
+const ASSET_ID_CORPUS = [
+  // —— 合法 ——
+  { id: `${H3_HOST}#a:a-0007`, expect: { hostContentId: H3_HOST, assetLocalId: 'a-0007' }, why: '合法：<宿主 ContentId>#a:<local>' },
+  { id: 'content:topic:ielts:environment#a:diagram-1', expect: { hostContentId: 'content:topic:ielts:environment', assetLocalId: 'diagram-1' }, why: '合法：另一宿主类型' },
+  { id: `${H3_HOST}#a:A-0007`, expect: { hostContentId: H3_HOST, assetLocalId: 'A-0007' }, why: '合法：local 保留大小写（normalizeLocalId 不做 lowercase）' },
+  // —— 非法 ——
+  { id: H3_HOST, expect: null, why: '无 #a: 分隔符' },
+  { id: `${H3_HOST}#a:`, expect: null, why: '#a: 后为空（local 空 ⇒ isStableLocalId 为否）' },
+  { id: `${H3_HOST}#A:a-1`, expect: null, why: '大写 #A: 不是分隔符（indexOf 找不到）' },
+  { id: `${H3_HOST}#a:a#a:b`, expect: null, why: '含两个 #a:：第二个并进 local，local 含 : ⇒ 非法' },
+  { id: 'content:vocabulary:ielts#a:a-1', expect: null, why: 'host 段数不对（3 段，非合法 ContentId）' },
+  { id: 'content:vocabulary:ecdict_ietf:ielts#a:a-1', expect: null, why: 'host 段含非法字符（namespace 里的 _）' },
+  { id: 'content:Vocabulary:ns:local#a:a-1', expect: null, why: 'host 段含非法字符（类型段大写）' },
+  { id: ` ${H3_HOST}#a:a-1`, expect: null, why: '前置空白（host 首字符为空格 ⇒ ContentId 不匹配）' },
+  { id: `${H3_HOST}#a:a-1 `, expect: null, why: '后置空白（local 尾空格 ⇒ 非规范形态）' },
+  { id: `${H3_HOST}#a:a/b`, expect: null, why: 'local 段含非法字符（/）' },
+]
+
+const OWNERSHIP_CORPUS = [
+  { id: `${H3_HOST}#a:a-0007`, host: H3_HOST, expect: true, why: '同包 ⇒ true' },
+  { id: `${H3_HOST}#a:a-0007`, host: 'content:vocabulary:cet4:cet4', expect: false, why: '异包 ⇒ false' },
+  { id: 'not-an-asset-id', host: H3_HOST, expect: false, why: '非法 id ⇒ false（不抛异常）' },
+  { id: `${H3_HOST}#A:a-1`, host: H3_HOST, expect: false, why: '大写分隔符 ⇒ 解析为 null ⇒ false' },
+]
+
+/** 只比较 { hostContentId, assetLocalId } 两字段（忽略两侧可能的额外字段），null 原样比较 */
+const normParsed = (r) => (r === null || r === undefined ? null : { hostContentId: r.hostContentId, assetLocalId: r.assetLocalId })
+const sameParsed = (a, b) => (a === null || b === null ? a === b : a.hostContentId === b.hostContentId && a.assetLocalId === b.assetLocalId)
 
 /** 证伪模式下隔离被删除文件的落地目录（同盘、已被 git 忽略，不污染工作树） */
 const QUARANTINE_DIR = join(ROOT, 'node_modules', '.tmp', 'gate-falsify')
@@ -447,6 +495,50 @@ async function runChecks() {
         ok(`H2 ${F_VALIDATE} 未自建类型白名单副本（单一副本）`)
       }
     }
+
+    /* ---------- H3. 资产规则 TS ⟷ Node 双侧一致性（带独立字面真值） ---------- */
+    {
+      const assetMod = await load('/src/core/content/model/asset.ts')
+      if (typeof assetMod.parseAssetId !== 'function' || typeof assetMod.isAssetOwnedBy !== 'function') {
+        throw new Fatal('asset.ts 未导出 parseAssetId / isAssetOwnedBy（H3 无法判定 —— 解析失败绝不降级成 PASS）')
+      }
+      let rulesMod
+      try {
+        // 带内容哈希查询串：绕开 ESM 模块缓存，证伪模式里改了 asset-rules.mjs 才能真读到新内容
+        rulesMod = await import(`${pathToFileURL(abs(F_ASSET_RULES)).href}?v=${sha(F_ASSET_RULES)}`)
+      } catch (e) {
+        throw new Fatal(`无法加载 ${F_ASSET_RULES} — ${e.message}`)
+      }
+      if (typeof rulesMod.parseAssetId !== 'function' || typeof rulesMod.isAssetOwnedBy !== 'function') {
+        throw new Fatal(`${F_ASSET_RULES} 未导出 parseAssetId / isAssetOwnedBy`)
+      }
+
+      /** 每一处不一致都点名"是哪一侧、哪条语料、期望什么" —— 只看布尔结论定位不了漂移 */
+      const mism = []
+      for (const c of ASSET_ID_CORPUS) {
+        const ts = normParsed(assetMod.parseAssetId(c.id))
+        const js = normParsed(rulesMod.parseAssetId(c.id))
+        if (!sameParsed(ts, c.expect)) mism.push(`parseAssetId TS ${JSON.stringify(c.id)} → ${JSON.stringify(ts)}，真值 ${JSON.stringify(c.expect)}（${c.why}）`)
+        if (!sameParsed(js, c.expect)) mism.push(`parseAssetId .mjs ${JSON.stringify(c.id)} → ${JSON.stringify(js)}，真值 ${JSON.stringify(c.expect)}（${c.why}）`)
+      }
+      for (const c of OWNERSHIP_CORPUS) {
+        const ts = assetMod.isAssetOwnedBy(c.id, c.host)
+        const js = rulesMod.isAssetOwnedBy(c.id, c.host)
+        if (ts !== c.expect) mism.push(`isAssetOwnedBy TS (${JSON.stringify(c.id)}, ${JSON.stringify(c.host)}) → ${ts}，真值 ${c.expect}（${c.why}）`)
+        if (js !== c.expect) mism.push(`isAssetOwnedBy .mjs (${JSON.stringify(c.id)}, ${JSON.stringify(c.host)}) → ${js}，真值 ${c.expect}（${c.why}）`)
+      }
+
+      if (mism.length === 0) {
+        ok(
+          `H3 资产规则 TS⟷Node 双侧一致（parseAssetId ${ASSET_ID_CORPUS.length} 例 + isAssetOwnedBy ${OWNERSHIP_CORPUS.length} 例；` +
+            '三条独立来源对齐：TS == 字面真值 == .mjs）',
+        )
+      } else {
+        fail('H', `H3 资产规则 TS/Node 与字面真值不一致 ${mism.length} 处：`)
+        for (const m of mism.slice(0, 8)) errors.push(`      ${m}`)
+        if (mism.length > 8) errors.push(`      …另有 ${mism.length - 8} 处`)
+      }
+    }
   } finally {
     await server.close()
   }
@@ -530,6 +622,16 @@ const CASES = [
     file: F_LICENSE_POLICY,
     from: "  'course', 'lesson',\n])",
     to: "  'course',\n])",
+  },
+  {
+    letter: 'H',
+    expect: ['H'],
+    why: '改坏 asset-rules 的分隔符只被 H3 看见 —— H1（license-policy）/H2（validate.mjs）都不读 asset-rules，故不连带判红',
+    name: "把 asset-rules.mjs 的 ASSET_SEPARATOR '#a:' 改成 '#a'（Node 侧 parseAssetId 与 TS 侧漂移 ⇒ H3 判红）",
+    kind: 'edit',
+    file: F_ASSET_RULES,
+    from: "export const ASSET_SEPARATOR = '#a:'",
+    to: "export const ASSET_SEPARATOR = '#a'",
   },
 ]
 

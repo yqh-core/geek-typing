@@ -51,6 +51,8 @@
     "gate:content-contract": "node scripts/gate-content-contract.mjs",
     "gate:content-type-contract": "node scripts/gate-content-type-contract.mjs",
     "gate:content-type-contract:falsify": "node scripts/gate-content-type-contract.mjs --falsify",
+    "gate:license": "node scripts/gate-license.mjs",
+    "gate:license:falsify": "node scripts/gate-license.mjs --falsify",
     "audit:a11y": "node scripts/audit-a11y-viewports.mjs",
     "release:gate": "node scripts/verify-release-gate.mjs"
   },

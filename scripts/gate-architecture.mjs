@@ -57,6 +57,7 @@ const FUTURE_GATES = [
   { id: 'content-contract', label: 'content-contract', script: 'scripts/gate-content-contract.mjs', wave: 'Wave 4', note: 'Content 必须经 registry 注册' },
   { id: 'content-type-contract', label: 'content-type-contract', script: 'scripts/gate-content-type-contract.mjs', wave: 'P1.8-A', note: '类型契约唯一 / 禁 per-type 散落 / 注册表⟷查询层对账（INV-6）' },
   { id: 'perf', label: 'perf', script: 'scripts/gate-perf.mjs', wave: 'Wave 5', note: '新依赖必须过 bundle budget' },
+  { id: 'license', label: 'license', script: 'scripts/gate-license.mjs', wave: 'P1.8-B', note: '资产/许可入库前置硬门（INV-5）' },
 ]
 
 function tail(text, n = TAIL_LINES) {
