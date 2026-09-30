@@ -39,6 +39,10 @@ const ALLOWLIST = new Set([
   'src/hooks/useBank.ts',
   'src/hooks/useReviewFlow.ts',
   'src/hooks/useTypingRound.ts',
+  // P18-D：修正「带 g 正则复用 lastIndex」的假阴性后**暴露**的既有消费点 —— 不是新增依赖。
+  // 该文件值导入的是 `DEFAULT_BANK_ID`：它只是**默认词库 id 常量**，既不读词表也不遍历词条，
+  // 与 useBank.ts 的词表读取路径无关。修正前本门报 11（漏检此文件）属**假绿**，真值为 12。
+  'src/hooks/useSettings.ts',
 ])
 
 let pass = 0
@@ -66,13 +70,17 @@ function walk(dir, out = []) {
 const files = walk(SRC)
 const rel = (p) => relative(ROOT, p).replaceAll('\\', '/')
 
-// 匹配 `from '...wordBanks'` / `from "..wordBanks"`（路径可含 ../ 与子目录）
-const IMPORT_RE = /from\s+['"][^'"]*wordBanks['"]/g
+// 匹配 `from '...wordBanks'` / `from "..wordBanks"`（路径可含 ../ 与子目录）。
+// ⚠️ P18-D 修复：原实现把**带 `g` 标志**的正则放在循环外复用，`.test()` 会保留 `lastIndex`，
+//    逐文件循环时状态跨文件残留 ⇒ **假阴性**（实测漏检 `src/hooks/useSettings.ts`：本门报 11，真值 12）。
+//    现在每文件重建正则（`new RegExp(source)`）：即便日后有人把 `g` 加回，也不会再跨文件泄漏状态。
+//    语义**未变**：仍只认「模块说明符以 wordBanks 结尾的 import」，每个文件至多计 1 次。
+const IMPORT_RE_SOURCE = /from\s+['"][^'"]*wordBanks['"]/.source
 
 const importers = []
 for (const f of files) {
   const text = readFileSync(f, 'utf8')
-  if (IMPORT_RE.test(text)) importers.push(rel(f))
+  if (new RegExp(IMPORT_RE_SOURCE).test(text)) importers.push(rel(f))
 }
 
 console.log('== P1.6-A03 · 禁止新增 Legacy WordBank 依赖 ==')
