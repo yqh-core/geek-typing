@@ -97,6 +97,11 @@ export interface ContentPackageRef {
 /** 多来源溯源（V4.1 升级：单一内容可能由 ECDICT + GitHub 数据集 + 自整理共同构成） */
 export interface ContentSource {
   origin: string
+  /** 来源方标识（P1.7-Wave4 B-4）：自有内容恒为 'geek-typing original'（见 provenance.ts）；
+   *  「免 SPDX」的判定依据 = 本字段，不再耦合 origin 字符串措辞 */
+  provider?: string
+  /** 来源仓库地址（外部来源填写，如 ECDICT 的 GitHub 仓库） */
+  repository?: string
   /** 结构化许可证（V4.1 升级：SPDX + 归属要求，替代单字符串） */
   license: ContentLicense
   importedAt?: string

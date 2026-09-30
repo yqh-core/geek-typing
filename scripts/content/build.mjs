@@ -48,6 +48,23 @@ const SOURCE = {
 }
 const namespaceOf = (id) => `${SOURCE[id] ?? 'curated'}-${id}`
 
+/** 来源方 → provider（P1.7-Wave4 B-4 溯源字段）：写入 manifest.sources[].provider。
+ *
+ *  ⚠️ 'geek-typing original' 是自有内容哨兵值，与 src/core/content/provenance.ts 的
+ *  PROVIDER_ORIGINAL 常量同源 —— 校验脚本（Node，无法 import TS）按该字面量判定
+ *  「自有内容免 SPDX」，两处必须同步修改。
+ *  ⚠️ 补 provider/repository 不参与 words 派生 checksum（checksum 只由 words.json 决定），
+ *  故 contentChecksum / contentVersion / ContentId 均不变 —— 只是溯源信息更完整。
+ *  ECDICT 仓库地址来自 docs/audit-package/08-exam/CET.md 的数据源记载，非臆测。 */
+const PROVIDER_ORIGINAL = 'geek-typing original'
+const PROVIDER = {
+  'ai-core': PROVIDER_ORIGINAL, 'cloud-native': PROVIDER_ORIGINAL, frontend: PROVIDER_ORIGINAL,
+  'ts-code': PROVIDER_ORIGINAL, 'go-code': PROVIDER_ORIGINAL,
+  ielts: 'ecdict', kaoyan: 'ecdict', toefl: 'ecdict', cet4: 'ecdict', cet6: 'ecdict',
+}
+/** 外部来源方 → 仓库地址；自有内容省略 */
+const PROVIDER_REPOSITORY = { ecdict: 'https://github.com/skywind3000/ECDICT' }
+
 /** manifest 结构版本（**不是内容版本**）。
  *  常量 SCHEMA_VERSION = 4 对应 V4.1-P0.5（schemaVersion/contentVersion 入 manifest）。
  *  仅当 manifest 结构发生破坏性变更（字段增删/语义变化，旧 reader 读不懂）才递增；
@@ -100,7 +117,14 @@ async function main() {
 
     /** 统一 checksum：内容指纹 = sha256(规范化序列化)，与文件排版无关（见文件头 ⑤(a)）。 */
     const checksum = sha256Canonical(words)
-    const sources = migrateSources(m, id).map((s) => ({ ...s, checksum }))
+    const provider = PROVIDER[id] ?? 'unknown'
+    const repository = PROVIDER_REPOSITORY[provider]
+    const sources = migrateSources(m, id).map((s) => ({
+      ...s,
+      checksum,
+      provider,
+      ...(repository ? { repository } : {}),
+    }))
 
     /* ── 版本三元组 ─────────────────────────────────────────────────────────
      * contentRevision —— 单调递增审计号：「这个包被构建过多少次」，回滚也不回头。

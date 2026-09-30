@@ -192,9 +192,15 @@ async function main() {
       if (!lic || typeof lic !== 'object') { fail(`source(${s.origin}) license 非结构化对象（需 {spdx,name,attributionRequired}）`); licenseOk = false; continue }
       if (!lic.name) { fail(`source(${s.origin}) license.name 缺失`); licenseOk = false }
       if (typeof lic.attributionRequired !== 'boolean') { fail(`source(${s.origin}) license.attributionRequired 必须为布尔`); licenseOk = false }
-      // 自维护内容无 SPDX 属正常；外部来源（含 ECDICT/GitHub 等）必须有 SPDX
-      if (!lic.spdx && !String(s.origin).includes('curated')) {
-        fail(`外部来源 ${s.origin} 缺 license.spdx（未知协议内容不得入库）`)
+      // 自维护内容无 SPDX 属正常；外部来源（含 ECDICT/GitHub 等）必须有 SPDX。
+      // P1.7-Wave4 B-4：判定依据从「origin 含 'curated'」的字符串巧合升级为语义字段
+      // provider === 'geek-typing original'（哨兵值见 src/core/content/provenance.ts，
+      // 本脚本是 Node 无法 import TS，按字面量镜像，两处同步修改）。
+      // provider 缺失时回退旧 origin 规则 —— 兼容未补 provider 的历史 manifest，不是放宽。
+      const isSelf = s.provider === 'geek-typing original'
+        || (s.provider === undefined && String(s.origin).includes('curated'))
+      if (!lic.spdx && !isSelf) {
+        fail(`外部来源 ${s.origin}（provider=${s.provider ?? '缺失'}）缺 license.spdx（未知协议内容不得入库）`)
         licenseOk = false
       }
     }
