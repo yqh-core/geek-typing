@@ -703,11 +703,18 @@ console.log('\n【15】P18-E reading 放开（启用集 / 包路由 / 索引 / �
     (await cq.count({ type: 'reading', hasPhonetic: true })) === readingItems,
   )
 
-  // ④ sort:'word' 的中性语义（词形排序是 word 族专属）：非 word 族退回 rank 主序，顺序不变
-  const readingSorted = await cq.list({ type: 'reading', pageSize: 100000, sort: 'word' })
+  // ④ sort:'word' 的中性语义（词形排序是 word 族专属）：非 word 族退回 rank 主序。
+  //    ⚠️ 这里**必须**用 order:'desc' 才可证伪（P18-E 复核实测结论）：
+  //      - 非 word 条目 rank 恒 0 ⇒ 主序恒等，`flip` 乘在 0 上没有任何效果；
+  //      - tie-break 按 sortRows 契约**恒升序且不受 order 影响**。
+  //      ⇒ `sort:'word'`（asc）与默认排序**必然**逐 id 相同。即便实现有 bug、真的按 title
+  //        给非 word 族排主序，asc 下顺序也不变 ⇒ 旧写法是**恒真断言**（不会失败的断言 = 没有断言）。
+  //      desc 把差异放大：非 word 族若真参与词形主序，`flip` 会把顺序整体反转 ⇒ 判红。
+  const readingSortedDesc = await cq.list({ type: 'reading', pageSize: 100000, sort: { field: 'word', order: 'desc' } })
   ok(
-    "list({type:'reading', sort:'word'}) == list({type:'reading'})（词形主序对非 word 族中性）",
-    readingIdOf(readingSorted) === readingIdOf(readingList),
+    "list({type:'reading', sort:{field:'word',order:'desc'}}) == list({type:'reading'})（词形主序对非 word 族中性）",
+    readingIdOf(readingSortedDesc) === readingIdOf(readingList),
+    `desc=${readingSortedDesc.map((h) => h.itemId).join(',')} / 默认=${readingList.map((h) => h.itemId).join(',')}`,
   )
 
   // ⑤ 跨族不外溢（最重要的一条）：显式指定异族包也必须被滤掉
