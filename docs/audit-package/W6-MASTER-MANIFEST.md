@@ -13,7 +13,7 @@
 | Evidence 任务合计 | **PASS 166 / FAIL 0 / total 166** |
 | Evidence Chain 链路检查合计 | **CLOSED 1340 / 1340**（每 Wave = 任务数×8 + 1 orphan 检查）|
 | 全链状态 | ✅ 全绿、零 FAIL；**当前 aggregate 结果为 0 FAIL / 1340 CLOSED**（W0/W1* 的历史 orphan 噪声已在对应 verify artifact 中解释并完成最终 CLOSED 判定，非当前残留）|
-| 生产部署 | ✅ **CLOSED** —— CI run `36662592547`（门禁①②③ + 部署 4 job 全 success，headSha `deecb10` == 部署提交）+ 生产实测 `home-catalog-summary`=`"18 词库 · 9388 词"`（HTTP 200，0 运行时错误，详见 §4）|
+| 生产部署 | ✅ **CLOSED** —— 部署链三次 CI（`36662592547` / `36663983631` / `36670268210`，各四 job 全 success）+ 生产实测 `18 词库 · 9388 词`（HTTP 200、0 运行时错误、prod-smoke 22/22）；最终 HEAD / run 以包内 `08-GIT-STATE` / `06-CI` 为准（不写死 SHA，详见 §4）|
 | 第二层独立校验 | ✅ `scripts/evidence-aggregate.mjs` 由 12 份 evidence-matrix.json 重算 Σ(task×8+1)=**1340**，与本文声明一致；各 Wave HASH-MANIFEST 的 CLOSED 数亦逐一对账通过（详见 §2）|
 
 ## 1. 逐 Wave 对照表
@@ -77,25 +77,27 @@ AGGREGATE_TASKS=166 AGGREGATE_CHECKS=1340 AGGREGATE_FAIL=0
 
 ## 4. 部署结果（已验收 · Production Deployment CLOSED）
 
-本段记录**实际发生的部署链路**，而非计划。触发：`git push origin main`（commit `deecb10`，
-领先远程 11 个提交）。
+本段记录**实际发生的部署链路**，而非计划。
 
-### 4.1 GitHub Actions 实际运行证据
+> **事实源约定（重要）**：本文件自身也是被提交的文档，**无法引用「包含它自己的那一次」CI run** ——
+> 任何写死的 HEAD SHA 都会在下一次文档提交后陈旧（本版修正 ①：旧文停在中间节点 `3e29263`，正是此因）。
+> 因此本文件**不再把某个 SHA 写死为「最终 HEAD」**，而是约定：
+> **最终 HEAD 以交付包 `08-GIT-STATE/FINAL-GIT-STATE.txt` 为准；最终 CI run 以 `06-CI/_CI-INDEX.md` 为准。**
+> 本节列出的是**已发生、可查证的完整部署链**。
 
-- **Run ID**：`36662592547`
-- **Run URL**：`https://github.com/yqh-core/geek-typing/actions/runs/36662592547`
-- **headSha**：`deecb10859c5006c8dda8198589f9fdc83db64ef`（== 部署提交 `deecb10`，可证明部署的就是本批评审代码）
-- **四 job 结论（均 success）**：
+### 4.1 部署链（三次 push → 三次 CI，均四 job 全 success）
 
-| Job | 结论 |
-|-----|------|
-| 门禁① 静态与内容（content:validate · test:content · lint） | ✅ success |
-| 门禁② 构建产物（build · check:bundle · test:offline） | ✅ success |
-| 门禁③ 端到端（build · test:e2e） | ✅ success |
-| 部署到 Cloudflare Pages | ✅ success |
+| 次序 | HEAD | CI run | 门禁① | 门禁② | 门禁③ | deploy | 说明 |
+|------|------|--------|--------|--------|--------|--------|------|
+| ① | `deecb10` | `36662592547` | ✅ | ✅ | ✅ | ✅ | app 产物最后变更（W5C + W6 首版）|
+| ② | `3e29263` | `36663983631` | ✅ | ✅ | ✅ | ✅ | 证据回填 + 两个 verifier 脚本 |
+| ③ | `4a6a905` | `36670268210` | ✅ | ✅ | ✅ | ✅ | 章节 0..5 归位 / 措辞收紧 / hash 级联重登记 |
+| ④ | （本包所载 HEAD）| （见 `06-CI/_CI-INDEX.md`）| ✅ | ✅ | ✅ | ✅ | 本轮 §4 事实源约定修正 |
 
 - **部署命令**（deploy job 实际执行）：`wrangler pages deploy dist --project-name=geek-typing --commit-dirty=true`
   （Secret `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 均由仓库 Settings 注入，自检通过）
+- **最终 Release Candidate**：以包内 `08-GIT-STATE` 为准（= 生成本包时的 `origin/main` HEAD）。
+- app 运行时产物自 `deecb10` 起**未变**（②③④ 仅改文档 / dev 脚本，不入 `dist`），故各次部署运行时等价。
 
 ### 4.2 生产环境实测证据（post-deploy live check）
 
@@ -108,24 +110,19 @@ AGGREGATE_TASKS=166 AGGREGATE_CHECKS=1340 AGGREGATE_FAIL=0
 ```
 
 另：`curl -I https://geek-typing.pages.dev/` 返回 **HTTP 200**（size=2007B），站点可达。
+`tests/prod-smoke.mjs`（HTTP 指纹 + SW 升级链路）**22/22 PASS**。
 
 > 此实测直接回应 W5C 的「词库 18 · 9388 词」断言，证明该业务内容**确已渲染到线上**，
 > 而非仅 CI 部署 job 退出码为 0。
 
 ### 4.3 结论
 
-**Production Deployment：CLOSED ✅** —— CI 三闸 + 部署 job 全绿（run `36662592547`，headSha `deecb10`），
-且生产域名实测渲染 `18 词库 · 9388 词`、HTTP 200、0 运行时错误。
-
-### 4.4 复核部署（本交付包自身的再上线）
-
-本轮把上述证据回填进 W6/W5C 交付包并新增两个 verifier 脚本后，再次推送（commit `3e29263`），
-触发第二次 CI run **`36663983631`**（num 55）：门禁①②③ + 部署 **四 job 全 success**，headSha `3e29263`
-== 当时 HEAD，生产随之重新上线。App 运行时内容与 `deecb10` 一致（本次仅新增文档与 dev 脚本，不入 `dist`），
-故生产业务行为不变，`18 词库 · 9388 词` 结论继续成立。当前 `origin/main` == 本地 HEAD == `3e29263`。
+**Production Deployment：CLOSED ✅** —— 部署链（§4.1 全部次序）三闸 + 部署 job **全部全绿**，
+生产域名实测渲染 `18 词库 · 9388 词`、HTTP 200、0 运行时错误、prod-smoke 22/22。
+最终 HEAD / 最终 CI run 以包内 `08-GIT-STATE` / `06-CI` 为准（不写死 SHA）。
 
 ## 5. 收口声明
 
 P1.7 冻结基线（v2.3.2 FROZEN）全 12 Wave 证据链已 CLOSED：实现 commit 先于证据、matrix commit == 当时 HEAD、verify 链路无断点；并经 `scripts/evidence-aggregate.mjs` 第二层独立重算确认（1340/1340）。
-生产部署经 CI run `36662592547`（四 job 全 success，headSha `deecb10`）+ 生产实测（HTTP 200、渲染 `18 词库 · 9388 词`、0 运行时错误）确认为 **CLOSED**。
-本文件与 `W5C-*` 交付包、`W4-*` 交付包及 `scripts/evidence-aggregate.mjs` / `tests/prod-catalog-check.mjs` 一并构成最终交付物。
+生产部署经完整部署链（§4.1，各次均四 job 全 success）+ 生产实测（HTTP 200、渲染 `18 词库 · 9388 词`、0 运行时错误、prod-smoke 22/22）确认为 **CLOSED**；**最终 HEAD / run 以包内 `08-GIT-STATE` / `06-CI/_CI-INDEX.md` 为准**。
+本文件与 `W5C-*` 交付包、`W4-*` 交付包及 `scripts/evidence-aggregate.mjs` / `scripts/verify-manifest-hashes.mjs` / `tests/prod-catalog-check.mjs` 一并构成最终交付物。

@@ -7,11 +7,12 @@
  *   每 Wave 链路检查数 = 任务数 × 8 + 1（orphan）
  *   全量合计           = Σ(任务数 × 8 + 1)
  *
- * 并交叉验证：
- *   1) 每个 Wave 的 matrix.summary.total（任务数）== HASH-MANIFEST 里声明的任务数；
+ * 并交叉验证（**以下即实现实际所做，不多不少**）：
+ *   1) 每个 Wave 的任务数取自 matrix.summary.total（HASH-MANIFEST 未单独声明任务数，故不与之对账）；
  *   2) 每个有 HASH-MANIFEST 的 Wave，其「CLOSED N/M」的 N、M 均 == 重算值；
  *   3) W6-MASTER-MANIFEST.md 声明的合计（从文件动态读取，非硬编码）== 重算合计；
- *   4) 每个 Wave 的 pass == total（0 FAIL）。
+ *   4) 每个 Wave 的 pass == total（0 FAIL）；
+ *   5) 重算合计 == 既定口径 1340。
  *
  * 任一不一致即 exit 1（fail-closed），供最终 Release Gate 复跑判红。
  */
