@@ -9,15 +9,28 @@
  *  - 自有内容哨兵值 'geek-typing original' 与 src/core/content/provenance.ts 的
  *    PROVIDER_ORIGINAL 常量同源（两处须同步修改）。
  *
- * License Policy Matrix（版本化 license-policy-1，由 ingest 程序输出，禁止手填）：
- *  MIT / Apache*            → allowed
- *  CC-BY-*（非 SA/NC）      → allowed+attribution
- *  CC-BY-SA* / GPL*        → review_required
- *  CC-BY-NC*               → rejected
- *  NOASSERTION             → review_required
- *  其它显式 SPDX（矩阵外）   → rejected（unknown）
- *  外部来源无 SPDX（缺失）   → rejected（unknown，无 license 判红）
- *  自有内容（provider 哨兵） → allowed（license 自主）
+ * License Policy Matrix（版本化 license-policy-1，由 ingest 程序输出，禁止手填）。
+ * **判定优先级自上而下，首条命中即返回** —— 顺序本身就是契约的一部分，改顺序 = 改语义：
+ *
+ *  [0] 公开分发声明（冻结 Plan §4.1 门禁规则 `:157` / `:158`）—— **对自有内容同样适用**：
+ *      · `license.commercialUse !== true`（**字段缺失也算「不 true」**）             → rejected（§4.1 :157）
+ *      · `license.attributionRequired === true` 且 `license.attribution` 为空/仅空白 → rejected（§4.1 :158）
+ *      为什么排在自有哨兵**之前**：自有内容的「license 自主」只意味着**不强制要求 SPDX**；
+ *      而这两条是「公开分发声明」（能不能再分发 / 必须署名），属**分发**层面的事实，
+ *      与内容是否自家整理无关 —— 故对自有内容**同样生效**，不能被哨兵短路掉。
+ *      边界：结构化 `license` 对象整体缺失时本段跳过（无法评估），交给 [2]（外部 ⇒ rejected）
+ *      或 [1]（自有 ⇒ allowed）按既有口径处置。
+ *  [1] 自有内容（provider 哨兵 PROVIDER_ORIGINAL） → allowed（license 自主：不强制要求 SPDX）
+ *  [2] 结构化 license 缺失                        → rejected（无 license ⇒ 判红）
+ *  [3] MIT / Apache*                              → allowed
+ *  [4] CC-BY-*（非 SA/NC）                        → allowed+attribution
+ *  [5] CC-BY-SA* / GPL*                           → review_required
+ *  [6] CC-BY-NC*                                  → rejected
+ *  [7] NOASSERTION                                → review_required
+ *  [8] 其它显式 SPDX（矩阵外） / 外部来源无 SPDX    → rejected（unknown）
+ *
+ * 本矩阵是**唯一实现**：`asset-rules.mjs` / `gate-license.mjs` / `validate.mjs` 只调用不复制。
+ *  §4.1 全表的「判据 ↔ 证伪用例」绑定见 `scripts/gate-license.mjs` 的 `PLAN_4_1_COVERAGE`。
  */
 import { readdir, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
@@ -94,17 +107,36 @@ export async function loadPackages() {
 export function decideLicense(source) {
   const provider = source?.provider
   const lic = source?.license
+  const structured = lic !== null && typeof lic === 'object' && !Array.isArray(lic)
 
-  // 自有内容：license 自主，恒 allowed（不依赖 SPDX 措辞）
+  // [0] 公开分发声明（冻结 Plan §4.1 :157 / :158）—— 对自有内容同样适用，故排在自由哨兵之前。
+  //     「自有内容 license 自主」只豁免 SPDX；能否再分发 / 是否必须署名是分发层面的事实。
+  if (structured) {
+    if (lic.commercialUse !== true) {
+      return {
+        decision: 'rejected',
+        reason: `license.commercialUse=${JSON.stringify(lic.commercialUse)} !== true（缺失也算不 true，不可假定允许商用）⇒ rejected（冻结 Plan §4.1 :157）`,
+      }
+    }
+    if (lic.attributionRequired === true && String(lic.attribution ?? '').trim() === '') {
+      return {
+        decision: 'rejected',
+        reason: 'license.attributionRequired === true 但 license.attribution 为空/仅空白（无署名文本 ⇒ 无法满足署名义务）⇒ rejected（冻结 Plan §4.1 :158）',
+      }
+    }
+  }
+
+  // [1] 自有内容：license 自主，恒 allowed（不依赖 SPDX 措辞）
   if (provider === PROVIDER_ORIGINAL) {
     return { decision: 'allowed', reason: `provider=${PROVIDER_ORIGINAL} ⇒ 自有内容，license 自主` }
   }
 
-  // 结构化 license 缺失 → 无 license（判红）
-  if (!lic || typeof lic !== 'object' || !lic.name) {
+  // [2] 结构化 license 缺失 → 无 license（判红）
+  if (!structured || !lic.name) {
     return { decision: 'rejected', reason: 'source 无结构化 license（无 license ⇒ 判红）' }
   }
 
+  // [3]–[8] SPDX 矩阵
   const spdx = String(lic.spdx ?? '').trim()
   if (!spdx) {
     // 外部来源无 SPDX：未知协议，rejected

@@ -120,6 +120,8 @@ export interface ContentLicense {
   url?: string
   /** 是否要求署名展示（CC BY 等） */
   attributionRequired: boolean
+  /** 署名文本（attributionRequired === true 时必填；运行时用于展示版权声明） */
+  attribution?: string
   /** 是否允许商业使用；未知为 undefined（不可假定允许） */
   commercialUse?: boolean
 }

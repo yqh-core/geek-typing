@@ -21,6 +21,10 @@
  *   2. 每条 `sources[]` 必须带**结构化 license**（`{name,…}`），且 `decideLicense` 判定**不是**
  *      `rejected` / `review_required`（review_required 在无人值守门里与 rejected 同为 FAIL，
  *      只是 code 分开以便人工分诊 —— 见 asset-rules.mjs 的 checkLicenseDecision 取舍说明）
+ *   2b. 每条 `sources[]` 的 `origin` / `provider` 必须为**非空字符串**（冻结 Plan §4.1 `:159`）
+ *   2c. 每条 `sources[]` 的 `checksum` 必须存在，且**等于载荷实体的完整 SHA-256**
+ *      （冻结 Plan §4.1 `:160`；用 `license-policy.mjs` 的 `checksumPayload`，与 `content:validate`
+ *       判据 6 共用同一个 helper —— 不许出现第三份哈希实现）
  *   3. 包级 `licenses` 表（若存在）逐条判定（同 2 的口径）
  *   4. 每个 asset 走 `checkManifestAssets` 的**全规则**（assetId 语法/归属 · checksum 形状 ·
  *      url 必须 https · 许可二选一与 licenseRef 解析 · provenance）
@@ -28,10 +32,21 @@
  *   fail-closed 附加（不留静默空洞）：未知内容类型目录 / `sources` 缺失或为空 —— 一律判红，
  *   因为"这个目录/包没被许可门覆盖"本身就意味着有内容可能绕过硬门入库。
  *
+ * §4.1 覆盖矩阵对账（本波核心 —— 把"靠注释"变成"靠机器"）：
+ *   `P1.8-PLAN` §5 总表声明本门判据 = 「§4.1 全表」。但 §4.1 是 **7 行**规则，其中
+ *   `:157` `commercialUse !== true` 与 `:158` `attributionRequired === true 但无署名文本`
+ *   两条此前**只写在合同文档的"口径说明"里**、无任何机器判据 —— 正是评审禁止的「靠注释」。
+ *   现在本门在**每次普通运行**里解析 `P1.8-PLAN-v1.0-FROZEN.md` §4.1 的 Markdown 表格，
+ *   逐行与 `PLAN_4_1_COVERAGE` 对账（Plan 有而矩阵无 / 矩阵有而 Plan 无 / owner·check·falsify
+ *   为空 / 证伪用例 id 不存在 ⇒ 判红），并**打印整张矩阵**。以后谁往 §4.1 加一行却不写门，
+ *   或删掉某条判据的证伪用例，**这道门立刻判红** —— 覆盖不全不可能再悄悄发生。
+ *   Plan 读不到 / 标题或表格解析不出来 ⇒ **Fatal EXIT=2**，绝不降级成 PASS。
+ *
  * 退出码（与本仓其它门同族，三分且严格）：
  *   0 = PASS（无任何违规）
  *   1 = FAIL（存在违规）
- *   2 = Fatal（manifest 读不到 / JSON 坏 / 规则模块加载失败 / 未知 flag）—— **解析失败绝不降级成 PASS**
+ *   2 = Fatal（manifest 读不到 / JSON 坏 / **冻结 Plan 读不到或 §4.1 解析失败** /
+ *       规则模块加载失败 / 未知 flag）—— **解析失败绝不降级成 PASS**
  *
  * 用法：
  *   npm run gate:license                     # 默认 --root=content/
@@ -42,6 +57,9 @@
  *   常规模式只证明"当前 content/ 通过"；--falsify 逐条植入故障、断言**命中集精确等于**预期
  *   （不是"包含"）、再字节还原并跑对照组复绿 —— 既证明它能判红，也证明它不越界误伤。
  *   隔离副本 = `node_modules/.tmp/gate-license-falsify/`（已被 gitignore），**绝不动真 content/**。
+ *   例外：证明「§4.1 覆盖矩阵对账是活的」那一条（M1）必须改**真 Plan** 的表格（否则对账读不到
+ *   被加的行）—— 但它不在 INV-1 冻结区（冻结区是 `docs/audit-package/**`），且改完立刻按
+ *   sha256 **字节级还原**，运行后 `git diff -- docs/p18/P1.8-PLAN-v1.0-FROZEN.md` 必须为空。
  *
  * 实现注记：本脚本**不 spawn 任何子进程**（本机 Node 预加载 safe-delete / brokered-fs shim，
  *   从 node 进程内 spawn 一律 EBUSY）；因此证伪也在**进程内**直接调用 runChecks()，
@@ -52,7 +70,7 @@ import { readdirSync, readFileSync, writeFileSync, mkdirSync, cpSync } from 'nod
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
-import { CONTENT_TYPES } from './content/license-policy.mjs'
+import { CONTENT_TYPES, checksumPayload, payloadNameOf } from './content/license-policy.mjs'
 import {
   checkManifestAssets,
   checkPackageAssetDeclarations,
@@ -67,6 +85,114 @@ class Fatal extends Error {}
 const sorted = (a) => [...a].sort()
 const sha = (file) => createHash('sha256').update(readFileSync(file)).digest('hex')
 const clone = (o) => structuredClone(o)
+
+/* ------------------------------------------------------------------ *
+ * §4.1 覆盖矩阵 + 与冻结 Plan 逐行对账（本波核心）
+ *   冻结 Plan `docs/p18/P1.8-PLAN-v1.0-FROZEN.md` §5 总表声明 `gate:license` 的判据
+ *   是「§4.1 全表」，但 §4.1 有 7 行规则 —— 只靠注释宣称"全覆盖"是**不可机检的承诺**。
+ *   这里把「每一行 ← 由哪个判据实现 ← 由哪条证伪用例证明它可失败」写成一张表，
+ *   再**每次运行**解析 Plan §4.1 表格逐行对账：少了行 / 多了行 / 证伪用例不存在 ⇒ 判红。
+ * ------------------------------------------------------------------ */
+
+/** 冻结 Plan（只读；**不在 INV-1 冻结区**内 —— 冻结区是 docs/audit-package/**） */
+const PLAN_FILE = join(ROOT, 'docs', 'p18', 'P1.8-PLAN-v1.0-FROZEN.md')
+const PLAN_41_HEADING_RE = /^###\s+4\.1\s+门禁规则\s*$/
+
+/**
+ * `PLAN_4_1_COVERAGE` —— §4.1 每一行 ↔ 实现它的判据 ↔ 证明它能判红的证伪用例 id。
+ * `key` **必须与 Plan §4.1 表格第一列规范化后的文本逐字相等**（去反引号 → 折叠连续空白 → 去首尾空白）；
+ * 对账失败会点名差异行，所以任何一侧改了文本，门会立刻告诉我们。
+ */
+const PLAN_4_1_COVERAGE = [
+  { key: 'license.spdx 未知 / 缺失', owner: 'gate:license', check: 'license-policy:decideLicense', falsify: 'S2' },
+  { key: 'spdx 非商用（如 CC-BY-NC）', owner: 'gate:license', check: 'license-policy:decideLicense', falsify: 'S3' },
+  { key: 'commercialUse !== true（面向公开分发的内容）', owner: 'gate:license', check: 'license-policy:decideLicense', falsify: 'S5' },
+  { key: 'attributionRequired === true 但无署名文本', owner: 'gate:license', check: 'license-policy:decideLicense', falsify: 'S6' },
+  { key: 'provenance.origin/provider 缺失', owner: 'gate:license', check: 'gate-license:sourceProvenance', falsify: 'S7' },
+  { key: 'checksum 缺失或与实体不符', owner: 'gate:license', check: 'gate-license:sourceChecksum', falsify: 'S8' },
+  { key: 'Asset 缺 license 且无有效 licenseRef', owner: 'gate:license', check: 'asset-rules:checkAssetLicense', falsify: 'A1' },
+]
+
+/** §4.1 规则文本规范化：去反引号 → 连续空白折叠为单空格 → 去首尾空白 */
+const normalizeRuleText = (s) => s.replace(/`/g, '').replace(/[\s\u00A0]+/g, ' ').trim()
+
+/**
+ * 解析冻结 Plan §4.1 表格的**第一列**（规则文本，已规范化）。
+ * 读不到 / 找不到 §4.1 标题 / 表格分隔行缺失 / 零行规则 ⇒ **Fatal**（解析失败绝不降级成 PASS）。
+ */
+function plan41Rules() {
+  let src
+  try {
+    src = readFileSync(PLAN_FILE, 'utf8')
+  } catch (e) {
+    throw new Fatal(`冻结 Plan 读不到（${PLAN_FILE}）— ${e.message}；§4.1 对账无法进行，绝不降级成 PASS`)
+  }
+  const lines = src.split(/\r?\n/)
+  const start = lines.findIndex((l) => PLAN_41_HEADING_RE.test(l.trim()))
+  if (start < 0) throw new Fatal(`Plan 中找不到 §4.1 标题「### 4.1 门禁规则」—— 表格结构被改动，对账无法进行`)
+
+  const rules = []
+  let sepSeen = false
+  for (let i = start + 1; i < lines.length; i++) {
+    const trimmed = lines[i].trim()
+    if (/^#{2,3}\s/.test(trimmed)) break // 下一个 ## / ### 标题 ⇒ 表格结束
+    if (!trimmed.startsWith('|')) continue
+    const cells = trimmed.split('|').slice(1, -1).map((c) => c.trim())
+    if (cells.length < 2) continue
+    if (cells.every((c) => /^:?-{2,}:?$/.test(c))) { sepSeen = true; continue } // |---|---| 分隔行
+    if (!sepSeen) continue // 表头行（在分隔行之前）
+    const key = normalizeRuleText(cells[0])
+    if (key) rules.push(key)
+  }
+  if (!sepSeen || rules.length === 0) {
+    throw new Fatal('Plan §4.1 表格解析为空（未找到表头分隔行，或零行规则）—— 对账无法进行，绝不降级成 PASS')
+  }
+  return rules
+}
+
+/**
+ * 对账：Plan §4.1 规则集合 ⟷ `PLAN_4_1_COVERAGE`。
+ * 返回 `{ ok, errors, logs }`；`ok=false` 时 errors 逐条指名差异（哪一行、差在哪一侧）。
+ */
+function checkPlan41Coverage() {
+  const planRules = plan41Rules()
+  const matrixKeys = PLAN_4_1_COVERAGE.map((r) => r.key)
+  const planSet = new Set(planRules)
+  const keySet = new Set(matrixKeys)
+  const errors = []
+
+  const missingInMatrix = planRules.filter((r) => !keySet.has(r)) // Plan 有而矩阵无
+  const extraInMatrix = matrixKeys.filter((k) => !planSet.has(k)) // 矩阵有而 Plan 无
+  if (missingInMatrix.length) {
+    errors.push(`Plan §4.1 有规则但覆盖矩阵未登记（有规则、无门）：${missingInMatrix.map((r) => `「${r}」`).join('、')}`)
+  }
+  if (extraInMatrix.length) {
+    errors.push(`覆盖矩阵登记了 Plan §4.1 不存在的规则（矩阵是死的/Plan 被改）：${extraInMatrix.map((r) => `「${r}」`).join('、')}`)
+  }
+  const dup = matrixKeys.filter((k, i) => matrixKeys.indexOf(k) !== i)
+  if (dup.length) errors.push(`覆盖矩阵 key 重复（会掩盖遗漏行）：${[...new Set(dup)].map((r) => `「${r}」`).join('、')}`)
+
+  const caseIds = new Set(CASES.map((c) => c.letter))
+  for (const row of PLAN_4_1_COVERAGE) {
+    for (const field of ['owner', 'check', 'falsify']) {
+      if (typeof row[field] !== 'string' || row[field].trim() === '') {
+        errors.push(`覆盖矩阵「${row.key}」的 ${field} 为空 —— 没有 owner/判据/证伪用例的覆盖是空头承诺`)
+      }
+    }
+    if (row.owner === 'gate:license' && !caseIds.has(row.falsify)) {
+      errors.push(`覆盖矩阵「${row.key}」的证伪用例 id「${row.falsify}」不在 CASES 中（判据失去证伪保障）`)
+    }
+  }
+
+  const logs = ['§4.1 覆盖矩阵（冻结 Plan 规则 → 判据 → 证伪用例）：']
+  for (const r of PLAN_4_1_COVERAGE) {
+    logs.push(`  · ${r.key}  →  ${r.check}  →  证伪 ${r.falsify}（owner ${r.owner}）`)
+  }
+  if (errors.length === 0) {
+    logs.push(`  ✓ 对账通过：Plan §4.1 ${planRules.length} 行 == 覆盖矩阵 ${matrixKeys.length} 行，每行证伪用例存在`)
+  }
+  return { ok: errors.length === 0, errors, logs }
+}
 
 /* ------------------------------------------------------------------ *
  * 参数
@@ -117,17 +243,65 @@ function readManifest(file, label) {
   }
 }
 
-/** 判据 2：每条 sources[] 的结构化许可 + decideLicense 判定。 */
-function checkSources(manifest, fail, logs) {
+/** 判据 2b/2c 需要「载荷实体」做基准：读包目录下的载荷文件（缺文件 ⇒ null；坏 JSON ⇒ 抛 Fatal）。 */
+function readPayload(file, label) {
+  let raw
+  try {
+    raw = readFileSync(file, 'utf8')
+  } catch {
+    return null // 无载荷文件：非 vocabulary 包允许无载荷 ⇒ 由调用方按「无实测基准」如实跳过
+  }
+  try {
+    return JSON.parse(raw)
+  } catch (e) {
+    throw new Fatal(`${label}：载荷文件不是合法 JSON（${file}）— ${e.message}；checksum 实体比对无法进行，绝不降级成 PASS`)
+  }
+}
+
+/** 判据 2 / 2b / 2c：每条 sources[] 的结构化许可 + decideLicense 判定 + provenance + checksum 实体比对。 */
+function checkSources(manifest, payload, payloadName, fail, logs) {
   const sources = manifest?.sources
   if (!Array.isArray(sources) || sources.length === 0) {
     fail('SOURCES_MISSING', 'sources[] 缺失或为空：包至少要有 1 条来源，无来源 = 无从判定许可（fail-closed，不静默跳过）')
     return
   }
+  const expectedChecksum = checksumPayload(payload) // null ⇒ 无载荷实体，无法比对
   for (let i = 0; i < sources.length; i++) {
     const s = sources[i] ?? {}
     const lic = s.license
     const origin = typeof s.origin === 'string' && s.origin ? s.origin : `sources[${i}]`
+
+    // 2b. provenance.origin / provider 必须为非空字符串（冻结 Plan §4.1 :159）
+    const missingProv = []
+    if (typeof s.origin !== 'string' || s.origin.trim() === '') missingProv.push('origin')
+    if (typeof s.provider !== 'string' || s.provider.trim() === '') missingProv.push('provider')
+    if (missingProv.length) {
+      fail(
+        'SOURCE_PROVENANCE_MISSING',
+        `source(sources[${i}]) 缺 provenance.${missingProv.join(' / ')}（须为非空字符串）：冻结 Plan §4.1「provenance.origin/provider 缺失 → 拒绝」`,
+      )
+    }
+
+    // 2c. checksum 必须存在，且等于载荷实体的完整 SHA-256（冻结 Plan §4.1 :160；
+    //     算法 = license-policy.checksumPayload，与 content:validate 判据 6 同一份实现）
+    const ck = s.checksum
+    if (typeof ck !== 'string' || ck.trim() === '') {
+      fail(
+        'SOURCE_CHECKSUM_MISSING',
+        `source(${origin}) 缺 checksum：冻结 Plan §4.1「checksum 缺失 → 拒绝」（须为载荷实体的完整 SHA-256）`,
+      )
+    } else if (expectedChecksum === null) {
+      logs.push(`  · source(${origin}) 无载荷实体（缺 ${payloadName}），跳过 checksum 实体比对（无实测基准，不判通过）`)
+    } else if (ck !== expectedChecksum) {
+      fail(
+        'SOURCE_CHECKSUM_MISMATCH',
+        `source(${origin}) checksum 与载荷实体不符：manifest=${ck} ≠ 实体 ${expectedChecksum}：冻结 Plan §4.1「checksum 与实体不符 → 拒绝」`,
+      )
+    } else {
+      logs.push(`  ✓ source(${origin}) checksum == 载荷实体 SHA-256（${ck.slice(0, 14)}…）`)
+    }
+
+    // 2. 结构化许可 + decideLicense 判定
     if (lic === null || typeof lic !== 'object' || Array.isArray(lic) || typeof lic.name !== 'string' || !lic.name) {
       fail('SOURCE_LICENSE_UNSTRUCTURED', `source(${origin}) 无结构化 license（需 {name, spdx?, attributionRequired, …}）`)
       continue
@@ -180,7 +354,7 @@ function checkAssets(manifest, fail, logs) {
 
 /**
  * 跑全部判据。返回 { hits:Set<code>, logs, errors, packageCount, violationCount }；hits 为空集即 PASS。
- * 致命问题（根不可读 / manifest 坏 / 规则模块出事）抛 Fatal。
+ * 致命问题（内容根不可读 / manifest 坏 / 载荷坏 / Plan §4.1 解析失败 / 规则模块出事）抛 Fatal。
  */
 function runChecks(contentDir) {
   const hits = new Set()
@@ -192,6 +366,11 @@ function runChecks(contentDir) {
     hits.add(code)
     errors.push(`  ✗ [${code}] ${msg}`)
   }
+
+  // 先跑 §4.1 覆盖矩阵对账（与内容根无关，只读冻结 Plan）—— 打印在前，让它每次都在人眼前
+  const cov = checkPlan41Coverage()
+  for (const l of cov.logs) logs.push(l)
+  if (!cov.ok) for (const e of cov.errors) fail('PLAN_4_1_COVERAGE_MISMATCH', e)
 
   let entries
   try {
@@ -215,8 +394,10 @@ function runChecks(contentDir) {
       const label = `${type}/${id}`
       logs.push(`▸ ${label}`)
       const manifest = readManifest(join(typeDir, id, 'manifest.json'), label)
+      const pName = payloadNameOf(type)
+      const payload = readPayload(join(typeDir, id, pName), label)
       const before = hits.size
-      checkSources(manifest, fail, logs)
+      checkSources(manifest, payload, pName, fail, logs)
       checkPackageLicenses(manifest, fail, logs)
       checkAssets(manifest, fail, logs)
       if (hits.size === before) logs.push('  ✓ 许可 / 资产判据全部通过')
@@ -285,36 +466,36 @@ const CASES = [
   {
     letter: 'S2',
     name: '外部来源无 SPDX（provider 改外部、license 去掉 spdx）',
-    why: 'decideLicense 对"外部来源无 spdx"返回 rejected ⇒ LICENSE_REJECTED',
+    why: 'decideLicense 对"外部来源无 spdx"返回 rejected ⇒ LICENSE_REJECTED（commercialUse/署名两条已满足，确保命中的是"无 spdx"分支，而不是被 §4.1 :157/:158 先拦下）',
     expect: ['LICENSE_REJECTED'],
     mutate: (m) => {
       const c = clone(m)
       c.sources[0].provider = EXTERNAL
-      c.sources[0].license = { name: 'ECDICT dataset', attributionRequired: true }
+      c.sources[0].license = { name: 'ECDICT dataset', commercialUse: true, attributionRequired: true, attribution: '© ECDICT' }
       return c
     },
   },
   {
     letter: 'S3',
     name: 'CC-BY-NC（非商用 ⇒ rejected）',
-    why: 'decideLicense 对 CC-BY-NC 返回 rejected ⇒ LICENSE_REJECTED（与"无 spdx"同 code，但拒绝理由不同）',
+    why: 'decideLicense 对 CC-BY-NC 返回 rejected ⇒ LICENSE_REJECTED（与"无 spdx"同 code，但拒绝理由不同；commercialUse/署名两条已满足 ⇒ 命中 CC-BY-NC 分支）',
     expect: ['LICENSE_REJECTED'],
     mutate: (m) => {
       const c = clone(m)
       c.sources[0].provider = EXTERNAL
-      c.sources[0].license = { name: 'CC BY-NC 4.0', spdx: 'CC-BY-NC-4.0', attributionRequired: true, commercialUse: false }
+      c.sources[0].license = { name: 'CC BY-NC 4.0', spdx: 'CC-BY-NC-4.0', commercialUse: true, attributionRequired: true, attribution: '© CC' }
       return c
     },
   },
   {
     letter: 'S4',
     name: 'CC-BY-SA（review_required ⇒ 在自动门里同判 FAIL）',
-    why: 'review_required 不得粉饰为 PASS（PENDING 不粉饰原则）⇒ 独有 code LICENSE_REVIEW_REQUIRED',
+    why: 'review_required 不得粉饰为 PASS（PENDING 不粉饰原则）⇒ 独有 code LICENSE_REVIEW_REQUIRED；署名文本已给（否则会被 §4.1 :158 先判 rejected，测不到 review_required 分支）',
     expect: ['LICENSE_REVIEW_REQUIRED'],
     mutate: (m) => {
       const c = clone(m)
       c.sources[0].provider = EXTERNAL
-      c.sources[0].license = { name: 'CC BY-SA 4.0', spdx: 'CC-BY-SA-4.0', attributionRequired: true, commercialUse: true }
+      c.sources[0].license = { name: 'CC BY-SA 4.0', spdx: 'CC-BY-SA-4.0', commercialUse: true, attributionRequired: true, attribution: '© CC' }
       return c
     },
   },
@@ -400,16 +581,104 @@ const CASES = [
     mutate: (m) => {
       const c = clone(m)
       c.provenance = { provider: EXTERNAL }
-      c.licenses = { bad: { name: 'CC BY-NC 4.0', spdx: 'CC-BY-NC-4.0', attributionRequired: true, commercialUse: false } }
+      c.licenses = { bad: { name: 'CC BY-NC 4.0', spdx: 'CC-BY-NC-4.0', commercialUse: true, attributionRequired: true, attribution: '© CC' } }
       return c
     },
+  },
+  /* —— P18-B 新增：冻结 Plan §4.1 :157/:158/:159/:160 四条此前无机器判据 —— */
+  {
+    letter: 'S5',
+    name: 'source license.commercialUse=false（自有内容也一样拦）',
+    why: '§4.1 :157「commercialUse !== true → 拒绝」；判据排在自有哨兵之前 ⇒ 自有内容不豁免分发声明',
+    expect: ['LICENSE_REJECTED'],
+    mutate: (m) => {
+      const c = clone(m)
+      c.sources[0].license = { ...c.sources[0].license, commercialUse: false }
+      return c
+    },
+  },
+  {
+    letter: 'S5b',
+    name: 'source license.commercialUse 字段缺失（缺失 = 不 true）',
+    why: '§4.1 :157 的「缺失也算不 true」：删掉字段后不得被静默放行（无声明 ≠ 允许商用）',
+    expect: ['LICENSE_REJECTED'],
+    mutate: (m) => {
+      const c = clone(m)
+      delete c.sources[0].license.commercialUse
+      return c
+    },
+  },
+  {
+    letter: 'S6',
+    name: 'attributionRequired=true 但无署名文本（外部 MIT）',
+    why: '§4.1 :158「attributionRequired === true 但无署名文本 → 拒绝」：license.attribution 缺失 ⇒ rejected',
+    expect: ['LICENSE_REJECTED'],
+    mutate: (m) => {
+      const c = clone(m)
+      c.sources[0].provider = EXTERNAL
+      c.sources[0].license = { name: 'MIT License', spdx: 'MIT', commercialUse: true, attributionRequired: true }
+      return c
+    },
+  },
+  {
+    letter: 'S6b',
+    name: '对照组：attributionRequired=true **且**给出署名文本 → 复绿',
+    why: '证明 §4.1 :158 判据不是恒红：同一条来源补上 attribution 文本后恢复 allowed（本门判绿）',
+    expect: [],
+    mutate: (m) => {
+      const c = clone(m)
+      c.sources[0].provider = EXTERNAL
+      c.sources[0].license = { name: 'MIT License', spdx: 'MIT', commercialUse: true, attributionRequired: true, attribution: '© 2026 Acme Records' }
+      return c
+    },
+  },
+  {
+    letter: 'S7',
+    name: 'source 缺 provenance.origin（删掉 sources[0].origin）',
+    why: '§4.1 :159「provenance.origin/provider 缺失 → 拒绝」⇒ 独有 code SOURCE_PROVENANCE_MISSING（许可仍 allowed ⇒ 不越界误伤）',
+    expect: ['SOURCE_PROVENANCE_MISSING'],
+    mutate: (m) => {
+      const c = clone(m)
+      delete c.sources[0].origin
+      return c
+    },
+  },
+  {
+    letter: 'S8',
+    name: 'sources[].checksum 格式合法但与载荷实体不符',
+    why: '§4.1 :160「checksum 与实体不符 → 拒绝」⇒ SOURCE_CHECKSUM_MISMATCH（换成一个 sha256:<64hex> 但≠实体指纹）',
+    expect: ['SOURCE_CHECKSUM_MISMATCH'],
+    mutate: (m) => {
+      const c = clone(m)
+      c.sources[0].checksum = `sha256:${'00'.repeat(32)}`
+      return c
+    },
+  },
+  {
+    letter: 'M1',
+    target: 'plan',
+    name: '给冻结 Plan §4.1 表格临时加一行「新规则（本波不应存在）」',
+    why: '证明覆盖矩阵对账是**活的**：Plan 有而矩阵无 ⇒ PLAN_4_1_COVERAGE_MISMATCH，且输出必须指名那一行（改完字节级还原，git diff 为空）',
+    expect: ['PLAN_4_1_COVERAGE_MISMATCH'],
+    // Plan 用例改的是**真 Plan 文件**（docs/p18/，不在 INV-1 冻结区），改完立即按 sha256 字节还原
+    mutateText: (t) =>
+      t.replace(
+        '| Asset 缺 `license` 且无有效 `licenseRef` | **拒绝** |',
+        '| Asset 缺 `license` 且无有效 `licenseRef` | **拒绝** |\n| 新规则（本波不应存在） | **拒绝** |',
+      ),
   },
 ]
 
 function falsify() {
+  const greenCount = CASES.filter((c) => c.expect.length === 0).length
+  const planCount = CASES.filter((c) => c.target === 'plan').length
   console.log('[gate:license] 证伪自检 —— 证明每条判据都能判红（不会失败的门等于没有门）')
-  console.log(`  用例 ${CASES.length} 条（含 1 条对照组）；每条：隔离副本注入故障 → 断言"命中集恰好等于预期" → 字节还原 → 复验复绿`)
-  console.log(`  隔离副本：${FALSIFY_CONTENT}（gitignore；真 content/ 只读、绝不被写）\n`)
+  console.log(`  用例 ${CASES.length} 条（含 ${greenCount} 条判绿对照组）；每条：注入故障 → 断言"命中集恰好等于预期" → 字节还原 → 复验复绿`)
+  console.log(`  隔离副本：${FALSIFY_CONTENT}（gitignore；真 content/ 只读、绝不被写）`)
+  console.log(
+    `  边界用例 ${planCount} 条改的是**真冻结 Plan**（${PLAN_FILE.replace(ROOT, '.')}，不在 INV-1 冻结区）：` +
+      '改完立刻按 sha256 字节还原，运行后 `git diff` 必须为空\n',
+  )
 
   // 建隔离副本（整树拷贝；后续每次只用字节还原被改的那一个 manifest）
   mkdirSync(FALSIFY_DIR, { recursive: true })
@@ -419,9 +688,11 @@ function falsify() {
   const results = []
 
   for (const c of CASES) {
-    const relPkg = BASE_PKG
-    const pristineFile = join(ROOT, 'content', relPkg, 'manifest.json')
-    const copyFile = join(FALSIFY_CONTENT, relPkg, 'manifest.json')
+    const isPlan = c.target === 'plan'
+    /** 还原基准（真文件）：manifest 用例 = 真 content/ 的原文件；plan 用例 = 真 Plan 自身 */
+    const pristineFile = isPlan ? PLAN_FILE : join(ROOT, 'content', BASE_PKG, 'manifest.json')
+    /** 被破坏的目标：manifest 用例改隔离副本（绝不动真 content/）；plan 用例改真 Plan */
+    const targetFile = isPlan ? PLAN_FILE : join(FALSIFY_CONTENT, BASE_PKG, 'manifest.json')
     const pristine = readFileSync(pristineFile, 'utf8')
     const before = sha(pristineFile)
 
@@ -431,15 +702,14 @@ function falsify() {
 
     try {
       /* ---- 植入 ---- */
-      let mutated
+      let out
       try {
-        mutated = c.mutate(JSON.parse(pristine))
+        out = isPlan ? c.mutateText(pristine) : JSON.stringify(c.mutate(JSON.parse(pristine)))
       } catch (e) {
         throw new Fatal(`用例 mutate 抛出异常：${e.message}`)
       }
-      const out = JSON.stringify(mutated)
-      if (out === pristine) throw new Fatal('植入空转：mutate 未改变 manifest —— 这样的"证伪"是假的')
-      writeFileSync(copyFile, out)
+      if (out === pristine) throw new Fatal('植入空转：mutate 未改变目标文件 —— 这样的"证伪"是假的')
+      writeFileSync(targetFile, out)
 
       /* ---- 观测（与常规模式同一条路径，root 指向副本） ---- */
       observed = runChecks(FALSIFY_CONTENT).hits
@@ -448,12 +718,12 @@ function falsify() {
     } finally {
       /* ---- 还原（无论成败）：字节写回 + sha256 真值验收 ---- */
       try {
-        writeFileSync(copyFile, pristine)
-        const after = sha(copyFile)
+        writeFileSync(targetFile, pristine)
+        const after = sha(targetFile)
         if (after !== before) {
           restoreNote = `sha 不符 ${before} → ${after}`
           bad++
-          console.error(`  ‼ ${c.letter} 还原失败（${copyFile} 内容哈希变了）`)
+          console.error(`  ‼ ${c.letter} 还原失败（${targetFile} 内容哈希变了）`)
         } else {
           restoreNote = 'bytes'
         }
@@ -509,7 +779,7 @@ function falsify() {
   console.log('──────────────────────────────────────────────────────')
   if (bad === 0) {
     console.log(
-      `License Gate Falsification：✅ PASS —— ${CASES.length}/${CASES.length} 用例恰好判红（含 1 条对照组判绿），隔离副本已字节还原，真 content/ 未被写入`,
+      `License Gate Falsification：✅ PASS —— ${CASES.length}/${CASES.length} 用例恰好判红（含 ${greenCount} 条判绿对照组），隔离副本已字节还原，真 content/ 未被写入`,
     )
     process.exit(0)
   }

@@ -28,7 +28,8 @@
  * 13. packageId 存在且 === 目录名（一词三表：manifest.packageId / 目录 / ContentId 第 4 段）
  * 14. namespace 存在，且与从 manifest.id 解析出的第 3 段严格相等（两者必须同源；
  *     「每包唯一」由第 9 项兜底）
- * 15. contentChecksum === sha256Canonical(words)（**必须走 canonical**，不得用文件原文
+ * 15. contentChecksum === checksumPayload(words)（= license-policy.mjs → canonical.mjs
+ *     的 sha256Canonical；**必须走 canonical**，不得用文件原文
  *     或 JSON.stringify 直算，否则文件排版一变就误判漂移）
  * 16. contentRevision / contentVersion 均为正整数；contentHistory 中存在
  *     checksum === contentChecksum 的条目，且该条目 version === contentVersion、
@@ -54,12 +55,14 @@
 import { readdir, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { sha256Canonical } from './canonical.mjs'
+/* 内容指纹**只走 license-policy.mjs 的 checksumPayload**（它内部 = canonical.mjs 的 sha256Canonical）。
+ * P18-B 之前本文件自己又调了一次 sha256Canonical，是同一算法的**第二份调用点**；现与
+ * `gate-license.mjs` 的 `sourceChecksum` 判据共用同一个 helper —— 消灭第二份哈希实现。 */
 /* 类型白名单**只从 license-policy.mjs 取**，本文件不再自建副本 ——
  * P1.8-A 之前这里是第二份手写镜像，注释写着"任一侧增删类型时两处同改"，
  * 而实际结果就是漂移：契约把 `ContentType` 扩到 14 时，两处 Node 白名单都停在 12。
  * 现在单一副本由 gate:content-type-contract 判据 H 对着契约上锁。 */
-import { CONTENT_TYPES } from './license-policy.mjs'
+import { CONTENT_TYPES, checksumPayload } from './license-policy.mjs'
 /* 资产规则**只从 asset-rules.mjs 取**（P1.8 裁定 ③/④-7）：本文件不得内联任何资产规则逻辑。
  * 资产规则的第二份副本由 gate:content-type-contract 判据 H3 上锁，与 CONTENT_TYPES 的 H1/H2 同一手法。 */
 import { checkManifestAssets, checkPackageAssetDeclarations, checkLicenseDecision } from './asset-rules.mjs'
@@ -223,8 +226,10 @@ async function main() {
         fail(`无载荷包 offline.policy=${policy ?? '缺失'} 非法（须 inline/lazy，registry 侧才可解释）`)
       }
 
-      // 内容指纹（第 6/15 项共用）：必须走 canonical —— 只取决于数据语义，与文件排版无关
-      const canonicalSum = payload === null ? null : sha256Canonical(payload)
+      // 内容指纹（第 6/15 项共用）：必须走 canonical —— 只取决于数据语义，与文件排版无关。
+      // 实现 = license-policy.mjs 的 checksumPayload（唯一哈希 helper，与 gate-license 的
+      // sourceChecksum 判据同一份）；payload 为 null 时返回 null（"无实测基准，不判通过"）。
+      const canonicalSum = checksumPayload(payload)
 
     // 2. 必填字段
     const missing = REQUIRED_FIELDS.filter((f) => manifest[f] === undefined)
@@ -251,7 +256,8 @@ async function main() {
     else if (manifest.stats?.items === payload.length) ok(`stats.items 与实际一致（${payload.length}）`)
     else fail(`stats.items=${manifest.stats?.items} ≠ 实际 ${payload.length} → vocabulary 包运行 npm run content:build 同步`)
 
-    // 6. checksum（第 6 项 = 来源原始数据指纹，走 canonical 序列化而非文件原文）
+    // 6. checksum（第 6 项 = 来源原始数据指纹，走 canonical 序列化而非文件原文；
+    //    与 gate-license 的 sourceChecksum 判据共用 checksumPayload —— 单一哈希实现）
     const sources = manifest.sources ?? []
     if (sources.length === 0) fail('sources 为空（V4.1 起为数组，至少一条来源）')
     else if (payload === null) console.log('  · 无载荷，跳过 checksum 比对（无实测基准，不判通过）')
