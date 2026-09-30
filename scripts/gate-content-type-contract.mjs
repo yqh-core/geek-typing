@@ -32,19 +32,47 @@
  *                       本波（P18-B）兑现（同 H1/H2 手法：权威只有一处，一致性由机器证明）。
  *                       语料带**手写字面真值**：判定 = TS == 真值 **且** .mjs == 真值
  *                       （三条独立来源对齐 —— 不是"TS == mjs"两两互证，两边同错就永远测不出来）。
+ *   I 启用即可达     —— **行为级**（跑真实查询层）：对 `queryEnabledTypes()` 里的**每一个**类型 t，
+ *                       ① `packagesOf(t)` 非空（"启用了一个没有内容的类型"要判红，不能悄悄返回空）；
+ *                       ② `list({type:t})` 非空，且**每一条**的 `packageLocalId ∈ packagesOf(t)`
+ *                          （**不外溢** —— 专抓 §⑨-1 的「返回词库数据」静默错数据）；
+ *                       ③ `count({type:t})` == Σ `packagesOf(t)` 的 `stats.items`，且 t≠'word' 时
+ *                          **不得**等于全库（专抓「count 返回 9346」）；
+ *                       ④ 每条 hit.id 能被 `parseContentId` 解析且 `type == descriptorOf(t).itemType`；
+ *                       ⑤ t≠'word' 补两条**中性**断言（用 `order:'desc'` 放大差异，否则恒真不可证伪）：
+ *                          `hasPhonetic:true` 与 `sort:{field:'word'}` 都**不得**改变结果集 ——
+ *                          这两者都是 **word 族专属**，非 word 族必须**不参与**（不是"筛成空"/"整体反转"）。
+ *                       另：`type:'all'` 不在逐类型范围内，但断言 `count({type:'all'})` ==
+ *                       各启用类型 `packagesOf` **去重并集**之和（防 word/vocabulary 重复计）。
+ *                       E 只比「启用集是否一致」，**看不见**上述五种静默错数据 —— 所以 I 必须存在。
+ *   I2 检索声明可解析 —— **静态判据**（纯读源码，不跑查询）：对每个类型 t，
+ *                       `descriptorOf(t).query.index` 里 `mode:'exact'` 的字段：
+ *                         word 族（itemType==='word'）必须在 `WORD_FIELDS` 键集内；
+ *                         非 word 族**只允许 `'id'`**（非 word 族倒排表尚未实现，一律走扫描；
+ *                         一旦有人加了别的 exact 字段 ⇒ 判红，提示"请先建倒排或改声明"）。
+ *                       `query.match` 的字段：word 族必须在 `WORD_FIELDS` 键集内；非 word 族无限制。
+ *                       意义：这正是「`VOCAB_QUERY.match` 漏声明 definition、代码却在匹配它」
+ *                       那类**声明 ⟷ 行为漂移**的守卫（P18-E 实测捕获的那次漂移）。
  *
  * 退出码（与本仓其它门同族）：
  *   0 = PASS；1 = FAIL；2 = 脚本自身错误（模块加载失败 / 关键声明解析不出 —— **绝不降级成 PASS**）
  *
  * 用法：
- *   npm run gate:content-type-contract              # 常规判据 A–H（含 H3）
+ *   npm run gate:content-type-contract              # 常规判据 A–H（含 H3）+ I/I2
  *   npm run gate:content-type-contract -- --falsify # 证伪自检（见下）
  *
  * 为什么自带 --falsify：**不会失败的门等于没有门**。
  *   常规模式只证明"当前代码通过"；--falsify 逐条植入故障、断言**恰好该判据判红**、
  *   再字节级还原并跑对照组复绿 —— 证明这些判据不是恒真的空转。
  *   断言用"命中集精确等于 {该判据}"而非"包含"：既证明它能判红，也证明它不越界误伤。
- *   用例共 **8 条**：A/B/C/D/E/G/H 各一条 + H3 追加一条（把 asset-rules 的判断改坏）。
+ *   用例共 **12 条**：A/B/C/D/G/H/H3 各一条 + E 一条（硬编码回退，见下）+ I 四条
+ *   （I-routing 路由破坏 / I-phonetic 守卫丢失 / I-sort 主序中性 / I2 声明漂移）。
+ *   I 的四条对应判据 I 的四类断言（逐条证明可证伪，不留"恒真断言"）。
+ *
+ *   ⚠️ 与裁定 §⑨-7 的字面差异（**实测纠正**，不是放松断言）：裁定写「E 改写用例 ⇒ 恰好 {E}」，
+ *      但实测把查询层派生调用换回 `['word']`（**漏掉已启用的 reading**）时，除了 E 之外
+ *      **判据 I 也必然判红** —— 因为 reading 在注册表里 `queryEnabled:true` 却说不可达（I 的第一条职责）。
+ *      这是两把锁**本该**同时响（同 A 用例的 {A,G}），故 E 用例的 expect 记为 `{E,I}`，**判据一行未改弱**。
  *
  * 实现注记（本机环境，两条都踩过并已加固）：
  *   ① 本脚本**不 spawn 任何子进程**。本机 Node 预加载了 node-language-shim（safe-delete /
@@ -87,6 +115,8 @@ const F_LICENSE_POLICY = 'scripts/content/license-policy.mjs'
 const F_ASSET_RULES = 'scripts/content/asset-rules.mjs'
 /** 不得再自建白名单副本的脚本 */
 const F_VALIDATE = 'scripts/content/validate.mjs'
+/** 包注册表（判据 I 派生 packagesOf(t) 用：getAllPackages() —— 不许写死包 id 名单） */
+const F_PKG_REGISTRY = 'src/core/content/registry.ts'
 
 /** G 判据的编译单元：契约本身 + 它的两个类型依赖（独立小程序，不必跑全项目 tsc） */
 const CONTRACT_UNITS = [F_REGISTRY, F_CONTENT, F_ASSET]
@@ -289,7 +319,7 @@ async function runChecks() {
     const zh = await load('/src/i18n/zh.ts')
     const en = await load('/src/i18n/en.ts')
 
-    const { CONTENT_TYPES, CONTENT_TYPE_REGISTRY, queryEnabledTypes, packageLevelTypes } = reg
+    const { CONTENT_TYPES, CONTENT_TYPE_REGISTRY, queryEnabledTypes, packageLevelTypes, descriptorOf } = reg
     if (!CONTENT_TYPES || !CONTENT_TYPE_REGISTRY) {
       throw new Fatal('registry.ts 未导出 CONTENT_TYPES / CONTENT_TYPE_REGISTRY')
     }
@@ -539,6 +569,182 @@ async function runChecks() {
         if (mism.length > 8) errors.push(`      …另有 ${mism.length - 8} 处`)
       }
     }
+
+    /* ---------- I. 启用即可达（行为级，跑真实查询层） ---------- */
+    {
+      const q = await load('/src/core/content/query/content-query.ts')
+      const modelMod = await load('/src/core/content/model/content.ts')
+      const pkgReg = await load(`/${F_PKG_REGISTRY}`)
+      if (
+        typeof q.list !== 'function' ||
+        typeof q.count !== 'function' ||
+        typeof modelMod.parseContentId !== 'function' ||
+        typeof pkgReg.getAllPackages !== 'function'
+      ) {
+        throw new Fatal(
+          'I 判据所需导出缺失（content-query.list/count、model.parseContentId、registry.getAllPackages）—— 绝不降级成 PASS',
+        )
+      }
+
+      const enabledTypes = queryEnabledTypes()
+      const allPkgs = pkgReg.getAllPackages()
+      /** 与 content-query.ts 的 packageTypesOf 同一规则（派生，不写死类型名） */
+      const packageTypesOf = (t) => {
+        const itemType = descriptorOf(t)?.itemType
+        if (!itemType) return []
+        return registryKeys.filter((x) => CONTENT_TYPE_REGISTRY[x].itemType === itemType)
+      }
+      /** 同族类型覆盖到的全部包（**派生**，不许写死包 id 名单） */
+      const packagesOf = (t) => {
+        const allowed = new Set(packageTypesOf(t))
+        return allowed.size ? allPkgs.filter((p) => allowed.has(p.manifest.type)) : []
+      }
+
+      let bad = 0
+      const idsOf = (arr) => arr.map((h) => h.id)
+      const sameIds = (a, b) => a.length === b.length && a.every((x, i) => x === b[i])
+      const totalItems = allPkgs.reduce((s, p) => s + p.manifest.stats.items, 0)
+
+      for (const t of enabledTypes) {
+        const pkgs = packagesOf(t)
+        if (!pkgs.length) {
+          fail('I', `I ${t}: packagesOf 为空 —— 启用了没有任何内容包的类型（「启用即可达」的前提不成立）`)
+          bad++
+          continue
+        }
+        const allowedLocals = new Set(pkgs.map((p) => p.localId))
+
+        const hits = await q.list({ type: t })
+        if (!hits.length) {
+          fail('I', `I ${t}: list({type:'${t}'}) 为空 —— 启用但不可达（四段齐备前不得放开）`)
+          bad++
+        }
+        const leak = hits.filter((h) => !allowedLocals.has(h.packageLocalId))
+        if (leak.length) {
+          fail(
+            'I',
+            `I ${t}: list 结果外溢 ${leak.length} 条（如 packageLocalId='${leak[0].packageLocalId}'）—— 返回了别的类型的数据（§⑨-1 静默错数据）`,
+          )
+          bad++
+        }
+
+        const expectedCount = pkgs.reduce((s, p) => s + p.manifest.stats.items, 0)
+        const c = await q.count({ type: t })
+        if (c !== expectedCount) {
+          fail('I', `I ${t}: count=${c} ≠ Σ packagesOf(${t}).stats.items=${expectedCount}（count 必须与 list 同源）`)
+          bad++
+        }
+        if (t !== 'word' && c === totalItems) {
+          fail('I', `I ${t}: count=${c} 等于全库 ${totalItems} —— 未按类型路由（§⑨-1「count 返回 9346」）`)
+          bad++
+        }
+
+        const wantItemType = descriptorOf(t)?.itemType
+        for (const h of hits) {
+          const parsed = modelMod.parseContentId(h.id)
+          if (!parsed || parsed.type !== wantItemType) {
+            fail('I', `I ${t}: 命中 id '${h.id}' 解析失败或 type≠'${wantItemType}'`)
+            bad++
+            break
+          }
+        }
+
+        if (t !== 'word') {
+          const base = idsOf(hits)
+          const withPhonetic = idsOf(await q.list({ type: t, hasPhonetic: true }))
+          if (!sameIds(withPhonetic, base)) {
+            fail(
+              'I',
+              `I ${t}: list({hasPhonetic:true}) 改变了非 word 族的结果集 —— hasPhonetic 是 word 族专属，非 word 族必须**不参与**筛选（不是"筛成空"）`,
+            )
+            bad++
+          }
+          const sortedDesc = idsOf(await q.list({ type: t, sort: { field: 'word', order: 'desc' } }))
+          if (!sameIds(sortedDesc, base)) {
+            fail(
+              'I',
+              `I ${t}: list({sort:'word',order:'desc'}) 改变了非 word 族的顺序 —— 词形主序是 word 族专属，非 word 族必须**不参与**（不是"整体反转"）`,
+            )
+            bad++
+          }
+        }
+      }
+
+      // type:'all' 的去重并集（防 word/vocabulary 重复计）
+      const unionLocals = new Set(enabledTypes.flatMap((t) => packagesOf(t)).map((p) => p.localId))
+      const expectedAll = allPkgs
+        .filter((p) => unionLocals.has(p.localId))
+        .reduce((s, p) => s + p.manifest.stats.items, 0)
+      const actualAll = await q.count({ type: 'all' })
+      if (actualAll !== expectedAll) {
+        fail('I', `I count({type:'all'})=${actualAll} ≠ 各启用类型 packagesOf 去重并集之和=${expectedAll}（重复计或漏计）`)
+        bad++
+      }
+
+      if (bad === 0) {
+        ok(
+          `I 启用即可达（${enabledTypes.length} 个类型 ${enabledTypes.join('/') || '（空）'}：packagesOf 非空 + list 非空且不外溢 + count 同源 + id 可解析 + 非 word 族过滤中性）`,
+        )
+      }
+    }
+
+    /* ---------- I2. descriptor 的检索声明可解析（静态判据） ---------- */
+    {
+      let src
+      try {
+        src = readFileSync(abs(F_QUERY), 'utf8')
+      } catch (e) {
+        throw new Fatal(`无法读取 ${F_QUERY} — ${e.message}`)
+      }
+      // WORD_FIELDS 未导出（模块私有），按源码形态提取键集 —— 与 E 提取启用集同一手法。
+      const wf = src.match(/const WORD_FIELDS[\s\S]*?=\s*\{([\s\S]*?)\n\}/)
+      if (!wf) {
+        throw new Fatal(
+          `无法从 ${F_QUERY} 解析 WORD_FIELDS 声明形态\n   解析失败绝不降级成 PASS —— word 族检索声明的可解析性无从判定`,
+        )
+      }
+      const wordFields = new Set(
+        [...wf[1].matchAll(/(?:^|\n)[ \t]*([A-Za-z_$][\w$]*)[ \t]*:/g)].map((x) => x[1]),
+      )
+      if (wordFields.size === 0) {
+        throw new Fatal(`WORD_FIELDS 键集为空（${F_QUERY}）—— 解析失败，绝不降级成 PASS`)
+      }
+      const wfList = [...wordFields].join(', ')
+
+      let bad = 0
+      for (const t of registryKeys) {
+        const d = CONTENT_TYPE_REGISTRY[t]
+        const wordFamily = d.itemType === 'word'
+        for (const spec of d.query?.index ?? []) {
+          if (spec.mode !== 'exact') continue
+          if (wordFamily) {
+            if (!wordFields.has(spec.field)) {
+              fail('I2', `I2 ${t}.query.index exact 字段 '${spec.field}' 不在 WORD_FIELDS 键集 {${wfList}} 内`)
+              bad++
+            }
+          } else if (spec.field !== 'id') {
+            fail(
+              'I2',
+              `I2 ${t}.query.index exact 字段只允许 'id'（非 word 族倒排表尚未实现，一律走扫描）—— 实得 '${spec.field}'，请先建倒排或改声明`,
+            )
+            bad++
+          }
+        }
+        if (wordFamily) {
+          for (const spec of d.query?.match ?? []) {
+            if (!wordFields.has(spec.field)) {
+              fail('I2', `I2 ${t}.query.match 字段 '${spec.field}' 不在 WORD_FIELDS 键集 {${wfList}} 内`)
+              bad++
+            }
+          }
+        }
+      }
+      if (bad === 0) {
+        ok(
+          `I2 检索声明可解析（${registryKeys.length} 个类型；word 族 exact/match ⊆ WORD_FIELDS {${wfList}}；非 word 族 exact 仅 'id'）`,
+        )
+      }
+    }
   } finally {
     await server.close()
   }
@@ -595,13 +801,16 @@ const CASES = [
   },
   {
     letter: 'E',
-    expect: ['E'],
-    why: 'queryEnabled 是数据字段，无类型约束 → 只有 E（注册表⟷查询层对账）看得见',
-    name: '把 audio 的 queryEnabled 翻成 true（注册表说能查、查询层没开）',
-    kind: 'regex',
-    file: F_REGISTRY,
-    pattern: /(labelKey: 'type\.audio\.label'[\s\S]*?queryEnabled: )false/,
-    to: '$1true',
+    expect: ['E', 'I'],
+    why:
+      '把查询层的派生调用换回**手写数组**且漏掉已启用的 reading：E（启用集对账，:400 的正则分支此时命中）判红；' +
+      '同时 I（启用即可达）也判红 —— reading 在注册表里 queryEnabled:true 却不可达（list 为 []）。' +
+      '两把锁本该同时响（同 A 用例的 {A,G}），不是用例不隔离',
+    name: "把 content-query.ts 的 SUPPORTED_TYPES 由 queryEnabledTypes() 换回手写数组 ['word']（守「将来有人优化回硬编码列表」）",
+    kind: 'edit',
+    file: F_QUERY,
+    from: 'const SUPPORTED_TYPES: ContentType[] = queryEnabledTypes()',
+    to: "const SUPPORTED_TYPES: ContentType[] = ['word']",
   },
   {
     letter: 'G',
@@ -632,6 +841,67 @@ const CASES = [
     file: F_ASSET_RULES,
     from: "export const ASSET_SEPARATOR = '#a:'",
     to: "export const ASSET_SEPARATOR = '#a'",
+  },
+  {
+    letter: 'I',
+    expect: ['I'],
+    why:
+      '复现裁定 §⑨-1 的**静默错数据**：scopePackages 退回 vocabulary-only（getVocabularyPackages()）并去掉同族过滤 ' +
+      '⇒ 路由无视类型维度，reading 查询落到 10 个词库上 —— core 工人实测 count({type:\'reading\'})→**9346**、' +
+      'list({type:\'reading\'})→**9346 条 word 行**（非空、不报错，正是最危险的一类）。' +
+      'E 只比启用集、I2 是静态判据，都看不见这条 ⇒ 只有 I 判红',
+    name: '把 scopePackages 的路由退回 vocabulary-only 并去掉 pkgs.filter(allowed) 那一行（reading 查询落到词库）',
+    kind: 'edit',
+    file: F_QUERY,
+    from: `  let pkgs: ContentPackage[] = packageId
+    ? [getPackage(packageId)].filter((p): p is ContentPackage => !!p)
+    : packagesOfTypes(types)
+  pkgs = pkgs.filter((p) => allowed.has(p.manifest.type))`,
+    to: `  let pkgs: ContentPackage[] = packageId
+    ? [getPackage(packageId)].filter((p): p is ContentPackage => !!p)
+    : getVocabularyPackages()`,
+  },
+  {
+    letter: 'I',
+    expect: ['I'],
+    why:
+      '去掉 poolEntries 的 isWordHit(hit) 守卫 ⇒ 非 word 条目全部无 phonetic ⇒ ' +
+      'list({type:t, hasPhonetic:true}) 被**静默筛成 []**（看起来像"没有结果"，不会有人怀疑；裁定 §⑨-6①）。' +
+      'E/I2 都看不见 ⇒ 只有 I 判红',
+    name: '去掉 poolEntries 的 `hasPhonetic && isWordHit(hit) && !hit.phonetic` 里的 isWordHit 守卫（非 word 族被静默筛成空）',
+    kind: 'edit',
+    file: F_QUERY,
+    from: 'if (hasPhonetic && isWordHit(hit) && !hit.phonetic) continue',
+    to: 'if (hasPhonetic && !hit.phonetic) continue',
+  },
+  {
+    letter: 'I',
+    expect: ['I'],
+    why:
+      "把 sortRows 里 field:'word' 对**非 word 行**的退让（`a.rank - b.rank`，主序中性）换成让 title 参与主序 " +
+      "⇒ `order:'desc'` 会把非 word 族**整体反转**（词形主序本应只对 word 族生效）。" +
+      '这条专证 I 的 sort 中性断言**可证伪**（不是恒真）—— 与 I-phonetic 一起覆盖裁定 §⑨-6① 的两条中性规则',
+    name: "让 sortRows 的 field:'word' 对非 word 行改按 title 参与主序（desc 下非 word 族被整体反转）",
+    kind: 'edit',
+    file: F_QUERY,
+    from: `            ? cmpText(norm(a.hit.word), norm(b.hit.word))
+            : a.rank - b.rank`,
+    to: `            ? cmpText(norm(a.hit.word), norm(b.hit.word))
+            : cmpText(tieText(a.hit), tieText(b.hit))`,
+  },
+  {
+    letter: 'I2',
+    expect: ['I2'],
+    why:
+      '给 reading 的 descriptor.query.index 加一个非 id 的 exact 字段 body ⇒ 非 word 族倒排表尚未实现（一律走扫描），' +
+      'exact 只允许 id ⇒ 只有 I2 判红。守的是「声明 ⟷ 行为漂移」：无人建倒排却先在声明里加 exact 字段',
+    name: "给 reading 的 descriptor.query.index 加 { field: 'body', mode: 'exact' }（非 word 族 exact 只允许 'id'）",
+    kind: 'edit',
+    file: F_REGISTRY,
+    from: `      index: [{ field: 'id', mode: 'exact' }],
+      match: [{ field: 'title', mode: 'substring' }, { field: 'body', mode: 'substring' }],`,
+    to: `      index: [{ field: 'id', mode: 'exact' }, { field: 'body', mode: 'exact' }],
+      match: [{ field: 'title', mode: 'substring' }, { field: 'body', mode: 'substring' }],`,
   },
 ]
 
