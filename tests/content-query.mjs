@@ -174,16 +174,37 @@ ok(
 const legacy = await q.searchWords({ query: 'abandon', limit: 50 })
 const uni = await cq.search({ type: 'word', query: 'abandon', pageSize: 50 })
 ok('search({type:"word"}) 与 searchWords 结果一致', idOf(uni) === idOf(legacy), `${uni.length} 条`)
-const uniAll = await cq.search({ type: 'all', query: 'abandon', pageSize: 50 })
-ok("type:'all' 与 type:'word' 结果一致（当前仅 word 已接入）", idOf(uniAll) === idOf(uni), `${uniAll.length} 条`)
-ok("type:'listening'（未接入）返回空数组", (await cq.search({ type: 'listening', query: 'abandon' })).length === 0)
+// P18-E：type:'all' = 全部已启用类型（word + reading）的并集。用 id 集合做**包含关系**（不比长度）：
+// 同一 query 下 'all' 必须同时包含 word 族与 reading 族的结果，且不得掺入未放开的类型。
+const uniAll = await cq.search({ type: 'all', query: 'tea', pageSize: 100000 })
+const allWordTea = await cq.search({ type: 'word', query: 'tea', pageSize: 100000 })
+const allReadingTea = await cq.search({ type: 'reading', query: 'tea', pageSize: 100000 })
+const allIdSet = new Set(uniAll.map((h) => h.id))
+ok(
+  "type:'all' 包含 word 与 reading 两族结果（id 集合包含关系，不比长度）",
+  allWordTea.length > 0 &&
+    allReadingTea.length > 0 &&
+    allWordTea.every((h) => allIdSet.has(h.id)) &&
+    allReadingTea.every((h) => allIdSet.has(h.id)) &&
+    uniAll.every((h) => h.id.startsWith('content:word:') || h.id.startsWith('content:reading:')),
+  `word=${allWordTea.length} reading=${allReadingTea.length} all=${uniAll.length}`,
+)
+ok("type:'listening'（仍未放开）返回空数组", (await cq.search({ type: 'listening', query: 'abandon' })).length === 0)
 ok("search 默认 type 为 word", idOf(await cq.search({ query: 'abandon', pageSize: 50 })) === idOf(uni))
 ok('search 精确排序保持：首位为词形全等', uni[0]?.word.toLowerCase() === 'abandon', uni[0]?.word)
 const uniPkg = await cq.search({ type: 'word', query: 'abandon', packageId: 'content:vocabulary:ecdict-ielts:ielts' })
 ok('search 支持 4 段式 packageId', uniPkg.length === 1 && uniPkg[0].packageLocalId === 'ielts')
 const got = await cq.get(sample.id)
 ok('contentQuery.get(contentId) 命中', !!got && got.id === sample.id && got.word === sample.word, `${got?.id}`)
-ok('contentQuery.get 未接入类型返回 null', (await cq.get('content:listening:ielts:test-01')) === null)
+ok('contentQuery.get 未放开类型返回 null', (await cq.get('content:listening:ielts:test-01')) === null)
+// P18-E：reading 已放开 ⇒ get 必须命中（此前会走 getWord 早退静默返回 null）
+const readingNsEarly = model.parseContentId(registry.getPackage('demo-reading-01').manifest.id).namespace
+const readingGetEarly = await cq.get(`content:reading:${readingNsEarly}:reading-item-01`)
+ok(
+  'contentQuery.get(reading ContentId) 命中且 type/itemId 正确（P18-E 放开）',
+  !!readingGetEarly && readingGetEarly.type === 'reading' && readingGetEarly.itemId === 'reading-item-01',
+  readingGetEarly ? `${readingGetEarly.id}` : 'null',
+)
 ok('contentQuery.get 非法 id 返回 null', (await cq.get('abandon')) === null)
 ok('count({type:"word"}) = 全库合计', (await cq.count({ type: 'word' })) === manifestTotal, `${await cq.count({ type: 'word' })} vs ${manifestTotal}`)
 ok('count({type:"listening"}) = 0', (await cq.count({ type: 'listening' })) === 0)
@@ -196,7 +217,7 @@ const tagged = await cq.list({ type: 'word', tags: ['ielts'], pageSize: 5 })
 ok('list tags 过滤生效', tagged.length > 0 && tagged.every((h) => h.packageLocalId === 'ielts'), `${tagged.length} 条`)
 ok('list 未知 tag 返回空', (await cq.list({ type: 'word', tags: ['nope-not-a-tag'] })).length === 0)
 ok('list 未知包返回空', (await cq.list({ type: 'word', packageId: 'nope' })).length === 0)
-ok('list 未接入类型返回空', (await cq.list({ type: 'listening', packageId: 'ielts' })).length === 0)
+ok('list 未放开类型返回空', (await cq.list({ type: 'listening', packageId: 'ielts' })).length === 0)
 const phUni = await cq.list({ type: 'word', tags: ['ai'], pageSize: 200, hasPhonetic: true })
 const phNone = await cq.list({ type: 'word', tags: ['ai'], pageSize: 200, hasPhonetic: false })
 ok('list hasPhonetic 过滤生效', phUni.every((h) => !!h.phonetic) && phNone.length >= phUni.length, `${phUni.length}/${phNone.length}`)
@@ -244,9 +265,16 @@ ok('getCatalog 不加载词条（只读 manifest）', typeof cat.getCatalog().pa
 
 const index = await idx.ensureIndex()
 const stats0 = idx.getIndexStats()
-ok('ensureIndex() 后 entries = 全库合计', stats0.entries === manifestTotal, `${stats0.entries} vs ${manifestTotal}`)
-ok('ensureIndex() 后 packages = 10', stats0.packages === 10, `${stats0.packages}`)
-ok('ensureIndex 幂等（二次调用 entries 不变）', (await idx.ensureIndex(), idx.getIndexStats().entries) === manifestTotal)
+// P18-E：无参 ensureIndex() = 覆盖**全部已注册包**（含 8 个 demo 包），不再只覆盖 10 个词库。
+// 期望值一律**从注册表派生**（allPkgs / expectedTotal 来自 【9】 的独立真值），不写死 18 / 9384 这类数字。
+const indexPackagesExpected = allPkgs.length
+ok('ensureIndex() 后 entries = 全库（含 demo 包）合计', stats0.entries === expectedTotal, `${stats0.entries} vs ${expectedTotal}`)
+ok(
+  'ensureIndex() 后 packages = 注册包数（省略参数 = 覆盖全库）',
+  stats0.packages === indexPackagesExpected,
+  `${stats0.packages} vs ${indexPackagesExpected}`,
+)
+ok('ensureIndex 幂等（二次调用 entries 不变）', (await idx.ensureIndex(), idx.getIndexStats().entries) === expectedTotal)
 const wordKey = idx.normalizeWord(sample.word)
 ok('byWord 收录词条的归一化 key', (index.byWord.get(wordKey) ?? []).includes(sample.id), wordKey)
 ok(
@@ -257,13 +285,21 @@ ok('byPackage 按包聚合', (index.byPackage.get('ielts') ?? []).length === iel
 ok('byTag 收录包级 tag', (index.byTag.get('ielts') ?? []).length === ieltsManifest.stats.items)
 idx.invalidateIndex('ielts')
 const stats1 = idx.getIndexStats()
-ok('invalidateIndex("ielts") 后 entries 降 3000', stats1.entries === manifestTotal - ieltsManifest.stats.items, `${stats1.entries} vs ${manifestTotal - ieltsManifest.stats.items}`)
-ok('invalidateIndex("ielts") 后 packages = 9', stats1.packages === 9, `${stats1.packages}`)
+ok(
+  'invalidateIndex("ielts") 后 entries 降该包 items 数',
+  stats1.entries === expectedTotal - ieltsManifest.stats.items,
+  `${stats1.entries} vs ${expectedTotal - ieltsManifest.stats.items}`,
+)
+ok(
+  'invalidateIndex("ielts") 后 packages = 注册包数 - 1',
+  stats1.packages === indexPackagesExpected - 1,
+  `${stats1.packages} vs ${indexPackagesExpected - 1}`,
+)
 ok('失效后 byPackage 不再含 ielts', index.byPackage.get('ielts') === undefined)
 ok('失效后 byWord 不再含 ielts 词条', !(index.byWord.get(wordKey) ?? []).some((id2) => id2.startsWith('content:word:ecdict-ielts:')))
 ok('失效后 byTag 不再含 ielts 词条', !(index.byTag.get('ielts') ?? []).length)
 const rebuilt = await idx.ensureIndex()
-ok('重新 ensureIndex 恢复全量', idx.getIndexStats().entries === manifestTotal, `${idx.getIndexStats().entries}`)
+ok('重新 ensureIndex 恢复全量', idx.getIndexStats().entries === expectedTotal, `${idx.getIndexStats().entries} vs ${expectedTotal}`)
 ok('重建后 byWord 恢复 ielts 词条', (rebuilt.byWord.get(wordKey) ?? []).includes(sample.id))
 idx.invalidateIndex()
 ok('invalidateIndex() 全清', idx.getIndexStats().entries === 0 && idx.getIndexStats().packages === 0)
@@ -624,6 +660,116 @@ console.log('\n【14】queryWord —— UI 唯一需要的单条寻址入口')
   const again = await q.queryWord('cet4', w0)
   ok('二次调用：结果逐字节相同（索引缓存不改变语义）', JSON.stringify(again) === JSON.stringify(hit))
   ok('已挂进 contentQuery 聚合导出（设计文档 §4.2 第 5 条）', typeof q.contentQuery.queryWord === 'function')
+}
+
+/* ---------- 15. P18-E：reading 放开（首个非 word 类型，四段齐备的行为级验收） ---------- */
+console.log('\n【15】P18-E reading 放开（启用集 / 包路由 / 索引 / 结果形状）')
+{
+  const READING_PKG = 'demo-reading-01'
+  const readingPkg = registry.getPackage(READING_PKG)
+  const readingNs = model.parseContentId(readingPkg.manifest.id).namespace
+  const readingItems = readingPkg.manifest.stats.items // 从注册表派生，不写死 6
+  const readingIdOf = (rows) => rows.map((h) => h.id).join('|')
+
+  await idx.ensureIndex() // 确保索引含全库（含 reading demo 包）
+
+  // ① 计数：必须 == 该类型包 stats.items 之和（专抓「count 仍返回 9346 词」）
+  ok(
+    `count({type:'reading'}) = reading 包 stats.items(${readingItems})`,
+    (await cq.count({ type: 'reading' })) === readingItems,
+    `${await cq.count({ type: 'reading' })} vs ${readingItems}`,
+  )
+
+  // ② 列表：非空 + 每条都是 reading 族 + 归属正确 + title 为字符串
+  const readingList = await cq.list({ type: 'reading', pageSize: 100000 })
+  ok(
+    "list({type:'reading'}) 非空且每条 type='reading' / 归属 demo-reading-01 / title 为 string",
+    readingList.length === readingItems &&
+      readingList.every((h) => h.type === 'reading') &&
+      readingList.every((h) => h.packageLocalId === READING_PKG) &&
+      readingList.every((h) => typeof h.title === 'string'),
+    `${readingList.length} 条`,
+  )
+
+  // ③ hasPhonetic 的中性语义（word 族专属过滤）：非 word 族**不参与筛选**，不是被筛成空
+  const readingPh = await cq.list({ type: 'reading', pageSize: 100000, hasPhonetic: true })
+  ok(
+    "list({type:'reading', hasPhonetic:true}) == list({type:'reading'})（非 word 族不参与音标筛选）",
+    readingIdOf(readingPh) === readingIdOf(readingList) && readingPh.length > 0,
+    `${readingPh.length} vs ${readingList.length}`,
+  )
+  ok(
+    "count({type:'reading', hasPhonetic:true}) = readingItems（count 与 list 同源）",
+    (await cq.count({ type: 'reading', hasPhonetic: true })) === readingItems,
+  )
+
+  // ④ sort:'word' 的中性语义（词形排序是 word 族专属）：非 word 族退回 rank 主序，顺序不变
+  const readingSorted = await cq.list({ type: 'reading', pageSize: 100000, sort: 'word' })
+  ok(
+    "list({type:'reading', sort:'word'}) == list({type:'reading'})（词形主序对非 word 族中性）",
+    readingIdOf(readingSorted) === readingIdOf(readingList),
+  )
+
+  // ⑤ 跨族不外溢（最重要的一条）：显式指定异族包也必须被滤掉
+  ok(
+    "list({type:'word', packageId:'demo-reading-01'}) = [] 且 count = 0（异族包被滤掉）",
+    (await cq.list({ type: 'word', packageId: READING_PKG, pageSize: 10 })).length === 0 &&
+      (await cq.count({ type: 'word', packageId: READING_PKG })) === 0,
+  )
+  ok(
+    "list({type:'reading', packageId:'ielts'}) = []（反向同样不外溢）",
+    (await cq.list({ type: 'reading', packageId: 'ielts', pageSize: 10 })).length === 0,
+  )
+
+  // ⑥ 检索：reading 族按 descriptor.query.match(title substring) 命中
+  const readingTea = await cq.search({ type: 'reading', query: 'tea', pageSize: 100000 })
+  ok(
+    "search({type:'reading', query:'tea'}) 非空且全部 type='reading'",
+    readingTea.length > 0 && readingTea.every((h) => h.type === 'reading'),
+    `${readingTea.length} 条：${readingTea.map((h) => h.itemId).join(',')}`,
+  )
+  ok(
+    "search({type:'reading', query:'zzz-not-present'}) = []",
+    (await cq.search({ type: 'reading', query: 'zzz-not-present' })).length === 0,
+  )
+  // 精确命中走 descriptor.query.index 的 exact 字段（reading → id）
+  const readingExact = await cq.search({ type: 'reading', query: 'reading-item-02', exact: true })
+  ok(
+    "search({type:'reading', query:'reading-item-02', exact:true}) 命中该条目（index.exact 走 id）",
+    readingExact.length === 1 && readingExact[0].itemId === 'reading-item-02',
+    `${readingExact.length} 条`,
+  )
+
+  // ⑦ 分页确定性（铁律：同一 query 两次顺序完全一致、翻页不重不漏）
+  const rp1a = await cq.list({ type: 'reading', page: 1, pageSize: 2 })
+  const rp1b = await cq.list({ type: 'reading', page: 1, pageSize: 2 })
+  const rp2 = await cq.list({ type: 'reading', page: 2, pageSize: 2 })
+  ok('list({type:"reading",pageSize:2}) 两次调用 id 序列完全一致', readingIdOf(rp1a) === readingIdOf(rp1b), readingIdOf(rp1a))
+  ok('page1 / page2 无交集', !rp1a.some((h) => rp2.some((x) => x.id === h.id)), `${rp1a.length}/${rp2.length}`)
+
+  // ⑧ 分族不变量（防假绿）：byWord 里不得出现任何非 word 族的 id
+  const byWordIds = [...index.byWord.values()].flat()
+  ok(
+    "index.byWord 不含任何 'content:reading:' 开头的 id（非 word 族不进倒排表）",
+    byWordIds.length > 0 && byWordIds.every((id2) => !id2.startsWith('content:reading:')),
+    `byWord 共 ${byWordIds.length} 项`,
+  )
+  // 对照组：byId 里必须有 reading 条目（证明索引确实覆盖了 reading，上条不是空转）
+  const byIdReading = [...index.byId.keys()].filter((id2) => id2.startsWith('content:reading:'))
+  ok(
+    '对照组：index.byId 含 reading 条目（证明索引确实覆盖 reading，上条非空转）',
+    byIdReading.length === readingItems,
+    `${byIdReading.length}`,
+  )
+  // ⑨ 条目 ContentId 自洽：content:reading:<ns>:<itemId> 可解析、可寻址、type 正确
+  // （readingList 为空时不许直接索引 [0] —— 回归应产出可读的 ❌，而不是让整个脚本崩掉）
+  const oneReadingId = readingList[0] ? model.makeContentId('reading', readingNs, readingList[0].itemId) : ''
+  const oneReadingHit = oneReadingId ? await cq.get(oneReadingId) : null
+  ok(
+    'get(条目自身 ContentId) 命中同一条，且 parseContentId 解析出的 type = reading',
+    !!oneReadingHit && oneReadingHit.id === oneReadingId && model.parseContentId(oneReadingHit.id)?.type === 'reading',
+    oneReadingId || '(readingList 为空，无法取条目)',
+  )
 }
 
 await server.close()

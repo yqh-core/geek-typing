@@ -13,8 +13,10 @@
  * 两个正交开关（刻意分开，别合并成一个 `status`）：
  *   packageRegistered —— 该类型**已有内容包**（含仅作结构探针的 demo 包）
  *   queryEnabled      —— 该类型**条目可被 Query 检索**
- *   现状：只有 `word` 可查询（SUPPORTED_TYPES=['word']），其余类型"包在、查不到"。
- *   P18-E 会**逐类型**把 queryEnabled 翻成 true，每次一个类型、各自出证据。
+ *   现状：`word` 与 `reading` 可查询（查询层 SUPPORTED_TYPES 由 queryEnabledTypes() 派生，
+ *   不再自带第二份清单），其余类型仍是"包在、查不到"。
+ *   P18-E 起**逐类型**把 queryEnabled 翻成 true，每次一个类型、各自出证据；
+ *   「放开」= 启用集 / 包路由 / 索引 / 结果形状四段齐备，缺一段由门判红（裁定 §⑨-2）。
  *   两个开关分开，是为了让"包存在"与"能查询"这两件事在证据里可分辨 —— 别用一句话糊过去。
  *
  * 不变量（由 scripts/gate-content-type-contract.mjs 机器校验，INV-6）：
@@ -127,7 +129,13 @@ const VOCAB_ITEM_FIELDS: FieldSpec[] = [
 
 const VOCAB_QUERY = {
   index: [{ field: 'word', mode: 'exact' as const }],
-  match: [{ field: 'word', mode: 'prefix' as const }, { field: 'translation', mode: 'substring' as const }],
+  match: [
+    { field: 'word', mode: 'prefix' as const },
+    { field: 'translation', mode: 'substring' as const },
+    // 声明补齐（P18-E）：rank2 一直也匹配 definition（旧实现里是硬编码判断），
+    // 只是本清单漏写 ⇒ 「声明少一条」的漂移。查询层改成由本清单派生后，声明必须与行为一致。
+    { field: 'definition', mode: 'substring' as const },
+  ],
   sort: ['relevance', 'word'],
 }
 
@@ -142,7 +150,7 @@ export const CONTENT_TYPE_REGISTRY: Readonly<Record<ContentType, ContentTypeDesc
     itemType: 'word',
     packageLevel: false, // 条目级类型：词条不属于任何包的子类型，不进 Catalog 类型列表
     packageRegistered: true,
-    queryEnabled: true, // ← 当前唯一可查询的类型
+    queryEnabled: true, // ← 当前唯一可查询的**条目级**类型（vocabulary 的条目也走它）
     fields: VOCAB_ITEM_FIELDS,
     assets: { required: [], optional: ['audio'] },
     query: VOCAB_QUERY,
@@ -207,7 +215,8 @@ export const CONTENT_TYPE_REGISTRY: Readonly<Record<ContentType, ContentTypeDesc
     itemType: 'reading',
     packageLevel: true,
     packageRegistered: true,
-    queryEnabled: false,
+    // P18-E 首个放开的非 word 类型（放开 = 启用集 / 包路由 / 索引 / 结果形状四段齐备）
+    queryEnabled: true,
     fields: [
       ID_FIELD,
       TITLE_FIELD,

@@ -9,12 +9,18 @@
  *  - 词条数据只经 registry.loadPackage() 取，复用其单份缓存；本文件禁止自己 import 词表，
  *    否则三大库会在内存里出现第二份 3000 词副本；
  *  - 懒构建：ensureIndex() 首次调用才加载目标包，已建过的包不重复加载；
- *  - 当前只索引 word 类型。**新内容类型接入时在此扩展索引维度**（byTag 的词级 tag、
- *    byAudio 等），而不是新增散装 API —— 否则又回到「每加一类就多一套查询函数」的老路。
+ *  - **分族索引**：条目按**形状族**（descriptorOf(包.type).itemType）落表 ——
+ *    word 族进 byId + byWord + byPackage + byTag；其他族只进 byId + byPackage + byTag
+ *    （**绝不进 byWord**：这是「非 word 条目不当词形检索」的结构保证，另有测试断言兜底）。
+ *    新增内容类型时在此**按族**扩展索引维度（byTag 的词级 tag、byAudio 等），
+ *    而不是新增散装 API —— 否则又回到「每加一类就多一套查询函数」的老路。
  */
-import { getPackage, getVocabularyPackages, loadPackage } from '../registry'
+import { getAllPackages, getPackage, loadPackage, loadPackageData } from '../registry'
 import { makeContentId, parseContentId } from '../model/content'
-import type { WordHit } from '../query/content-query'
+import type { ContentType } from '../model/content'
+import { descriptorOf } from '../types/registry'
+import { isWordHit } from '../query/content-query'
+import type { ContentHit, ContentItemHit, WordHit } from '../query/content-query'
 
 /**
  * ContentIndex —— **internal**：索引的物理结构（当前四张 Map）。
@@ -22,9 +28,10 @@ import type { WordHit } from '../query/content-query'
  * 否则「索引内部换成 Trie / 索引落到 Worker」那天要改的调用点会散落全站。
  */
 export interface ContentIndex {
-  /** ContentId → 词条（全量正排表，get() 与结果物化走这里） */
-  byId: Map<string, WordHit>
-  /** 归一化词形（NFC + lowercase + 空白折叠）→ ContentId[]（跨包同词各占一条） */
+  /** ContentId → 条目（全量正排表，get() 与结果物化走这里）。**所有族**都进这张表 */
+  byId: Map<string, ContentHit>
+  /** 归一化词形（NFC + lowercase + 空白折叠）→ ContentId[]（跨包同词各占一条）。
+   *  **只由 word 族写入**；非 word 族不进本表（分族不变量，见文件头）。 */
   byWord: Map<string, string[]>
   /** packageLocalId → ContentId[] */
   byPackage: Map<string, string[]>
@@ -69,6 +76,54 @@ export function buildHits(
   }))
 }
 
+/**
+ * 包内**非 word 族**条目 → ContentItemHit（P18-E）。
+ *
+ * 与 buildHits 的关键差异：
+ *  - 条目 id 取 `item.id`（**包内本地键**，不是词形）⇒ 稳定，不随展示文本变化；
+ *  - `fields` **保留原条目对象本身**（不是拷贝）—— descriptor 声明的任意字段按名取值
+ *    （query 层的 fieldValueOf 消费），字段集是**数据**，不在代码里写死。
+ *
+ * 载荷合法性是 `content:validate` 的门：这里遇到 `id` 不是非空字符串的行**跳过并留痕**
+ * （`console.warn`），不静默、也不抛 —— 运行时崩溃比缺一条更糟（与 content-query.ts 的
+ * queryWord 显式降级留痕同一风格）。
+ */
+export function buildItemHits(
+  localId: string,
+  packageId: string,
+  packageTitle: string,
+  itemType: ContentType,
+  rows: unknown[],
+): ContentItemHit[] {
+  const ns = parseContentId(packageId)?.namespace ?? localId
+  const out: ContentItemHit[] = []
+  for (const raw of rows) {
+    if (!raw || typeof raw !== 'object') {
+      console.warn(`[content-index] 跳过非法条目（非对象）：${localId}`, raw)
+      continue
+    }
+    const item = raw as Record<string, unknown>
+    const itemId = item.id
+    if (typeof itemId !== 'string' || !itemId) {
+      console.warn(`[content-index] 跳过非法条目（id 缺失/非字符串）：${localId}`, raw)
+      continue
+    }
+    out.push({
+      type: itemType,
+      id: makeContentId(itemType, ns, itemId),
+      itemId,
+      // title 由 content:validate 的 TITLE_FIELD(required) 保证为字符串；
+      // 此处不做运行时兜底改写 —— 缺 title 属载荷门失败，不许在索引里静默补默认值。
+      title: item.title as string,
+      packageId,
+      packageLocalId: localId,
+      packageTitle,
+      fields: item,
+    })
+  }
+  return out
+}
+
 /* ---------------- 索引状态（模块级单例，invalidateIndex 可整体或部分重建） ---------------- */
 const index: ContentIndex = {
   byId: new Map(),
@@ -97,15 +152,29 @@ async function buildOne(localId: string): Promise<void> {
   let task = inflight.get(localId)
   if (!task) {
     task = (async () => {
-      const pkg = getVocabularyPackages().find((p) => p.localId === localId)
+      const pkg = getPackage(localId)
       if (!pkg) return
-      // 唯一数据来源：registry.loadPackage（inline 直接命中，lazy 走动态 import + 缓存）
-      const words = await loadPackage(localId)
-      for (const hit of buildHits(localId, pkg.manifest.id, pkg.manifest.title, words)) {
-        index.byId.set(hit.id, hit)
-        push(index.byWord, normalizeWord(hit.word), hit.id)
-        push(index.byPackage, localId, hit.id)
-        for (const tag of pkg.manifest.tags) push(index.byTag, tag, hit.id)
+      // 分族判定用**形状**（descriptor.itemType），不是 14 个类型名的 switch ——
+      // vocabulary 的条目同样走 word 族（itemType='word'）。
+      const itemType = descriptorOf(pkg.manifest.type)?.itemType
+      if (!itemType) return
+      if (itemType === 'word') {
+        // word 族：唯一数据来源 registry.loadPackage（inline 直接命中，lazy 走动态 import + 缓存）
+        const words = await loadPackage(localId)
+        for (const hit of buildHits(localId, pkg.manifest.id, pkg.manifest.title, words)) {
+          index.byId.set(hit.id, hit)
+          push(index.byWord, normalizeWord(hit.word), hit.id)
+          push(index.byPackage, localId, hit.id)
+          for (const tag of pkg.manifest.tags) push(index.byTag, tag, hit.id)
+        }
+      } else {
+        // 其他族：条目通道（items.json）；**不写 byWord**（分族不变量）
+        const rows = await loadPackageData(localId)
+        for (const hit of buildItemHits(localId, pkg.manifest.id, pkg.manifest.title, itemType, rows)) {
+          index.byId.set(hit.id, hit)
+          push(index.byPackage, localId, hit.id)
+          for (const tag of pkg.manifest.tags) push(index.byTag, tag, hit.id)
+        }
       }
       built.add(localId)
     })()
@@ -115,11 +184,11 @@ async function buildOne(localId: string): Promise<void> {
   inflight.delete(localId)
 }
 
-/** 确保索引覆盖目标包；省略参数则覆盖全部已注册包。返回同一份 ContentIndex（可变单例）。 */
+/** 确保索引覆盖目标包；省略参数则覆盖**全部已注册包**（含非 vocabulary 类型）。返回同一份 ContentIndex（可变单例）。 */
 export async function ensureIndex(packageIds?: string[]): Promise<ContentIndex> {
   const targets = packageIds
     ? [...new Set(packageIds.map(resolveLocalId).filter((id): id is string => !!id))]
-    : getVocabularyPackages().map((p) => p.localId)
+    : getAllPackages().map((p) => p.localId)
   for (const id of targets) await buildOne(id)
   return index
 }
@@ -147,6 +216,8 @@ export function invalidateIndex(packageId?: string): void {
     const hit = index.byId.get(id)
     if (!hit) continue
     index.byId.delete(id)
+    // 只有 word 族 hit 进过 byWord；非 word hit 跳过该步（否则 normalizeWord(hit.word) 会抛 TypeError）
+    if (!isWordHit(hit)) continue
     const wordKey = normalizeWord(hit.word)
     const arr = index.byWord.get(wordKey)
     if (arr) {
@@ -188,9 +259,9 @@ export function getIndexStats(): { packages: number; entries: number } {
  *  - finder 是**同步**的：调用方需先 await ensureIndex() 覆盖目标包，
  *    未建索引的包表现为「查不到」（与 old 行为一致，不会返回半截数据）。
  */
-/** id[] → WordHit[]（保持索引顺序，跳过已失效的悬空 id） */
-function materialize(ids: string[] | undefined): WordHit[] {
-  const out: WordHit[] = []
+/** id[] → ContentHit[]（保持索引顺序，跳过已失效的悬空 id） */
+function materialize(ids: string[] | undefined): ContentHit[] {
+  const out: ContentHit[] = []
   for (const id of ids ?? []) {
     const hit = index.byId.get(id)
     if (hit) out.push(hit)
@@ -199,28 +270,32 @@ function materialize(ids: string[] | undefined): WordHit[] {
 }
 
 /** 按 ContentId 取单条；未命中 / 未建索引返回 null */
-export function findById(id: string): WordHit | null {
+export function findById(id: string): ContentHit | null {
   return index.byId.get(id) ?? null
 }
 
-/** 按归一化词形取全部命中（跨包同词各占一条）；key 必须经 normalizeWord 处理 */
+/** 按归一化词形取全部命中（跨包同词各占一条）；key 必须经 normalizeWord 处理。
+ *
+ *  `byWord` 由构造（buildOne 的 word 族分支）**只含 word 族 id**；这里的 `filter(isWordHit)`
+ *  只是把它表达成**类型桥**（byWord 的值类型是 string[]，物化后是联合类型）。
+ *  该不变量另有测试断言兜底（byWord 里不得出现非 word 前缀的 id）。 */
 export function findByWord(normalizedWord: string): WordHit[] {
-  return materialize(index.byWord.get(normalizedWord))
+  return materialize(index.byWord.get(normalizedWord)).filter(isWordHit)
 }
 
-/** 包内全部词条（裸 localId，如 'cet4'） */
-export function findByPackage(packageLocalId: string): WordHit[] {
+/** 包内全部条目（裸 localId，如 'cet4' / 'demo-reading-01'） */
+export function findByPackage(packageLocalId: string): ContentHit[] {
   return materialize(index.byPackage.get(packageLocalId))
 }
 
-/** tag 命中的全部词条（当前 tag 取包 manifest.tags；词级 tag 接入后由索引侧扩展） */
-export function findByTag(tag: string): WordHit[] {
+/** tag 命中的全部条目（当前 tag 取包 manifest.tags；词级 tag 接入后由索引侧扩展） */
+export function findByTag(tag: string): ContentHit[] {
   return materialize(index.byTag.get(tag))
 }
 
-/** 按包 namespace（如 'ecdict-ielts'）取全部词条；namespace 每包唯一 ⇒ 最多命中一个包 */
-export function findByNamespace(namespace: string): WordHit[] {
-  const pkg = getVocabularyPackages().find((p) => parseContentId(p.manifest.id)?.namespace === namespace)
+/** 按包 namespace（如 'ecdict-ielts'）取全部条目；namespace 每包唯一 ⇒ 最多命中一个包 */
+export function findByNamespace(namespace: string): ContentHit[] {
+  const pkg = getAllPackages().find((p) => parseContentId(p.manifest.id)?.namespace === namespace)
   return pkg ? findByPackage(pkg.localId) : []
 }
 

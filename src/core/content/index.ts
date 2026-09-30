@@ -18,6 +18,8 @@ export {
   listWords,
   getWord,
   countWords,
+  // P18-E：结果联合的结构判别（非 word 族靠它收窄，不用 as 断言）
+  isWordHit,
 } from './query/content-query'
 
 export { getCatalog, getPackageCatalog } from './catalog/catalog'
@@ -38,6 +40,8 @@ export type {
 
 export type {
   WordHit,
+  ContentHit,
+  ContentItemHit,
   QueryOptions,
   SearchOptions,
   ListOptions,
