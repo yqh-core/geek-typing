@@ -9,7 +9,9 @@
  * 内容数据的唯一定义源是 content/<type>/<id>/{manifest,words}.json；本文件不承载数据。
  * stats/checksum 一律由 content:build 从数据自动派生，不人工维护。
  */
-import type { ContentSource, ContentType, ContentRevisionEntry } from './model/content'
+import type { ContentSource, ContentType, ContentRevisionEntry, ContentLicense } from './model/content'
+import type { AssetManifest } from './model/asset'
+import type { Provenance } from './provenance'
 
 export type { ContentType, ContentSource, ContentLicense, ParsedContentId } from './model/content'
 export { makeContentId, parseContentId, wordId } from './model/content'
@@ -76,6 +78,15 @@ export interface PackageManifest {
   /** Import Pipeline 的规范化开关：代码词库须 stripHtml=false，
    *  否则 `type Handler<T>` / `<div />` 会被当成 HTML 标签删掉，词表被破坏。 */
   normalize?: { stripHtml?: boolean }
+  /** 包级许可表：id → 许可；asset 用 licenseRef 指向这里的 id（声明式继承）。
+   *  是**具名表**而非单个 license —— 一个包里"词表 MIT / 音频 CC-BY-NC"可以并存。
+   *  与 `sources[].license`（载荷来源许可）职责分离，**不得互相 fallback**。 */
+  licenses?: Record<string, ContentLicense>
+  /** 包级溯源（描述"这批内容从哪来"）。与该包 `sources[]` 的载荷来源是两回事，字段名不许混用。
+   *  与 `licenses` 同属「条件必填」：包内声明了非空 `assets[]` 时二者必填（P1.8 裁定 ④-3）。 */
+  provenance?: Provenance
+  /** 包内资产（独立实体，生命周期严格随宿主包；见 model/asset.ts 的 AssetManifest） */
+  assets?: AssetManifest[]
 }
 
 /** 词条载荷（与 V3 WordItem 形状一致；V4.1 起定义在 model/vocabulary）。

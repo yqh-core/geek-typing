@@ -236,12 +236,19 @@ canonicalize([{ word: 'z' }, { word: 'a' }]) === '[{"word":"z"},{"word":"a"}]'
 
 ## 7. Asset —— Content ≠ File
 
-`AssetRef { assetId, kind, url, mime?, bytes?, checksum?, license? }`，`assetId` 形态
-`asset:<kind>:<namespace>:<localId>`（**不用 `content:` 前缀**，避免被 `parseContentId` 误解析）。
-`AssetKind = 'audio' | 'image' | 'document' | 'subtitle' | 'other'`，由 `makeAssetId(kind, namespace, localId)` 生成。
+`AssetManifest`（`src/core/content/model/asset.ts`）：`assetId` 形态为
+`<宿主包 ContentId>#a:<assetLocalId>` —— 宿主段复用既有 4 段式 ContentId 文法，例
+`content:vocabulary:ecdict-ietf:ielts#a:a-0007`；由 `makeAssetId(hostContentId, assetLocalId)`
+生成，配 `parseAssetId(id)` / `isAssetOwnedBy(assetId, hostContentId)`。
+`AssetKind = 'audio' | 'video' | 'image' | 'document' | 'subtitle' | 'other'`。
+
+许可**必须显式二选一**（编译期互斥）：内联 `license`，或 `licenseRef` 指向包级
+`manifest.licenses[ref]` —— **禁止隐式继承，缺 = FAIL**。`url` 必须远程 `https://`
+（运行期经 `/media/*` 同源代理；媒体本体不进 git）。三条所有权规则见
+`docs/p18/P1.8-PLAN-v1.0-FROZEN.md` §3.2。
 
 Content 回答「这个东西是什么」，Asset 回答「文件在哪」。
-将来 本地 → Cloudflare R2 → CDN → GitHub Releases 切换时，Content 模型一行都不用改。
+将来 Cloudflare R2 → CDN → GitHub Releases 切换时，Content 模型一行都不用改。
 
 ## 8. Registry / Catalog / Index / Query —— 四个职责，不要混
 

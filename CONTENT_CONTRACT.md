@@ -58,7 +58,7 @@
 | 3 | PackageId / namespace / localId |
 | 4 | 版本模型：schemaVersion / contentVersion / contentRevision / checksum |
 | 5 | Canonical JSON 与 checksum 算法 |
-| 6 | 核心类型：ContentRef / ContentVersioned / ContentVersionRef / ContentSnapshot / AssetRef |
+| 6 | 核心类型：ContentRef / ContentVersioned / ContentVersionRef / ContentSnapshot / AssetManifest |
 | 7 | manifest.json 契约 |
 | 8 | words.json / relations.json 契约 |
 | 9 | Catalog / ContentIndex / ContentQuery 三层职责与 API |
@@ -355,23 +355,36 @@ interface ContentSnapshot {
 - **`findRevision` 必须与 `content:build` 同口径**：二者都取「最近一次以该内容发布的记录」。
   `contentHistory` 按 revision **升序**追加；同一 checksum 可出现多次（回滚场景），以最近一次为准。
 
-### 6.6 `AssetRef` —— Content ≠ File
+### 6.6 `AssetManifest` —— Content ≠ File
 
 ```ts
-type AssetKind = 'audio' | 'image' | 'document' | 'subtitle' | 'other'
+type AssetKind = 'audio' | 'video' | 'image' | 'document' | 'subtitle' | 'other'
 
-interface AssetRef {
-  assetId: string      // asset:<kind>:<namespace>:<localId>
+type AssetLicense =
+  | { license: ContentLicense; licenseRef?: never }   // 二选一，编译期互斥
+  | { licenseRef: string; license?: never }
+
+type AssetManifest = {
+  assetId: string      // <宿主包 ContentId>#a:<assetLocalId>
   kind: AssetKind
-  url: string          // 相对路径 / https URL（R2 / CDN / Releases）
+  url: string          // 必须远程 https://（运行期经 /media/* 同源代理）
   mime?: string
   bytes?: number
-  checksum?: string
-  license?: ContentLicense
-}
+  checksum: string     // 必填，sha256:<64 位小写 hex>
+  duration?: number    // 秒
+  lang?: string
+  role?: string
+  provenance: Provenance   // 逐件溯源（复用 provenance.ts，必填 provider）
+} & AssetLicense
 ```
 
-- 前缀必须是 `asset:` 而不是 `content:` —— 否则会被 `parseContentId` 误解析成内容实体。
+- `assetId` 的宿主段复用 4 段式 ContentId 文法（`parseContentId`），本地段复用
+  `isStableLocalId`；构造/解析用 `makeAssetId(hostContentId, assetLocalId)` /
+  `parseAssetId(id)` / `isAssetOwnedBy(assetId, hostContentId)`。
+- 许可**必须显式二选一**（内联 `license`，或 `licenseRef` 指向包级 `licenses[ref]`），
+  **禁止隐式继承，缺 = FAIL** —— 这是三条所有权规则的第 2 条。
+- 资产**不可跨包引用**（规则 1）：归属由 `assetId` 语法直接承载，落校验为归属断言。
+- `url` 必须远程 —— 媒体本体不进 git（INV-4），同源代理才能进 SW 缓存。
 - Content 回答「这个东西是什么」，Asset 回答「文件在哪」。搬运到 CDN / R2 时 **Content 模型一行都不用改**。
 
 ---
@@ -598,7 +611,7 @@ rank `0` = 精确词形 > `1` = 前缀 > `2` = 释义/翻译命中。**组内**�
 | L-2 | **`contentVersion` 不保证连续** | 回滚后新内容会跳号（实测 ver `1 → 4`） | 下游只用 checksum 判断内容身份，见 §4.3 |
 | L-3 | **`relations.json` / `assets/` 尚无数据** | 门禁相应项打印「跳过」，不伪造通过 | P3 接入时必须同步补门禁断言 |
 | L-4 | **近似重复只在 for-review 层** | car / automobile 这类语义近义**不做自动处理**，绝不自动删除任何词 | 只生成候选供人工 review |
-| L-5 | **AssetManifest 未做** | `assets/manifest.json`（checksum / mime / bytes / duration / language / source / license / storage）尚未建模 | 推到 P3 |
+| L-5 | **Asset 实体未落盘** | `AssetManifest` 模型已定稿（P18-B：assetId 新形态 + 许可显式二选一 + `PackageManifest.licenses/provenance/assets`）；`assets/manifest.json` 实体与 `content/assets/` 目录仍不存在 | 实体落地 + `/media/*` 同源代理推 P18-F |
 | L-6 | **Learning 层未迁移**（P0.6.1 事实订正）：**运行时学习记录的键是裸 `word`，连包的信息都没有** —— 不是旧表述的 `bankId + word`。四层口径还各不相同（见下表） | 量化：全库 9346 词中**跨包同名词 2323 个**（同一词形出现在 ≥2 个包）、原词形**含大写 93 条**；**全仓不存在任何 `bankId + word` 拼接** | P1.5 迁移到 ContentId；迁移**存在不可逆信息损失**，按下方归属规则执行 |
 | L-7 | **UI 尚未接 Query Layer 与 Catalog**：现有组件（HomePanel / PracticePanel / ReviewPanel / CommandPalette …）仍直读词表 | 实测：`?raw` 词表导入**全站只在 `src/core/content/registry.ts` 一处**（比旧描述好，UI 组件零直连）；但 UI 有 **17 处**直接持有词数组做操作；`contentQuery.*` / `getCatalog()` 在 UI 中调用数 **= 0**；`hasFeature()`（registry.ts:134）调用数 **= 0** | P1 直接接线，**不造新抽象 / 新目录 / 新 Repository / 新 Service**；边界见 §12 |
 
