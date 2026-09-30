@@ -1,0 +1,62 @@
+# RunId: P18-D-FALSIFY-UI-CONTRACT-20260930-230840-R01
+# Command: node tests/ui-contract.mjs --falsify
+# Commit: fd811b1af36846ec3464921c7dd33e437fc91cbe
+# StartedAt: 2026-09-30T15:08:40.465Z
+# DurationMs: 3602
+# ExitCode: 0
+
+--- stdout+stderr ---
+[ui-contract] 证伪自检 —— 证明每条判据分支都能判红（不会失败的门等于没有门）
+  三组用例：A 决策层各分支精确判红 / B 输入层 fail-closed（基线缺失·坏 JSON）/ C 探测器层字节注入→精确命中→字节还原→复绿
+  隔离副本：node_modules/.tmp/ui-contract-falsify（gitignore；真仓库文件只读）
+
+  ✓ A1 恰好判红（fail={ZERO-tableJsonImports} unknown={∅}）
+      注入 tableJsonImports=1（硬零桶）
+  ✓ A2 恰好判红（fail={ZERO-packageBranches} unknown={∅}）
+      注入 packageBranches=1（硬零桶）
+  ✓ A3 恰好判红（fail={RATCHET-wordTableSources} unknown={∅}）
+      wordTableSources 抬到 基线+1
+  ✓ A4 恰好判红（fail={RATCHET-handleReads} unknown={∅}）
+      handleReads 抬到 基线+1
+  ✓ A5 恰好判红（fail={RATCHET-bannedArrayOps} unknown={∅}）
+      bannedArrayOps 抬到 基线+1
+  ✓ A6 恰好判红（fail={RATCHET-bypassFacadeImports} unknown={∅}）
+      bypassFacadeImports 抬到 基线+1
+  ✓ A7 恰好判红（fail={∅} unknown={SCAN-NONEMPTY}）
+      扫描到 0 个文件（⇒ UNKNOWN，不通过）
+  ✓ A8 恰好判红（fail={∅} unknown={RATCHET-wordTableSources,RATCHET-handleReads,RATCHET-bannedArrayOps,RATCHET-bypassFacadeImports}）
+      基线不可用（按 0 处理会全绿 ⇒ 必须走 Fatal）
+      ↳ 四个棘轮桶全部退化为 UNKNOWN（不是 PASS）—— 证明「基线读不到 ⇒ 当 0 ⇒ 全绿」这条假绿路径不存在
+  ✓ ACTRL 恰好判绿（对照组）
+      对照组：不注入任何故障 ⇒ 九条判据全 PASS
+  ✓ B1 恰好判 Fatal（exit 2），且**没有**把缺失当成计数 0
+      基线文件缺失 ⇒ readBaseline ok=false ⇒ 入口 exit 2
+      ↳ 基线文件读不到（D:\work\geek-typing\node_modules\.tmp\ui-contract-falsify\absent-baseline.json）— ENOENT: no such file or directory, open 'D:\work\geek-typing\node_modules\.tmp\ui-contract-falsify\absent-baseline.json'
+  ✓ B2 恰好判 Fatal（exit 2），且**没有**把缺失当成计数 0
+      基线 JSON 损坏 ⇒ readBaseline ok=false ⇒ 入口 exit 2
+      ↳ 基线文件不是合法 JSON — Unexpected end of JSON input
+  ✓ B3 恰好判 Fatal（exit 2），且**没有**把缺失当成计数 0
+      基线桶集合不全（缺桶 ⇒ 不得当成 0）
+      ↳ 基线 buckets.wordTableSources 缺失或不是非负整数（实测 undefined）
+  ✓ C0 对照组：隔离副本 pristine 状态六桶全 0（基线 {tableJsonImports=0, packageBranches=0, wordTableSources=0, handleReads=0, bannedArrayOps=0, bypassFacadeImports=0}）
+  ✓ C1 探测器恰好判红（增量 {tableJsonImports+1}）
+      直读词表 JSON（静态 import）
+      ↳ 字节还原 ✓，对照组复绿 ✓（增量归零）
+  ✓ C2 探测器恰好判红（增量 {packageBranches+1}）
+      内容包 id 分支
+      ↳ 字节还原 ✓，对照组复绿 ✓（增量归零）
+  ✓ C3 探测器恰好判红（增量 {wordTableSources+1}）
+      词表来源点（X.words，无读操作）
+      ↳ 字节还原 ✓，对照组复绿 ✓（增量归零）
+  ✓ C4 探测器恰好判红（增量 {handleReads+1}）
+      句柄读（按名锚点 bankWords.length，不掺 wordTableSources）
+      ↳ 字节还原 ✓，对照组复绿 ✓（增量归零）
+  ✓ C5 探测器恰好判红（增量 {bannedArrayOps+1}）
+      WordItem[] 上的禁用算子（不掺 wordTableSources）
+      ↳ 字节还原 ✓，对照组复绿 ✓（增量归零）
+  ✓ C6 探测器恰好判红（增量 {bypassFacadeImports+1}）
+      绕过门面直引 core/content/** 深路径
+      ↳ 字节还原 ✓，对照组复绿 ✓（增量归零）
+  ✓ CTRL 真仓库只读：真基线可读且未被改写，真探针夹具与副本逐字节一致
+──────────────────────────────────────────────────────
+✓ falsify: 20/20 恰好判红（含 1 条全 PASS 决策对照组 + 1 条 pristine 探测器对照组 + 1 条真仓库只读对照）

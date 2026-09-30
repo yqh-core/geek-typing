@@ -1,0 +1,275 @@
+# RunId: P18-D-LINT-20260930-230727-R01
+# Command: npx oxlint src/
+# Commit: fd811b1af36846ec3464921c7dd33e437fc91cbe
+# StartedAt: 2026-09-30T15:07:27.817Z
+# DurationMs: 2946
+# ExitCode: 0
+
+--- stdout+stderr ---
+
+  ! eslint(no-irregular-whitespace): Unexpected irregular whitespace
+    ,-[src/core/persistence/channels.ts:12:67]
+ 11 |  *   settingsChannel     → settings  ：useSettings / i18n / speech 的偏好键
+ 12 |  *   diagnosticsChannel  → diagnostics（唯一允许 allKeys）　：learning/diagnostics.ts
+    :                                                           ^^
+ 13 |  */
+    `----
+  help: Try to remove the irregular whitespace
+
+  ! eslint(no-control-regex): Unexpected control characters
+     ,-[src/core/content/model/content.ts:154:16]
+ 153 |     // 控制字符一律删除（\u0000-\u001F、\u007F）
+ 154 |     .replace(/[\u0000-\u001F\u007F]/g, '')
+     :                ^^^|^^ ^^^|^^
+     :                   |      `-- 'U+001F' is a control character.
+     :                   `-- 'U+0000' is a control character.
+ 155 |     // `:` 与 `/` 会破坏 4 段式 ContentId 的解析，必须禁止，退化成 `-`
+     `----
+  help: Avoid matching control characters in regular expressions. If intentional, disable this rule for the expression.
+
+  ! eslint(no-control-regex): Unexpected control characters
+     ,-[src/core/content/model/content.ts:166:9]
+ 165 |   if (id.includes(':') || id.includes('/')) return false
+ 166 |   if (/[\u0000-\u001F\u007F]/.test(id)) return false
+     :         ^^^|^^ ^^^|^^
+     :            |      `-- 'U+001F' is a control character.
+     :            `-- 'U+0000' is a control character.
+ 167 |   return normalizeLocalId(id) === id
+     `----
+  help: Avoid matching control characters in regular expressions. If intentional, disable this rule for the expression.
+
+  ! react-hooks(exhaustive-deps): React Hook useMemo has unnecessary dependency: tab
+    ,-[src/hooks/useReviewFlow.ts:48:6]
+ 47 |     // 切页签时也刷新一次：背单词页的三键打分不在本组件内打点
+ 48 |   }, [reviewVersion, tab])
+    :      ^^^^^^^^^^^^^^^^^^^^
+ 49 |   const reviewTotal = useMemo(() => {
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useMemo has unnecessary dependency: tab
+    ,-[src/hooks/useReviewFlow.ts:52:6]
+ 51 |     return learningService.getReviewTotalCount()
+ 52 |   }, [reviewVersion, tab])
+    :      ^^^^^^^^^^^^^^^^^^^^
+ 53 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useMemo has unnecessary dependency: tab
+    ,-[src/hooks/useReviewFlow.ts:55:63]
+ 54 |   /** Today's Practice 推荐快照：错题本变化（或切回页签）时重建 */
+ 55 |   const recommendation = useMemo(() => buildRecommendation(), [reviewVersion, tab])
+    :                                                               ^^^^^^^^^^^^^^^^^^^^
+ 56 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useMemo has unnecessary dependency: reviewVersion
+    ,-[src/hooks/useReviewFlow.ts:55:63]
+ 54 |   /** Today's Practice 推荐快照：错题本变化（或切回页签）时重建 */
+ 55 |   const recommendation = useMemo(() => buildRecommendation(), [reviewVersion, tab])
+    :                                                               ^^^^^^^^^^^^^^^^^^^^
+ 56 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+    ,-[src/i18n/index.tsx:68:17]
+ 67 | /** 取当前语言与切换函数 */
+ 68 | export function useLang(): { lang: Lang; setLang: (l: Lang) => void } {
+    :                 ^^^^^^^
+ 69 |   return useContext(LangContext)
+    `----
+
+  ! react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+    ,-[src/i18n/index.tsx:73:17]
+ 72 | /** 取翻译函数 */
+ 73 | export function useT(): (key: string) => string {
+    :                 ^^^^
+ 74 |   return useContext(LangContext).t
+    `----
+
+  ! eslint(no-useless-escape): Unnecessary escape character '-'
+    ,-[src/lib/customBanks.ts:93:50]
+ 92 |       const parts = line.split(/\s+/)
+ 93 |       if (parts.length >= 2 && /^[A-Za-z][A-Za-z'\-]*$/.test(parts[0])) {
+    :                                                  ^^
+ 94 |         return { word: parts[0], translation: parts.slice(1).join(' ') }
+    `----
+  help: Replace `\-` with `-`.
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+    ,-[src/hooks/useBank.ts:21:5]
+ 19 |   // 切换词库时顺带刷新一次自定义词库列表（导入新词库后会触发这里）
+ 20 |   useEffect(() => {
+    :   ^^^^|^^^^
+    :       `-- This is the containing effect
+ 21 |     setCustomBanks(loadCustomBanks())
+    :     ^^^^^^^|^^^^^^
+    :            `-- Avoid calling setState() directly within an effect
+ 22 |   }, [bankId])
+    `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+    ,-[src/hooks/useBank.ts:46:7]
+ 42 |   const [bankWords, setBankWords] = useState<WordItem[]>([])
+ 43 |   useEffect(() => {
+    :   ^^^^|^^^^
+    :       `-- This is the containing effect
+ 44 |     const ready = bankWordsOf(bank)
+ 45 |     if (ready.length > 0) {
+ 46 |       setBankWords(ready)
+    :       ^^^^^^|^^^^^
+    :             `-- Avoid calling setState() directly within an effect
+ 47 |       return
+    `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'currentWpm'
+     ,-[src/hooks/useTypingRound.ts:380:6]
+ 309 |               // P1.6-C：完成段交给 App 接 Practice Engine（学习语义中枢）
+ 310 |               onCompleteWord(current.word, true, currentWpm())
+     :                                                  ^^^^^|^^^^
+     :                                                       `-- useEffect uses `currentWpm` here
+ 311 |               window.setTimeout(() => {
+ 312 |                 lockRef.current = false
+ 313 |                 setTyped('')
+ 314 |                 advance()
+ 315 |               }, 220)
+ 316 |             }
+ 317 |             return
+ 318 |           }
+ 319 |     
+ 320 |           /* ================= 经典 / 限时 / 代码模式：严格纠错 ================= */
+ 321 |           const next = typed + key
+ 322 |     
+ 323 |           // ✅ 敲对了（code 模式为原文比较，大小写敏感）
+ 324 |           if (target.startsWith(next)) {
+ 325 |             const nextCombo = statsRef.current.combo + 1
+ 326 |             sound.correct()
+ 327 |             setTyped(next)
+ 328 |             updateAnalytics((a) => learningService.applyKey(a, key, true))
+ 329 |             setErrorFlash(false)
+ 330 |             setStats((s) => ({
+ 331 |               ...s,
+ 332 |               keys: s.keys + 1,
+ 333 |               correct: s.correct + 1,
+ 334 |               combo: s.combo + 1,
+ 335 |               bestCombo: Math.max(s.bestCombo, s.combo + 1),
+ 336 |             }))
+ 337 |     
+ 338 |             // 🎉 连击里程碑提示
+ 339 |             if (MILESTONES.includes(nextCombo)) {
+ 340 |               sound.milestone()
+ 341 |               setMilestone(nextCombo)
+ 342 |               if (milestoneTimer.current) window.clearTimeout(milestoneTimer.current)
+ 343 |               milestoneTimer.current = window.setTimeout(() => setMilestone(null), 1400)
+ 344 |             }
+ 345 |     
+ 346 |             // 整个单词敲完
+ 347 |             if (next === target) {
+ 348 |               lockRef.current = true
+ 349 |               sound.complete()
+ 350 |               setHistory(recordWord())
+ 351 |               // P1.6-C：完成段交给 App 接 Practice Engine（学习语义中枢）
+ 352 |               const perfect = statsRef.current.errors === 0
+ 353 |               onCompleteWord(current.word, perfect, currentWpm())
+ 354 |               window.setTimeout(() => {
+ 355 |                 lockRef.current = false
+ 356 |                 setTyped('')
+ 357 |                 if (wordIndex + 1 >= queue.length) {
+ 358 |                   finishRound()
+ 359 |                 } else {
+ 360 |                   setWordIndex((i) => i + 1)
+ 361 |                 }
+ 362 |               }, 220)
+ 363 |             }
+ 364 |             return
+ 365 |           }
+ 366 |     
+ 367 |           // ❌ 敲错了：不允许跳过，必须敲正确的下一个字母
+ 368 |           sound.error()
+ 369 |           updateAnalytics((a) => learningService.applyKey(a, key, false))
+ 370 |           setWrongKey(key)
+ 371 |           setErrorFlash(true)
+ 372 |           if (flashTimer.current) window.clearTimeout(flashTimer.current)
+ 373 |           flashTimer.current = window.setTimeout(() => setErrorFlash(false), 280)
+ 374 |           setWrongWords((prev) => (prev.includes(targetLower) ? prev : [...prev, targetLower]))
+ 375 |           setStats((s) => ({ ...s, keys: s.keys + 1, errors: s.errors + 1, combo: 0 }))
+ 376 |         }
+ 377 |     
+ 378 |         window.addEventListener('keydown', handleKeyDown)
+ 379 |         return () => window.removeEventListener('keydown', handleKeyDown)
+ 380 | ,->   }, [
+ 381 | |       typed,
+ 382 | |       wordIndex,
+ 383 | |       queue,
+ 384 | |       targetLower,
+ 385 | |       target,
+ 386 | |       current,
+ 387 | |       finished,
+ 388 | |       startRound,
+ 389 | |       mode,
+ 390 | |       advance,
+ 391 | |       finishRound,
+ 392 | |       tab,
+ 393 | |       commandMode,
+ 394 | |       wrongWords,
+ 395 | |       updateAnalytics,
+ 396 | |       onCompleteWord,
+ 397 | |       setHistory,
+ 398 | `->   ])
+ 399 |     
+     `----
+  help: Either include it or remove the dependency array.
+
+  ! react(purity): Cannot call impure function during render
+    ,-[src/components/ReviewPanel.tsx:55:15]
+ 54 | 
+ 55 |   const now = Date.now()
+    :               ^^^^^|^^^^
+    :                    `-- Cannot call impure function
+ 56 |   const entries = useMemo(() => [...views].sort((a, b) => a.entry.nextReviewAt - b.entry.nextReviewAt), [views])
+    `----
+  help: `Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component re-renders
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/purity
+
+  ! react(purity): Cannot call impure function during render
+    ,-[src/components/ReviewPanel.tsx:50:73]
+ 49 | 
+ 50 |   const due = useMemo(() => views.filter((v) => v.entry.nextReviewAt <= Date.now()), [views])
+    :                                                                         ^^^^^|^^^^
+    :                                                                              `-- Cannot call impure function
+ 51 | 
+    `----
+  help: `Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component re-renders
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/purity
+
+  ! react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+     ,-[src/components/BankManager.tsx:201:17]
+ 200 | /** 把自定义词库包装成标准 WordBank 结构 */
+ 201 | export function toWordBank(custom: CustomBank): WordBank {
+     :                 ^^^^^^^^^^
+ 202 |   return {
+     `----
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+    ,-[src/components/BankManager.tsx:37:15]
+ 35 | 
+ 36 |   useEffect(() => {
+    :   ^^^^|^^^^
+    :       `-- This is the containing effect
+ 37 |     if (open) setBanks(loadCustomBanks())
+    :               ^^^^|^^^
+    :                   `-- Avoid calling setState() directly within an effect
+ 38 |   }, [open])
+    `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+Found 17 warnings and 0 errors.
+Finished in 120ms on 94 files with 116 rules using 16 threads.
