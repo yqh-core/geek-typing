@@ -1,0 +1,44 @@
+# RunId: P18-H-FALSIFY-CONTENT-TYPE-CONTRACT-20261001-115427-R01
+# Command: node scripts/gate-content-type-contract.mjs --falsify
+# Commit: 01aa1c58b8f765ac04743ff42409d833fca2d294
+# StartedAt: 2026-10-01T03:54:27.942Z
+# DurationMs: 56773
+# ExitCode: 0
+
+--- stdout+stderr ---
+[gate:content-type-contract] 证伪自检 —— 证明每条判据都能判红（不会失败的门等于没有门）
+  用例 13 条；每条：植入故障 → 断言"命中集恰好等于预期" → 字节还原 → 逐条核对
+
+  ✓ A 恰好判红（命中 {A,G,J}；还原=bytes）
+      从运行时清单 CONTENT_TYPES 摘掉 lesson（注册表多出一个类型）
+      ↳ 预期耦合：CONTENT_TYPES 摘掉成员同时破坏运行时穷尽(A) 与编译期"联合⊆数组"锁(G) —— 两把锁本就该同时响。P18-E′ 起再叠加一把：CONTENT_TYPES 与 CONTENT_TYPE_CORE 的键集合由 J1 对账（摘掉 lesson ⇒ CORE 仍 14 键而 CONTENT_TYPES 13 ⇒ J 判红）—— 同样是三把锁本该同时响，不是用例不隔离
+  ✓ B 恰好判红（命中 {B}；还原=unlink）
+      在 model/ 下新建 per-type 散落文件 audio.ts
+  ✓ C 恰好判红（命中 {C}；还原=bytes）
+      从 zh.ts 摘掉 type.reading.label 一行（en 仍有 → 不对齐 + 注册表引用落空）
+  ✓ D 恰好判红（命中 {D}；还原=bytes）
+      让 catalog 的类型维度多出 word（与 packageLevelTypes() 不一致）
+  ✓ E 恰好判红（命中 {E,I}；还原=bytes）
+      把 content-query.ts 的 SUPPORTED_TYPES 由 queryEnabledTypes() 换回手写数组 ['word']（守「将来有人优化回硬编码列表」）
+      ↳ 预期耦合：把查询层的派生调用换回**手写数组**且漏掉已启用的 reading：E（启用集对账，:400 的正则分支此时命中）判红；同时 I（启用即可达）也判红 —— reading 在注册表里 queryEnabled:true 却不可达（list 为 []）。两把锁本该同时响（同 A 用例的 {A,G}），不是用例不隔离
+  ✓ G 恰好判红（命中 {G}；还原=bytes）
+      给 ContentType 联合加未同步到 CONTENT_TYPES 的成员 quiz（只有编译期锁能抓）
+  ✓ H 恰好判红（命中 {H}；还原=bytes）
+      从 license-policy.mjs 摘掉 lesson（契约加了类型、Node 构建/入库/校验不认）
+  ✓ H 恰好判红（命中 {H}；还原=bytes）
+      把 asset-rules.mjs 的 ASSET_SEPARATOR '#a:' 改成 '#a'（Node 侧 parseAssetId 与 TS 侧漂移 ⇒ H3 判红）
+  ✓ I 恰好判红（命中 {I}；还原=bytes）
+      把 scopePackages 的路由退回 vocabulary-only 并去掉 pkgs.filter(allowed) 那一行（reading 查询落到词库）
+  ✓ I 恰好判红（命中 {I}；还原=bytes）
+      去掉 poolEntries 的 `hasPhonetic && isWordHit(hit) && !hit.phonetic` 里的 isWordHit 守卫（非 word 族被静默筛成空）
+  ✓ I 恰好判红（命中 {I}；还原=bytes）
+      让 sortRows 的 field:'word' 对非 word 行改按 title 参与主序（desc 下非 word 族被整体反转）
+  ✓ I2 恰好判红（命中 {I2}；还原=bytes）
+      给 reading 的 descriptor.query.index 加 { field: 'body', mode: 'exact' }（非 word 族 exact 只允许 'id'）
+  ✓ J 恰好判红（命中 {J}；还原=bytes）
+      在 REGISTRY 的 reading 条目里于展开之后覆盖 queryEnabled:false（CORE 与 REGISTRY 两个面分家）
+
+  对照组（还原后复绿）
+  ✓ 全部判据复绿（还原后零命中）—— 证明上面每一轮的判红都来自植入，而非环境残留
+──────────────────────────────────────────────────────
+Falsification：✅ PASS —— 13/13 判据均恰好判红，工作树已字节还原，对照组复绿
