@@ -1,0 +1,13 @@
+########## 预热三处：改前(f089254) vs 改后(HEAD) 对照 ##########
+245:export const WARMUP_IDS = ['kaoyan', 'toefl'] as const
+90:const WARMUP_MAX_IDS = 2
+{
+  "warmupIdsMax": 2,
+  "ids": [
+    "kaoyan",
+    "toefl"
+  ],
+  "recorded": "2026-10-01T05:59:25.756Z",
+  "note": "check-bundle --record-baseline 写入；清单只许降不许升，变长时重记会被拒绝"
+}
+结论：三处值完全未变（行号位移只因新增注释），只加了说明性注释，见 P18-J-WARMUP-COMMENT.txt

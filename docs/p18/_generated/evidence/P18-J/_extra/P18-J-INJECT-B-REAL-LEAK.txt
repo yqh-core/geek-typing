@@ -1,0 +1,8 @@
+########## 注入 B：真泄漏（保留 load: 同时静态导入 frontend 词表 + rebuild）##########
+build exit=0
+--- check:bundle（判据 2 / 判据 5）---
+[check-bundle] dist/assets：14 个文件
+  2. ✗ FAIL   数据 chunk 12 个（words 4 + items 8）< registry lazy 包 13 个：有 lazy 包没产出独立 chunk（多半被写成 inline 并进了主 chunk）
+  5. ? UNKNOWN lazy 语义（registry 声明 lazy 的包不得 inline 进主 chunk）：frontend 部分命中 7/8：["asynchronous","memoization","middleware"]（不视为通过）
+      · frontend (vocabulary/load) probes=8 命中 7 → ? UNKNOWN（部分命中，归属歧义）
+[check-bundle] FAIL：第 2 项 FAIL；第 5 项 UNKNOWN（UNKNOWN 视为不通过）

@@ -1,0 +1,38 @@
+# RunId: P18-J-FALSIFY-CHECK-BUNDLE-20261001-164110-R01
+# Command: node scripts/check-bundle.mjs --falsify
+# Commit: 28b4994ef911d916e52c9e40e724234c54b8662b
+# StartedAt: 2026-10-01T08:41:10.949Z
+# DurationMs: 4630
+# ExitCode: 0
+
+--- stdout+stderr ---
+[check-bundle] --falsify 自带证伪自检（不会失败的门等于没有门）
+  用例 8 条；每条：注入故障 → 断言「目标分支恰好 FAIL，其余分支状态不变」→ 整门必须非 PASS
+
+  ✓ CTRL 基线对照：5 分支 j1/j2/j3/lazy/warm 全 PASS（断言非恒红）
+  ✓ J1 目标分支 j1 恰好非 PASS（命中集 {j1} = FAIL），其余分支状态不变，整门 exit=1
+      RUNTIME_MANIFEST_FIELDS 多一个不存在的字段（__NO_SUCH_FIELD__）
+      白名单 26 字段 ∪ 裁剪 3 字段 = 29；PackageManifest 28 字段；content 并集 25 字段 —— 白名单多出（不在 PackageManifest 字段集，疑似写错字段名）：__NO_SUCH_FIELD__
+  ✓ J1b 目标分支 j1 恰好非 PASS（命中集 {j1} = FAIL），其余分支状态不变，整门 exit=1
+      src/ 下存在 manifest.json?raw 导入（J1 防回退子判据）
+      白名单 25 字段 ∪ 裁剪 3 字段 = 28；PackageManifest 28 字段；content 并集 25 字段 —— src/ 下仍有 manifest.json?raw 导入（投影被撤销的回退）：src/core/content/registry.ts:41
+  ✓ J2 目标分支 j2 恰好非 PASS（命中集 {j2} = FAIL），其余分支状态不变，整门 exit=1
+      把被裁字段的探测串换成必然存在的保留字段串（stats:）
+      sources 探测串 "stats:" 命中 22 次（上下文 …abulary`],icon:`Globe`,features:{phonetic:!0,definition:!0},stats:{phonetic:2986,definition:3e3,items:3e3},offline:{policy:`la…） —— 被裁字段不该出现在主 chunk（投影失效或字段被写回白名单）
+  ✓ J2b 目标分支 j2 恰好非 PASS（命中集 {j2} = FAIL），其余分支状态不变，整门 exit=1
+      把 ?raw 形态的 manifest JSON 塞进主 chunk（模拟投影被撤销退回 ?raw）
+      sources 探测串 "\"sources\"" 命中 1 次（上下文 …window.setTimeout(()=>void e(),2e3)})}} var raw=`[{"id":"x","sources":[],"contentHistory":[],"build":{"toolVersion":"content-buil…）；contentHistory 探测串 "\"contentHistory\"" 命中 1 次（上下文 …eout(()=>void e(),2e3)})}} var raw=`[{"id":"x","sources":[],"contentHistory":[],"build":{"toolVersion":"content-build/1.1","builtAt":"20…）；build 探测串 "\"toolVersion\"" 命中 1 次（上下文 …r raw=`[{"id":"x","sources":[],"contentHistory":[],"build":{"toolVersion":"content-build/1.1","builtAt":"2026-09-28T00:00:00.000Z","s…）；build 探测串 "\"builtAt\"" 命中 1 次（上下文 …ntentHistory":[],"build":{"toolVersion":"content-build/1.1","builtAt":"2026-09-28T00:00:00.000Z","sourceChecksum":"sha256:00"}}]`…）；build 探测串 "\"sourceChecksum\"" 命中 1 次（上下文 …n":"content-build/1.1","builtAt":"2026-09-28T00:00:00.000Z","sourceChecksum":"sha256:00"}}]`; …） —— 被裁字段不该出现在主 chunk（投影失效或字段被写回白名单）
+  ✓ J3 目标分支 j3 恰好非 PASS（命中集 {j3} = FAIL），其余分支状态不变，整门 exit=1
+      把保留字段探测串换成必然不存在的串（__NO_SUCH_FIELD__:）
+      保留字段探测串仅 0/1 命中（要求 ≥4）："__NO_SUCH_FIELD__:"=0 —— 探测本身无效：manifest 可能没进主 chunk，或探测串形态写得不对（J2 的"不存在"断言会因此空转）
+  ✓ L5 目标分支 lazy 恰好非 PASS（命中集 {lazy} = FAIL），其余分支状态不变，整门 exit=1
+      把某个 lazy 包的全部探测串塞进主 chunk 文本
+      cloud-native 的 8 个探测串**全部**命中主 chunk（声明 lazy 却被 inline）
+  ✓ W6a 目标分支 warm 恰好非 PASS（命中集 {warm} = FAIL），其余分支状态不变，整门 exit=1
+      往 WARMUP_IDS 清单里塞第三个包（模拟扩词时手滑把新库加进预热）
+       预热清单长度 3 > 上限 2（清单 [kaoyan, toefl, ielts]）：扩词时代预热只许减不许增
+  ✓ W6b 目标分支 warm 恰好非 PASS（命中集 {warm} = UNKNOWN），其余分支状态不变，整门 exit=1
+      把 WARMUP_IDS 清单抹掉（模拟改造实现时把常量改名/改成非字面量）
+       无法确定 registry.ts 的 WARMUP_IDS 预热清单 ⇒ 清单长度上限与棘轮无法核算（不视为通过）
+──────────────────────────────────────────────────────
+✓ falsify: 8/8 恰好判红（含 1 条全 PASS 基线对照）

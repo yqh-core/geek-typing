@@ -1,0 +1,8 @@
+########## 注入 A：registry 加载方式 load: → words:（不 rebuild）##########
+--- check:bundle ---
+[check-bundle] dist/assets：15 个文件
+  2. ✓ PASS   数据 chunk 13 个（words 5 + items 8）≥ registry lazy 包 12 个
+  5. ✓ PASS   lazy 语义（registry 声明 lazy 的包不得 inline 进主 chunk）：registry 全部 12 个 lazy 包的探测串在主 chunk 命中 0 次
+[check-bundle] PASS：6 项全部通过
+--- content:validate 判据 20 ---
+  ✗ 策略不一致：frontend manifest policy=lazy，registry.ts 实际为 inline（静态 import ⇒ 进主 chunk）：两边须同改

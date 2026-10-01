@@ -1,0 +1,52 @@
+# RunId: P18-J-RELEASE-GATE-20261001-164141-R01
+# Command: node scripts/verify-release-gate.mjs
+# Commit: 28b4994ef911d916e52c9e40e724234c54b8662b
+# StartedAt: 2026-10-01T08:41:41.281Z
+# DurationMs: 493
+# ExitCode: 0
+
+--- stdout+stderr ---
+======================================================================
+ P1.8 RELEASE GATE — 分层机器判定（verify-release-gate.mjs）
+ 合同①：docs/audit-package/13-acceptance/P1.5-RELEASE-GATE.md —— P1.5 历史冻结基线（只读 · INV-1 禁改）
+ 合同②：docs/p18/P1.8-RELEASE-GATE-CONTRACT.md                —— P1.8 增量合同（本阶段新增）
+ 分层原因：P1.5 判据派生自冻结区 md（禁改），P1.8 又要求「新增门进入 release:gate」
+           → 冻结基线只读 + 增量合同叠加，校验器同时读两份、分层报告。
+======================================================================
+
+【合同① P1.5（历史冻结基线 · 只读 · INV-1 禁改）】
+Unit       判据  PASS  FAIL  PENDING   总览声明(行)      一致
+G1         5     5     0     0        5/0/0            ✅
+G2         4     4     0     0        4/0/0            ✅
+G3         6     6     0     0        6/0/0            ✅
+G4         5     5     0     0        5/0/0            ✅
+G5         4     4     0     0        4/0/0            ✅
+G6         5     5     0     0        5/0/0            ✅
+R1         1     1     0     0        1/0/0            ✅
+R2         1     1     0     0        1/0/0            ✅
+R3         1     1     0     0        1/0/0            ✅
+R4         1     1     0     0        1/0/0            ✅
+R5         1     1     0     0        1/0/0            ✅
+R6         1     1     0     0        1/0/0            ✅
+──────────────────────────────────────────────────────────────────────
+  层一 CODE/ARCHITECTURE GATE：29 项 —— 29 PASS / 0 FAIL / 0 PENDING → 🟢 ENGINEERING READY
+  层二 PRODUCT RELEASE GATE：6 项 —— 6 PASS / 0 FAIL / 0 PENDING → 🟢 RELEASE READY
+
+【合同② P1.8（增量合同）】
+Unit       判据  PASS  FAIL  PENDING   总览声明(行)      一致
+P18-G1     1     1     0     0        1/0/0            ✅
+P18-G2     1     1     0     0        1/0/0            ✅
+P18-G3     1     1     0     0        1/0/0            ✅
+P18-G4     1     1     0     0        1/0/0            ✅
+P18-G5     1     1     0     0        1/0/0            ✅
+P18-G6     1     1     0     0        1/0/0            ✅
+P18-R1     1     1     0     0        1/0/0            ✅
+P18-R2     1     1     0     0        1/0/0            ✅
+──────────────────────────────────────────────────────────────────────
+  P1.8 工程门 P18-G*（P1.8 六条不变量）：6 项 —— 6 PASS / 0 FAIL / 0 PENDING → 🟢 INVARIANTS READY
+  P1.8 阶段发布门 P1.8-R*：2 项 —— 2 PASS / 0 FAIL / 0 PENDING → 🟢 PHASE RELEASE READY
+
+======================================================================
+总判定：43 项判据 —— 43 PASS / 0 FAIL / 0 PENDING
+RELEASE=APPROVED —— 两份合同全绿（P1.5 历史冻结基线 + P1.8 增量合同逐节核实，总览数字机器核对一致）
+⚠️ 这只代表门禁合同自洽；发布前仍需：未提交改动清点（git status）+ FINAL-TEST-OUTPUT 全量复跑留档。

@@ -1,0 +1,9 @@
++/** 预热清单长度上限（门阈值）。预热是"离线可切大词库"的代价，扩词时代只许减不许增
++ *  ⚠️ B 步 9.5 实测结论（别再试）：把 `frontend` / `cloud-native` 塞进 WARMUP_IDS 换不来任何
++ *  首屏收益 —— 预热时机在 `window load` → `requestIdleCallback`（首屏之后），而这两个包改 lazy
++ *  本上限与 warmup-ids-baseline.json 棘轮两道坎。详见 registry.ts 的 WARMUP_IDS 处注释。 */
++ * 注意：这与预热的取舍无关（见 WARMUP_IDS 处注释）—— 改 lazy 不意味着该进预热清单。 */
++ *   3. 「预热哪些」由常量决定（可被判据独立读取），「先预热哪个」留给运行时排序（不影响预算核算）。
++ *   1. 预热时机在 `window load` → `requestIdleCallback`（src/main.tsx），发生在**首屏之后**；
++ *      提前预热换不来任何首屏收益；
++ *   2. 清单从 2 撑到 4 会同时撞两道坎 —— `scripts/check-bundle.mjs:86` 的 `WARMUP_MAX_IDS = 2`
