@@ -48,6 +48,9 @@ import {
   DROPPED_MANIFEST_FIELDS,
   DROPPED_MANIFEST_PROBES,
 } from './content/manifest-runtime.mjs'
+// 预热清单的解析实现与测试夹具共用（scripts/content/warmup-ids.mjs）：
+// 判据与 e2e 探针若各写一套正则，口径迟早漂移 —— 事实源只有 registry.ts 一个。
+import { parseWarmUpLiteral } from './content/warmup-ids.mjs'
 
 const ROOT = process.cwd()
 const DIST = path.join(ROOT, 'dist')
@@ -183,12 +186,13 @@ function parseRegistryEntries(src) {
  *    ② 若哪天把「候选池」写进 allSettled（而不是「实际加热的」），判据会算了错的数字还照样判绿（假通过）。
  *
  *  改后：数组字面量里的字符串**就是 localId**，与注册项 localId 直接比对，解析面更窄也更硬。
- *  解析不到（常量被删/改名/写成非字面量）⇒ 返回 null ⇒ 判据 3/6 记 UNKNOWN（**不视为通过**）。 */
+ *  解析不到（常量被删/改名/写成非字面量）⇒ 返回 null ⇒ 判据 3/6 记 UNKNOWN（**不视为通过**）。
+ *
+ *  实际解析由 scripts/content/warmup-ids.mjs 的 parseWarmUpLiteral 承担（本文件只多一层
+ *  「是否都是已知 localId」的校验）—— 与 e2e 预热探针同一份实现，避免两套正则口径漂移。 */
 function parseWarmUpIds(src, entries) {
-  const m = /\bconst\s+WARMUP_IDS\s*=\s*\[([^\]]*)\]/.exec(src)
-  if (!m) return null
-  const ids = [...m[1].matchAll(/['"`]([^'"`]+)['"`]/g)].map((x) => x[1]).filter(Boolean)
-  if (ids.length === 0) return null
+  const ids = parseWarmUpLiteral(src)
+  if (!ids) return null
   const known = new Set(entries.map((e) => e.id))
   return ids.every((id) => known.has(id)) ? ids : null
 }

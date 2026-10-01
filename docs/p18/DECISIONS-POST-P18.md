@@ -118,6 +118,39 @@ export const WARMUP_IDS = ['ielts', 'toefl', 'kaoyan'] as const
 - 本波**没有**新增 `WARMUP_GZIP_BUDGET` 的运行时字节钳制 —— 运行时拿不到 gzip 尺寸，
   **在构建期判据里算才是唯一诚实的位置**；硬塞进运行时只会得到一个"永远不触发的保险丝"。
 
+### 9.2.8 收口补记：e2e 预热探针（CI 抓出来的红灯）
+
+9.2 落地后 **CI 立刻抓到一条红灯**，直指本项决策的**副作用面**，记在这里避免重犯：
+
+- **现象**：CI run `36822725289`，门禁③ 端到端 `共 170 项，通过 169，失败 1`，
+  唯一失败项是 `❌ 预热探针：SW 缓存含 ielts/kaoyan/toefl chunk`。
+- **根因**：`tests/e2e.mjs` 那条探针**把清单内容写死成 3 个包名**，
+  9.2 把清单收到 2 个后，它等的是永远等不到的第 3 个 chunk，轮询满 120s 超时判红。
+- **为什么这是"夹具跟不上实现"而不是"实现坏了"**：实现侧正是要少预热一个，
+  e2e 的**业务断言全部通过**（词库下拉 8 本齐全、`:bank kaoyan` 懒加载出词、
+  考研/托福词库 `3000` 词、错题本、`:review` 复习轮全部 ✅）。
+- **怎么改的**（两处，都朝"单一事实源"收敛）：
+  1. 期望值不再写死：改从 `registry.ts` 的 `WARMUP_IDS` 派生
+     （经 `scripts/content/warmup-ids.mjs` 的 `readWarmUpIds()`）；
+     **解析不到 ⇒ 探针直接判红**，与 `check-bundle` 判据 6 的 `UNKNOWN` 同口径。
+  2. 探针挪到**移动端上下文先清空 SW 缓存**再等 idle 预热。原因：words chunk 的文件名是
+     `words-<hash>.js`，**不带包名**，只能按数量判；不清缓存的话，本套件【15】的
+     `:bank kaoyan` 等懒加载用例会把 chunk 塞进同一个 SW 缓存 ⇒ 即使把
+     `warmUpVocabulary()` 整个删掉，探针也会看到 2 个 chunk 而**假通过**。
+     移动端上下文从不切词库，清空后缓存里的 words chunk 只可能来自预热本身。
+- **证伪**（证明这条探针不是摆设）：摘掉 `src/main.tsx` 的 `void warmUpVocabulary()` →
+  `npm run build` → `npm run test:e2e`，探针必须判红、其余 169 项不得受影响。
+  复绿后 `sha256sum src/main.tsx` 与注入前逐字节一致。注入形式用"保留引用"的
+  `void warmUpVocabulary`，否则 tsc 的 TS6133（声明未读）会直接把构建挡住、根本跑不到 e2e。
+- **顺带纠正一处漂移注释**：`src/main.tsx` 里"预拉 ielts/kaoyan/toefl 三个大库"已删，
+  改为指向 `registry.ts` 的 `WARMUP_IDS`；`tests/e2e.mjs` 文件头的 `networkidle`
+  复盘注释同样改了措辞。
+
+> **一条值得记住的代价**：`test:e2e` 打的是 `vite preview` ⇒ **看 `dist/` 的产物**，
+> 不是 `src/`。改了 `src/` 不重建就跑 e2e，等于在验证旧构建 ——
+> 我第一次做证伪就踩了（注入进 `src/main.tsx` 后直接跑，探针照样绿，证明不了任何事）。
+> **证伪前必须先 `npm run build`，并确认产物 chunk 名确实变了。**
+
 ---
 
 ## 9.5 7 个 inline 词库改 lazy 【本步定口径，实施待排】

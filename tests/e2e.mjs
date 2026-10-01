@@ -11,6 +11,9 @@ import { chromium } from 'playwright-core'
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { ensurePreviewServer, stopPreview } from './preview-server.mjs'
+// 预热清单的解析实现与 check-bundle 判据 3/6 共用（scripts/content/warmup-ids.mjs）：
+// 事实源只有 registry.ts 一个，这里不再自己写一遍正则 —— 两套口径迟早漂移。
+import { readWarmUpIds } from '../scripts/content/warmup-ids.mjs'
 
 const PROD_BASE = 'https://geek-typing.pages.dev'
 const IS_PROD = process.argv.includes('--prod')
@@ -74,7 +77,8 @@ const norm = (s) => (s ?? '').replace(/\s+/g, ' ')
  * 根因是页面自身的后台流量：
  *   - public/sw.js 注册后，install 阶段 precacheShell() 会把首页 HTML 里所有 /assets/* 逐个拉一遍；
  *   - src/main.tsx 的 warmUpVocabulary() 在 window load 后经 requestIdleCallback 预拉
- *     ielts/kaoyan/toefl 三个 words-*.js（合计约 1.4 MB）。
+ *     registry.ts 的 WARMUP_IDS 清单内的 words-*.js（P18-B 遗留项 9.2 从写死三库收敛为清单驱动，
+ *     当前 [kaoyan, toefl]，合计约 1 MB）。
  * networkidle 要求「500ms 内无任何进行中的网络请求」；CI runner 首次无缓存、跨公网拉这
  * 1.4 MB 时，这个窗口长时间无法出现 → page.goto/reload 一直等到 Playwright 默认 30s 超时，
  * 16 次累积即卡死。本地 chunk 已在磁盘缓存里，网络瞬间 idle，所以从未暴露。
@@ -1317,30 +1321,51 @@ async function run() {
   await gotoPage(mpage)
   await waitForTestId(mpage, 'tab-memorize') // 等应用壳挂载
 
-  // 预热探针：后台轮询 SW 缓存，等手势/命令用例跑完后收取（与 idle 预热并行）。
-  // 预算 240×500ms=120s：CI runner 首次无缓存、跨公网拉 3 个 words-*.js（合计约 1.4 MB）
-  // 时，「下载 + SW 写入缓存」可能远超本地；原 30s 预算在 CI 上被判定为下一个红灯风险
-  // （见 CI run 36308273299 复盘）。提到 4 倍余量：仍能在合理时间内失败，不会无限等待。
-  // 生产环境即使并发抢带宽 >18s 也远在预算内。
-  const warmProbe = mpage.evaluate(async () => {
-    for (let i = 0; i < 240; i++) {
-      try {
-        const names = await caches.keys()
-        if (names.includes('gt-shell-v3')) {
-          const cache = await caches.open('gt-shell-v3')
-          const urls = (await cache.keys()).map((r) => r.url)
-          // V4-P0：大词库 chunk 从模块名(ielts-*.js)变为 ?raw JSON 命名(words-*.js)，
-          // 懒加载 words chunk 当前即三大词库，按前缀计数
-          const hits = urls.filter((u) => /\/assets\/words-.*\.js/.test(u))
-          if (hits.length >= 3) return { ok: true, hits }
-        }
-      } catch {
-        /* SW 未就绪继续等 */
-      }
-      await new Promise((r) => setTimeout(r, 500))
-    }
-    return { ok: false, hits: [] }
+  // 预热探针（P18-B 遗留项 9.2 收口）：验证「registry.ts 的 WARMUP_IDS 清单里的包，
+  // 真的被 idle 预热拉进 SW 缓存」—— 期望值从清单派生，不写死包数。
+  //
+  // 三个必须说清的点：
+  //  ① 期望值从哪来：readWarmUpIds() 解析 registry.ts 的 WARMUP_IDS，与
+  //     scripts/check-bundle.mjs 判据 3/6 共用 scripts/content/warmup-ids.mjs 的同一份解析实现。
+  //     清单变长/变短 ⇒ 期望值跟着变；清单解析不到 ⇒ 期望值 0 ⇒ 立刻判红（绝不放行）。
+  //  ② 为什么先清空 SW 缓存：words chunk 的文件名是 `words-<hash>.js`，**不带包名**，
+  //     所以只能按数量判、没法按名字判归属。若不清缓存，本套件【15】的 `:bank kaoyan`
+  //     等懒加载用例会把 chunk 塞进同一个 SW 缓存 ⇒ 即使 warmUpVocabulary 被整个删掉，
+  //     探针也会看到 2 个 chunk 而**假通过**。清空后本页（移动端上下文从不切词库）
+  //     缓存里的 words chunk 只可能来自 idle 预热本身。
+  //  ③ 预算 240×500ms=120s：CI runner 首次无缓存、跨公网拉清单内的 words-*.js（合计约 1 MB）
+  //     时，「下载 + SW 写入缓存」可能远超本地；原 30s 预算在 CI 上被判定为下一个红灯风险
+  //     （见 CI run 36308273299 复盘）。提到 4 倍余量：仍能在合理时间内失败，不会无限等待。
+  //     生产环境即使并发抢带宽 >18s 也远在预算内。
+  const warmIds = readWarmUpIds(process.cwd())
+  await mpage.evaluate(async () => {
+    const names = await caches.keys()
+    await Promise.all(names.map((n) => caches.delete(n)))
   })
+  await gotoPage(mpage)
+  await waitForTestId(mpage, 'tab-memorize') // 清缓存后重新挂载，把 idle 预热的起跑点对齐到这里
+  const warmProbe =
+    warmIds === null
+      ? // 清单解析不到 ⇒ 期望包数无法确定 ⇒ 直接判红（与 check-bundle 判据 3/6 的 UNKNOWN 同口径：测不出来 ≠ 通过）
+        Promise.resolve({ ok: false, hits: [], why: 'registry.ts 的 WARMUP_IDS 解析不到' })
+      : mpage.evaluate(async (need) => {
+          for (let i = 0; i < 240; i++) {
+            try {
+              const names = await caches.keys()
+              if (names.includes('gt-shell-v3')) {
+                const cache = await caches.open('gt-shell-v3')
+                const urls = (await cache.keys()).map((r) => r.url)
+                // V4-P0：大词库 chunk 从模块名(ielts-*.js)变为 ?raw JSON 命名(words-*.js)
+                const hits = urls.filter((u) => /\/assets\/words-.*\.js/.test(u))
+                if (hits.length >= need) return { ok: true, hits }
+              }
+            } catch {
+              /* SW 未就绪继续等 */
+            }
+            await new Promise((r) => setTimeout(r, 500))
+          }
+          return { ok: false, hits: [], why: '轮询 120s 超时' }
+        }, warmIds.length)
 
   await mpage.click('[data-testid="tab-memorize"]')
   await mpage.waitForTimeout(700) // isTouch 探测 + 手势监听绑定
@@ -1460,9 +1485,16 @@ async function run() {
   check('移动端：:theme ide 生效', norm(await mpage.textContent('body')).includes('export const'))
   check('手势/移动端：无 console error', mConsoleErrors.length === 0, mConsoleErrors.slice(0, 2).join(' | '))
 
-  // 14.9 预热探针：SW 缓存出现三大词库 chunk（与上面用例并行预热）
+  // 14.9 预热探针：SW 缓存出现 WARMUP_IDS 清单内的 chunk（期望值 = 清单长度，与上面用例并行预热）
   const warm = await warmProbe
-  check('预热探针：SW 缓存含 ielts/kaoyan/toefl chunk', warm.ok, warm.hits.map((u) => u.split('/').pop()).join(', '))
+  const warmIdsTxt = warmIds === null ? '（清单解析不到）' : `[${warmIds.join(', ')}]`
+  check(
+    `预热探针：SW 缓存含 WARMUP_IDS 全部 chunk（${warmIdsTxt}）`,
+    warm.ok,
+    [warm.why, `${warm.hits.length} 个 words chunk：${warm.hits.map((u) => u.split('/').pop()).join(', ')}`]
+      .filter(Boolean)
+      .join(' — '),
+  )
 
   await mctx.close()
 

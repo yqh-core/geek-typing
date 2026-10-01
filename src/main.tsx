@@ -57,7 +57,8 @@ if (import.meta.env.PROD) {
         }
       }
       // V4-P0：预热改经 registry（与 wordBanks.load 同一动态 import 模块 → 同一 chunk），
-      // 预拉 ielts/kaoyan/toefl 三个大库，SW fetch handler 顺手 put 进缓存
+      // 预拉 src/core/content/registry.ts 的 WARMUP_IDS 清单内的包，SW fetch handler 顺手 put 进缓存
+      // （清单本体在 registry.ts，这里不复制包数；e2e 预热探针也从那份清单派生期望值）
       void warmUpVocabulary()
     }
     window.addEventListener('load', () => {
