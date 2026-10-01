@@ -334,6 +334,29 @@ function asciiPhraseProbes(json, otherPayloadTexts) {
  * 构造判据 5 的逐包探测集。
  * vocabulary lazy 包 → words.json 的独有词（复用 distinctProbes）；
  * 非 vocabulary lazy 包 → items.json 的独有 ASCII 短语（asciiPhraseProbes）。
+ *
+ * vocabulary 内部为什么还要再分「主路径 / 兜底路径」两条（这条是本函数唯一的两级结构）：
+ *   · 主路径 distinctProbes 只挑 **纯字母且 ≥5 字符** 的词；
+ *     **前端词汇类**包（kaoyan / toefl / cet4 / cet6 / ai-core / ielts …）的 `word` 就是
+ *     真英文单词，独有词 ≥ PROBE_MIN，走主路径出串质量最高（单长词，几乎不可能巧合命中）。
+ *   · **代码骨架类**包（ts-code / go-code 这一类）的 `word` 是整条代码骨架
+ *     （形如 `const [state, setState] = useState(initialState);`）——
+ *     整串含空格/括号/分号，`/^[a-z]{5,}$/i` 一条都匹配不上；
+ *     而骨架里那些"看得见的字母片段"（useState / useState 之外的类型名、变量名、箭头函数体）
+ *     又都是复用率极高的通用 token，拿单个 token 当探测串必然撞进 App 源码。
+ *     ⇒ 这类包在主路径上独有候选恒为 0，若没有兜底，判据 5 会对它**恒记 UNKNOWN**
+ *       （UNKNOWN 视为不通过 ⇒ 门红），而且报错只说「只找到 0 个独有探测串」，看代码的人
+ *       根本不知道该修哪一条。这就是兜底存在的唯一理由。
+ *   · 兜底直接复用 items 分支那套 asciiPhraseProbes：**整条骨架**作探测串
+ *     （整串是该包独有的内容特征，跨包去重后不会与别的包重叠），
+ *     探测路径与 kind 都会在报错信息里体现（kind = `vocabulary/load/ascii`，
+ *     与 `vocabulary/load` / `items/loadData` 区分开）。
+ *
+ * 兜底的失效条件（说清楚，别指望它万能）：
+ *   · 骨架串若**同时出现在 App 源码**里（如某个 helper 正好写了 `const sorted = [...list].sort(...)`），
+ *     干净态也会命中 ⇒ 判据 5 退化成「部分命中 ⇒ UNKNOWN」；这类串得靠判据 1（体积）+ 判据 2（chunk 数）兜底，
+ *     这与 distinctProbes 那条「排除主 chunk 已有」的取舍是同一类问题。
+ *   · 兜底**不做主 chunk 过滤**（与 items 分支一致）—— 它防的是跨包重叠，不是「已在主 chunk」。
  */
 function collectLazyProbes(entries, setsById, mainText) {
   const lazy = entries.filter((e) => e.mode === 'lazy')
@@ -352,9 +375,24 @@ function collectLazyProbes(entries, setsById, mainText) {
   }
   return lazy.map((e) => {
     let probes
-    if (kindOf.get(e.id) === 'vocabulary/load') {
+    let kind = kindOf.get(e.id)
+    if (kind === 'vocabulary/load') {
       // 过滤用残文 = mainText 摘掉本包自己的词条（自指陷阱见 distinctProbes 注释）
       probes = distinctProbes(e.id, setsById, stripOwnPayload(mainText, setsById.get(e.id)))
+      if (probes.length < PROBE_MIN) {
+        // 主路径样本不足（典型：代码骨架类词库，word 是整条骨架而非单个英文词）⇒
+        // 兜底走整串 ASCII 短语，与 items 分支同一套算法（内部已做跨包去重 + 长串优先）
+        const txt = texts.get(e.id) ?? ''
+        let json = null
+        try { json = JSON.parse(txt) } catch { json = null }
+        const others = [...texts].filter(([k]) => k !== e.id).map(([, v]) => v)
+        const ascii = json ? asciiPhraseProbes(json, others) : []
+        // JSON 解析失败 ⇒ ascii 恒为空，此时保持原 kind 与空 probes（不抛错、不假装探测到了）
+        if (ascii.length > probes.length) {
+          probes = ascii
+          kind = 'vocabulary/load/ascii'
+        }
+      }
     } else {
       const txt = texts.get(e.id) ?? ''
       let json = null
@@ -362,7 +400,7 @@ function collectLazyProbes(entries, setsById, mainText) {
       const others = [...texts].filter(([k]) => k !== e.id).map(([, v]) => v)
       probes = json ? asciiPhraseProbes(json, others) : []
     }
-    return { id: e.id, kind: kindOf.get(e.id), probes }
+    return { id: e.id, kind, probes }
   })
 }
 
@@ -860,6 +898,27 @@ const FALSIFY_CASES = [
       const subject = inp.lazyProbes.find((p) => p.probes.length >= PROBE_MIN)
       if (!subject) throw new Fatal('证伪用例 L5 找不到可用样本（lazy 探测串为空）')
       return { mainText: `${inp.mainText}\n/* ${subject.probes.join(' | ')} */\n` }
+    },
+  },
+  {
+    letter: 'L5b',
+    name: '把「代码骨架类」lazy 包的整条骨架串塞进主 chunk（走 vocabulary ASCII 兜底路径）',
+    why: '证明兜底路径不是死代码/恒空：先把 ts-code 以 lazy 身份重新喂给 collectLazyProbes（骨架类主路径独有候选恒 0 ⇒ 必走兜底），**断言兜底真产出了 ≥ PROBE_MIN 个串**，再把它们塞进主 chunk ⇒ 判据 5 必须判红',
+    target: 'lazy',
+    mutate: (inp) => {
+      // ts-code 在 registry 里是 inline（words: parseWords(...)）；这里人为置成 lazy，
+      // 让 collectLazyProbes 的 vocabulary 分支落到「主路径样本不足 ⇒ ASCII 兜底」这条路上。
+      const entries = [
+        { id: 'ts-code', loader: 'loadTsCode', mode: 'lazy' },
+        ...parseRegistryEntries(readFileSync(REGISTRY_TS, 'utf8')),
+      ]
+      const perPkg = collectLazyProbes(entries, loadWordSets(), inp.mainText)
+      const subject = perPkg.find((p) => p.kind === 'vocabulary/load/ascii')
+      if (!subject) throw new Fatal('证伪用例 L5b 未走到兜底路径（没有 kind=vocabulary/load/ascii 的lazy包）⇒ 兜底是死代码或 kind 写错')
+      if (subject.probes.length < PROBE_MIN) {
+        throw new Fatal(`证伪用例 L5b 兜底只产出 ${subject.probes.length} 个探测串（要求 ≥ ${PROBE_MIN}）⇒ 兜底等于没兜，判据 5 对骨架类仍是瞎的`)
+      }
+      return { lazyProbes: perPkg, mainText: `${inp.mainText}\n/* ${subject.probes.join(' | ')} */\n` }
     },
   },
   {
