@@ -15,6 +15,9 @@
  *   态4b MIME 投毒探针 → /assets/*.js 不得缓存 text/html（BUG-002 回归判据）
  *
  * 结果 JSON：tests/_evidence/offline-audit-result.json
+ *   ⚠️ 该文件**不入库**（见 .gitignore）：每次运行都会重写，抽样词随机使内容必然变化，
+ *   入库会让工作树在每次跑完 test:offline 之后都不干净（P18 遗留 9.4 / Stage 0 · N7）。
+ *   路径保持不变 —— 谁在按这个路径读证据，读到的仍是最近一次的真实运行结果。
  */
 import { chromium } from 'playwright-core'
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'

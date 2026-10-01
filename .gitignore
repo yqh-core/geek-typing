@@ -26,6 +26,13 @@ dist-ssr
 # e2e 截图证据不入库（offline-audit-result.json 除外）
 tests/_evidence/*.png
 
+# 离线审计的证据 JSON 不入库（Stage 0 · N7）：
+#   它每次运行都会**重写**（态2 的抽样词是随机的，内容必然漂 —— 不是时间戳漂移，
+#   所以「跑完再还原」这条路堵死了：还原等于伪造证据）。入库会让 `git status --porcelain`
+#   跑完 test:offline 之后永远不干净，每次都要人工还原（P18 遗留 9.4）。
+#   产物路径不变、仍然照常落盘并可读，其他流程按同一路径读取即可；只是不再进版本库。
+tests/_evidence/offline-audit-result.json
+
 # preview 自举的所有权标记（tests/preview-server.mjs 运行时生成，<pid> 每次不同不可枚举）
 .preview-*.pid
 
