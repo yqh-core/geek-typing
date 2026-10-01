@@ -43,6 +43,7 @@
     "test:service": "node tests/learning-service.mjs",
     "gate:persistence": "node scripts/gate-persistence.mjs",
     "gate:g4": "node scripts/gate-g4.mjs",
+    "gate:g4:falsify": "node scripts/gate-g4.mjs --falsify",
     "gate:legacy-wordbank": "node scripts/gate-legacy-wordbank.mjs",
     "gate:learning-boundary": "node scripts/gate-learning-boundary.mjs",
     "gate:practice-engine": "node scripts/gate-practice-engine.mjs",

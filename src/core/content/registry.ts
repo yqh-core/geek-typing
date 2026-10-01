@@ -244,7 +244,21 @@ export function hasFeature(packageId: string, feature: string): boolean {
  */
 export const WARMUP_IDS = ['kaoyan', 'toefl'] as const
 
-/** SW 空闲期预热（main.tsx）：按清单预拉词库 chunk 入 SW 缓存，保证首次离线可切大词库 */
-export function warmUpVocabulary(): Promise<unknown> {
-  return Promise.allSettled(WARMUP_IDS.map((id) => getPackage(id)?.load?.())).catch(() => {})
+/** SW 空闲期预热（main.tsx）：按清单预拉词库 chunk 入 SW 缓存，保证首次离线可切大词库。
+ *
+ * ⚠️ 返回值是**结果摘要**而不是 `void`：旧实现末尾挂的 `.catch(() => {})` 把一切失败
+ * 吞得干干净净 —— `allSettled` 本身就不会 reject，再加上这个裸 catch，调用方（main.tsx）
+ * 拿到的是一个「永远成功」的空 promise，预热没跑成在控制台不留任何痕迹，只能等用户反馈
+ * 「离线切不了大词库」才被发现。现在把成功/失败/缺 loader 三个数**回传**，由 main.tsx
+ * 决定怎么打日志：静默失败必须变成可观测事件（Stage 0 · N2）。
+ *
+ * 仍然不 reject：预热全程跑在 `window load` → `requestIdleCallback` 的空闲期，只服务于
+ * 「首次离线可切大词库」这一条体验，失败不该影响任何流程，也不该挂到 ErrorBoundary 上。 */
+export function warmUpVocabulary(): Promise<{ warmed: number; failed: number; missing: number }> {
+  const jobs = WARMUP_IDS.map((id) => getPackage(id)?.load?.())
+  return Promise.allSettled(jobs).then((rs) => ({
+    warmed: rs.filter((r) => r.status === 'fulfilled').length,
+    failed: rs.filter((r) => r.status === 'rejected').length,
+    missing: jobs.filter((j) => j === undefined).length,
+  }))
 }

@@ -18,8 +18,12 @@
  *       附带：customBanks.persist() 必须有 try 保护（原先直接抛，会炸 ErrorBoundary）。
  *
  * 退出码：0 = 全部 PASS；1 = 任一 FAIL（静默 catch 计数 > 0 也含在此）。
+ *
+ * --falsify = 自带证伪自检：把 G4-3② 的两条判据**故意打回缺陷态**，要求它们各自判红 ——
+ * 「门一直绿」不等于「门能拦人」。两条注入都走 try/finally 写回原文；注入期间文件是坏的，
+ * 跑完必须 `git status --porcelain` 确认无残留。
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -50,6 +54,10 @@ function walk(dir, out = []) {
 }
 const files = walk(SRC)
 const rel = (p) => relative(ROOT, p).replaceAll('\\', '/')
+
+// --falsify 必须在任何正式判定之前跑：它留下的坏文件会把 G4-1/2/3① 的输出污染成假 FAIL，
+// 也会让「证伪到底验了什么」这句话变得不可复核（先自证伪，再判定）。
+if (process.argv.includes('--falsify')) falsifyWarmUp()
 
 /* ---------------- G4-1 · 目录与 tsc ---------------- */
 console.log('== G4-1 · Learning 持久化模块齐备 ==')
@@ -155,6 +163,117 @@ ok('白名单静默 = diagnostics.ts 恒 5 处 + main.tsx 恒 1 处（多了说�
     whitelisted.filter((h) => h.file === 'src/main.tsx').length === 1,
   `实际 ${whitelisted.length} 处：${whitelisted.map((h) => `${h.file}:${h.line}`).join(', ')}`)
 console.log('  ℹ️ 白名单依据：' + [...SILENT_OK.entries()].map(([f, why]) => `${f} —— ${why}`).join('；'))
+
+/* ---------------- G4-3② · 大词库预热的失败/降级路径必须可观测（Stage 0 · N2） ---------------- */
+/**
+ * 静态判定：`src/main.tsx` 的 warmBanks 必须做到「预热没跑成会被人发现」。
+ * 它曾经是这里唯一的静默失效点 —— 裸 `void warmUpVocabulary()` 丢掉 promise，
+ * 而 warmUpVocabulary 内部又 `allSettled(...).catch(() => {})` 把失败吞光，
+ * 于是慢设备上 SW 没接管 ⇒ 预热发生在 SW 控制之外 ⇒ chunk 不进 SW 缓存，
+ * 全程零信号，只能等用户报「离线切不了大词库」。
+ *
+ * 两条判据（返回未通过的条目，空数组 = 全过）：
+ *   W1 预热调用点不得裸丢弃 —— 每个 `warmUpVocabulary()` 调用点之后必须**紧跟**
+ *      一个 `.then(` / `.catch(`（紧盯是刻意的：允许隔着别的语句 ⇒ 判定会被旁路），
+ *      且该处理里要有 `console.` 日志；
+ *   W2 SW 接管等待预算 `SW_CONTROLLER_WAIT_POLLS` 必须 ≥ 100（= 10s）。
+ *      这是**只许升不许降**的棘轮：预算越宽越不容易在慢设备上退化成「预热发生在接管前」，
+ *      所以只卡下界、不卡上界（上界是产品取舍，不该由机器判）。
+ *
+ * ⚠️ 判定纯走文本、不跑 tsc —— 证伪注入时文件会被临时改坏，跑 tsc 只会得到
+ *    「语法错误」而不是「判据失效」，那是另一种假象。
+ */
+function warmUpJudge(rawText) {
+  const failed = []
+  // 先剥注释：注释里「提到」这个调用点不是「调用」它（判据查的是调用，不是提及，与 G4-2 同口径）
+  const mainText = stripComments(rawText)
+
+  const callSites = []
+  for (let i = mainText.indexOf('warmUpVocabulary()'); i !== -1; i = mainText.indexOf('warmUpVocabulary()', i + 1)) {
+    callSites.push(i)
+  }
+  // 「紧跟」= 跳过空白/换行后立刻接 .then( / .catch(（允许跨行缩进，因为 prettier 会折行）
+  const bare = callSites.filter(
+    (i) => !/^\s*\.\s*(?:then|catch)\s*\(/.test(mainText.slice(i + 'warmUpVocabulary()'.length, i + 80)),
+  )
+  if (!callSites.length) failed.push('W1 在 src/main.tsx 里找不到 warmUpVocabulary() 调用点')
+  else if (bare.length) failed.push(`W1 有 ${bare.length} 处 warmUpVocabulary() 被裸丢弃（其后 80 字内无 then/catch 处理结果）`)
+
+  const logged = callSites.some((i) => {
+    const window = mainText.slice(i, i + 320)
+    return /\.then\s*\(/.test(window) && /console\./.test(window)
+  })
+  if (callSites.length && !logged) failed.push('W1 预热结果处理里没有 console 日志（失败仍然不可观测）')
+
+  const budget = mainText.match(/SW_CONTROLLER_WAIT_POLLS\s*=\s*(\d+)/)
+  if (!budget) failed.push('W2 找不到 SW 接管等待预算常量 SW_CONTROLLER_WAIT_POLLS')
+  else if (Number(budget[1]) < 100) failed.push(`W2 SW 接管等待预算 ${budget[1]} 次 ×100ms < 10s，会重演「慢设备预热发生在 SW 接管前」`)
+  return failed
+}
+
+/* ---------------- --falsify：G4-3② 的自证伪 ---------------- */
+/** 注入 ①：在既有调用点之前再插一条**裸丢弃**的 warmUpVocabulary()（语法仍合法，只是不可观测） */
+function INJECT_BARE(t) {
+  return t.replace('warmUpVocabulary().then(', 'void warmUpVocabulary(); warmUpVocabulary().then(')
+}
+/** 注入 ②：把 SW 接管等待预算打回旧值 50（= 5s） */
+function INJECT_BUDGET(t) {
+  return t.replace(/SW_CONTROLLER_WAIT_POLLS\s*=\s*\d+/, 'SW_CONTROLLER_WAIT_POLLS = 50')
+}
+
+function falsifyWarmUp() {
+  const p = join(SRC, 'main.tsx')
+  const original = readFileSync(p, 'utf8')
+  const bad = []
+  const judgeOn = (text) => warmUpJudge(text).join('；')
+
+  try {
+    // ① 裸丢弃 ⇒ W1 必须红
+    const t1 = INJECT_BARE(original)
+    if (t1 === original) throw new Error('证伪①注入没生效（main.tsx 里找不到 warmUpVocabulary().then( 锚点）')
+    const f1 = warmUpJudge(t1).filter((f) => f.startsWith('W1'))
+    if (!f1.length) bad.push(`注入裸丢弃后 W1 仍为 ${judgeOn(t1) || '通过'} —— 预热失败依旧不会被发现`)
+    else console.log(`  ✅ 证伪① OK：插入裸 warmUpVocabulary() ⇒ ${f1.join('；')}`)
+
+    // ② 预算回退 50 ⇒ W2 必须红
+    const t2 = INJECT_BUDGET(original)
+    if (t2 === original) throw new Error('证伪②注入没生效（main.tsx 里找不到 SW_CONTROLLER_WAIT_POLLS = N）')
+    const f2 = warmUpJudge(t2).filter((f) => f.startsWith('W2'))
+    if (!f2.length) bad.push(`预算回退到 50 后 W2 仍为 ${judgeOn(t2) || '通过'} —— 5s 的旧缺陷能悄悄回来`)
+    else console.log(`  ✅ 证伪② OK：SW 接管等待预算打回 50（5s）⇒ ${f2.join('；')}`)
+
+    // ③ 两条同时注入 ⇒ 必须两条都红（确认不是「只有一条会红」的假自检）
+    const f12 = warmUpJudge(INJECT_BUDGET(INJECT_BARE(original)))
+    if (f12.length < 2) bad.push(`双注入只红了 ${f12.length} 条（${f12.join('；') || '无'}），自检覆盖面不足`)
+    else console.log(`  ✅ 证伪③ OK：两条缺陷同时注入 ⇒ 红 ${f12.length} 条`)
+  } finally {
+    writeFileSync(p, original, 'utf8')
+  }
+
+  if (readFileSync(p, 'utf8') !== original) bad.push('证伪结束没能把 src/main.tsx 还原成原文')
+  if (bad.length) {
+    console.error('❌ G4-3② 证伪自检失败（判据可能恒真）：')
+    for (const b of bad) console.error(`   · ${b}`)
+    process.exit(1)
+  }
+  console.log('✅ G4-3② 证伪自检通过：裸丢弃与预算回退两条缺陷都能被判红，且文件已还原')
+  process.exit(0)
+}
+
+
+const mainText = readFileSync(join(SRC, 'main.tsx'), 'utf8')
+const warmFailed = warmUpJudge(mainText)
+console.log('\n== G4-3② · 预热（warmBanks）失败/降级路径可观测 ==')
+ok(
+  '预热调用点带结果处理且打日志（非裸 void 丢弃）',
+  !warmFailed.some((f) => f.startsWith('W1')),
+  warmFailed.find((f) => f.startsWith('W1'))?.replace('W1 ', '') ?? 'warmUpVocabulary().then(…) 内有 console 日志',
+)
+ok(
+  'SW 接管等待预算 ≥ 100 次（10s），不许回退到 5s 的旧值',
+  !warmFailed.some((f) => f.startsWith('W2')),
+  warmFailed.find((f) => f.startsWith('W2'))?.replace('W2 ', '') ?? `SW_CONTROLLER_WAIT_POLLS = ${mainText.match(/SW_CONTROLLER_WAIT_POLLS\s*=\s*(\d+)/)?.[1]}`,
+)
 
 /* customBanks.persist() 必须有 try 保护（G4-3① 的姊妹条款：无保护 setItem = 0） */
 const cbText = readFileSync(join(SRC, 'lib', 'customBanks.ts'), 'utf8')
