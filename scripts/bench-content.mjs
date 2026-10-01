@@ -33,7 +33,8 @@ import { dirname, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const OUT = resolve(root, 'docs', 'audit-package', '_generated', 'perf-baseline.json')
+// 与 bench-boot 同源约定：可变基线落在 INV-1 冻结区之外，避免 bench 把冻结区改脏。
+const OUT = resolve(root, 'docs', '_generated', 'perf-baseline.json')
 
 const SAMPLES = 200          // 每组采样次数（≥200，见文件头「为什么」）
 const WARMUP = 5             // 预热次数（不计入样本：JIT + 模块缓存 + 文件页缓存）

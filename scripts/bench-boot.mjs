@@ -40,7 +40,10 @@ import { execFileSync } from 'node:child_process'
 import { ensurePreviewServer, stopPreview } from '../tests/preview-server.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const OUT = resolve(root, 'docs', 'audit-package', '_generated', 'perf-baseline.json')
+// 注意：基线是可变产物（每次采样都会重写），**必须**落在 INV-1 冻结区之外，
+// 否则任何一次 bench 都会把 docs/audit-package/_generated/perf-baseline.json 改脏、
+// 让 verify-p17-frozen 判红。冻结区里那份是历史种子，只读不写。
+const OUT = resolve(root, 'docs', '_generated', 'perf-baseline.json')
 
 const PORT = 4182          // preview 端口（避让 4173/4174/4181）
 const CDP_PORT = 9223      // chrome remote-debugging 端口

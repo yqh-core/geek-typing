@@ -1,0 +1,92 @@
+{
+  "content": {
+    "searchWords": {
+      "samples": 200,
+      "unit": "ms",
+      "p50": 28.69,
+      "p95": 32.649,
+      "min": 25.191,
+      "max": 42.182,
+      "method": "searchWords({query:<cet4 前 20 词循环>, limit:20})，索引预先建好"
+    },
+    "queryWord": {
+      "samples": 200,
+      "unit": "ms",
+      "p50": 0.003,
+      "p95": 0.005,
+      "min": 0.003,
+      "max": 0.019,
+      "method": "queryWord('cet4', <cet4 前 20 词循环>)，索引预先建好"
+    },
+    "indexBuild": {
+      "samples": 200,
+      "unit": "ms",
+      "p50": 8.84,
+      "p95": 15.438,
+      "min": 7.315,
+      "max": 23.837,
+      "method": "invalidateIndex() 全清 → ensureIndex() 全量重建（10 包 / 9346 条）"
+    },
+    "queryWords": [
+      "abandon",
+      "absolute",
+      "abstract",
+      "academic",
+      "accelerate",
+      "accommodate",
+      "accompany",
+      "accomplish",
+      "accumulate",
+      "adequate",
+      "adjust",
+      "advocate",
+      "aggressive",
+      "alternative",
+      "ambitious",
+      "analyze",
+      "anxiety",
+      "apparent",
+      "appropriate",
+      "arbitrary"
+    ]
+  },
+  "meta": {
+    "generatedAt": "2026-09-30T02:37:11.964Z",
+    "node": "v22.22.2",
+    "platform": "win32 x64",
+    "commit": "410f17b",
+    "machine": "Windows 11 + Esafenet 透明加密驱动（IO 抖动大，单次采样不可信）；本地测量值仅供趋势对照，不作为 CI 判据"
+  },
+  "boot": {
+    "desktop": {
+      "samples": 12,
+      "unit": "ms",
+      "p50": 90,
+      "p95": 112.6,
+      "min": 79.5,
+      "max": 112.6,
+      "viewport": "1280x800",
+      "cpuThrottle": null,
+      "method": "整页冷导航（每次新 tab）→ [data-testid=\"home-panel\"] 首现的 performance.now()；同 profile 预热后采样（SW precache 与 chunk 缓存落定），度量启动执行/渲染成本，非「首次到访」口径；探针经 Page.addScriptToEvaluateOnNewDocument 注入 MutationObserver，显式轮询读取，不用 networkidle"
+    },
+    "mobile": {
+      "samples": 12,
+      "unit": "ms",
+      "p50": 245.6,
+      "p95": 316.6,
+      "min": 169.7,
+      "max": 316.6,
+      "viewport": "412x915",
+      "cpuThrottle": 4,
+      "method": "整页冷导航（每次新 tab）→ [data-testid=\"home-panel\"] 首现的 performance.now()；同 profile 预热后采样（SW precache 与 chunk 缓存落定），度量启动执行/渲染成本，非「首次到访」口径；探针经 Page.addScriptToEvaluateOnNewDocument 注入 MutationObserver，显式轮询读取，不用 networkidle"
+    }
+  },
+  "bundle": {
+    "mainChunkRaw": 445931,
+    "mainChunkGzip": 138249,
+    "wordsChunkMaxRaw": 483087,
+    "mainChunkFile": "index-CXA9m-G5.js",
+    "recordedAt": "2026-09-30T01:56:42.273Z",
+    "note": "gate-perf --record-baseline 写入；gzip 口径与 check-bundle 一致（zlib level 9）"
+  }
+}

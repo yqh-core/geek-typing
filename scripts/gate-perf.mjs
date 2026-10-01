@@ -41,7 +41,9 @@ import { fileURLToPath } from 'node:url'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = join(ROOT, 'dist')
 const ASSETS = join(DIST, 'assets')
-const BASELINE_JSON = join(ROOT, 'docs', 'audit-package', '_generated', 'perf-baseline.json')
+// 预算门的输入是可变基线（bench-boot / bench-content / --record-baseline 都会重写），
+// 因此放在 INV-1 冻结区之外；docs/audit-package/_generated/perf-baseline.json 那份是历史冻结种子，只读。
+const BASELINE_JSON = join(ROOT, 'docs', '_generated', 'perf-baseline.json')
 
 const FACTOR = 1.15
 

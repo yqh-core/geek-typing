@@ -190,3 +190,20 @@ Stage 0/1/2          → 本地 / 证据任务 + 阶段门禁，不为了「看�
 **硬约束复核（我独立跑的，不是听转述）**：
 `git diff 13dac12..2f0c43f -- docs/audit-package scripts/gate-perf.mjs scripts/check-bundle.mjs` **输出为空**
 ⇒ INV-1 冻结区零改动、INV-3 预算常量一行未动；`npm run test:e2e` 仍是 **171/171**（一条没动 e2e）。
+
+---
+
+## 7. Stage 1 第一刀已落地（2026-10-01）
+
+主 chunk 构成分析与两处瘦身的完整数据、候选判定、证伪过程都在
+`docs/p18/_generated/stage1/STAGE1-SLICE1-2026-10-01.md`（**这个文件的口径是分析证据**；本文件仍是排期唯一事实源）。
+
+结论三句：
+
+1. **主 chunk 424.99 → 404.73 KiB raw / 134.84 → 127.13 KiB gzip，余量 3.3%/4.8% → 7.9%/10.2%；阈值一行未动。**
+2. **只动了两刀**（`canvas-confetti` 19.8 KiB、`migrate.ts` 16.2 KiB 移出主 chunk）—— 理由是按「最小变更 + 不撞未签的 UX」排序：
+   面板 lazy 那个 101.6 KiB 的大杠杆**不做**，因为它要加载态，而 N6（9.5 UX 视觉复核）还没签。
+3. **顺带堵了一个真缺陷**：`bench:boot` 把可变基线写进 INV-1 冻结区，我证伪过「往那文件追加一个空格 ⇒ `verify-p17-frozen` EXIT=1」。
+   现在三个脚本的写入路径改到 `docs/_generated/`，冻结区那份只读不写。
+
+Stage 1 还没 CLOSED：下一刀候选与「不做的理由」见上引文件 §7。
