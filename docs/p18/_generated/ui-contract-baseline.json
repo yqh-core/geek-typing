@@ -6,11 +6,11 @@
     "wordTableSources": 13,
     "handleReads": 11,
     "bannedArrayOps": 11,
-    "bypassFacadeImports": 2
+    "bypassFacadeImports": 0
   },
   "meta": {
-    "generatedAt": "2026-09-30T15:01:21.201Z",
-    "commit": "8b711802572b63ac638ff5d9d4b5b232ad103112",
+    "generatedAt": "2026-10-01T03:52:02.912Z",
+    "commit": "fbe7804470a2ea06c5f8468d4bacc6573b42962a",
     "node": "v22.22.2",
     "scannedFiles": 26,
     "scanner": "scripts/ast/ui-contract-ast.mjs",

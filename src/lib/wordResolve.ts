@@ -26,7 +26,7 @@
  * **`?? { word, translation: '' }` 这种写法在本文件之后即属违规。**
  */
 import { allLoadedWords, type WordBank, type WordItem } from '../data/wordBanks'
-import { queryWord } from '../core/content/query/content-query'
+import { queryWord } from '../core/content'
 
 /** 已加载词条 → Map（多个一次不过构建，避免逐词重复 flatMap）。键为**原词形**。 */
 export function buildLoadedMap(banks: WordBank[]): Map<string, WordItem> {

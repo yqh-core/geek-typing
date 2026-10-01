@@ -24,6 +24,11 @@ export {
 
 export { getCatalog, getPackageCatalog } from './catalog/catalog'
 
+/* P18-H：预热入口也走门面 —— 否则 UI（main.tsx）只能直引 './core/content/registry' 深路径，
+ * 而 deep import 正是 CONTENT_CONTRACT §12.1 要消灭的东西（门面存在的意义就是"新增内容类型时
+ * 本 barrel 不变、调用方不感知"）。门判据 bypassFacadeImports 硬盯着这类直引。 */
+export { warmUpVocabulary } from './registry'
+
 export {
   makeContentId,
   parseContentId,

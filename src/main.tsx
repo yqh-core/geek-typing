@@ -4,7 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import AppErrorBoundary from './components/AppErrorBoundary'
 import { LangProvider } from './i18n'
-import { warmUpVocabulary } from './core/content/registry'
+import { warmUpVocabulary } from './core/content'
 import { learningService } from './core/learning'
 
 /* P1.5-S4 §3.5 硬耦合②：M 与读侧切换必须同时 —— 迁移在首屏渲染**之前**完成（或明确放弃），
