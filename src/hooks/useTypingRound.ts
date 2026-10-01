@@ -384,6 +384,7 @@ export function useTypingRound({
     targetLower,
     target,
     current,
+    currentWpm,
     finished,
     startRound,
     mode,

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { FileDown, FileUp, Plus, Trash2, X } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
 import {
@@ -32,9 +32,22 @@ export default function BankManager({ theme, onBankChange, open: openProp, onOpe
   const [msg, setMsg] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
+  /* 「面板一打开就按最新磁盘状态重取一次自定义词库列表」—— 原写法把 setBanks 挂在 effect
+   * 的 [open] 上，React 19 已把「effect 里同步 setState」点名为反模式（白起一轮级联渲染）。
+   * 改成官方的 **render 阶段调整 state**：用 banksForOpen 记下「这份列表是为哪个 open 取值
+   * 取的」，open 一变就在 render 里重取一次，触发点与原来 effect 的 [open] 对齐。
+   *
+   * ⚠️ 语义核对（原 effect 只在 open 变化那一轮跑，改后会不会漏刷？）：
+   * 关面板只有两条出口 —— 右上角关闭键（91 行 setOpen(false)）和「练习」行（173 行
+   * setOpen(false)），两条都把 open 翻成 false，所以「A 路径关掉 → B 路径打开」必然夹着
+   * 一次 false→true 跳变；而下面比较的正是「本次 render 的 open」与「这份 banks 是为哪个
+   * open 取的」，跳变两侧必然不等 ⇒ 照样重载。反过来，open 恒为 true 时原 effect 也不会
+   * 重跑，两边行为一致。结论：不存在「该刷新的没刷新」的漏点。 */
+  const [banksForOpen, setBanksForOpen] = useState(open)
+  if (open !== banksForOpen) {
+    setBanksForOpen(open)
     if (open) setBanks(loadCustomBanks())
-  }, [open])
+  }
 
   const panelClass = `${theme.card} border ${theme.border}`
 

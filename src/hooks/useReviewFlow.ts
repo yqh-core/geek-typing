@@ -41,18 +41,30 @@ export function useReviewFlow({ banks, bankWords, bankId, startRound, setTab, ta
   )
 
   /* ---------------- 错题本（艾宾浩斯）派生数据 ---------------- */
+  /* 切页签时也刷新一次：背单词页的三键打分不在本组件内打点 —— 用户在背单词页打分只会走
+   * 那条路径、不会 bump reviewVersion，切回复习页签必须靠 tab 变化再触发一次重算。
+   * ⚠️ tab 在这里是**刷新信号**而不是真依赖：memo 体不读它，加了它就会让 linter 报
+   * 「unnecessary dependency」并诱导人把它从 deps 里删掉 —— 那样等于让「切页签后到期数
+   * 还是旧值」这个真实缺陷回来。所以显式在体里读一次 tab（与上面 void reviewVersion
+   * 「版本号当刷新量」同一套既有写法），让「依赖它」这件事在代码里成立。 */
   const dueCount = useMemo(() => {
     void reviewVersion
+    void tab
     return learningService.getReviewDueCount()
-    // 切页签时也刷新一次：背单词页的三键打分不在本组件内打点
   }, [reviewVersion, tab])
   const reviewTotal = useMemo(() => {
     void reviewVersion
+    void tab
     return learningService.getReviewTotalCount()
   }, [reviewVersion, tab])
 
   /** Today's Practice 推荐快照：错题本变化（或切回页签）时重建 */
-  const recommendation = useMemo(() => buildRecommendation(), [reviewVersion, tab])
+  const recommendation = useMemo(() => {
+    // 同上：recommendation 体也不读这两个刷新信号，故各显式读一次
+    void reviewVersion
+    void tab
+    return buildRecommendation()
+  }, [reviewVersion, tab])
 
   /** 单挑一个错词反复练。contentId 存在 = 精确归属该 (词,包)（ReviewPanel 的条目自带，
    *  §3.5 硬耦合③）；缺省 = 归属当前词库（Header 弱词 / 命令面板入口无包归属信息）。

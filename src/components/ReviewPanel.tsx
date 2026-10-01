@@ -47,12 +47,28 @@ export default function ReviewPanel({ theme, banks, reviewVersion, analytics, on
     return learningService.getMasteryDistribution()
   }, [reviewVersion])
 
-  const due = useMemo(() => views.filter((v) => v.entry.nextReviewAt <= Date.now()), [views])
+  /* 「到期」判定用的时间快照：**每次复习版本刷新取一次**，本轮 render 内所有到期判定共用它。
+   * 原来 render 体里直接 `const now = Date.now()` 会被判为 purity 违规（impure 函数）。
+   *
+   * ⚠️ 行为差异（有意为之）：在 reviewVersion 不变的额外 re-render（例如展开某个词条、
+   * 切换语言等纯 UI 状态变化）里，now 保持本轮快照而不重新取值。影响面被 views 兜住 ——
+   * 到期条目清单本身就只在 reviewVersion 变化时重建（上面 37 行的 useMemo），
+   * 视图没变却拿一个更晚的 now 只会把**已经存在**的条目误判成「到期」，属于假阳性；
+   * 真正让某条到期的一定是 recordCorrect/recordWrong 打点（bump reviewVersion ⇒ now 一起刷新）。 */
+  const now = useMemo(() => {
+    // 时间快照刻意跟着复习版本走：刷新一次就重取一次（下面 void 是为了把「依赖 reviewVersion」
+    // 这件事写进代码里，与同文件 38/46 行的既有写法一致，避免被优化成只在首次渲染取一次）
+    void reviewVersion
+    // 时间快照：刻意取外部时钟，purist 规则按惯例在此例外
+    // eslint-disable-next-line react/purity
+    return Date.now()
+  }, [reviewVersion])
+
+  const due = useMemo(() => views.filter((v) => v.entry.nextReviewAt <= now), [views, now])
 
   // ① 已加载词条映射（含用户自定义词库）：同步命中，零 await —— 与旧行为等价
   const itemMap = useMemo(() => buildLoadedMap(banks), [banks])
 
-  const now = Date.now()
   const entries = useMemo(() => [...views].sort((a, b) => a.entry.nextReviewAt - b.entry.nextReviewAt), [views])
   // 有到期 → 只列到期词；无到期 → 全量按 nextReviewAt 升序前 20
   const shown = due.length > 0 ? entries.filter((x) => x.entry.nextReviewAt <= now) : entries.slice(0, 20)

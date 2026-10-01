@@ -1,8 +1,4 @@
 {
-  "total": 10,
-  "byRule": {
-    "react-hooks(exhaustive-deps)": 5,
-    "react(set-state-in-effect)": 3,
-    "react(purity)": 2
-  }
+  "total": 0,
+  "byRule": {}
 }
