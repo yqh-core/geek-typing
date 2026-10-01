@@ -197,9 +197,70 @@ git log --oneline -1       # 期望：12de9c9 或更新
 | 10.7 | UI 契约 | `node tests/ui-contract.mjs` | `bypassFacadeImports=0`、两个硬零桶 =0 |
 | 10.8 | UI 契约能判红 | `node tests/ui-contract.mjs --falsify` | EXIT=0，20/20 |
 | 10.9 | relations 端点（真实数据） | `node scripts/content/validate.mjs \| grep relations` | reading 4 条 / collection 7 条"端点合法且可达" |
-| 10.10 | 体积 | `git clean -xdf dist && npm run build && node scripts/check-bundle.mjs` | 426.67 KiB ≤ 439.45 |
+| 10.10 | 体积 | `git clean -xdf dist && npm run build && node scripts/check-bundle.mjs` | 424.47 KiB ≤ 439.45（9.5 已把这 2 包改 lazy；余量 3.4% / 4.9%） |
 | 10.11 | 发布门 | `node scripts/verify-release-gate.mjs` | 43 PASS / 0 PENDING / APPROVED |
 | 10.12 | 线上 | `curl -s --noproxy '*' -o /dev/null -w '%{http_code}' https://geek-typing.pages.dev/` | 200 |
 
 > ⚠️ 跑 `--falsify` 时**严禁用 `| head` 截断**（SIGPIPE 会把进程打死在"已注入未还原"的中间态，
 > 留下注入残留）；用 `| tail` 或重定向，跑完立刻 `git status --porcelain` 验残留。
+
+---
+
+## 11. 补录：上一轮评审之后又改的三处（2026-10-01 同日，含一条自我更正）
+
+本审查包生成时的 HEAD 是 `12de9c9`。之后又推进了 A/B/C/D 四步与一次 Final Consistency Sweep，
+有三处**会影响评审结论**，补在这里；`docs/p18/P18-CLOSURE-STATUS.md` 是总索引。
+
+### 11.1 ⚠️ 自我更正：本包 §0「十二次 CI 全 success」当时说过头了
+
+`e4b6674`（只改文档）那一笔 CI（`36840665242`）的 `门禁③ 端到端` 实际是 **failure**：
+唯一红项是预热探针 `❌ 预热探针：… 轮询 120s 超时 — 0 个 words chunk`（其余 169/170 全过）。
+同一份 src 的三笔 CI 是 **绿（515941c）/ 红（e4b6674）/ 绿（1f46ab9）** ⇒ 是 **flaky，不是代码回归**。
+根因**没有定死**（详见 §11.3 那条被证伪的推断），处置是把出事的那一刀拔掉（§11.3）。
+
+### 11.2 契约一致性（对应评审的第七项）已收
+
+- `CONTENT_CONTRACT.md` §13.2 / `content/README.md` §15.2 改名「**历史基线**」并加 ⚠️ 说明，
+  「当前实测」不再与「P0.6.1 时代基线」并存于同一层级；
+- §13.3/§13.4、§15.3 的实验表与外推明确标成 **Historical baseline / planning estimate**，
+  「当前实测」一律集中到 §13.5 / §15.1，并以 `npm run check:bundle` / `npm run content:validate` 输出为准；
+- **I-20 改为原则式、不抄任何动态数值**（契约阈值 ≠ 当前预算层，抄进来必然过期）；
+- 状态措辞同步：DECISIONS §0、SIGN-OFF 4 行 + 汇总 + §5、HYGIENE PLAN §4 → §4.1/§4.2。
+
+### 11.3 e2e 预热探针：处置方式 + 一条被证伪的推断
+
+**先说被证伪的那条**，免得按它继续下沉：`src/main.tsx` 的 `warmBanks` 在 `await navigator.serviceWorker.ready`
+之后只等 `navigator.serviceWorker.controller` **最多 5s** 就照样 `import()`，而未接管页面的动态
+import 不经过 SW fetch handler ⇒ chunk 永不入缓存 —— **机制为真**，但改成「先按状态等接管（30s 上限）再 reload」
+之后，独立证伪脚本**仍稳定复现 0 hits**（诊断显示 `controller` 恒 false、`gt-shell-v3` 全程没建出来）。
+⇒ 「不等接管」不是充分条件，不能当根因结论写。
+
+**处置（`a49bcc7`）**：直接删掉「清空 SW 缓存 + 重新加载」这一步。依据是它本就多余 ——
+探针跑在 `mctx` 这个新开浏览器上下文（独立 profile ⇒ 独立 SW 缓存），该上下文只服务【14】的
+移动端手势、**从不切词库**；套件【15】用的是主上下文（`tests/e2e.mjs:208`），两边共享不到。
+探针改为**按状态等 SW 接管**（上限 30s），失败 Diagnosis 拆成「SW 没接管/缓存没建出来（**测不到**）」
+与「预热没把 chunk 写进缓存（**测到没通过**）」两种，新增一条前提断言。
+**证伪性质不削弱**：删掉 `warmUpVocabulary` ⇒ 0 hits ⇒ 仍判红。
+
+**同时只登记、本轮不改的生产侧缺口**：慢设备上 SW 激活超过 5s 时 `warmBanks` 会在未接管状态 import
+⇒ 预热静默失效（首次离线仍切不了大词库），而 `Promise.allSettled` 把失败吞掉、无日志。非 P18 引入。
+
+### 11.4 门健壮性（`abc99af`）
+
+`scripts/gate-lint.mjs` 的 spawn 失败原本是裸崩（未捕获异常栈，不属于三态之一）。
+改为可读诊断 + 顶层 catch ⇒ **UNKNOWN / EXIT 2**，即「这台机器没能测 lint」≠「lint 通过」。
+本机 sustained `EBUSY`（spawnSync / execFileSync / 绝对路径 node.exe 三种全挂，而直接 `node` 正常），
+错误信息里直接给了分流：`node node_modules/oxlint/bin/oxlint --format=json` 能跑通就说明 oxlint 与门都没坏。
+
+### 11.5 最终证据（同一次 run —— 对应评审第七项）
+
+`a49bcc7` ⇐ CI run **36846847388**，四道门禁全过，下表数字**与这一次 run 同源**，不是各门禁分别挑最好的一次拼的：
+
+| 门禁 | 结论 | 关键实测 |
+|---|---|---|
+| ① 静态与内容（无产物） | ✅ | `content:validate` 18 包全部通过、`test:content` 179/179、`test:ui-contract` 19/19、`gate:license`(INV-5)、`gate:lint` 当前 0 条 = 基线 0 条 |
+| ② 构建产物（体积 + 离线） | ✅ | `check:bundle` 6/6；主 chunk **424.47 KiB raw / 134.61 KiB gzip** ≤ 439.45/141.60（余量 3.4% / 4.9%，即 §3.1 那个 4.9%）；`test:offline` 过 |
+| ③ 端到端（`test:e2e`） | ✅ | **171/171**；含「✓ 预热探针前提：SW 已接管 — 等接管 19ms」+「✓ 预热探针：2 个 words chunk」 |
+| 部署到 Cloudflare Pages | ✅ | 已部署 |
+
+本地同源：`npm run test:e2e` 171/171、`oxlint` 0 warnings、`check:bundle` 6/6。
