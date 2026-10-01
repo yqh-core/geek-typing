@@ -1,0 +1,127 @@
+# RunId: P18-I-GATE-LICENSE-20261001-135750-R01
+# Command: node scripts/gate-license.mjs
+# Commit: 14426a04eddef1b2bbd14dc305d6a810d53e4cbf
+# StartedAt: 2026-10-01T05:57:50.604Z
+# DurationMs: 592
+# ExitCode: 0
+
+--- stdout+stderr ---
+§4.1 覆盖矩阵（冻结 Plan 规则 → 判据 → 证伪用例）：
+  · license.spdx 未知 / 缺失  →  license-policy:decideLicense  →  证伪 S2（owner gate:license）
+  · spdx 非商用（如 CC-BY-NC）  →  license-policy:decideLicense  →  证伪 S3（owner gate:license）
+  · commercialUse !== true（面向公开分发的内容）  →  license-policy:decideLicense  →  证伪 S5（owner gate:license）
+  · attributionRequired === true 但无署名文本  →  license-policy:decideLicense  →  证伪 S6（owner gate:license）
+  · provenance.origin/provider 缺失  →  gate-license:sourceProvenance  →  证伪 S7（owner gate:license）
+  · checksum 缺失或与实体不符  →  gate-license:sourceChecksum  →  证伪 S8（owner gate:license）
+  · Asset 缺 license 且无有效 licenseRef  →  asset-rules:checkAssetLicense  →  证伪 A1（owner gate:license）
+  ✓ 对账通过：Plan §4.1 7 行 == 覆盖矩阵 7 行，每行证伪用例存在
+▸ audio/demo-audio-01
+  ✓ source(curated in-repo (B-2 试金石)) checksum == 载荷实体 SHA-256（sha256:2ecf5d3…）
+  ✓ source(curated in-repo (B-2 试金石)) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ collection/demo-study-set
+  ✓ source(curated in-repo (B-2 试金石)) checksum == 载荷实体 SHA-256（sha256:04ec849…）
+  ✓ source(curated in-repo (B-2 试金石)) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ exercise/demo-exercise-01
+  ✓ source(curated in-repo (B-2 试金石)) checksum == 载荷实体 SHA-256（sha256:eba19d1…）
+  ✓ source(curated in-repo (B-2 试金石)) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ listening/demo-listening-01
+  ✓ source(curated in-repo (B-2 试金石)) checksum == 载荷实体 SHA-256（sha256:a29d953…）
+  ✓ source(curated in-repo (B-2 试金石)) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ reading/demo-reading-01
+  ✓ source(curated in-repo (B-2 试金石)) checksum == 载荷实体 SHA-256（sha256:47fcb01…）
+  ✓ source(curated in-repo (B-2 试金石)) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ speaking/demo-speaking-01
+  ✓ source(curated in-repo (B-2 试金石)) checksum == 载荷实体 SHA-256（sha256:149700f…）
+  ✓ source(curated in-repo (B-2 试金石)) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ topic/demo-topic-01
+  ✓ source(curated in-repo (B-2 试金石)) checksum == 载荷实体 SHA-256（sha256:d45684a…）
+  ✓ source(curated in-repo (B-2 试金石)) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ vocabulary/ai-core
+  ✓ source(curated in-repo (2026 AI 核心词库)) checksum == 载荷实体 SHA-256（sha256:f3b2be1…）
+  ✓ source(curated in-repo (2026 AI 核心词库)) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ vocabulary/cet4
+  ✓ source(ECDICT) checksum == 载荷实体 SHA-256（sha256:3a59d97…）
+  ✓ source(ECDICT) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ vocabulary/cet6
+  ✓ source(ECDICT) checksum == 载荷实体 SHA-256（sha256:4560e3f…）
+  ✓ source(ECDICT) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ vocabulary/cloud-native
+  ✓ source(curated in-repo (云原生词库)) checksum == 载荷实体 SHA-256（sha256:cddaa3d…）
+  ✓ source(curated in-repo (云原生词库)) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ vocabulary/frontend
+  ✓ source(curated in-repo (前端词库)) checksum == 载荷实体 SHA-256（sha256:ae689a1…）
+  ✓ source(curated in-repo (前端词库)) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ vocabulary/go-code
+  ✓ source(curated in-repo (Go 代码词库)) checksum == 载荷实体 SHA-256（sha256:6b22c0d…）
+  ✓ source(curated in-repo (Go 代码词库)) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ vocabulary/ielts
+  ✓ source(ECDICT) checksum == 载荷实体 SHA-256（sha256:bd904d2…）
+  ✓ source(ECDICT) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ vocabulary/kaoyan
+  ✓ source(ECDICT) checksum == 载荷实体 SHA-256（sha256:fa6a912…）
+  ✓ source(ECDICT) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ vocabulary/toefl
+  ✓ source(ECDICT) checksum == 载荷实体 SHA-256（sha256:19f1dac…）
+  ✓ source(ECDICT) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ vocabulary/ts-code
+  ✓ source(curated in-repo (TS 代码词库)) checksum == 载荷实体 SHA-256（sha256:9f34b06…）
+  ✓ source(curated in-repo (TS 代码词库)) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+▸ writing/demo-writing-01
+  ✓ source(curated in-repo (B-2 试金石)) checksum == 载荷实体 SHA-256（sha256:a0032e0…）
+  ✓ source(curated in-repo (B-2 试金石)) 许可判定 allowed
+  · manifest 无 assets 字段，跳过 asset 校验
+  ✓ 资产契约：无 assets[]，包级 licenses/provenance 不要求（条件未触发）
+  ✓ 许可 / 资产判据全部通过
+──────────────────────────────────────────────────────
+License Gate: PASS —— packages 18, violations 0

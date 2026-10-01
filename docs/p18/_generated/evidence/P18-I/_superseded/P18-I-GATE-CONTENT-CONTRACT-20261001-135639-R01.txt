@@ -1,0 +1,85 @@
+# RunId: P18-I-GATE-CONTENT-CONTRACT-20261001-135639-R01
+# Command: node scripts/gate-content-contract.mjs
+# Commit: 14426a04eddef1b2bbd14dc305d6a810d53e4cbf
+# StartedAt: 2026-10-01T05:56:39.757Z
+# DurationMs: 907
+# ExitCode: 0
+
+--- stdout+stderr ---
+[gate:content-contract] 18 个包
+▸ audio/demo-audio-01
+  ✓ license 全部 allowed（self）
+  ✓ 载荷引用存在（items.json）
+  ✓ ContentId 与包体一致（content:audio:demo-demo-audio-01:demo-audio-01）
+▸ collection/demo-study-set
+  ✓ license 全部 allowed（self）
+  ✓ 载荷引用存在（items.json）
+  ✓ relations.json 7 条端点可达
+  ✓ ContentId 与包体一致（content:collection:demo-demo-study-set:demo-study-set）
+▸ exercise/demo-exercise-01
+  ✓ license 全部 allowed（self）
+  ✓ 载荷引用存在（items.json）
+  ✓ ContentId 与包体一致（content:exercise:demo-demo-exercise-01:demo-exercise-01）
+▸ listening/demo-listening-01
+  ✓ license 全部 allowed（self）
+  ✓ 载荷引用存在（items.json）
+  ✓ ContentId 与包体一致（content:listening:demo-demo-listening-01:demo-listening-01）
+▸ reading/demo-reading-01
+  ✓ license 全部 allowed（self）
+  ✓ 载荷引用存在（items.json）
+  ✓ relations.json 4 条端点可达
+  ✓ ContentId 与包体一致（content:reading:demo-demo-reading-01:demo-reading-01）
+▸ speaking/demo-speaking-01
+  ✓ license 全部 allowed（self）
+  ✓ 载荷引用存在（items.json）
+  ✓ ContentId 与包体一致（content:speaking:demo-demo-speaking-01:demo-speaking-01）
+▸ topic/demo-topic-01
+  ✓ license 全部 allowed（self）
+  ✓ 载荷引用存在（items.json）
+  ✓ ContentId 与包体一致（content:topic:demo-demo-topic-01:demo-topic-01）
+▸ vocabulary/ai-core
+  ✓ license 全部 allowed（self）
+  ✓ 载荷引用存在（words.json）
+  ✓ ContentId 与包体一致（content:vocabulary:curated-ai-core:ai-core）
+▸ vocabulary/cet4
+  ✓ license 全部 allowed（MIT）
+  ✓ 载荷引用存在（words.json）
+  ✓ ContentId 与包体一致（content:vocabulary:ecdict-cet4:cet4）
+▸ vocabulary/cet6
+  ✓ license 全部 allowed（MIT）
+  ✓ 载荷引用存在（words.json）
+  ✓ ContentId 与包体一致（content:vocabulary:ecdict-cet6:cet6）
+▸ vocabulary/cloud-native
+  ✓ license 全部 allowed（self）
+  ✓ 载荷引用存在（words.json）
+  ✓ ContentId 与包体一致（content:vocabulary:curated-cloud-native:cloud-native）
+▸ vocabulary/frontend
+  ✓ license 全部 allowed（self）
+  ✓ 载荷引用存在（words.json）
+  ✓ ContentId 与包体一致（content:vocabulary:curated-frontend:frontend）
+▸ vocabulary/go-code
+  ✓ license 全部 allowed（self）
+  ✓ 载荷引用存在（words.json）
+  ✓ ContentId 与包体一致（content:vocabulary:curated-go-code:go-code）
+▸ vocabulary/ielts
+  ✓ license 全部 allowed（MIT）
+  ✓ 载荷引用存在（words.json）
+  ✓ ContentId 与包体一致（content:vocabulary:ecdict-ielts:ielts）
+▸ vocabulary/kaoyan
+  ✓ license 全部 allowed（MIT）
+  ✓ 载荷引用存在（words.json）
+  ✓ ContentId 与包体一致（content:vocabulary:ecdict-kaoyan:kaoyan）
+▸ vocabulary/toefl
+  ✓ license 全部 allowed（MIT）
+  ✓ 载荷引用存在（words.json）
+  ✓ ContentId 与包体一致（content:vocabulary:ecdict-toefl:toefl）
+▸ vocabulary/ts-code
+  ✓ license 全部 allowed（self）
+  ✓ 载荷引用存在（words.json）
+  ✓ ContentId 与包体一致（content:vocabulary:curated-ts-code:ts-code）
+▸ writing/demo-writing-01
+  ✓ license 全部 allowed（self）
+  ✓ 载荷引用存在（items.json）
+  ✓ ContentId 与包体一致（content:writing:demo-demo-writing-01:demo-writing-01）
+
+[gate:content-contract] PASS：18 包全部通过 Content Contract

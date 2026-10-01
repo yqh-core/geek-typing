@@ -1,0 +1,35 @@
+# RunId: P18-I-TEST-UI-CONTRACT-20261001-140141-R02
+# Command: node tests/ui-contract.mjs
+# Commit: b93168a8e8a45148bb5d14750fd22e0953bb3319
+# StartedAt: 2026-10-01T06:01:41.741Z
+# DurationMs: 3232
+# ExitCode: 0
+
+--- stdout+stderr ---
+== P18-D · UI 内容契约棘轮门（INV-2 · tests/ui-contract.mjs）==
+扫描范围 = UI_SCOPE_RE ∪ UI_EXTRA_FILES(["src/lib/wordResolve.ts"])
+扫描到 26 个文件；内容包 id 集合 18 个（从 content/ 派生）；AST 判定耗时 1842ms
+基线 docs/p18/_generated/ui-contract-baseline.json（记录于 2026-10-01T03:52:02.912Z）
+
+  ✅ SCAN-NONEMPTY [PASS] — 扫描到 26 个文件
+  ✅ ZERO-tableJsonImports [PASS] — tableJsonImports = 0（硬零：CONTENT_CONTRACT §12.2①，单位=import 语句（静态 + 动态））
+  ✅ ZERO-packageBranches [PASS] — packageBranches = 0（硬零：CONTENT_CONTRACT §12.2③，单位=BinaryExpression 边）
+  ✅ RATCHET-wordTableSources [PASS] — wordTableSources 当前 13 ≤ 基线 13（余量 0）
+  ✅ RATCHET-handleReads [PASS] — handleReads 当前 11 ≤ 基线 11（余量 0）
+  ✅ RATCHET-bannedArrayOps [PASS] — bannedArrayOps 当前 11 ≤ 基线 11（余量 0）
+  ✅ RATCHET-bypassFacadeImports [PASS] — bypassFacadeImports 当前 0 ≤ 基线 0（余量 0）
+  ✅ ⑧-4 显式追加文件已纳入扫描（src/lib/wordResolve.ts） — 在扫描集内
+  ✅ 对照组：探针扫描集与期望表**逐一对应**（无未登记探针） — 9 个探针文件
+  ✅ 探针 _support/wordBanks.ts 命中数恰好等于预期 — 六桶全 0（放行样本）
+  ✅ 探针 p1-table-json-import.probe.ts 命中数恰好等于预期 — {tableJsonImports=2}
+  ✅ 探针 p2-package-branch.probe.ts 命中数恰好等于预期 — {packageBranches=1}
+  ✅ 探针 p3-word-table-source.probe.ts 命中数恰好等于预期 — {wordTableSources=2, handleReads=2}
+  ✅ 探针 p4-banned-array-ops.probe.ts 命中数恰好等于预期 — {wordTableSources=1, handleReads=1, bannedArrayOps=3}
+  ✅ 探针 p5-handle-reads.probe.ts 命中数恰好等于预期 — {wordTableSources=2, handleReads=3}
+  ✅ 探针 p6-bypass-facade.probe.ts 命中数恰好等于预期 — {bypassFacadeImports=1}
+  ✅ 探针 p7-type-only-negative.probe.ts 命中数恰好等于预期 — 六桶全 0（放行样本）
+  ✅ 探针 p8-false-positive-guards.probe.ts 命中数恰好等于预期 — 六桶全 0（放行样本）
+  ✅ 对照组双向钳制成立（同时存在「期望非零」与「期望全零」样本） — 期望非零 6 个 / 期望全零 3 个 —— 缺任一侧都会让「恒放行」或「恒判红」的实现蒙过去
+──────────────────────────────────────────────────────
+共 19 项，通过 19，失败 0
+UI Content Contract：✅ PASS —— 硬零 2/2、棘轮 4/4、探针 9 个全对；计数 tableJsonImports=0 packageBranches=0 wordTableSources=13 handleReads=11 bannedArrayOps=11 bypassFacadeImports=0

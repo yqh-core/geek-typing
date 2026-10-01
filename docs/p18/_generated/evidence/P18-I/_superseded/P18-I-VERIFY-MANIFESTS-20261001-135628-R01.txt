@@ -1,0 +1,25 @@
+# RunId: P18-I-VERIFY-MANIFESTS-20261001-135628-R01
+# Command: node scripts/verify-manifest-hashes.mjs
+# Commit: 14426a04eddef1b2bbd14dc305d6a810d53e4cbf
+# StartedAt: 2026-10-01T05:56:28.019Z
+# DurationMs: 623
+# ExitCode: 0
+
+--- stdout+stderr ---
+  ✅ W2B-HASH-MANIFEST.md：15 份文件，0 处不符
+  ✅ W2C-HASH-MANIFEST.md：22 份文件，0 处不符
+  ✅ W3-HASH-MANIFEST.md：49 份文件，0 处不符
+  ✅ W4-HASH-MANIFEST.md：33 份文件，0 处不符
+  ✅ W5C-HASH-MANIFEST.md：7 份文件，0 处不符
+  ✅ W5D-HASH-MANIFEST.md：29 份文件，0 处不符
+
+汇总：
+  W2B-HASH-MANIFEST.md => 15 文件 / 0 不符
+  W2C-HASH-MANIFEST.md => 22 文件 / 0 不符
+  W3-HASH-MANIFEST.md => 49 文件 / 0 不符
+  W4-HASH-MANIFEST.md => 33 文件 / 0 不符
+  W5C-HASH-MANIFEST.md => 7 文件 / 0 不符
+  W5D-HASH-MANIFEST.md => 29 文件 / 0 不符
+  合计核对文件数 = 155；不符 = 0
+
+artifact 完整性：✅ PASS —— 所有 HASH-MANIFEST 登记的 artifact 逐字节匹配
