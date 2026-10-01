@@ -80,3 +80,92 @@
 > P18 该闭合的都闭合了；**下一阶段真正卡住进度的只有三件事**——
 > **N3（R2 凭据，不在工程侧）、N4（主 chunk 余量，要你拍板瘦身 or 重订预算）、N5（注册表自动化，要你裁定）**，
 > 其余九条都是工程侧可独立消化的中低优先项，Stage 0 就能清掉大半。
+
+---
+
+## 5. 本轮评审定调的边界与 Stage 2 路线（2026-10-01）
+
+### 5.1 P18 本体冻结，N1–N12 是「之后」而不是「之内」
+
+评审的定性是：**P18 已进入「工程收口完成 → 下一阶段扩展准备」，不再继续大改 P18 本体**。
+于是本队列里那条唯一的例外要单独说清：**N2（`warmBanks`）**。它在 P18 里是「只登记未修」，
+那次处置评审是对的（不去追 reload 竞态、只把出事的那一刀拔掉）；登记不等于处理完，
+所以把它**落到下一阶段 Stage 0 做掉**，而不是继续留在遗留清单里 —— 这样 `warmBanks` 缺口
+既不会让 P18 背着「已知的未修缺陷」睡觉，也不会变成「回头改 P18 本体」。
+
+冻结区硬约束继续生效，不因进入下一阶段而松：
+
+- **INV-1**：`docs/audit-package/` 零改动；
+- **INV-3**：`scripts/gate-perf.mjs` 预算常量**一行未动**（瘦身的收益要落在别处，不是改阈值）。
+
+### 5.2 Stage 2 不许再走「把新内容 import 进前端」
+
+这是本轮评审对下一阶段最重要的一条架构定调。内容进包只能走四层：
+
+```
+内容层（course / chapter）
+  IELTS / 新概念 / Vocabulary / Reading / Listening / Speaking / Video / Documents
+        ↓
+内容资产层
+  manifest · metadata · audio · video · subtitle · image · document · word bank · relations
+        ↓
+远程资产层
+  R2 / CDN / media proxy  ← 这就是 9.1 落地后的形态，不是另起一条路
+        ↓
+前端按需加载
+  首页 → 课程 → 章节 → 学习内容 → 按需拉资源
+```
+
+**推论（机器可 enforcing，不要靠自觉）**：Stage 2 新增的任何内容**不允许进入主 chunk**。
+谁把它 import 进主图，谁就被 `check-bundle` 判据 1 直接撞红 —— 这正好接上 §3.1 那条 4.9% 余量：
+不是「别把内容塞进主包»是劝告句」，而是「塞进去就红」。
+
+同时它反过来定义了 9.1 的价值：R2 / `AssetManifest` 不是「多存几张图的活」，
+它是 Stage 2 那三层里**第三层本身的地基**；凭据不到位，第四层（按需加载）只能退化为
+「按需 import JS 但没有媒体可远程拿」，等于路线缺一环。这也是为什么 9.1 保持
+`BLOCKED / WAITING EXTERNAL CREDENTIAL`、不为了「看起来完成」伪造 PASS。
+
+### 5.3 证据纪律换一档
+
+- P18 的判定基线**锁死**在 `a49bcc7` ⇐ CI run **36846847388**，四门禁同源；
+- 从 Stage 0 开始，新产生的证据只认**本阶段自己的同次 run**，
+  **不再为了继续证明 P18 而复现整理旧资料**（评审明确： Stage 0/1 开始后按新证据继续即可）；
+- 每一笔改动仍走「先提交实现、后跑证据」，门自带证伪自检（`--falsify`），UNKNOWN 视为不通过。
+
+---
+
+## 6. Stage 0 落地结果（2026-10-01，`16bb11a` + `2f0c43f`，CI run 36857119856 四门禁全过）
+
+**N2 `warmBanks` 静默失效 —— 已修，不是只登记了**：
+- `src/core/content/registry.ts` 的 `warmUpVocabulary()` 不再 `.catch(() => {})` 吞掉一切，
+  改成回传 `{warmed, failed, missing}`；
+- `src/main.tsx` 的 controller 等待预算 **5s → 15s**（`SW_CONTROLLER_WAIT_POLLS` 50 → 150），
+  SW 未接管与预热未全覆盖两条降级路径都打 `console.warn`；
+- 新增 **`scripts/gate-g4.mjs` 的 G4-3②**（W1「每个 `warmUpVocabulary()` 调用点必须处理返回值 + 附近有日志」、
+  W2「SW 接管等待预算 ≥ 10s」），判据数 **18 → 20**，`--falsify` 三条注入**全部真判红并还原**
+  （裸丢弃 / 预算打回 50 / 两条同时注入）。**这两条会把缺陷锁死，不会有人再把它改回静默。**
+
+**N7 `test:offline` 非幂等 —— 已修**：产物 `tests/_evidence/offline-audit-result.json` 移出 git 跟踪
+（`.gitignore` + `git rm --cached`），路径不变、落盘仍可读。实测：跑完 `npm run test:offline`
+（`EXIT=0`、离线审计全部通过）后 `git status --porcelain` **只有本计划文档**。
+
+**N9 / N10 —— 代码 0 行改动，因为它们在本阶段之前就已落地**：
+N9 的 `gate:todo` 豁免键早已由行号改为内容锚点（实测：给两个锚点文件各插 5 个空行，仍是
+`12 处命中：登记 12，违规 0` ⇒ 插空行不影响判定）；N10 的 CI 依赖早已升到
+`ubuntu-24.04` / `checkout@v7` / `setup-node@v7`，全仓无 `ubuntu-latest`、无 Node 20。
+
+**未动**：`gate:lint` 挂不挂进 `verify-release-gate.mjs`（N1，等你拍板）；
+`WARMUP_IDS` / `WARMUP_MAX_IDS` / `warmup-ids-baseline.json` 三处零改动（沿用 9.5 的纪律）。
+
+**两条需要在下一轮拍板的**：
+
+1. **G4-3② 目前只在本地/证据任务里成立，没进 CI。** 要进 `deploy.yml` 就得再动 workflow，
+   与「N10 零改动」打架（我按「N10 优先」处理了）。**一条不进 CI 的判据等于没有判据** ——
+   这条建议补进 CI，但它是 workflow 改动，要不要动请你定。
+2. **`16bb11a` 里混进了 N7 的 `git rm --cached`（109 行证据文件删除）**，因为索引变更先于 N2 那笔提交。
+   状态是对的（两笔都在 main、四门绿），只是审阅时「fix(warmup)」里会看到不相干的文件删除。
+   重排成干净的两笔需要 `reset --soft` + 重提 + force-push 重放 + 重跑一轮 CI —— 硬反向操作，等你点头。
+
+**硬约束复核（我独立跑的，不是听转述）**：
+`git diff 13dac12..2f0c43f -- docs/audit-package scripts/gate-perf.mjs scripts/check-bundle.mjs` **输出为空**
+⇒ INV-1 冻结区零改动、INV-3 预算常量一行未动；`npm run test:e2e` 仍是 **171/171**（一条没动 e2e）。
