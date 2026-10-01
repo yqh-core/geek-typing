@@ -66,7 +66,19 @@ function measure() {
     [join('node_modules', 'oxlint', 'bin', 'oxlint'), '--format=json'],
     { cwd: ROOT, encoding: 'utf8' }
   )
-  if (r.error) throw r.error
+  if (r.error) {
+    // spawn 本身失败（不是 oxlint 扫出问题）：既不伪装成「测出 N 条」，也不裸抛 ——
+    // 顶层会把这条归到 UNKNOWN。「测不到」必须和「未超基线」分开，否则门会拿崩溃冒充结论。
+    const code = r.error && r.error.code
+    const hint =
+      code === 'EBUSY'
+        ? 'EBUSY —— 本机起不动第二个 node 进程（Windows 常见：沙箱限制 / 同时跑多个 node / node.exe 被其它进程占用）。' +
+            '最快的分流：`node node_modules/oxlint/bin/oxlint --format=json` 若直接能跑通，说明 oxlint 与门脚本本身都没问题，是 spawn 被环境挡了'
+        : code === 'ENOENT'
+          ? 'ENOENT —— 找不到 node_modules/oxlint/bin/oxlint，先确认依赖装全'
+          : `spawn 失败（${code}）`
+    throw new Error(`oxlint 起不来，测量失败：${hint}`)
+  }
   // oxlint 有 warnings 时退出码为 1，那是正常的「扫到东西」；这里只看输出。
   const out = r.stdout || ''
   let j = null
@@ -186,7 +198,15 @@ const argv = process.argv.slice(2)
 if (argv.includes('--record-baseline')) recordBaseline()
 if (argv.includes('--falsify')) falsify()
 
-const measured = measure()
+let measured
+try {
+  measured = measure()
+} catch (e) {
+  console.error(`[gate-lint] ⚠️ UNKNOWN —— 测量失败，拿不到 baseline 可比的数字，不许放行：`)
+  console.error(`   ${e.message}`)
+  console.error(`   （这不是「lint 通过」，是「这台机器没能测 lint」。CI 上 oxlint 可正常 spawn。）`)
+  process.exit(2)
+}
 let baseline = null
 if (existsSync(BASELINE)) {
   try {
