@@ -901,6 +901,9 @@ async function run() {
   await page.keyboard.type(':bank cet4', { delay: 25 })
   await page.keyboard.press('Enter')
   await page.waitForTimeout(450)
+  // 3c：cet4 由 inline 改 lazy ⇒ 切库后词表是异步就位的，bankWords 为空时 [data-testid="word"]
+  // 根本不渲染（PracticePanel.tsx），readWord 的一次性快照会拿到 ''。先等 word 挂载再读词。
+  await waitForTestId(page, 'word')
   const wrongTarget = await readWord(page)
   check('预置：classic 出词', wrongTarget.length > 0, `词=${wrongTarget}`)
   await page.keyboard.press(wrongTarget[0] === 'z' ? 'x' : 'z') // 故意敲错

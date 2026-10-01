@@ -49,10 +49,8 @@ import frontendManifest from '../../../content/vocabulary/frontend/manifest.json
 import tsCodeManifest from '../../../content/vocabulary/ts-code/manifest.json?runtime'
 import goCodeManifest from '../../../content/vocabulary/go-code/manifest.json?runtime'
 
-/* ---------------- inline 小库词条（同步 parse，体积小无负担） ---------------- */
+/* ---------------- inline 小库词条（同步 parse）—— 保留 ai-core（默认库）+ ts-code / go-code（本刀不动） ---------------- */
 import aiCoreWords from '../../../content/vocabulary/ai-core/words.json?raw'
-import cet4Words from '../../../content/vocabulary/cet4/words.json?raw'
-import cet6Words from '../../../content/vocabulary/cet6/words.json?raw'
 import tsCodeWords from '../../../content/vocabulary/ts-code/words.json?raw'
 import goCodeWords from '../../../content/vocabulary/go-code/words.json?raw'
 
@@ -70,6 +68,8 @@ const loadFrontend = async () => parseWords((await import('../../../content/voca
 const loadIelts = async () => parseWords((await import('../../../content/vocabulary/ielts/words.json?raw')).default)
 const loadKaoyan = async () => parseWords((await import('../../../content/vocabulary/kaoyan/words.json?raw')).default)
 const loadToefl = async () => parseWords((await import('../../../content/vocabulary/toefl/words.json?raw')).default)
+const loadCet4 = async () => parseWords((await import('../../../content/vocabulary/cet4/words.json?raw')).default)
+const loadCet6 = async () => parseWords((await import('../../../content/vocabulary/cet6/words.json?raw')).default)
 
 /* ---------------- 非 vocabulary 试金石包（P1.7-Wave4 B-2） ----------------
  * manifest 静态 import（常驻主 chunk，单个 ~1.2 KiB，O(包数) 线性小步涨）；
@@ -99,8 +99,8 @@ const packages: ContentPackage[] = [
   { manifest: aiCoreManifest, localId: 'ai-core', words: parseWords(aiCoreWords) },
   { manifest: cloudNativeManifest, localId: 'cloud-native', load: loadCloudNative },
   { manifest: frontendManifest, localId: 'frontend', load: loadFrontend },
-  { manifest: cet4Manifest, localId: 'cet4', words: parseWords(cet4Words) },
-  { manifest: cet6Manifest, localId: 'cet6', words: parseWords(cet6Words) },
+  { manifest: cet4Manifest, localId: 'cet4', load: loadCet4 },
+  { manifest: cet6Manifest, localId: 'cet6', load: loadCet6 },
   { manifest: ieltsManifest, localId: 'ielts', load: loadIelts },
   { manifest: kaoyanManifest, localId: 'kaoyan', load: loadKaoyan },
   { manifest: toeflManifest, localId: 'toefl', load: loadToefl },
