@@ -222,13 +222,35 @@ function evalWarmupIds(warmIds) {
 /* ---------------- 归属探测 ---------------- */
 
 /**
- * 取「该包独有」的词作为探测词：出现在目标包、且不出现在任何其它包。
+ * 取「该包独有」的词作为探测词：出现在目标包、且不出现在任何其它包、
+ * **也不出现在主 chunk 里**（主 chunk 已有 ⇒ 这个串就算命中也解释不了「这个包被 inline 进来」，
+ * 拿它当探测串只会让判据 5 恒定「部分命中 ⇒ UNKNOWN」）。
  * chunk hash 会随内容变化，所以**不能硬编码文件名**，只能用内容特征反查归属。
  * 只取纯字母且 ≥5 字符的词 —— chunk 里词表是以 JSON 转义后的字符串形式存在的，
  * 纯字母词才能与 chunk 文本字面量直接比对（带转义符的词会漏判/误判）。
  * 长词优先：越长越不可能是巧合命中。
+ *
+ * ⚠️ 这条「也排除主 chunk 已有」是 B 步 9.5 实测逼出来的（不是理论推演）：
+ * `frontend` 是通用前端词库，`component` 在主 chunk 出现 50 次、`repository` 3 次
+ * （都来自 App 代码本身，与 frontend 包无关），8 个探测串里必然混进这两个
+ * ⇒ 判据 5 从「改 lazy 前不探这个包」变成**恒定 UNKNOWN**（UNKNOWN 视为不通过，门被焊死）。
+ *
+ * ⚠️ 过滤用的文本必须是「主 chunk 里**摘掉本包载荷**之后的残文」（见 stripOwnPayload），
+ *    不能直接用 mainText —— 那是自指的：包一旦真泄漏，它的词同时出现在 mainText 里，
+ *    过滤会把**要用的探测词自己洗掉**，判据 5 从「该 FAIL」退化成
+ *    「只剩 1 个探测串 < PROBE_MIN ⇒ UNKNOWN」（注入 B 实测复现过）。
+ *
+ * 两级行为（注入 B：registry 保留 load: 却静态导入 frontend 词表后 rebuild 复现）：
+ *   · 干净态：13 个 lazy 包探测串在主 chunk 命中 0 次 ⇒ 判据 5 PASS；
+ *   · 泄漏态：frontend 部分命中 7/8 ⇒ 判据 5 UNKNOWN（**不视为通过**），
+ *     同时判据 2（chunk 数 12 < lazy 包 13）判 FAIL ⇒ 整门 FAIL。
+ * 即「泄漏 ⇒ 门红」成立，判据 5 不再被自己的探测集卡住 ⇒ 不再恒定 UNKNOWN。
+ *
+ * 代价说清楚：被过滤掉的词**失去泄漏分辨力**（只把这类通用词塞进主 chunk 的泄漏，
+ * 判据 5 抓不到，由判据 1 主 chunk 体积 + 判据 2 chunk 计数兜底）。这是「归属歧义」
+ * 与「检测力」之间必须做的取舍，不是把门调松绕过问题。
  */
-function distinctProbes(pkgId, setsById) {
+function distinctProbes(pkgId, setsById, mainText) {
   const mine = setsById.get(pkgId)
   if (!mine || mine.size === 0) return []
   const others = new Set()
@@ -237,11 +259,24 @@ function distinctProbes(pkgId, setsById) {
     for (const w of set) others.add(w)
   }
   const uniq = [...mine].filter((w) => !others.has(w) && /^[a-z]{5,}$/i.test(w))
-  uniq.sort((a, b) => b.length - a.length || a.localeCompare(b))
-  return uniq.slice(0, PROBE_COUNT)
+  const discriminative = mainText ? uniq.filter((w) => !mainText.includes(w)) : uniq
+  discriminative.sort((a, b) => b.length - a.length || a.localeCompare(b))
+  return discriminative.slice(0, PROBE_COUNT)
 }
 
 const hitsAll = (text, probes) => probes.every((p) => text.includes(p))
+
+/**
+ * 把 mainText 里「本包载荷自身贡献的」带引号词条抹掉，得到过滤用残文。
+ *
+ * 为什么只抹**带引号**形态：词表是以 JSON 字符串数组形态进 chunk 的（`,"component",`），
+ * 而 App 代码里同一个词通常以裸标识符形态出现（`"component"` 只 1 次、裸 component 50 次）——
+ * 只抹带引号的，既不误伤 App 代码的裸用法，又能把「本包内容」干净摘除。
+ */
+function stripOwnPayload(mainText, ownWords) {
+  if (!mainText || !ownWords || ownWords.size === 0) return mainText
+  return [...ownWords].reduce((t, w) => (w.length >= 3 ? t.split(`"${w}"`).join('') : t), mainText)
+}
 
 function loadWordSets() {
   const dirs = readdirSync(VOCAB_DIR, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)
@@ -300,7 +335,7 @@ function asciiPhraseProbes(json, otherPayloadTexts) {
  * vocabulary lazy 包 → words.json 的独有词（复用 distinctProbes）；
  * 非 vocabulary lazy 包 → items.json 的独有 ASCII 短语（asciiPhraseProbes）。
  */
-function collectLazyProbes(entries, setsById) {
+function collectLazyProbes(entries, setsById, mainText) {
   const lazy = entries.filter((e) => e.mode === 'lazy')
   const texts = new Map()
   const kindOf = new Map()
@@ -318,7 +353,8 @@ function collectLazyProbes(entries, setsById) {
   return lazy.map((e) => {
     let probes
     if (kindOf.get(e.id) === 'vocabulary/load') {
-      probes = distinctProbes(e.id, setsById)
+      // 过滤用残文 = mainText 摘掉本包自己的词条（自指陷阱见 distinctProbes 注释）
+      probes = distinctProbes(e.id, setsById, stripOwnPayload(mainText, setsById.get(e.id)))
     } else {
       const txt = texts.get(e.id) ?? ''
       let json = null
@@ -551,7 +587,7 @@ function collectInputs() {
     mainText,
     droppedProbes: DROPPED_MANIFEST_PROBES,
     retainedProbes: RETAINED_MANIFEST_PROBES,
-    lazyProbes: entries ? collectLazyProbes(entries, setsById) : [],
+    lazyProbes: entries ? collectLazyProbes(entries, setsById, mainText) : [],
     warmIds,
   }
 }
