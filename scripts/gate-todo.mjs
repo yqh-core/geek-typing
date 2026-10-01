@@ -300,7 +300,8 @@ function findTokens(text) {
   TOKEN_RE.lastIndex = 0
   let m
   while ((m = TOKEN_RE.exec(text)) !== null) {
-    out.push({ token: m[0].toUpperCase(), offset: m.index })
+    // raw 保留原始大小写：锚点要的是「这个标识符叫什么」，不是它归一化成哪个标记词
+    out.push({ token: m[0].toUpperCase(), raw: m[0], offset: m.index })
     if (m.index === TOKEN_RE.lastIndex) TOKEN_RE.lastIndex++
   }
   return out
@@ -314,11 +315,31 @@ const snippet = (text, from, to) => {
 
 /* ---------------- allowlist ---------------- */
 /**
- * 登记行格式（四列，竖线分隔）：
- *   - `文件路径:行号` | TOKEN | 原因 | 解封 Wave
+ * 登记行格式（五列，竖线分隔）：
+ *   - `文件路径` | TOKEN | 锚点 | 原因 | 解封 Wave
+ *
+ * ⚠️ 锚点不是行号 —— 这是 9.6 的核心改动：行号是会漂的地址，靠行号做豁免键，
+ * 任何一次同文件改动都会让登记批量失效（2026-10-01 实测：给 content/normalize.mjs
+ * 加 5 行 import/注释 ⇒ 6 条登记全红，门明明什么都没放过去）。锚点取**内容**：
+ *   - 标识符 / 类型·成员名命中 ⇒ 那个标识符的**名字**（实际值由 `--print-anchors`
+ *     直接打出来，这里刻意不写字面量 —— 本文件扫描自身，写进去就是自指命中）；
+ *     只要这个变量还叫这个名字，豁免就在，哪怕它在文件里被挪到第 300 行；
+ *   - 注释命中 ⇒ 注释正文的前 40 字（空白折叠后，`|` 换成 `/`，免得撑破五列解析）。
+ *
+ * 锚点里不允许出现竖线：登记行就是按竖线切五列的，锚点带竖线会把后面几列整体错位，
+ * 表现为「登记了却仍然判红」这种最难查的假失败。
+ * 于是「挪一行」不会破豁免，而**新增**一个同文件同 Token 但不同锚点的命中仍会判红
+ * （想豁免必须再登记一条）—— 既去脆又没放开宽度。
+ *
+ * 文档里的「登记行格式」示例长得和真登记行一模一样，会被本正则当成一条登记计数
+ * （它永远匹配不到命中，因为不存在叫「文件路径」的文件，但会让「登记 N 条」这个数字
+ * 比真实登记数多 1）。故显式排除这个占位路径（见 loadAllowlist）。
  */
 const ALLOWLIST_LINE_RE =
-  /^\s*[-*]\s+`([^`]+?):(\d+)`\s*\|\s*([A-Za-z]+)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*$/gm
+  /^\s*[-*]\s+`([^`]+?)`\s*\|\s*([A-Za-z]+)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*$/gm
+
+/** 登记行格式示例里的路径列占位符（不是真路径，见上面的 ⚠️） */
+const TEMPLATE_PLACEHOLDER_PATH = '文件路径'
 
 function normPath(p) {
   return String(p).replace(/^\.\//, '').replaceAll('\\', '/')
@@ -332,16 +353,26 @@ function loadAllowlist() {
   ALLOWLIST_LINE_RE.lastIndex = 0
   let m
   while ((m = ALLOWLIST_LINE_RE.exec(text)) !== null) {
+    if (m[1].trim() === TEMPLATE_PLACEHOLDER_PATH) continue // 格式示例行，不是登记
+    const file = normPath(m[1])
+    const token = m[2].toUpperCase()
+    const anchor = m[3].trim()
     entries.push({
-      file: normPath(m[1]),
-      line: Number(m[2]),
-      token: m[3].toUpperCase(),
+      file,
+      token,
+      anchor,
       reason: m[4],
       wave: m[5],
-      key: `${normPath(m[1])}:${Number(m[2])}:${m[3].toUpperCase()}`,
+      key: `${file}:${anchor}:${token}`,
     })
   }
   return { entries, raw: entries.length }
+}
+
+/** 锚点：标识符命中用标识符名，其余（注释）用正文前 40 字（空白折叠）；`|` 换 `/`。 */
+function anchorOf(hit, raw) {
+  const base = hit.kind === 'identifier' || hit.kind === 'typeName' ? hit.name : String(raw ?? '')
+  return base.replace(/\s+/g, ' ').trim().slice(0, 40).replace(/\|/g, '/')
 }
 
 /* ---------------- 主流程 ---------------- */
@@ -374,7 +405,7 @@ for (const sf of tsFiles) {
     seenCommentPos.add(pos)
     const body = range.getText()
     for (const t of findTokens(body)) {
-      hits.push({ file: sf, line: lineOf(starts, pos + t.offset), token: t.token, kind: 'comment', excerpt: snippet(body, Math.max(0, t.offset - 20), t.offset + 60) })
+      hits.push({ file: sf, line: lineOf(starts, pos + t.offset), token: t.token, kind: 'comment', raw: body, excerpt: snippet(body, Math.max(0, t.offset - 20), t.offset + 60) })
     }
   }
   source.forEachDescendant((node) => {
@@ -391,7 +422,7 @@ for (const sf of tsFiles) {
     const isTypeName = !!parent && TYPE_NAME_PARENTS.has(parent.getKind()) && typeof parent.getNameNode === 'function' && parent.getNameNode() === node
     const kind = isTypeName ? 'typeName' : 'identifier'
     const pos = node.getStart()
-    hits.push({ file: sf, line: lineOf(starts, pos), token: findTokens(name)[0].token, kind, excerpt: snippet(text, pos - 20, pos + name.length + 40) })
+    hits.push({ file: sf, line: lineOf(starts, pos), token: findTokens(name)[0].token, kind, name, raw: name, excerpt: snippet(text, pos - 20, pos + name.length + 40) })
   })
 }
 
@@ -403,11 +434,11 @@ for (const file of jsFiles) {
   for (const r of commentRanges) {
     const body = text.slice(r.start, r.end)
     for (const t of findTokens(body)) {
-      hits.push({ file, line: lineOf(starts, r.start + t.offset), token: t.token, kind: 'comment', excerpt: snippet(body, Math.max(0, t.offset - 20), t.offset + 60) })
+      hits.push({ file, line: lineOf(starts, r.start + t.offset), token: t.token, kind: 'comment', raw: body, excerpt: snippet(body, Math.max(0, t.offset - 20), t.offset + 60) })
     }
   }
   for (const t of findTokens(codeMask)) {
-    hits.push({ file, line: lineOf(starts, t.offset), token: t.token, kind: 'identifier', excerpt: snippet(text, t.offset - 20, t.offset + 60) })
+    hits.push({ file, line: lineOf(starts, t.offset), token: t.token, kind: 'identifier', name: t.raw, raw: t.raw, excerpt: snippet(text, t.offset - 20, t.offset + 60) })
   }
 }
 
@@ -424,8 +455,9 @@ console.log(`allowlist：${ALLOWLIST_FILE} —— 登记 ${allowEntries.length} 
 const registered = []
 const violations = []
 for (const h of hits) {
-  const key = `${h.file}:${h.line}:${h.token}`
-  if (allowKeys.has(key)) registered.push(h)
+  // 豁免键 = 文件路径 + 内容锚点 + Token（**不含行号**，见 anchorOf 的注释）
+  h.key = `${h.file}:${anchorOf(h, h.raw)}:${h.token}`
+  if (allowKeys.has(h.key)) registered.push(h)
   else violations.push(h)
 }
 
@@ -449,15 +481,30 @@ if (violations.length) {
   console.log('')
 }
 
-// 失效登记：登记了但代码里已不存在（多半是行号漂移或已清理），提示但不判红
-const hitKeys = new Set(hits.map((h) => `${h.file}:${h.line}:${h.token}`))
+// 失效登记：登记了但代码里已不存在（多半是重命名/已清理），提示但不判红
+const hitKeys = new Set(hits.map((h) => h.key))
 const stale = allowEntries.filter((e) => !hitKeys.has(e.key))
 if (stale.length) {
-  console.log(`---- 失效登记 ${stale.length} 条（代码里已无对应命中，请核对后从 ${ALLOWLIST_FILE} 移除）----`)
-  for (const e of stale) console.log(`  ⚠️ ${e.file}:${e.line}  ${e.token}  （登记原因：${e.reason}）`)
+  console.log(`---- 失效登记 ${stale.length} 条（代码里已无对应锚点，请核对后从 ${ALLOWLIST_FILE} 移除）----`)
+  for (const e of stale) console.log(`  ⚠️ ${e.file}  ${e.token}  锚点「${e.anchor}」（登记原因：${e.reason}）`)
   console.log('')
 }
 
 console.log(`共 ${hits.length} 处命中：登记 ${registered.length}，违规 ${violations.length}`)
 console.log(violations.length ? '\n❌ TODO Gate FAIL' : '\n✅ TODO Gate PASS')
+
+/* --print-anchors：把当前每条命中的「可粘贴登记行」打出来。
+ * 9.6 之后锚点由内容决定、人不用自己想，直接复制这一行粘进 P1.7-DEFERRED.md 即可；
+ * 登记条数可以减少（同一锚点覆盖多处），但**不要**为了省事用宽锚点糊过去。 */
+if (process.argv.includes('--print-anchors')) {
+  console.log(`\n---- --print-anchors：${ALLOWLIST_FILE} 可粘贴行（锚点已按内容生成，去重后按列序）----`)
+  const seen = new Set()
+  for (const h of hits) {
+    if (allowKeys.has(h.key) || seen.has(h.key)) continue
+    seen.add(h.key)
+    console.log(`- \`${h.file}\` | ${h.token} | ${anchorOf(h, h.raw)} | 原因待填 | Wave 待填`)
+  }
+  console.log('')
+}
+
 process.exit(violations.length > 0 ? 1 : 0)
