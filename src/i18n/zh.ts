@@ -255,6 +255,8 @@ export const zh: Record<string, string> = {
   'memorize.again': '再来一组',
   'memorize.emptyBank': '当前词库为空',
   'memorize.loadingBank': '正在加载词库…',
+  'memorize.loadError': '词库加载失败，请检查网络后重试',
+  'memorize.retryLoad': '重试加载',
   'memorize.allDone': '本库新词已全部学完',
   'memorize.definition': '释义',
   'memorize.keyFlip': 'Space 翻面',

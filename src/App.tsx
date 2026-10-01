@@ -79,7 +79,7 @@ export default function App() {
     setAutoSpeak,
   } = useSettings()
   const { commandMode, setCommandMode, closePalette } = useCommandMode()
-  const { banks, bank, bankWords } = useBank(bankId)
+  const { banks, bank, bankWords, loadFailed, retryBankLoad } = useBank(bankId)
   const { analytics, analyticsRef, updateAnalytics, reset: resetAnalytics } = useAnalytics()
   const { history, setHistory, todayCount, streakDays } = useStreak()
 
@@ -349,7 +349,7 @@ export default function App() {
           ) : tab === 'memorize' ? (
             /* key=bank.id：memorize 视图按 (词,包) 归属，切库即重挂载重取本包视图，
              * 杜绝「旧库视图过滤新库词表」的瞬时脏状态 */
-            <Memorize key={bank.id} theme={theme} bank={{ ...bank, words: bankWords }} paused={commandMode} streakDays={streakDays} />
+            <Memorize key={bank.id} theme={theme} bank={{ ...bank, words: bankWords }} paused={commandMode} streakDays={streakDays} loadFailed={loadFailed} onRetryBankLoad={retryBankLoad} />
           ) : current ? (
             <PracticePanel
               theme={theme}

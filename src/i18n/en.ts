@@ -254,6 +254,8 @@ export const en: Record<string, string> = {
   'memorize.again': 'Another batch',
   'memorize.emptyBank': 'This bank is empty',
   'memorize.loadingBank': 'Loading word bank…',
+  'memorize.loadError': 'Failed to load the word bank. Check your connection and retry',
+  'memorize.retryLoad': 'Retry loading',
   'memorize.allDone': 'All new words in this bank are learned',
   'memorize.definition': 'Definition',
   'memorize.keyFlip': 'Space to flip',

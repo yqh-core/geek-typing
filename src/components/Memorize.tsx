@@ -21,6 +21,10 @@ interface MemorizeProps {
   paused?: boolean
   /** 连续打卡天数（勋章卡展示用） */
   streakDays?: number
+  /** 词条异步拉取已失败（chunk 404 / 断网 / sw 504） —— 与 loading / empty 并列开第四态 */
+  loadFailed?: boolean
+  /** 失败态里的重试入口：点击重新拉取当前词库的词条 */
+  onRetryBankLoad?: () => void
 }
 
 /** 每日新词计划：默认 20 个 */
@@ -34,7 +38,14 @@ const SWIPE_THRESHOLD = 60
  * 正面 = 单词 + 发音；翻面 = 释义；三键调度：unknown 追加 2 次、fuzzy 1 次、known 完成。
  * 进度存本机存储，刷新不丢。
  */
-export default function Memorize({ theme, bank, paused = false, streakDays = 0 }: MemorizeProps) {
+export default function Memorize({
+  theme,
+  bank,
+  paused = false,
+  streakDays = 0,
+  loadFailed = false,
+  onRetryBankLoad,
+}: MemorizeProps) {
   const t = useT()
 
   /** memorize 进度（P1.5-S4：**本包视图**，按 (词,包) 归属；State A 为 v1 全表）。
@@ -263,11 +274,35 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
   }, [flipped, item?.word])
 
   /* ---------- 词库未就绪 ----------
-   * 三态区分（修复「加载中」被误判为「空词库」）：
-   *  - lazy 包（bank.load 存在）且 words 为空 ⇒ 词条 chunk 仍在拉取中/拉取失败，显示加载态
-   *  - 无 load 且 words 为空 ⇒ 真·空词库，显示空态文案
+   * 四态区分（修复「加载中」被误判为「空词库」；N13 追加第四态，修复「失败」被当成「加载中」卡死）：
+   *  1) 失败态（loadFailed）⇒ 词条 chunk 拉取已经 reject（chunk 404 / 断网 / sw 504），
+   *     显示失败文案 + 重试入口；**不能**继续显示「正在加载词库…」，否则用户永远等不到结果。
+   *  2) 加载态（bank.load 存在 & 空 & 未失败）⇒ 词条 chunk 仍在拉取中，显示加载态
+   *  3) 空态（无 load & 空）⇒ 真·空词库，显示空态文案
+   *  4) 有词 ⇒ 正常卡片流
    * 判据依据：wordBanks.ts 仅为 lazy 包挂 load/count；全部内置包 stats.items > 0。 */
   if (bank.words.length === 0) {
+    if (loadFailed) {
+      return (
+        <div data-testid="memorize-load-error" className={`text-sm ${theme.sub}`}>
+          {t('memorize.loadError')}
+          {onRetryBankLoad && (
+            <button
+              type="button"
+              data-testid="memorize-load-retry"
+              onClick={() => {
+                sound.tap()
+                onRetryBankLoad()
+              }}
+              className={`flex items-center justify-center gap-2 w-full mt-3 px-4 py-2.5 rounded-xl border ${theme.border} text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-95`}
+            >
+              <RotateCcw size={14} />
+              {t('memorize.retryLoad')}
+            </button>
+          )}
+        </div>
+      )
+    }
     if (bank.load) {
       return (
         <div data-testid="memorize-loading" className={`text-sm ${theme.sub}`}>

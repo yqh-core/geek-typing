@@ -1,9 +1,10 @@
 /* P1.6-D · 词库 hook —— 从 App.tsx 抽出（内置库 + 自建库 + 懒加载词条）
  *
  * 懒加载语义保持：小词库同步；懒加载词库异步填充（模块级缓存兜底），
- * 拉取失败**保持加载态**而不是塞空释义（CONTENT_CONTRACT 明令禁止占位）。
+ * 拉取失败**不塞空释义**（CONTENT_CONTRACT 明令禁止占位），而是记下失败态交给 UI 显示
+ * 失败态 + 重试入口（N13：原来只 warn 后永远停在「正在加载词库…」，用户以为卡死）。
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   WORD_BANKS,
   bankWordsOf,
@@ -56,6 +57,19 @@ export function useBank(bankId: string) {
     setBankWordsFor(bank)
     setBankWords(bankWordsOf(bank))
   }
+  /* 词条异步拉取的失败态。记 bank.id（不是 bool）而不是「有没有失败」：
+   * 换库时才能只清掉旧库那一条，不用额外判断「这次失败是不是上一个库留下的」。 */
+  const [loadFailedId, setLoadFailedId] = useState<string | null>(null)
+  /** 重试计数：+1 即让下面的 effect 再发起一次 ensureBankWords（失败后 UI 点重试走这里） */
+  const [retryToken, setRetryToken] = useState(0)
+  /* 换库（含切回原库）时清掉上一个库的失败态 —— 渲染阶段调整 state，与上面 bankWordsFor 同一写法，
+   * 避免「A 库断网失败」的失败态粘到切过来的 B 库上，把 B 库误判成失败态。 */
+  const [loadFailedFor, setLoadFailedFor] = useState<string | null>(null)
+  if (loadFailedFor !== bank.id) {
+    setLoadFailedFor(bank.id)
+    setLoadFailedId(null)
+  }
+
   /* effect 只留「占位为空 ⇒ 异步 fill」这一条：ready 非空已经在上面的 render 阶段填好，
    * 这里再判一次长度就不会重复发起（原逻辑：ready 非空 ⇒ 同步填且不走异步）。 */
   useEffect(() => {
@@ -63,16 +77,31 @@ export function useBank(bankId: string) {
     let alive = true
     ensureBankWords(bank)
       .then((w) => {
-        if (alive) setBankWords(w)
+        if (!alive) return
+        setBankWords(w)
+        setLoadFailedId(null) // 重试成功：失败态一并清掉
       })
       .catch((e) => {
-        // 断网首次切到未加载过的大词库：chunk 拉取失败，保持加载态（词库数据无法凭空获得）
+        /* 断网首次切到未加载过的大词库 / sw 504 / chunk 404：ensureBankWords reject。
+         * 词库数据无法凭空获得（CONTENT_CONTRACT 禁止塞空释义），但**不能让用户永远停在
+         * 「正在加载词库…」** —— 记下失败态，由 UI 显示错误文案 + 重试入口。日志保留，便于线上定位。 */
         console.warn(`词库 ${bank.id} 加载失败`, e)
+        if (alive) setLoadFailedId(bank.id)
       })
     return () => {
       alive = false
     }
-  }, [bank])
+    // retryToken：重试入口把计数 +1 时重新发起一次拉取（失败态本身不入依赖，否则会和 setFailed 互踢）
+  }, [bank, retryToken])
 
-  return { banks, bank, bankWords, customBanks }
+  return {
+    banks,
+    bank,
+    bankWords,
+    customBanks,
+    /** 当前词库的词条异步拉取已失败（供 Memorize 开第四态） */
+    loadFailed: loadFailedId === bank.id,
+    /** 重试当前词库的词条拉取 */
+    retryBankLoad: useCallback(() => setRetryToken((n) => n + 1), []),
+  }
 }
