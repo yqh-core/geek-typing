@@ -59,7 +59,7 @@ export default function ReviewPanel({ theme, banks, reviewVersion, analytics, on
     // 时间快照刻意跟着复习版本走：刷新一次就重取一次（下面 void 是为了把「依赖 reviewVersion」
     // 这件事写进代码里，与同文件 38/46 行的既有写法一致，避免被优化成只在首次渲染取一次）
     void reviewVersion
-    // 时间快照：刻意取外部时钟，purist 规则按惯例在此例外
+    // 时间快照：刻意取外部时钟，purity 规则按仓库既有惯例在此例外
     // eslint-disable-next-line react/purity
     return Date.now()
   }, [reviewVersion])
