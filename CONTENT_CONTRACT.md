@@ -698,7 +698,7 @@ P1/P1.5 若要让自定义词库进入 Content 体系，**必须先在契约里�
 | I-17 | `canonicalize` 对「同内容不同排版」输出一致，且**不重排数组** | canonical.selfCheck + test:content |
 | I-18 | `findRevision` 与 `content:build` 回滚同口径（取 revision 最大的匹配条目） | test:content【13】 |
 | **I-19**（P0.6.1） | **词条 ContentId 的 lemma 保留原词形**（`wordId` 与 `buildHits` 同源，**禁止在 id 侧 lowercase**） | `test:content` |
-| **I-20**（P0.6.1） | **首屏体积不随词库增长**（主 chunk ≤ **420 KiB raw / 135 KiB gzip**；`offline.policy==='inline'` 的包 **Σ词 ≤ 1000 且 Σ words.json ≤ 64 KiB**） | `check:bundle` + `content:validate` 第 **19 / 21** 项 |
+| **I-20**（P0.6.1） | **首屏体积不随词库增长** —— 主 chunk 体积必须落在 `check:bundle` 的**当前生效预算层**内；**数值不在此抄写**（分层预算会随波次调整，抄进来就必然过期），当前实测见 **§13.5**；另 `offline.policy==='inline'` 的包 **Σ词 ≤ 1000 且 Σ words.json ≤ 64 KiB** 是**静态阈值**，不随波次变 | `check:bundle` 判据 **1** + `content:validate` 判据 **19** |
 
 ---
 
@@ -793,9 +793,15 @@ Package = manifest.json（永远轻、常驻、O(包数)）  +  words.json（按
 manifest 只装元数据，**与词数无关**（实测单包 1.25–1.40 KiB，3000 词包与 20 词包一样大）。
 因此：**包变多 ⇒ 主 chunk 只按包数线性增长；词变多 ⇒ 只要走 lazy，主 chunk 不动。**
 
-### 13.2 当前实测（node zlib gzip level 9，与 vite 构建日志交叉核对）
+### 13.2 历史基线（P0.6.1 时代 fresh build，node zlib gzip level 9，与 vite 构建日志交叉核对）
 
-| 项 | 实测值 |
+> ⚠️ **本节是「历史基线」，不是当前值。** 它记录的是 P0.6.1 时代那一次 fresh build 的实测，
+> 存在的意义是给 §13.3 的对照实验当「前值」对照 —— 那些实验结论（inline 把主 chunk 撑大多少）
+> 至今仍成立，但表里的绝对值已过期。
+> **当前实测一律见 §13.5，并以 `npm run check-bundle` / `npm run content:validate` 的输出为准；
+> 契约条目（I-20）本身不抄写任何动态数值。**
+
+| 项 | 历史基线（P0.6.1 时代 fresh build） |
 |---|---|
 | 首屏必须下载（index.html + 主 chunk + CSS，**不含 words chunk**） | **406.09 KiB raw / 125.21 KiB gzip** |
 | 主 chunk `index-Cawl4_-q.js` | **381.06 KiB raw / 118.89 KiB gzip** |
@@ -814,11 +820,15 @@ manifest 只装元数据，**与词数无关**（实测单包 1.25–1.40 KiB，
 
 临时把 lazy 的 **kaoyan 改成 inline** 再 build（已还原）：
 
-| 项 | 前 | 后 | 增量 |
+| 项 | 前（= §13.2 历史基线） | 后 | 增量 |
 |---|---|---|---|
 | 主 chunk raw | 381.06 KiB | 852.97 KiB | **+471.92 KiB（+123.8%）** |
 | 主 chunk gzip | 118.89 KiB | 285.30 KiB | **+166.41 KiB（+140.0%）** |
 | words chunk 数 | 3 | 2 | −1 |
+
+> 注意这个「前」是**单个 lazy 包（kaoyan）改 inline** 前的基线，**不是**「全 inline」基线；
+> 下一段（§13.4）的外推用的系数同样来自这一组实验，属**规划估算（planning estimate）**，
+> 不是对当前构建的任何断言 —— 当前构建落在 `check:bundle` 判据 1 内即可，见 §13.5。
 
 - 增量与 kaoyan `words.json` 的 **471.70 KiB** 呈**字节级 1:1.0005 全额传导** —— 词表一字节不落地进主 chunk；
 - rolldown **当场报 `INEFFECTIVE_DYNAMIC_IMPORT` 警告**（见 13.6）。
@@ -827,7 +837,8 @@ manifest 只装元数据，**与词数无关**（实测单包 1.25–1.40 KiB，
 主 chunk 390.20 → 353.10 kB，
 gzip 123.07 → 107.90 kB ⇒ **7 个 inline 词表占主 chunk 37.10 kB raw / 15.17 kB gzip**。
 
-### 13.4 未来推算
+### 13.4 未来推算（planning estimate —— 基于 §13.3 那组历史实验的系数外推，
+### 回答的是「以后再加词库会不会爆」，**不构成**对当前构建的断言；当前构建见 §13.5）
 
 **加 5 个大包（GRE 12000 / Oxford 30000 / Cambridge 20000 / 自建 5000 / TOEFL 10000 = 77000 词）全部 lazy：**
 

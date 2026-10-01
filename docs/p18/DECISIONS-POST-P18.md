@@ -12,7 +12,7 @@
 | # | 项 | 决策 | 落点 |
 |---|---|---|---|
 | 9.2 | `warmUpVocabulary` 按需 + 限量 | **清单常量化（`WARMUP_IDS`）+ 清单长度硬顶（≤ 2）+ 新库默认不入清单**，预算只受清单控制、不再随包数线性膨胀 | 已实施（P18-I） |
-| 9.5 | 7 个 inline 词库改 lazy | **只改 2 个（`frontend` / `cloud-native`），其余 5 个保持 inline**；改 lazy 的必须给骨架屏 + 失败重试 | 本文件定口径，实施待排 |
+| 9.5 | 7 个 inline 词库改 lazy | **只改 2 个（`frontend` / `cloud-native`），其余 5 个保持 inline**；改 lazy 的必须给骨架屏 + 失败重试 | **已实施 · P18-J**（`9b468e0` / `28b4994` / `76d90ce`）—— 全文见 **§9.5**；UX 视觉那一票仍未签 |
 | 9.1 | R2 / `AssetManifest` | **不自行造凭据网关**；产品前置条件 = 媒体资源清单覆盖 6 类内容类型 + `/media/*` 提供同源直链与离线兜底；凭据就位后单开半波 | 本文件定前置条件，实施待凭据 |
 
 ---
@@ -240,7 +240,7 @@ export const WARMUP_IDS = ['ielts', 'toefl', 'kaoyan'] as const
 - 10 条 → 0，`gate:lint` 基线棘轮随之 record 到 0（10 → 0，只许降不许升）。
   意味着**任何一条新 warning 都会让 CI 的 `gate-static` 红 ⇒ 部署不触发** —— 有意的硬锁，
   但行动升级与棘轮叠在同一个 push 首次跑 CI，失败时要能分清是哪一项
-  （见 `ENGINEERING-HYGIENE-PLAN.md` §2.7）。
+  （见 `ENGINEERING-HYGIENE-PLAN.md` §4.2）。
 - 实测：oxlint `diagnostics.length` = 0；`tsc -b` EXIT=0；`build` EXIT=0；
   `test:e2e` **170 / 170 通过 0 失败**；`gate:todo` PASS（登记 12 / 命中 12 / 违规 0）；
   `gate:license` / `test:content` / `content:validate` / `check:bundle` 全 EXIT=0；
@@ -392,5 +392,7 @@ fresh build 实测主 chunk **424.47 KiB raw / 134.61 KiB gzip**；判据 21 生
 ## 附：三项之间没有关系依赖
 
 - 9.2 已实施完毕（P18-I），是 D 步扩词的**硬前置**，已解除。
-- 9.5 与 9.2 无依赖，可独立排期；注意 9.5 会动 `check-bundle` 判据 2/5，与 9.2 的判据 3/6 **互不重叠**，可同波或分波。
+- 9.5 **已实施完毕（P18-J）**，与 9.2 无依赖；实施时确实动了 `check-bundle` 判据 5
+  （12.1 KiB/包的探测过滤器自指 bug，见 **§9.5.6 第 2 条**），与 9.2 的判据 3/6 **互不重叠**，
+  因此两波可以同波或分波 —— 实际分波做（9.2 在 P18-I、9.5 在 P18-J）。
 - 9.1 卡外部凭据，与另两项无关。

@@ -234,14 +234,14 @@ npm 脚本：`gate:lint` / `gate:lint:falsify` / `gate:lint:baseline`。基线�
 
 ---
 
-## 4. 9.6 / 9.7 两项遗留（本阶段一并收）
+## 4. 9.6 / 9.7 两项遗留 —— ✅ 已收（见 §4.1 / §4.2）
 
 | # | 项 | 方案 |
 |---|---|---|
-| 9.6 | `gate:todo` 按行号登记 | 行号是**会漂的地址**，判据不该依赖它。改**内容锚点**形态 —— 见 §2.6（`1b21870`） |
-| 9.7 | CI 注解 / action 主版本（2026-10-19 到期） | 升 `.github/workflows/deploy.yml` 的 actions 版本 + Lint 步骤接入 `gate:lint` 棘轮 —— 见 §2.7（`216fe8b`） |
+| 9.6 | `gate:todo` 按行号登记 | 行号是**会漂的地址**，判据不该依赖它。改**内容锚点**形态 —— 见 §4.1（`1b21870`） |
+| 9.7 | CI 注解 / action 主版本（2026-10-19 到期） | 升 `.github/workflows/deploy.yml` 的 actions 版本 + Lint 步骤接入 `gate:lint` 棘轮 —— 见 §4.2（`216fe8b`） |
 
-### 2.6 9.6 已收：豁免键由行号改内容锚点（`1b21870`）
+### 4.1 9.6 已收：豁免键由行号改内容锚点（`1b21870`）
 
 **这不是"把规则放宽"，是把豁免键换成不会漂的东西。**
 
@@ -259,7 +259,7 @@ npm 脚本：`gate:lint` / `gate:lint:falsify` / `gate:lint:baseline`。基线�
 
 实测：命中 12 / 登记 5 / 违规 0 / 失效 0，`gate:todo` EXIT=0。
 
-### 2.7 9.7 已收：action 主版本升级 + Lint 接入棘轮（`216fe8b`）
+### 4.2 9.7 已收：action 主版本升级 + Lint 接入棘轮（`216fe8b`）
 
 只动 `.github/workflows/deploy.yml`（`node-version` 本来就是 `'22'`，"Node 20 deprecated" 这条注解已不成立）。
 

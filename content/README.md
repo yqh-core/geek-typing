@@ -549,9 +549,16 @@ Package = manifest.json（永远轻、常驻、O(包数)）  +  words.json（按
 manifest 只装元数据、**与词数无关**（实测单包 1.25–1.40 KiB，3000 词包与 20 词包一样大）。
 所以：**包变多 ⇒ 主 chunk 按包数线性增长；词变多 ⇒ 只要走 lazy，主 chunk 不动。**
 
-### 15.2 当前实测（node zlib gzip level 9，与 vite 构建日志交叉核对）
+### 15.2 历史基线（P0.6.1 时代 fresh build，node zlib gzip level 9，与 vite 构建日志交叉核对）
 
-| 项 | 实测值 |
+> ⚠️ **本节是「历史基线」，不是当前值。** 它记录 P0.6.1 时代那一次 fresh build 的实测，
+> 存在的意义是给 §15.3 的对照实验当「前值」—— 实验结论（inline 会把主 chunk 撑多大）至今成立，
+> 但绝对数值已过期。
+> **当前实测 = 本文末尾判据表第 18–21 行，以 `npm run content:validate` / `npm run check-bundle`
+> 的输出为准；契约条目 I-20 不抄写任何动态数值。**
+> 本节**之后的包分布是 9.5 之后的当前值**，不要拿这张表的 chunk 数 / 包数去对。
+
+| 项 | 历史基线（P0.6.1 时代 fresh build） |
 |---|---|
 | 首屏必须下载（index.html + 主 chunk + CSS，**不含 words chunk**） | **406.09 KiB raw / 125.21 KiB gzip** |
 | 主 chunk `index-Cawl4_-q.js` | **381.06 KiB raw / 118.89 KiB gzip** |
@@ -574,11 +581,16 @@ manifest 只装元数据、**与词数无关**（实测单包 1.25–1.40 KiB，
 
 把 lazy 的 **kaoyan 临时改成 inline** 再 build（已还原）：
 
-| 项 | 前 | 后 | 增量 |
+| 项 | 前（= §15.2 历史基线） | 后 | 增量 |
 |---|---|---|---|
 | 主 chunk raw | 381.06 KiB | 852.97 KiB | **+471.92 KiB（+123.8%）** |
 | 主 chunk gzip | 118.89 KiB | 285.30 KiB | **+166.41 KiB（+140.0%）** |
 | words chunk 数 | 3 | 2 | −1 |
+
+> 这个「前」是**单个 lazy 包（kaoyan）改 inline** 前的基线，**不是**「全 inline」基线；
+> 后面的外推系数（157.3 KiB/千词 raw、55.5 KiB/千词 gzip）同样来自这一组实验，属
+> **planning estimate（规划估算）**，回答的是"以后再加词库会不会爆"，
+> **不构成**对当前构建的断言 —— 当前构建见文末判据表第 21 行。
 
 增量与 kaoyan `words.json` 的 **471.70 KiB** 呈**字节级 1:1.0005 全额传导** —— 词表一字节不落地进主 chunk。
 
