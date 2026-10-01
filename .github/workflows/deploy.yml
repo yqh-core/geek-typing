@@ -28,12 +28,12 @@ jobs:
   # ── 闸门 1：不依赖构建产物，最快报红 ────────────────────────────────────────
   gate-static:
     name: 门禁① 静态与内容（无产物）
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 兜底超时：本地实测 14s。给 10 分钟余量防止异常挂死烧满 runner。
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -61,20 +61,25 @@ jobs:
       # 属证据任务而非每次构建的门，已登记在 P18 证据任务表（FALSIFY-UI-CONTRACT）。
       - name: UI 内容契约棘轮门（test:ui-contract · INV-2）
         run: npm run test:ui-contract
-      # oxlint：基线 0 error / 16 warning。只拦 error，不把既有 warning 变成阻塞。
+      # oxlint 棘轮门：脚本 = scripts/gate-lint.mjs（外面包一层基线比对，不改 `npm run lint` 本身）。
+      # 基线（docs/p18/_generated/_baselines/lint-warnings.json）现在是 **total 0 warning**，
+      # 只许降不许升：当前 total 或任一规则的当前值超过基线 ⇒ FAIL(1)；
+      # 基线文件缺失 ⇒ UNKNOWN(2)，按本项目三态约定**视为不通过**，不静默放行。
+      # 想降数只能真改代码（本门不会为了变绿去关规则）。
+      # 本地可用 `npm run gate:lint:falsify` 复核这道门本身确实会判红。
       - name: Lint（oxlint）
-        run: npm run lint
+        run: npm run gate:lint
 
   # ── 闸门 2：需要 dist/ 与 preview 服务器 ───────────────────────────────────
   gate-build:
     name: 门禁② 构建产物（体积 + 离线）
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 兜底超时：本地实测 build+bundle+chromium+offline 约 1 分钟，CI 实测 51s（含失败）。
     # 给 20 分钟余量防止挂死。
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -101,15 +106,15 @@ jobs:
   # ── 闸门 3：真实浏览器端到端（原仅 PR 触发，现补齐 push main）─────────────
   gate-e2e:
     name: 门禁③ 端到端（test:e2e）
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 兜底超时（关键）：CI run 36308273299 曾因 16 处 networkidle 在最终环境上
     # 挂死 25 分钟且不会自动失败，只能人工 cancel——白白烧 runner 额度且看起来
     # 像「一直在跑」。已在 tests/e2e.mjs 改用 waitUntil:'load' + 显式超时修根因，
     # 这里是第二层保险：20 分钟到点强制失败。本地实测 e2e 约 2.5 分钟。
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -140,16 +145,16 @@ jobs:
       needs.gate-static.result == 'success' &&
       needs.gate-build.result == 'success' &&
       needs.gate-e2e.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       deployments: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -179,7 +184,7 @@ jobs:
       # 只有推送到 main 才部署；PR 仅做构建校验
       - name: Publish to Cloudflare Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
