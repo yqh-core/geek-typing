@@ -1,0 +1,27 @@
+# RunId: P18-G2-GATE-ARCHITECTURE-20261001-104119-R01
+# Command: node scripts/gate-architecture.mjs
+# Commit: 99e676765e86d1965c750805d861c1588f43b7b5
+# StartedAt: 2026-10-01T02:41:19.761Z
+# DurationMs: 13112
+# ExitCode: 0
+
+--- stdout+stderr ---
+== P1.7-W3 · Architecture Gate 汇总（A-4）==
+已接入子门 5 个，计划内待落地 5 个（PENDING 不计 FAIL，但必打印）
+
+  ✅ B02            learning-boundary  EXIT=0  UI→core/learning 唯一入口 / UI❌→lib/learning
+  ✅ G4             g4                 EXIT=0  G4-1/2/3① 静态侧（键族入口 + 零静默 catch）
+  ✅ A03            legacy-wordbank    EXIT=0  旧词库边界
+  ✅ persistence    persistence        EXIT=0  UI❌→localStorage；core/learning❌→browser storage 直触
+  ✅ practice-engine practice-engine    EXIT=0  练习引擎边界
+  ✅ content-contract content-contract   EXIT=0  （已从 PENDING 转为已接入）Content 必须经 registry 注册
+  ✅ content-type-contract content-type-contract EXIT=0  （已从 PENDING 转为已接入）类型契约唯一 / 禁 per-type 散落 / 注册表⟷查询层对账（INV-6）
+  ✅ perf           perf               EXIT=0  （已从 PENDING 转为已接入）新依赖必须过 bundle budget
+  ✅ license        license            EXIT=0  （已从 PENDING 转为已接入）资产/许可入库前置硬门（INV-5）
+  ✅ ui-contract    ui-contract        EXIT=0  （已从 PENDING 转为已接入）UI 内容契约棘轮门（INV-2）：UI 只经 Catalog/Query/Learning 访问内容数据
+
+共 10 项：通过 10，失败 0，未接入 0
+失败子项：无
+未接入子项：无
+
+✅ Architecture Gate PASS
