@@ -99,21 +99,21 @@ const PRESET = {
   'gt.junk.notinlist': JSON.stringify({ keep: 'me' }),
 }
 
-/* 内联微缩 ContentProvider（口径见文件头）—— 数据表形态（playwright evaluate 只能传可序列化值，
+/* 内联微缩 ContentProvider（口径见文件头）—— 数据表形态（playwright evaluate 的入参
+ * 只能是**可序列化值**，所以传数据、页内再拼出函数组；
    函数在浏览器内重建） */
 const PROVIDER_DATA = {
   lowerToForms: { treeshaking: ['treeShaking'], useeffect: ['useEffect'], apple: ['apple'] },
   wordToPkgs: { treeShaking: ['frontend'], useEffect: ['ts-code'], apple: ['cet4'] },
   pkgInfo: { frontend: { namespace: 'frontend' }, 'ts-code': { namespace: 'ts-code' }, cet4: { namespace: 'cet4' } },
 }
-/** 浏览器内注入的 provider 构建源码（page.evaluate 顶部 eval 成函数组） */
-const PROVIDER_SOURCE = `(function (PD) {
-  return {
-    lowerToForms: (l) => PD.lowerToForms[l] ?? null,
-    wordToPkgs: (w) => PD.wordToPkgs[w] ?? null,
-    pkgInfo: (p) => PD.pkgInfo[p] ?? null,
-  }
-})(${JSON.stringify(PROVIDER_DATA)})`
+/* provider 的**数据**用 PROVIDER_DATA（可序列化，能直接当 page.evaluate 的入参传进页里），
+ * 「数据 → 函数组」的拼装在**页内**就地完成（每个 evaluate 里各写一遍 —— page.evaluate
+ * 只序列化函数体本身，模块作用域里的函数到页里并不存在，抽个 buildProvider() 会 ReferenceError）。
+ *
+ * 为什么去掉 eval：这里 eval 的只有本文件写死的 fixture，既无外部输入也无动态拼串，
+ * 属于「能不 eval 就不 eval」的典型。它唯一的实际代价是让 `no-eval` 红灯常驻，
+ * 顺带给人一种「这条用例在做动态代码注入」的错觉。*/
 
 console.log('P1.5-S3 · browser-migration-e2e')
 const chrome = findChrome()
@@ -155,10 +155,15 @@ try {
   ok('浏览器内 import 真实 migrate.ts / storage.ts 成功', loaded.hasMigrate && loaded.hasRollback, JSON.stringify(loaded))
 
   /* ---------- apply：纯函数 + 契约顺序落盘 ---------- */
-  const applyResult = await page.evaluate(async (providerSource) => {
+  const applyResult = await page.evaluate(async (providerData) => {
     const mod = await import('/src/lib/learning/migrate.ts')
     const sto = await import('/src/lib/learning/storage.ts')
-    const provider = eval(providerSource)
+    // 页内就地拼出 provider（原先 eval(providerSource)，数据同源无外部输入，能不 eval 就不 eval）
+    const provider = {
+      lowerToForms: (l) => providerData.lowerToForms[l] ?? null,
+      wordToPkgs: (w) => providerData.wordToPkgs[w] ?? null,
+      pkgInfo: (p) => providerData.pkgInfo[p] ?? null,
+    }
     const raw = Object.fromEntries(Object.entries(localStorage))
     const split = mod.splitSnapshot(raw)
     const run = mod.migrateV1toV2(split.snapshot, provider, {
@@ -183,7 +188,7 @@ try {
       marker: run.next.marker,
       learningKeys: Object.keys(run.next.learning).length,
     }
-  }, PROVIDER_SOURCE)
+  }, PROVIDER_DATA)
 
   console.log(`\n【apply】迁移三档：resolved=${applyResult.tiers?.resolved} ambiguous=${applyResult.tiers?.ambiguous} orphan=${applyResult.tiers?.orphan} caseConflict=${applyResult.tiers?.caseConflict} invalid=${applyResult.tiers?.invalid}（learning ${applyResult.learningKeys} 条）`)
 
@@ -214,10 +219,14 @@ try {
   /* ---------- reload 幂等 ---------- */
   await page.reload({ waitUntil: 'load' })
   const afterReloadBefore = await page.evaluate(() => Object.fromEntries(Object.entries(localStorage)))
-  const rerun = await page.evaluate(async (providerSource) => {
+  const rerun = await page.evaluate(async (providerData) => {
     const mod = await import('/src/lib/learning/migrate.ts')
     const sto = await import('/src/lib/learning/storage.ts')
-    const provider = eval(providerSource)
+    const provider = {
+      lowerToForms: (l) => providerData.lowerToForms[l] ?? null,
+      wordToPkgs: (w) => providerData.wordToPkgs[w] ?? null,
+      pkgInfo: (p) => providerData.pkgInfo[p] ?? null,
+    }
     const raw = Object.fromEntries(Object.entries(localStorage))
     const split = mod.splitSnapshot(raw)
     const marker = sto.loadMigrationMarker()
@@ -228,7 +237,7 @@ try {
       existingMarkerFingerprint: marker?.sourceFingerprint ?? null,
     })
     return { skipped: run.skipped, pendingWrites: run.pendingWrites ?? [], markerReadOk: marker !== null }
-  }, PROVIDER_SOURCE)
+  }, PROVIDER_DATA)
 
   console.log(`\n【reload 幂等】marker 读取=${rerun.markerReadOk} skipped=${rerun.skipped} pendingWrites=${rerun.pendingWrites.length}`)
   ok('④ reload 后 marker 可读', rerun.markerReadOk)
