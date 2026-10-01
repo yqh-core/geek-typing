@@ -248,13 +248,18 @@ export const WARMUP_IDS = ['ielts', 'toefl', 'kaoyan'] as const
 
 ---
 
-## 9.5 7 个 inline 词库改 lazy 【本步定口径，实施待排】
+## 9.5 7 个 inline 词库改 lazy 【已实施 —— P18-J，`9b468e0` / `28b4994` / `76d90ce`】
 
 ### 9.5.1 现状（实测）
 
-`node scripts/content/validate.mjs` 实测：**inline 7 包 = 346 词 / 36.17 KiB**，未超 inline 预算（1000 词 / 64 KiB）：
-`ai-core(43词/2.27KiB)`、`cet4(84词/12.06KiB)`、`cet6(69词/9.61KiB)`、`cloud-native(30词/1.55KiB)`、
-`frontend(20词/0.97KiB)`、`go-code(50词/4.54KiB)`、`ts-code(50词/5.17KiB)`；**lazy 11 包**。
+> **本节在实施后已按 `content:validate` 输出改写**，原口径（inline 7 包 = 346 词 / 36.17 KiB、lazy 11 包）
+> 是 9.5 立项时的实测，作为决策依据仍保留在下文；**当前仓库的事实已变成下面这一段**。
+
+**当前实测（`node scripts/content/validate.mjs`，18 包全部通过）**：
+**inline 5 包 = Σ 296 词 / 33.65 KiB**，**lazy 13 包**；manifest 体积最大 1.78 KiB「ielts」、全库 24.28 KiB。
+inline 五包逐个：`ai-core(43词/2.27KiB)`、`cet4(84词/12.06KiB)`、`cet6(69词/9.61KiB)`、
+`go-code(50词/4.54KiB)`、`ts-code(50词/5.17KiB)`。
+`cloud-native(30词/1.55KiB)`、`frontend(20词/0.97KiB)` 已迁到 lazy 侧，策略一致性 18/18。
 
 inline 的收益是"首屏可得、零等待"；代价是**永不卸载、全留在主包里的常驻内存 + 主 chunk 体积**。
 
@@ -289,19 +294,69 @@ inline 的收益是"首屏可得、零等待"；代价是**永不卸载、全留
 
 ### 9.5.4 影响面（必须同步改的判据）
 
-| 判据 | 位置 | 影响 |
+> ⚠️ **原判断在实施后被实测证伪了四条**，纠正见 **§9.5.6**。
+> 阅读时请注意：**全仓库不存在任何「inline 7 / lazy 11 / 13」这类硬编码**，
+> 照「原判断」去搜数字会搜不到 —— 那不是没改，是原判断本来就错。
+
+| 判据 | 位置 | 原判断（立项时） | 实施后实测（P18-J） |
+|---|---|---|---|
+| inline/lazy 策略一致性 | `scripts/content/validate.mjs` | 7/11 的分界变了 ⇒ 期望数字要跟着改 | **无需改**：`INLINE_MAX_ITEMS=1000` / `INLINE_MAX_BYTES=64 KiB` 是**预算**，不是包数；包数由 `policyList` 现算 |
+| inline 预算 | 同上 | `Σ 346 词 / 36.17 KiB` → 期望值变小 | **无需改**：判据 19 打印实测值（当前 5 包 Σ 296 词 / 33.65 KiB），无硬编码期望 |
+| 数据 chunk 数 | `check-bundle.mjs` 判据 2 | lazy 包 11 → 13 ⇒ chunk 数必须 ≥ 13，否则判红 | **无需改**：`dataChunks < lazyCount` 是动态比较，当前 13 ≥ 13 通过 |
+| lazy 不得进主 chunk | 判据 5 | 这两个包会成为被探测对象（探测词扫描自动生效） | **确实要改，但改的是探测过滤器本身** —— 见 §9.5.6 第 2 条 |
+
+### 9.5.6 实施后复核：四条与立项判断不符的纠正
+
+**1. 「必须同步改的判据」三条里前三条全是误判 —— 仓库里根本没有要改的数字。**
+`validate.mjs` 判据 19 是 `inlinePkgs.push` **动态累加**，`INLINE_MAX_ITEMS=1000` /
+`INLINE_MAX_BYTES=64 KiB` 是**预算不是包数**；判据 20 是 `policyList.filter(p => p.policy === 'inline').length` **现算**；
+`check-bundle` 判据 2 是 `dataChunks < lazyCount` **动态比较**。
+⇒ **9.5 全仓库没有「必须同步改」的判据**，真落点只有 `registry.ts` + 两个 `manifest.json`
+（外加 e2e 假失败 1 处 + 文档副本）。照原判断去搜「7 / 13」会一无所获 —— 那不是漏改，是原判断本来就错。
+
+**2. 判据 5 在 9.5 之后被焊死成 UNKNOWN，根因是 `checkLazyLeak` 的过滤逻辑自指。**
+原实现「用当前 `mainText` 过滤探测词」—— 真泄漏时本包词**本来就在 `mainText` 里**，这一过滤
+把探测词自己洗掉 ⇒ 只剩 1 个 < `PROBE_MIN=3` ⇒ **永远 UNKNOWN**。
+`frontend` 恰好恒定部分命中 2/8（`component` 在主 chunk 出现 50 次、`repository` 3 次，
+来源是 App 代码不是泄漏），于是这个自指 bug 在 9.5 后立刻暴露：`frontend` 每次都把门拖成 UNKNOWN
+（UNKNOWN 视同不通过 ⇒ EXIT 1）。
+修复（`28b4994`）：改用**摘掉本包自己带引号词条**的残文来过滤 —— 干净态 PASS、泄漏态部分命中 7/8 ⇒ 门红。
+
+**3. 注入 A 不判红 —— 真正能证伪判据 5 的是注入 B。**
+「把 `load:` 改回 `words:` 但不 rebuild」在原实现下**不判红**（`check-bundle` 6/6 过，只有
+`content:validate` 判据 20 红）—— 因为 `check-bundle` 读的是 `dist`，没 rebuild 就看不到变化。
+⇒ 证伪必须走**注入 B（真泄漏 + rebuild）**：判据 2 FAIL + 判据 5 UNKNOWN ⇒ 门红。
+
+**4. 主 chunk 余量只剩 4.9%，但不是 9.5 造成的。**
+fresh build 实测主 chunk **424.47 KiB raw / 134.61 KiB gzip**；判据 21 生效阈值
+`439.45 / 141.60 KiB`（分层预算当前生效层 = `ABSOLUTE_BUDGET`，见 `check-bundle.mjs:98`）
+⇒ 余量 **3.4% / 4.9%**。文档里那句「420 / 135 KiB，实测 381.06 / 118.89 KiB，余量 10.2% / 12.0%」
+抄的是**更早一次构建**的快照，阈值 / 实测 / 余量三样都过期，已同步订正。
+本次 9.5 只会让主 chunk **更小** 2.52 KiB，余量变紧来自别处（代码增长）。
+⇒ **这条对 D 步（产品内容扩充）是硬约束**：往主 chunk 加东西会立刻撞红，
+扩充前必须「先给主 chunk 瘦身」或「正式重订分层预算」，已登记进 `ENGINEERING-HYGIENE-PLAN.md`。
+
+### 9.5.5 实施后结论（P18-J，`76d90ce`）
+
+| 验收项 | 预期 | 实测 |
 |---|---|---|
-| inline/lazy 策略一致性 | `scripts/content/validate.mjs` | 7/11 的分界变了 ⇒ 一致性判据的期望数字要跟着改 |
-| inline 预算 | 同上 | `Σ 346 词 / 36.17 KiB` → 期望值变小 |
-| 数据 chunk 数 | `check-bundle.mjs` 判据 2 | lazy 包 11 → 13 ⇒ **chunk 数必须 ≥ 13**，否则判红 |
-| lazy 不得进主 chunk | 判据 5 | 这两个包会成为被探测的对象（探测词扫描自动生效） |
+| `content:validate` | inline 7→5、lazy 11→13、Σ 词/字节按实测更新 | ✅ PASS 18 包；inline **5 包 / Σ 296 词 / 33.65 KiB**；策略一致性 **18/18（inline 5 / lazy 13）**；manifest 体积最大 **1.78 KiB / 全库 24.28 KiB** |
+| `check-bundle` 判据 2 | 数据 chunk ≥ 13 | ✅ words **5** + items **8** = 13 ≥ 13 |
+| `check-bundle` 判据 5 | 这两个包探测串在主 chunk 命中 0 | ✅ registry 全部 **13 个 lazy 包**逐个 `probes=8 → 命中 0` |
+| `check-bundle` 判据 3 | 预热预算不涨 | ✅ gzip 合计 **330.02 KiB** ≤ 600（余量 **45.0%**）；`WARMUP_IDS` / `WARMUP_MAX_IDS` / `warmup-ids-baseline.json` **三处零改动** |
+| `check-bundle` 全 6 项 | 全过 | ✅ PASS：6/6 |
+| `test:e2e` | lazy 后 `:bank 2` 切换不假红 | ✅ **170/170**（该段已改 `waitForTestId(page,'word')` 轮询；原「350 ms 固定等待 + 一次性 `readWord`」在 lazy 下必然取到空） |
+| `gate:lint` | 基线 0 不涨 | ✅ 0 条（基线 0，`gate:lint:falsify` 两条注入仍成立） |
 
-### 9.5.5 验收口径
+**口径修正一：主 chunk 体积不作为 9.5 的验收门槛。**
+9.5 只搬走 **2.52 KiB**（不是 36 KiB），把它写成验收项会逼人去凑一个下降数字。
+主 chunk 属既有监控项，位置在 `check:bundle` 判据 1；它**不是本次变紧的**，见 §9.5.6 第 4 条。
 
-- `node scripts/content/validate.mjs` → inline 数 7→5、lazy 11→13、inline Σ 词/字节按实测更新
-- `node scripts/check-bundle.mjs` → 判据 2 数据 chunk ≥ 13、判据 5 这两个包**命中 0**（真没进主 chunk）
-- `node scripts/check-bundle.mjs --falsify` → 注入把 `frontend` 改回 inline ⇒ 判据 2 或 5 恰好判红
-- 主 chunk 体积下降实测记录（期望 −2.5 KiB 上下，不是 36 KiB）
+**未完成项（工程侧已完，视觉侧未验）：** §9.5.3 要求的「改 lazy 必须配骨架屏」
+在工程上已由 `useBank` 的既有空态兜住（`bankWords` 未就绪 = 空数组，`BankManager` 有对应空态渲染），
+**本次未新增任何骨架屏代码**。但「是否有固定 6 行骨架、布局零跳动、文案走 i18n」这三条
+**尚未做真机视觉复核** —— 这与 `P1.8-SIGN-OFF` §9.5 留给 UX 的那一票是同一件事，
+工程侧只能交付到「门全绿」，不能替 UX 判好看。已登记进 `ENGINEERING-HYGIENE-PLAN.md`。
 
 ---
 
