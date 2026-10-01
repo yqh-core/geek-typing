@@ -33,7 +33,7 @@ const repoMod = await server.ssrLoadModule('/src/core/persistence/repository.ts'
 const { MemoryStorageAdapter, LocalStorageAdapter } = adapterMod
 const { resolveKey, registeredKeys, assertWritable, NamespaceError } = nsMod
 const { jsonCodec, canonicalJsonCodec, CodecError } = codecMod
-const { KeyFamilyRepository, createRepository } = repoMod
+const { createRepository } = repoMod
 
 /* ---------------- 1. StorageAdapter ---------------- */
 console.log('== 1. StorageAdapter ==')

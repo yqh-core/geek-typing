@@ -149,7 +149,7 @@ export function buildBundleRows(recorded, measured) {
   return rows
 }
 
-const kib = (b) => (b == null ? '—' : `${(b / 1024).toFixed(2)} KiB`)
+const _kib = (b) => (b == null ? '—' : `${(b / 1024).toFixed(2)} KiB`)
 
 function fmtBytes(b) {
   return b == null ? '—' : `${b} B`

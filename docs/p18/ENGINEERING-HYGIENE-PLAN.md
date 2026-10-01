@@ -78,13 +78,13 @@ npx oxlint --format=json > <临时文件>    # 解析 r.diagnostics[].code / .fi
 
 ## 2. 批次划分（每批一个 commit，批间跑全套回归）
 
-| 批 | 内容 | 条数 | 验证 | 风险 |
-|---|---|---:|---|---|
-| **H1** | `no-unused-vars`(31) + `no-useless-escape`(1) + `no-irregular-whitespace`(1) —— 纯机械删除 | 33 | 全套测试 + tsc + 三个门禁 | **低**（但见下方"假清理"陷阱） |
-| **H2** | `no-control-regex`(5) —— 逐个查不可见字符来源 | 5 | 同上 + 内容门禁（`content:validate`） | 低中 |
-| **H3** | `no-eval`(2) —— 人工审 + 加受控说明 | 2 | 安全审读留档 | **高（最该优先看）** |
-| **H4** | `exhaustive-deps`(5) + `set-state-in-effect`(3) + `purity`(2) —— 语义改动 | 10 | 全套测试 + **人工过交互路径** | 中高 |
-| **H5** | `only-export-components`(3) —— 结构拆分 | 3 | 构建 + ui-contract 探针 | 中（拆文件动 import 面） |
+| 批 | 内容 | 条数 | 验证 | 风险 | 状态 |
+|---|---|---:|---|---|---|
+| **H1** | `no-unused-vars`(31) + `no-useless-escape`(1) + `no-irregular-whitespace`(1) —— 纯机械删除 | 33 | 全套测试 + tsc + 三个门禁 | **低**（但见下方"假清理"陷阱） | ✅ 已做（53 → **20**） |
+| **H2** | `no-control-regex`(5) —— 逐个查不可见字符来源 | 5 | 同上 + 内容门禁（`content:validate`） | 低中 | 待做 |
+| **H3** | `no-eval`(2) —— 人工审 + 加受控说明 | 2 | 安全审读留档 | **高（最该优先看）** | 待做（搁在 H1 之后做，见 §2.3） |
+| **H4** | `exhaustive-deps`(5) + `set-state-in-effect`(3) + `purity`(2) —— 语义改动 | 10 | 全套测试 + **人工过交互路径** | 中高 | 待做 |
+| **H5** | `only-export-components`(3) —— 结构拆分 | 3 | 构建 + ui-contract 探针 | 中（拆文件动 import 面） | 待做 |
 
 ### 2.1 H1 的"假清理"陷阱（必须写进实施要求）
 
@@ -103,6 +103,40 @@ oxlint 默认对 `_` 前缀放行（`argsIgnorePattern` 类配置）—— 实�
 
 **H3 优先于 H1** —— `no-eval` 是唯一带安全语义的一类，
 即便它只有 2 条，也该在"批量删未用变量"之前看清楚。
+
+> **实际执行顺序反了（H1 先做）**，理由与代价记在这里，避免后人以为顺序是刻意的：
+> 当时正在收口 P18-B 遗留项 9.2（预热清单化），CI e2e 恰好红着，
+> 顺手把机械批次做完能让 CI 一次变绿、不必等安全审读结论。**代价是 H3 的
+> `no-eval` 人工审读被推后了** —— 目前那 2 条仍未处理，仍是本阶段最该先看的一条。
+
+### 2.3 H1 实施记录（53 → 20）
+
+**做了什么**：`no-unused-vars` 31 → 0；`no-useless-escape` 1 → 0（`src/lib/customBanks.ts`
+正则字符类里多余的 `\-`）；`no-irregular-whitespace` 1 → 0（`src/core/persistence/channels.ts`
+注释里的全角空格 → 半角）。合计 **33 条**。
+
+**假清理陷阱的处置**（§2.1 的要求：拿不准就走 `_` 前缀 + 行内说明，而不是删）：
+
+- `tests/migration-lock.mjs:84` 的 `a`（并发对照样本）→ 保留并加 `_` 前缀 + 说明；
+- `tests/learning-model.mjs` 的 `typesMod`：它**不能**改成下划线前缀 ——
+  那处 `await server.ssrLoadModule('/src/lib/learning/types.ts')` 只吃副作用（把 types.ts
+  加载进 SSR 模块图），改成 `let _typesMod; _typesMod = await …` 会让赋值语句引用一个
+  未声明的裸标识符 ⇒ `ReferenceError` ⇒ EXIT=2。改法：删掉接收，只留副作用调用 + 注释。
+- `scripts/content/ingest.mjs:201` 的 `({ generatedAt, ...rest })`：`generatedAt` 是
+  **刻意排除**的比较项（每跑必变），重命名成 `_generatedAt` 而非从解构里删 —— 删掉就
+  等于把 generatedAt **算进了语义比较**，每次运行都会判定"产物变了"从而重写文件，
+  直接破坏该脚本的幂等语义。这是本批唯一一处"看起来能删、删了就出错"的地方。
+
+**踩到的坑（值得留给下一批）**：
+
+- `src/lib/customBanks.ts` 修 `no-useless-escape` 时，我第一版把 `\-\u0020` 写成字符类
+  末位之前的 `'- ` ⇒ oxlint 报 `Invalid regular expression: Character class atom range out of order`
+  （`'` 0x27 > 空格 0x20，逆向区间）并直接**新增一条 error 级诊断**。
+  正解是让 `-` 落末位：`[A-Za-z' -]`。这条已经进了 lint 输出统计，所以 **"删一个 lint 项
+  反而让 total 变多"是真实存在的** —— §3 的分规则棘轮必须允许"同一条规则内部换写法"，
+  不能只认数字。
+- `src/main.tsx` 里"预拉 ielts/kaoyan/toefl 三个大库"的注释已删（9.2 之后它就是错的），
+  改成指向 `registry.ts` 的 `WARMUP_IDS`。
 
 ---
 
@@ -136,7 +170,26 @@ oxlint 默认对 `_` 前缀放行（`argsIgnorePattern` 类配置）—— 实�
 
 ---
 
-## 5. 阶段边界（防止 C 步又滑回 P18）
+## 5. 跑门禁脚本时的副作用面（实测踩到，跑验证前先看这段）
+
+不是 lint 问题，但 C 步要反复跑全套回归，这几条不记下来就一定会再踩：
+
+| 命令 | 副作用 | 处理 |
+|---|---|---|
+| `npm run migration:dryrun` | 会**重写** `docs/audit-package/_generated/` 里的
+  `migration-dryrun-{ambiguous,orphan}.jsonl` 与 `migration-dryrun-report.json` | 跑完 `git checkout -- docs/audit-package/`（那是 INV-1 冻结区） |
+| `npm run content:ingest` | 刷新 `content/license-policy-1.json` 的 `generatedAt` | 跑完 `git checkout -- content/license-policy-1.json` |
+| 任何 rebuild | `vite build` 的 `emptyOutDir` 要删 `dist/assets`（>50 个文件 ⇒ safe-delete shim 拦下，构建在写入前中止，但 stdout 的 `✓ built in` 会排在 stderr 报错**前面**） | `CODEBUDDY_SAFE_DELETE_ENABLED=0 npm run build` |
+
+**一个值得单独说的发现**：`scripts/verify-p17-frozen.mjs` 只查「冻结区**新增**了什么」，
+**不查既有文件的内容被改了什么** —— 上面 `migration:dryrun` 把三个既有文件改得面目全非
+（ambiguous.jsonl 26 行 → 9 行、report.json 246 行差异）时，这条 INV-1 门照样 `EXIT=0`。
+冻结区的"只读"目前是**靠人工自觉 + 只拦增量**的约束。要不要补一条"冻结区任文件字节级
+不变"的判据，本阶段先登记不下决定（它属于 P1.7 那条不变量的加固，动它有跨阶段影响）。
+
+---
+
+## 6. 阶段边界（防止 C 步又滑回 P18）
 
 本阶段**不做**：
 

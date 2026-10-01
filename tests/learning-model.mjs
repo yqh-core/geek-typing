@@ -276,10 +276,12 @@ async function main() {
   })
 
   let migrateMod
-  let typesMod
   try {
     migrateMod = await server.ssrLoadModule('/src/lib/learning/migrate.ts')
-    typesMod = await server.ssrLoadModule('/src/lib/learning/types.ts')
+    // 刻意**不接收返回值**：这个 ssrLoadModule 的目的只是把 types.ts 加载进 SSR 模块图，
+    // 让下面 splitSnapshot 用到的类型常量到位。改成 `let x; x = await ...` 加 `_` 前缀会
+    // 变成「声明一个从没赋值过的变量 + 给一个未声明的名字赋值」⇒ strict 下 ReferenceError。
+    await server.ssrLoadModule('/src/lib/learning/types.ts')
   } catch (e) {
     await server.close()
     console.error('FAIL(EXIT=2): 无法加载 src/lib/learning/*.ts：', e?.stack ?? e)

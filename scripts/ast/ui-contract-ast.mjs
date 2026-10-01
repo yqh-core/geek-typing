@@ -53,9 +53,8 @@
  * 用法（CLI）：node scripts/ast/ui-contract-ast.mjs [--scan-root=<dir>] [--json]
  */
 import { Node, Project, SyntaxKind, ts } from 'ts-morph'
-import { readdirSync, statSync } from 'node:fs'
+import { readdirSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { REPO_ROOT, foldString, walkSourceFiles } from './boundary-ast.mjs'
 
 export { REPO_ROOT }

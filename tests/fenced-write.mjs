@@ -59,7 +59,7 @@ const mod = await server.ssrLoadModule('/src/core/persistence/migration-write-gu
 const {
   checkWrite, decideKillRecovery, MigrationWriteGuard, applySwitch,
   createMemoryFenceStore, FENCE_LOCK_KEY, stagingKey,
-  encodeStagedValue, decodeStagedValue,
+  decodeStagedValue,
 } = mod
 
 const NOW = 1_000_000_000

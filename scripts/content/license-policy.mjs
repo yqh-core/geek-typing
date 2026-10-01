@@ -63,7 +63,7 @@ export const payloadNameOf = (type) => (type === 'vocabulary' ? 'words.json' : '
 /** ContentId 端点解析：content:<type>:<namespace>:<localId> */
 export const CONTENT_ID_RE = /^content:([a-z]+):([a-z0-9-]+):(.+)$/
 
-const ROOT = path.resolve(process.cwd())
+const _ROOT = path.resolve(process.cwd())
 
 /**
  * `--root=<dir>` 解析（P18-G0）：**仅**覆盖「内容包目录」，ROOT / registry.ts / i18n 等一律不变。

@@ -71,7 +71,7 @@ const exe = findChrome()
 if (!exe) { console.error('❌ 未找到 Chrome'); process.exit(2) }
 const browser = await chromium.launch({ executablePath: exe, headless: true })
 
-const OLD_GLOBAL_KEY = 'gt.fence.old'
+const _OLD_GLOBAL_KEY = 'gt.fence.old'
 
 async function newPage(context) {
   const p = await context.newPage()
@@ -87,6 +87,7 @@ try {
   console.log('== 1. 真 IDB：Lock + Guard 同库集成，全链路提交 ==')
   const dbName = `gt-fence-w1b-full-${Date.now()}`
   const full = await pageA.evaluate(async ([db]) => {
+    // 不能加 `_` 前缀：下面 99/100 行在引用裸 `lockMod`（lint 只报声明点，加前缀后连报都不报）
     const lockMod = await import('/src/core/persistence/migration-lock.ts')
     const guardMod = await import('/src/core/persistence/migration-write-guard.ts')
     const entries = [
@@ -179,9 +180,8 @@ try {
 
     // 页签 B：重启后的编排者（同 origin = 共享 IDB + localStorage）
     const pageB = await newPage(context)
-    const recovered = await pageB.evaluate(async ([db, position, keys]) => {
+    const recovered = await pageB.evaluate(async ([db, keys]) => {
       const guardMod = await import('/src/core/persistence/migration-write-guard.ts')
-      const lockMod = await import('/src/core/persistence/migration-lock.ts')
       const store = await guardMod.createIdbFenceStore(db)
       const guard = new guardMod.MigrationWriteGuard(store)
       // —— 恢复前快照（先看现场，再动手）——
@@ -217,7 +217,7 @@ try {
         new2: localStorage.getItem(keys.new2),
         old: localStorage.getItem(keys.old),
       }
-    }, [dbName, position, keys])
+    }, [dbName, keys])
     await pageB.close()
 
     console.log(`  -- ${position}: phase=${recovered.pre.phase} → recovery=${recovered.action}`)

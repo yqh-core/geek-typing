@@ -134,7 +134,7 @@ writeFileSync(BANKS_PATH, lines.join('\n'), 'utf8')
 
 /* ---------- 4. 统计报告 ---------- */
 const afterWordCount = (lines.join('\n').match(/^\s*\{\s*word:/gm) ?? []).length
-const cet4 = (lines.join('\n').match(/word:/g) ?? []).length
+const _cet4 = (lines.join('\n').match(/word:/g) ?? []).length
 console.log(`\n========== 统计 ==========`)
 console.log(`补上 definition 的词条数：${patched}`)
 console.log(`匹配不到的词数：${missed.length}`)

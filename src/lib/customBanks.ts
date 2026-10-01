@@ -87,10 +87,11 @@ export function parseWords(raw: string): WordItem[] {
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const m = line.match(/^([A-Za-z][A-Za-z'\- ]*?)\s*(?:=|,|\||:|：|\t| {2,})\s*(.+)$/)
+      // 字符类里 `-` 必须落末位（写成 `[A-Za-z'- ]` 会给 `'`~` ` 造一个逆向区间 ⇒ 正则直接非法）
+      const m = line.match(/^([A-Za-z][A-Za-z' -]*?)\s*(?:=|,|\||:|：|\t| {2,})\s*(.+)$/)
       if (m) return { word: m[1].trim(), translation: m[2].trim() }
       const parts = line.split(/\s+/)
-      if (parts.length >= 2 && /^[A-Za-z][A-Za-z'\-]*$/.test(parts[0])) {
+      if (parts.length >= 2 && /^[A-Za-z][A-Za-z'-]*$/.test(parts[0])) {
         return { word: parts[0], translation: parts.slice(1).join(' ') }
       }
       return { word: line, translation: '' }

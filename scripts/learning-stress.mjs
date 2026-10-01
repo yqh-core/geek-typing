@@ -87,7 +87,7 @@ const ALL_LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('')
  * ------------------------------------------------------------------------- */
 const DAY = 86400000
 const INTERVALS_DAYS = [1, 2, 4, 7, 15]
-const LETTER_KEYS = { hit: 0, miss: 0 }
+const _LETTER_KEYS = { hit: 0, miss: 0 }
 const nowMs = Date.now()
 const rnd = (seed) => {
   // 确定性伪随机，保证同一 N 每次生成同一份数据（可复现）
@@ -294,7 +294,7 @@ const MEASURE_ONE = function (key, value, repeat) {
     readParseMsMax: +Math.max(...r).toFixed(3),
   }
 }
-const MEASURE_ONE_SRC = MEASURE_ONE.toString()
+const _MEASURE_ONE_SRC = MEASURE_ONE.toString()
 
 /** 场景测量 + Quota 行为：Quota 判定用「累加预算模拟」，延迟用干净的 setItem 计时 */
 const MEASURE_SCENARIO = function (payload, repeat, quotaLimitBytes) {
@@ -618,7 +618,7 @@ function computeEvictionSequence() {
   }
   // 预排序（与 save 内 entries.sort 同序：intervalIdx 降序；同档保持原插入序）
   const order = entries.slice().sort((a, b) => b.idx - a.idx)
-  const removed = new Set()
+  const _removed = new Set()
   const jsonBytes = (removedSet) => {
     let sum = 2 // {}
     let first = true

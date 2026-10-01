@@ -54,7 +54,7 @@ function run(cmd, args) {
 const git = (...args) => run('git', args)
 
 let failures = 0
-const ignore = (msg) => console.log(`   ignore: ${msg}`)
+const _ignore = (msg) => console.log(`   ignore: ${msg}`)
 
 console.log('======================================================================')
 console.log(' P1.8 INV-1 — P1.7 冻结基线保护门（verify-p17-frozen.mjs）')

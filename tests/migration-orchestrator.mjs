@@ -90,6 +90,8 @@ function seed() {
 
 /** lock 与 guard 共用同一内存 map（镜像共库 IDB 串行化语义） */
 function freshOrchestrator() {
+  // 这里**不能**加 `_` 前缀：下面 lockStore 的闭包与 return 都在引用 `mem`（lint 只报声明点、
+  // 报不到引用点，改成 `_mem` 会留下一个裸标识符引用 ⇒ ReferenceError）。
   const mem = createMemoryFenceStore()
   const lockStore = {
     runTxn: (fn) =>
@@ -130,7 +132,7 @@ console.log('== 1. RUN 全流水线 ==')
 console.log('== 2. R5 违规路径 ==')
 {
   seed()
-  const { mem, orch } = freshOrchestrator()
+  const { orch } = freshOrchestrator()
   // transform 丢一条记录（r2 缺失 → identity set 不等）
   const badDef = makeDef({
     transform: (k, v) => v.records.filter((r) => r.id !== 'r2').map((r) => ({ key: `app.data.v2:${r.id}`, value: JSON.stringify(r) })),

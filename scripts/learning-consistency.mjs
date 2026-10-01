@@ -123,7 +123,7 @@ const STORE_KEYS = {
   analytics: 'gt.analytics.v1',
 }
 
-const EMPTY_LEARNING = { review: {}, memorize: {}, analytics: {} }
+const _EMPTY_LEARNING = { review: {}, memorize: {}, analytics: {} }
 
 /**
  * 从 store 对象里抽出「word 键集」。

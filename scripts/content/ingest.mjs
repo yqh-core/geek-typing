@@ -27,8 +27,8 @@ import { writeFile, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import {
-  LICENSE_POLICY_VERSION, PROVIDER_ORIGINAL, CONTENT_TYPES,
-  loadPackages, decidePackage, decideLicense, checksumPayload, resolveContentDir,
+  LICENSE_POLICY_VERSION, PROVIDER_ORIGINAL,
+  loadPackages, decidePackage, checksumPayload, resolveContentDir,
 } from './license-policy.mjs'
 /* relations 端点可达性**只从 relations.mjs 取**（P18-G0 裁定 §⑪-3）：本文件不得再有第二份实现。
  * 历史上这里与 scripts/gate-content-contract.mjs 是**逐字复制**，与 validate.mjs 是第三份。 */
@@ -198,7 +198,8 @@ async function main() {
    * 变化，故不参与语义比较 —— 否则产物（已入库、受版本控制）每次运行都会产生一次工作区漂移。
    * ⚠️ 只**排除**它参与判定，不从产物里删字段；落盘结构 / 键序 / 缩进 / 尾随换行一律不变。
    * ⚠️ 两侧用同一方式构造 ⇒ 键序一致，可直接比字符串，不引入任何新的规范化依赖。 */
-  const semanticsOf = ({ generatedAt, ...rest }) => JSON.stringify(rest)
+  // `_generatedAt`：它每跑必变、刻意**不参与**语义比较（排除而不删字段），下划线 = 有意不用
+  const semanticsOf = ({ _generatedAt, ...rest }) => JSON.stringify(rest)
   let prev = null
   try { prev = JSON.parse(await readFile(OUT, 'utf8')) } catch { prev = null } // 不存在/不可解析 ⇒ 必须写
   if (prev !== null && typeof prev === 'object' && semanticsOf(prev) === semanticsOf(artifact)) {

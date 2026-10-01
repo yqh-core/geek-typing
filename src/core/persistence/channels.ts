@@ -9,7 +9,7 @@
  *   analyticsChannel    → analytics ：analytics.ts 的 gt.analytics.v1
  *   contentChannel      → content   ：customBanks.ts 的 gt.customBanks.v1
  *   settingsChannel     → settings  ：useSettings / i18n / speech 的偏好键
- *   diagnosticsChannel  → diagnostics（唯一允许 allKeys）　：learning/diagnostics.ts
+ *   diagnosticsChannel  → diagnostics（唯一允许 allKeys） ：learning/diagnostics.ts
  */
 
 import { createChannel } from './channel'

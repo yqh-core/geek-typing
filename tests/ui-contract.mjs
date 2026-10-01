@@ -43,7 +43,7 @@
  *   npm run test:ui-contract:falsify        # 自带证伪自检
  *   node tests/ui-contract.mjs --record-baseline [--force-raise --reason="..."]
  */
-import { cpSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -493,7 +493,7 @@ function falsify() {
     { letter: 'A4', name: 'handleReads 抬到 基线+1', mutate: (s) => ({ counts: { ...s.counts, handleReads: s.baseline.handleReads + 1 } }), expectFail: ['RATCHET-handleReads'], expectUnknown: [] },
     { letter: 'A5', name: 'bannedArrayOps 抬到 基线+1', mutate: (s) => ({ counts: { ...s.counts, bannedArrayOps: s.baseline.bannedArrayOps + 1 } }), expectFail: ['RATCHET-bannedArrayOps'], expectUnknown: [] },
     { letter: 'A6', name: 'bypassFacadeImports 抬到 基线+1', mutate: (s) => ({ counts: { ...s.counts, bypassFacadeImports: s.baseline.bypassFacadeImports + 1 } }), expectFail: ['RATCHET-bypassFacadeImports'], expectUnknown: [] },
-    { letter: 'A7', name: '扫描到 0 个文件（⇒ UNKNOWN，不通过）', mutate: (s) => ({ scanned: 0 }), expectFail: [], expectUnknown: ['SCAN-NONEMPTY'] },
+    { letter: 'A7', name: '扫描到 0 个文件（⇒ UNKNOWN，不通过）', mutate: () => ({ scanned: 0 }), expectFail: [], expectUnknown: ['SCAN-NONEMPTY'] },
     {
       letter: 'A8',
       name: '基线不可用（按 0 处理会全绿 ⇒ 必须走 Fatal）',

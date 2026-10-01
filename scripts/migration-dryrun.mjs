@@ -68,12 +68,12 @@ const KEY_LETTER_STATS = 'gt.letterStats.v1'
 const KEY_TOTALS = 'gt.totals.v1'
 const KEY_CUSTOM_INDEX = 'gt.customBankIndex.v1'
 const KEY_BACKUP = 'gt.learning.v2.backup'
-const KEY_MIGRATION = 'gt.migration.v1'
+const _KEY_MIGRATION = 'gt.migration.v1'
 
 /** 迁移源 4 键（§2.1 表：gt.streak.v1 不在其中） */
 const LEGACY_KEYS = ['gt.review.v1', 'gt.memorize.v1', 'gt.analytics.v1', 'gt.customBanks.v1']
 /** 读取但**不迁移**的键（§2.1 第 5 行：键是日期、不含词，与 Learning 层正交） */
-const NOT_IN_SCOPE_KEYS = ['gt.streak.v1']
+const _NOT_IN_SCOPE_KEYS = ['gt.streak.v1']
 const STREAK_NOT_IN_SCOPE_REASON = 'keys are dates, no word dimension'
 
 /** 样本上限（§2.8.1 注释：orphan 最多 100 条 / ambiguous 最多 20 条） */
@@ -800,6 +800,9 @@ function assertIdempotent(run1, run2) {
 /* ===========================================================================
  * 6. 报告自检（结构非法 ⇒ exit 1）
  * ========================================================================= */
+// 形参名必须是 `content`：第 925 行的 buildSynthetic(content) 在引用它。
+// （别被 no-unused-vars 的声明点误导 —— lint 只报声明、不报引用，改成 `_content` 会
+// 留下一个裸标识符引用 ⇒ migration:dryrun EXIT=2）
 function validateReport(report, content) {
   const errors = []
 
@@ -909,6 +912,8 @@ async function main() {
   let sourceDetail
   let sourceKeysPresent
 
+  // `content` 不能加下划线前缀：926 行的 buildSynthetic(content) 引用裸 `content`。
+  // oxlint 只报声明点、不报引用点，加前缀后这条崩溃彻底隐身 —— 实测 migration:dryrun EXIT=2。
   const content = loadContentTruth()
 
   if (userStoreArg) {

@@ -235,7 +235,7 @@ async function main() {
     })
     await sleep(700)
   }
-  const pressKey = (key) => async (s) => {
+  const _pressKey = (key) => async (s) => {
     const vk = { Escape: 27, Enter: 13, ' ': 32 }[key] ?? 0
     await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key, windowsVirtualKeyCode: vk })
     await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key, windowsVirtualKeyCode: vk })
@@ -245,7 +245,7 @@ async function main() {
   const series = (...steps) => async (s) => {
     for (const step of steps) await step(s)
   }
-  const typeInto = (sel, text) => async (s) => {
+  const _typeInto = (sel, text) => async (s) => {
     await s.send('Runtime.evaluate', {
       expression: `(()=>{
         const el=document.querySelector(${JSON.stringify(sel)});if(!el)return 'missing';
@@ -388,7 +388,7 @@ async function main() {
   /** 打开命令面板 */
   const openCmd = () => clickSel('[data-testid="open-cmd"]')
   /** 注入运行时错误以触发 ErrorBoundary */
-  const triggerError = () => async (s) => {
+  const _triggerError = () => async (s) => {
     await s.send('Runtime.evaluate', {
       expression: `(()=>{const el=document.querySelector('[data-testid="error-home"]');if(el)return 'already'; 
       // 通过破坏一个必然渲染的 React 根属性来触发渲染期错误

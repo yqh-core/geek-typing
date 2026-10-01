@@ -81,7 +81,7 @@ console.log('== 3. renew / release ==')
 {
   const store = createMemoryLockStore()
   const lock = new MigrationLock(store)
-  const a = await lock.acquire('A', { leaseMs: lease, now: NOW })
+  const _a = await lock.acquire('A', { leaseMs: lease, now: NOW })
   const exp = { ownerId: 'A', leaseUntil: NOW + lease, fencingToken: 1 }
   const rn = await lock.renew(exp, { leaseMs: lease, now: NOW + 1 })
   ok('renew 三元组匹配 → 成功且 token 不变', rn.ok && rn.record.fencingToken === 1)
