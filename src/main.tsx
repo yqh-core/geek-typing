@@ -34,8 +34,9 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 
 /* ---------------- SW 空闲期预热大词库 ----------------
  * 首访用户不会在 idle 前点开大词库，chunk 不进 SW 缓存 → 首次离线切换大词库会失败。
- * window load 后借 requestIdleCallback 预拉考研/雅思/托福分包（与 wordBanks.ts 同一
- * 动态 import，产出同一 chunk），SW fetch handler 会顺手 put 进缓存。
+ * window load 后借 requestIdleCallback 预拉 **registry 的 WARMUP_IDS 清单内**分包
+ * （当前 = kaoyan / toefl，考研 + 托福；与 wordBanks.ts 同一动态 import，产出同一 chunk），
+ * SW fetch handler 会顺手 put 进缓存。清单见 `src/core/content/registry.ts` —— 以那里为唯一事实源。
  * 移动流量用户（saveData / 2g/3g）跳过，不打爆流量；无 SW 的浏览器预热仍让模块
  * 缓存生效，二次切换零等待。全程异步不阻塞交互。 */
 if (import.meta.env.PROD) {

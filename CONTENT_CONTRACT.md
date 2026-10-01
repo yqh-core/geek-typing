@@ -845,7 +845,7 @@ gzip 123.07 → 107.90 kB ⇒ **7 个 inline 词表占主 chunk 37.10 kB raw / 1
 | 19 | inline 预算：`offline.policy==='inline'` 的包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB** | 1000 词 / 64 KiB | **346 词 / 37.15 KiB** | 不红 |
 | 20 | 策略一致性：manifest 的 `offline.policy` 必须与 `registry.ts` 实际加载方式一致（`words:` ↔ inline，`load:` ↔ lazy） | 10/10 | **10/10** | 不红 |
 | 21 | 主 chunk 体积：raw ≤ **420 KiB** 且 gzip ≤ **135 KiB** | 420 / 135 KiB | **381.06 / 118.89 KiB** | 不红（**10.2% / 12.0%**） |
-| 22 | 预热预算：被 `warmUpVocabulary` 列入的包 gzip 总量 ≤ **600 KiB** | 600 KiB | **497.03 KiB** | 不红（余量仅 **17%**，最紧） |
+| 22 | 预热预算：被 `warmUpVocabulary` 列入的包 gzip 总量 ≤ **600 KiB** | 600 KiB | **330.02 KiB**（清单 `[kaoyan, toefl]`） | 不红（余量 **45%**） |
 
 第 **18 / 19 / 20** 项由 `content:validate` 守护（门禁从 17 项扩到 **20** 项）；
 第 **21 / 22** 项是**构建后检查**，由 `check:bundle` 守护，**不属于 `content:validate`**。
@@ -861,19 +861,23 @@ gzip 123.07 → 107.90 kB ⇒ **7 个 inline 词表占主 chunk 37.10 kB raw / 1
 构建器自带的 `INEFFECTIVE_DYNAMIC_IMPORT` 警告 = **有人把一个本该 lazy 的包写成了 static import**。
 它在本轮对照实验中**当场触发**，零成本。**看到这条警告必须当缺陷处理，不许忽略。**
 
-### 13.7 🔴 已知限制 / 待办：预热预算是最薄弱的一环
+### 13.7 预热预算：已由「按需 + 限量」收口（P18 后 B 步 9.2）
 
-`warmUpVocabulary()`（`src/core/content/registry.ts:139-141`）当前**硬编码全量预热 3 个 lazy 包
-= 497.03 KiB gzip**，且有两个方向相反的失效模式：
+`warmUpVocabulary()` 曾经**硬编码全量预热 3 个 lazy 包 = 497.03 KiB gzip**，且有两个方向相反的失效模式：
 
 - **加包时不会自动加入** ⇒ 漏预热 ⇒ **首次离线切库失败**（用户离线状态下切到新包直接打不开）；
-- **手动加入又没有上限** ⇒ 流量**随包数线性膨胀**（现在 3 个包就已吃掉 600 KiB 预算的 83%）。
+- **手动加入又没有上限** ⇒ 流量**随包数线性膨胀**（3 个包就吃掉 600 KiB 预算的 83%）。
 
-**本轮未解决**（只做收口，不改架构）。记录待办：
+**已解决**：预热改为**清单驱动 + 长度硬顶**（P18-I）：
 
-> 在新增 GRE / Oxford 之前，必须先把 `warmUpVocabulary()` 从「全量 `allSettled`」改成
-> **「按需 + 限量」**（例如只预热当前包 + 最近使用的 N 个包，或按 600 KiB 预算截断）。
-> 否则包一多，必然二选一地踩中上面两个坑。
+- 唯一事实源 `src/core/content/registry.ts` 的 `WARMUP_IDS = ['kaoyan', 'toefl']`；
+- **新增任何大词库（GRE / Oxford / …）默认不进清单** ⇒ 预热预算不再随包数线性膨胀；
+- `scripts/check-bundle.mjs` 判据 6 守**清单长度上限 2** 与**棘轮基线**（只许降不许升，`--record-baseline`，清单变长时拒绝重记）；
+- 实测预热 gzip **330.02 KiB**（余量 45%，原 496.89 KiB / 17%）。
+
+> 仍**未**解决（属产品口径，见 `docs/p18/DECISIONS-POST-P18.md` §9.2.7）：
+> 「按用户最近使用排序」的真按需 —— 需要持久化与产品决策，本步未做，也不影响上述预算结论。
+> 另：`check-bundle` 判据由 5 项变 6 项（新增第 6 项），判据 3（预热字节预算）解析入口随之改为读 `WARMUP_IDS`。
 
 ---
 

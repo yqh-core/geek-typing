@@ -38,7 +38,7 @@
  *   node scripts/check-bundle.mjs              # 默认：构建后体积门禁（需先 npm run build）
  *   node scripts/check-bundle.mjs --falsify    # 自带证伪自检（证明判据 4/5 各分支能判红）
  */
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { gzipSync } from 'node:zlib'
 import ts from 'typescript'
@@ -62,11 +62,27 @@ const SCHEMA_TS = path.join(SRC_DIR, 'core', 'content', 'schema.ts')
 class Fatal extends Error {}
 
 const USAGE = `用法：
-  node scripts/check-bundle.mjs              # 构建后体积门禁（需先 npm run build）
-  node scripts/check-bundle.mjs --falsify    # 自带证伪自检（证明判据 4/5 各分支能判红）`
+  node scripts/check-bundle.mjs                    # 构建后体积门禁（需先 npm run build）
+  node scripts/check-bundle.mjs --falsify          # 自带证伪自检（证明判据 4/5/6 各分支能判红）
+  node scripts/check-bundle.mjs --record-baseline  # 重记预热清单长度棘轮基线（清单变长时拒绝）`
 
 /** 预热阈值（字节）。预热预算不在 gate-perf 预算表管辖内，保留本文件常量 */
 const WARM_GZIP_MAX = 600 * 1024
+
+/** 读预热清单长度的棘轮基线（缺失返回 null ⇒ 判据 6 记 UNKNOWN，不视为通过） */
+function loadWarmupBaseline() {
+  try {
+    const j = JSON.parse(readFileSync(WARMUP_BASELINE_JSON, 'utf8'))
+    return Number.isInteger(j?.warmupIdsMax) ? j.warmupIdsMax : null
+  } catch {
+    return null
+  }
+}
+
+/** 预热清单长度上限（门阈值）。预热是"离线可切大词库"的代价，扩词时代只许减不许增 */
+const WARMUP_MAX_IDS = 2
+/** 清单长度棘轮基线（由 `check-bundle --record-baseline` 落盘并随仓库提交；与 perf-baseline.json 同目录同源口径） */
+const WARMUP_BASELINE_JSON = path.join(ROOT, 'docs', 'audit-package', '_generated', 'warmup-ids-baseline.json')
 
 /** 主 chunk 阈值从 gate-perf 预算表读取（双基线取更严；输入缺失返回 null 由调用方判 UNKNOWN） */
 function mainChunkBudgets() {
@@ -156,22 +172,40 @@ function parseRegistryEntries(src) {
   return out
 }
 
-/** 解析 warmUpVocabulary 里被预热的包：loadXxx() 调用 → 反查注册项。
- *  用 lastIndexOf 锚定到函数**定义**（registry.ts 里首个 warmUpVocabulary 命中是
- *  第 6 行注释，截不到 allSettled([...])，会误判成「无预热」⇒ UNKNOWN；函数定义才是真身）。 */
+/** 解析 warmUpVocabulary 实际预热的包：读 registry.ts 的 WARMUP_IDS 常量数组（预热预算的唯一事实源）。
+ *
+ *  旧实现（抠 warmUpVocabulary 函数体里 `allSettled([...])` 的 `loadXxx()` 调用名 → 反查注册项）
+ *  是**多一层的间接解析**：loader 名 → 包名。它埋着两个坑 ——
+ *    ① 改造预热实现（改按需 / 清单化 / 数据驱动）会让判据**解析不到 ⇒ UNKNOWN ⇒ 不通过**；
+ *    ② 若哪天把「候选池」写进 allSettled（而不是「实际加热的」），判据会算了错的数字还照样判绿（假通过）。
+ *
+ *  改后：数组字面量里的字符串**就是 localId**，与注册项 localId 直接比对，解析面更窄也更硬。
+ *  解析不到（常量被删/改名/写成非字面量）⇒ 返回 null ⇒ 判据 3/6 记 UNKNOWN（**不视为通过**）。 */
 function parseWarmUpIds(src, entries) {
-  const at = src.lastIndexOf('function warmUpVocabulary')
-  if (at < 0) {
-    // 兜底：直接找调用点 void warmUpVocabulary() / 任意 warmUpVocabulary(...)，从其后取 allSettled
-    const callAt = src.indexOf('warmUpVocabulary(')
-    if (callAt < 0) return null
+  const m = /\bconst\s+WARMUP_IDS\s*=\s*\[([^\]]*)\]/.exec(src)
+  if (!m) return null
+  const ids = [...m[1].matchAll(/['"`]([^'"`]+)['"`]/g)].map((x) => x[1]).filter(Boolean)
+  if (ids.length === 0) return null
+  const known = new Set(entries.map((e) => e.id))
+  return ids.every((id) => known.has(id)) ? ids : null
+}
+
+/** 预热清单长度判定（纯函数，供判据 6 与 --falsify 共用；warmIds 为 null ⇒ 解析不到，记 UNKNOWN） */
+function evalWarmupIds(warmIds) {
+  const base = loadWarmupBaseline()
+  if (warmIds === null) {
+    return { status: 'UNKNOWN', msg: ` 无法确定 registry.ts 的 WARMUP_IDS 预热清单 ⇒ 清单长度上限与棘轮无法核算（不视为通过）` }
   }
-  const anchor = at >= 0 ? at : src.indexOf('warmUpVocabulary(')
-  const body = src.slice(anchor, anchor + 600)
-  const inner = /allSettled\(\[([\s\S]*?)\]\)/.exec(body)?.[1] ?? body
-  const calls = new Set([...inner.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(\s*\)/g)].map((m) => m[1]))
-  const ids = entries.filter((e) => e.loader && calls.has(e.loader)).map((e) => e.id)
-  return ids.length > 0 ? ids : null
+  if (warmIds.length > WARMUP_MAX_IDS) {
+    return { status: 'FAIL', msg: ` 预热清单长度 ${warmIds.length} > 上限 ${WARMUP_MAX_IDS}（清单 [${warmIds.join(', ')}]）：扩词时代预热只许减不许增` }
+  }
+  if (base === null) {
+    return { status: 'UNKNOWN', msg: ` 预热清单长度 ${warmIds.length}（[${warmIds.join(', ')}]）未超上限，但棘轮基线缺失 —— 先跑 node scripts/check-bundle.mjs --record-baseline 并提交该文件` }
+  }
+  if (base < warmIds.length) {
+    return { status: 'FAIL', msg: ` 预热清单长度 ${warmIds.length} > 基线 ${base}（棘轮只许降不许升）：清单 [${warmIds.join(', ')}]` }
+  }
+  return { status: 'PASS', msg: ` 预热清单长度 ${warmIds.length} ≤ 上限 ${WARMUP_MAX_IDS} 且 ≤ 基线 ${base}（清单 [${warmIds.join(', ')}]）` }
 }
 
 /* ---------------- 归属探测 ---------------- */
@@ -486,10 +520,13 @@ function collectInputs() {
   try { contentKeys = contentManifestKeyUnion() } catch { contentKeys = null }
 
   let entries = null
+  let warmIds = null
   try {
     const src = readFileSync(REGISTRY_TS, 'utf8')
     entries = parseRegistryEntries(src)
     if (!entries || entries.length === 0) entries = null
+    // warmIds 一并在此解析（判据 6 与 --falsify 共用同一入口：注入改的就是这个字段）
+    warmIds = entries ? parseWarmUpIds(src, entries) : null
   } catch { entries = null }
 
   const setsById = loadWordSets()
@@ -504,6 +541,7 @@ function collectInputs() {
     droppedProbes: DROPPED_MANIFEST_PROBES,
     retainedProbes: RETAINED_MANIFEST_PROBES,
     lazyProbes: entries ? collectLazyProbes(entries, setsById) : [],
+    warmIds,
   }
 }
 
@@ -514,6 +552,7 @@ function runPureChecks(inp) {
     j2: checkJ2(inp.mainText, inp.droppedProbes),
     j3: checkJ3(inp.mainText, inp.retainedProbes, RETAINED_PROBE_MIN),
     lazy: checkLazyLeak(inp.mainText, inp.lazyProbes),
+    warm: evalWarmupIds(inp.warmIds ?? null),
   }
 }
 
@@ -651,6 +690,13 @@ function main() {
   record(lazyLeak.status, 5, ` lazy 语义（registry 声明 lazy 的包不得 inline 进主 chunk）：${lazyLeak.msg}`)
   for (const l of lazyLeak.lines ?? []) console.log(l)
 
+  /* —— 6. 预热清单长度上限 + 棘轮（B 步 9.2）——
+   * 预热是「离线可切大词库」的代价，旧实现把三个库硬编码在函数体里且无上限 ⇒ 扩词即膨胀。
+   * 现在「预热哪些包」由 registry.ts 的 WARMUP_IDS 常量决定，本判据守两件事：
+   *   ① 长度不越过上限；② 长度不越过已落盘基线（棘轮，只许降不许升）。 */
+  const warmRes = runPureChecks(inp).warm
+  record(warmRes.status, 6, warmRes.msg)
+
   const bad = results.filter((r) => r.status !== 'PASS')
   if (bad.length > 0) {
     console.error(`\n[check-bundle] ${bad.some((r) => r.status === 'FAIL') ? 'FAIL' : 'UNKNOWN'}：${bad.map((r) => `第 ${r.no} 项 ${r.status}`).join('；')}（UNKNOWN 视为不通过）`)
@@ -665,11 +711,49 @@ function main() {
 function parseArgs(argv) {
   const args = argv.slice(2)
   let falsify = false
+  let recordBaseline = false
   for (const a of args) {
     if (a === '--falsify') { falsify = true; continue }
+    if (a === '--record-baseline') { recordBaseline = true; continue }
     throw new Fatal(`未知参数 ${JSON.stringify(a)} —— 本门不接受未知 flag，也不猜测其语义`)
   }
-  return { falsify }
+  return { falsify, recordBaseline }
+}
+
+/**
+ * 写入预热清单长度棘轮基线（判据 6 的另一半）。
+ * 与 gate-perf --record-baseline 同一心智模型：**基线换代时人工执行**，CI 里绝不重记。
+ * 硬约束：清单**变长**时一律拒绝借记基线 —— 否则棘轮可以被「重记一次」顶破，
+ * 这个口子一开，扩词时代预热预算就又回到「随包数线性膨胀」的老路。
+ */
+function recordWarmupBaseline() {
+  const src = readFileSync(REGISTRY_TS, 'utf8')
+  const entries = parseRegistryEntries(src)
+  if (!entries || entries.length === 0) throw new Fatal('registry.ts 解析不到任何注册项，拒绝记基线')
+  const ids = parseWarmUpIds(src, entries)
+  if (ids === null) throw new Fatal('registry.ts 解析不到 WARMUP_IDS 预热清单，拒绝记基线（先让判据 6 在干净树上跑绿）')
+
+  const prev = loadWarmupBaseline()
+  if (prev !== null && prev < ids.length) {
+    throw new Fatal(`预热清单长度从基线 ${prev} **变长**到 ${ids.length} —— 棘轮只许降不许升，禁止借记基线顶破（这是扩词膨胀的入口）`)
+  }
+  mkdirSync(path.dirname(WARMUP_BASELINE_JSON), { recursive: true })
+  writeFileSync(
+    WARMUP_BASELINE_JSON,
+    `${JSON.stringify(
+      {
+        warmupIdsMax: ids.length,
+        ids: [...ids],
+        recorded: new Date().toISOString(),
+        note: 'check-bundle --record-baseline 写入；清单只许降不许升，变长时重记会被拒绝',
+      },
+      null,
+      2,
+    )}\n`,
+  )
+  console.log(
+    `[check-bundle] 已记录预热清单长度基线：${ids.length}（${ids.join(', ')}）→ ${path.relative(ROOT, WARMUP_BASELINE_JSON)}`,
+  )
 }
 
 /* ---------------- 证伪自检 ----------------
@@ -678,7 +762,7 @@ function parseArgs(argv) {
  * 两组基线对照：不加任何故障时四个分支必须全 PASS（证明这套断言不是恒红的）。
  * ------------------------------------------------------------------ */
 
-const BRANCHES = ['j1', 'j2', 'j3', 'lazy']
+const BRANCHES = ['j1', 'j2', 'j3', 'lazy', 'warm']
 
 const FALSIFY_CASES = [
   {
@@ -731,6 +815,21 @@ const FALSIFY_CASES = [
       return { mainText: `${inp.mainText}\n/* ${subject.probes.join(' | ')} */\n` }
     },
   },
+  {
+    letter: 'W6a',
+    name: '往 WARMUP_IDS 清单里塞第三个包（模拟扩词时手滑把新库加进预热）',
+    why: '模拟「新增大词库进了预热清单」⇒ 判据 6 必须判红（长度超上限）；同时判据 3 的字节预算会被第 3 个共享分支不影响',
+    target: 'warm',
+    mutate: (inp) => ({ warmIds: [...(inp.warmIds ?? []), 'ielts'] }),
+  },
+  {
+    letter: 'W6b',
+    name: '把 WARMUP_IDS 清单抹掉（模拟改造实现时把常量改名/改成非字面量）',
+    why: '证明「清单消失」不是悄悄放行而是 UNKNOWN（本项目：UNKNOWN 视为不通过）；若实现成「解析不到就当没预热」就是假通过',
+    target: 'warm',
+    expect: 'UNKNOWN',
+    mutate: () => ({ warmIds: null }),
+  },
 ]
 
 function falsify() {
@@ -747,13 +846,13 @@ function falsify() {
   let bad = 0
   const lines = []
 
-  /* —— 对照组：不加故障时四分支必须全 PASS（否则后面「恰好判红」没有意义） —— */
+  /* —— 对照组：不加故障时全部分支必须全 PASS（否则后面「恰好判红」没有意义） —— */
   const baseNotPass = BRANCHES.filter((b) => base[b].status !== 'PASS')
   if (baseNotPass.length) {
     bad++
     lines.push(`  ✗ CTRL 基线对照未全绿：${baseNotPass.map((b) => `${b}=${base[b].status}`).join(', ')} —— 应先在干净树上跑通 npm run build && npm run check:bundle`)
   } else {
-    lines.push('  ✓ CTRL 基线对照：四分支 J1/J2/J3/lazy 全 PASS（断言非恒红）')
+    lines.push(`  ✓ CTRL 基线对照：${BRANCHES.length} 分支 ${BRANCHES.join('/')} 全 PASS（断言非恒红）`)
   }
 
   for (const c of FALSIFY_CASES) {
@@ -770,21 +869,28 @@ function falsify() {
       continue
     }
 
-    const targetOk = res[c.target].status === 'FAIL'
+    /* targetOk 的口径随用例而变：多数用例要求「判红(FAIL)」，
+     * 但「输入缺失/清单消失」这类注入正确结果是 UNKNOWN（本项目 UNKNOWN 视为不通过，
+     * 若实现成「解析不到就当没预热」就是假通过）—— 用 expect 区分，避免把 UNKNOWN 当失败。 */
+    const targetOk = c.expect === 'UNKNOWN'
+      ? res[c.target].status === 'UNKNOWN'
+      : c.expect === 'nonpass'
+        ? res[c.target].status !== 'PASS'
+        : res[c.target].status === 'FAIL'
     const othersUnchanged = BRANCHES.filter((b) => b !== c.target).every((b) => res[b].status === base[b].status)
-    const failedSet = BRANCHES.filter((b) => res[b].status === 'FAIL')
-    const exact = failedSet.length === 1 && failedSet[0] === c.target
+    const hitSet = BRANCHES.filter((b) => res[b].status !== 'PASS')
+    const exact = hitSet.length === 1 && hitSet[0] === c.target
     const exitCode = BRANCHES.some((b) => res[b].status !== 'PASS') ? 1 : 0
 
     if (targetOk && othersUnchanged && exact && exitCode !== 0) {
-      lines.push(`  ✓ ${c.letter} 目标分支 ${c.target} 恰好判红（命中集 {${failedSet.join(',')}}），其余分支状态不变，整门 exit=${exitCode}`)
+      lines.push(`  ✓ ${c.letter} 目标分支 ${c.target} 恰好非 PASS（命中集 {${hitSet.join(',')}} = ${res[c.target].status}），其余分支状态不变，整门 exit=${exitCode}`)
       lines.push(`      ${c.name}`)
       lines.push(`      ${res[c.target].msg}`)
     } else {
       bad++
       lines.push(
-        `  ✗ ${c.letter} 未达预期：target=${c.target} status=${res[c.target].status}（应为 FAIL）；` +
-          `命中集 {${failedSet.join(',') || '∅'}}（应恰为 {${c.target}}）；其余分支${othersUnchanged ? '不变' : '被越界影响'}；exit=${exitCode}（应非 0）`,
+        `  ✗ ${c.letter} 未达预期：target=${c.target} status=${res[c.target].status}（应为 ${c.expect === 'UNKNOWN' ? 'UNKNOWN' : 'FAIL'}）；` +
+          `命中集 {${hitSet.join(',') || '∅'}}（应恰为 {${c.target}}）；其余分支${othersUnchanged ? '不变' : '被越界影响'}；exit=${exitCode}（应非 0）`,
       )
     }
   }
@@ -802,8 +908,9 @@ function falsify() {
 /* ---------------- 入口 ---------------- */
 
 try {
-  const { falsify: wantFalsify } = parseArgs(process.argv)
-  if (wantFalsify) falsify()
+  const { falsify: wantFalsify, recordBaseline: wantBaseline } = parseArgs(process.argv)
+  if (wantBaseline) recordWarmupBaseline()
+  else if (wantFalsify) falsify()
   else main()
 } catch (e) {
   if (e instanceof Fatal) {

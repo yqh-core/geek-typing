@@ -591,7 +591,7 @@ Oxford 30000 词 → **1854 KiB（×13.4）**。
 | 19 | inline 预算：inline 包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB** | 1000 词 / 64 KiB | 346 词 / 37.15 KiB | 不红 | `content:validate` |
 | 20 | 策略一致性：`offline.policy` 与 `registry.ts` 实际加载方式一致（`words:` ↔ inline，`load:` ↔ lazy） | 10/10 | 10/10 | 不红 | `content:validate` |
 | 21 | 主 chunk 体积：raw ≤ **420 KiB**、gzip ≤ **135 KiB** | 420 / 135 KiB | 381.06 / 118.89 KiB | 不红（10.2% / 12.0%） | `check:bundle` |
-| 22 | 预热预算：`warmUpVocabulary` 列入的包 gzip 总量 ≤ **600 KiB** | 600 KiB | 497.03 KiB | 不红（余量仅 **17%**） | `check:bundle` |
+| 22 | 预热预算：`warmUpVocabulary` 列入的包 gzip 总量 ≤ **600 KiB** | 600 KiB | 330.02 KiB（清单 `[kaoyan, toefl]`） | 不红（余量 **45%**） | `check:bundle` |
 
 > **第 21 条是抓 inline 误用的，不是抓 lazy 增长的**：
 > 加 5 个 lazy 包只到 **387.6 KiB**（阈值内，不该红）；inline 一个 **500 词小包 +78 KiB**（立刻撞线，必须红）。
@@ -602,7 +602,8 @@ Oxford 30000 词 → **1854 KiB（×13.4）**。
 ```
 1) 决定 policy：词数 > 1000 或 words.json > 64 KiB ⇒ 必须 lazy
 2) registry.ts 用 load: () => import('...?raw')，不要用 words:
-3) 若走 lazy，评估是否加入 warmUpVocabulary（注意 600 KiB 预热预算）
+3) 若走 lazy，评估是否加入 `WARMUP_IDS` 预热清单（**只预热 2 个，新库默认不入清单**；
+   加入即占字节预算，且需 `check:bundle` 判据 6 放行 —— 清单变长会被棘轮基线拒绝，详见 `CONTENT_CONTRACT.md` §13.7）
 4) 跑 npm run check:bundle 确认主 chunk 未越界
 5) 跑 npm run content:validate（第 18 / 19 / 20 项）
 ```
@@ -611,11 +612,11 @@ Oxford 30000 词 → **1854 KiB（×13.4）**。
 
 - **免费检测信号**：构建器自带的 `INEFFECTIVE_DYNAMIC_IMPORT` 警告 = 有人把本该 lazy 的包写成了
   static import。本轮对照实验中它**当场触发**。**看到必须当缺陷处理，不许忽略。**
-- 🔴 **预热预算是最薄弱的一环（本轮未解决，属待办）**：
-  `warmUpVocabulary()`（`src/core/content/registry.ts:139-141`）当前硬编码全量预热 3 个 lazy 包
-  = **497.03 KiB gzip**，已吃掉 600 KiB 预算的 83%。加包时它**不会自动加入**（漏预热 ⇒ 首次离线切库失败），
-  手动加入又**没有上限**（流量随包数线性膨胀）。
-  在新增 GRE / Oxford 之前，必须先把它从「全量 `allSettled`」改成「按需 + 限量」。
+- ✅ **预热预算已收口（B 步 9.2，见 `CONTENT_CONTRACT.md` §13.7）**：
+  `warmUpVocabulary()` 改为清单驱动 + 长度硬顶 —— `WARMUP_IDS = ['kaoyan', 'toefl']`
+  （`src/core/content/registry.ts`），实测 **330.02 KiB / 600 KiB（余量 45%）**。
+  新增 GRE / Oxford 等大词库**默认不入清单** ⇒ 预算不再随包数线性膨胀；
+  `check:bundle` 判据 6 守「长度 ≤ 2」与棘轮基线（只许降不许升，`--record-baseline` 在清单变长时拒绝重记）。
 - **UI 不得破坏懒加载边界**（见契约 §12.5）：页面初始化时同步 `import` 任何 `words.json`、
   或把 lazy 包强制拉进主 chunk，都会被 `check:bundle` 判红。
 
@@ -626,7 +627,7 @@ Oxford 30000 词 → **1854 KiB（×13.4）**。
 | **P0.6.1**（本轮收口） | 只钉边界不新增架构：C-6（id 保留原词形）/ L-6·L-7 事实订正 / §12 P1 UI Contract / §13 Content Loading Strategy + 五条阈值 |
 | **P1 词汇产品化** | Catalog → Package Explorer → Search → Word List → Word Detail → Start Learning，把已有的 Query Layer 接到 UI 上（守 §12 防腐层，不破坏 §13 懒加载边界） |
 | **P1.5 Learning ContentId 迁移** | 运行时键从**裸 `word`** 迁到 `contentId`（+ version/checksum）；**存在不可逆信息损失**（2323 个跨包同名词无法定归属），按契约 §10.1 三档规则执行 |
-| **P2 内容规模化 / 导入体系** | 大词库批量接入（GRE / Oxford / Cambridge…），全部走 lazy；先解决 `warmUpVocabulary` 预热预算 |
+| **P2 内容规模化 / 导入体系** | 大词库批量接入（GRE / Oxford / Cambridge…），全部走 lazy；`warmUpVocabulary` 预热预算已于 B 步 9.2 收口（新库默认不入清单，无需再排队处理） |
 | **P3 Audio / Reading / Asset** | Topic / Audio / Reading 接入 + Asset 实体落地（模型已在 P1.8-B 定稿，见后置项） |
 
 **P1 的硬原则：不再造新的抽象 / 目录 / Framework / Repository / Service。**

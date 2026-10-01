@@ -2,8 +2,8 @@
  *
  * 原则：
  *  - UI 永远不感知内容来自 JSON / TS / GitHub / CDN / IndexedDB —— 只经本文件与 query 层；
- *  - 小库（curated + CET）inline 同步可用；三大库（ielts/kaoyan/toefl）lazy 动态 chunk，
- *    SW 空闲期预热（main.tsx → warmUpVocabulary）；
+ *  - 小库（curated + CET）inline 同步可用；大库（ielts/kaoyan/toefl…）lazy 动态 chunk，
+ *    其中 **WARMUP_IDS 清单内的包**由 main.tsx 空闲期预热（清单本体在本文件末尾，见 warmUpVocabulary）；
  *  - 词条以 `?raw` 导入 + 运行时 JSON.parse，规避 tsc 对大 JSON 的字面量类型推断；
  *  - 加载结果单份缓存（loadPackage），兼容层与查询层共享，不重复占用内存。
  *
@@ -216,7 +216,19 @@ export function hasFeature(packageId: string, feature: string): boolean {
   return getPackage(packageId)?.manifest.features[feature] === true
 }
 
-/** SW 空闲期预热（main.tsx）：预拉三大库 chunk 入 SW 缓存，保证首次离线可切大词库 */
+/* ---------------- 预热清单（预热预算的唯一事实源） ----------------
+ * 旧实现把 `loadIelts()/loadKaoyan()/loadToefl()` 直接写死在函数体里，且**没有上限** ——
+ * 每新增一个 lazy 词库就只能靠人记得「要不要手动加一行」，预热因此随包数线性膨胀
+ * （三库合计已占 600 KiB 预算的 82.8%）。
+ *
+ * 改造要点（B 步 9.2）：
+ *   1. 预热哪些包 = 本数组，**运行时不得自行扩张**（新增大词库默认不入清单 ⇒ 预算不自动爆）；
+ *   2. 本数组被 `scripts/check-bundle.mjs` 判据 3 以同语法解析 —— 判据算的就是这份清单，
+ *      而不是「候选集 / 全注册表」；清单若消失 ⇒ 判 UNKNOWN（不视为通过，绝不悄悄放行）；
+ *   3. 「预热哪些」由常量决定（可被判据独立读取），「先预热哪个」留给运行时排序（不影响预算核算）。 */
+export const WARMUP_IDS = ['kaoyan', 'toefl'] as const
+
+/** SW 空闲期预热（main.tsx）：按清单预拉词库 chunk 入 SW 缓存，保证首次离线可切大词库 */
 export function warmUpVocabulary(): Promise<unknown> {
-  return Promise.allSettled([loadIelts(), loadKaoyan(), loadToefl()]).catch(() => {})
+  return Promise.allSettled(WARMUP_IDS.map((id) => getPackage(id)?.load?.())).catch(() => {})
 }
