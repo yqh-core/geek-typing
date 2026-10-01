@@ -1330,35 +1330,63 @@ async function run() {
   // 预热探针（P18-B 遗留项 9.2 收口）：验证「registry.ts 的 WARMUP_IDS 清单里的包，
   // 真的被 idle 预热拉进 SW 缓存」—— 期望值从清单派生，不写死包数。
   //
-  // 三个必须说清的点：
+  // 四个必须说清的点：
   //  ① 期望值从哪来：readWarmUpIds() 解析 registry.ts 的 WARMUP_IDS，与
   //     scripts/check-bundle.mjs 判据 3/6 共用 scripts/content/warmup-ids.mjs 的同一份解析实现。
   //     清单变长/变短 ⇒ 期望值跟着变；清单解析不到 ⇒ 期望值 0 ⇒ 立刻判红（绝不放行）。
-  //  ② 为什么先清空 SW 缓存：words chunk 的文件名是 `words-<hash>.js`，**不带包名**，
-  //     所以只能按数量判、没法按名字判归属。若不清缓存，本套件【15】的 `:bank kaoyan`
-  //     等懒加载用例会把 chunk 塞进同一个 SW 缓存 ⇒ 即使 warmUpVocabulary 被整个删掉，
-  //     探针也会看到 2 个 chunk 而**假通过**。清空后本页（移动端上下文从不切词库）
-  //     缓存里的 words chunk 只可能来自 idle 预热本身。
-  //  ③ 预算 240×500ms=120s：CI runner 首次无缓存、跨公网拉清单内的 words-*.js（合计约 1 MB）
-  //     时，「下载 + SW 写入缓存」可能远超本地；原 30s 预算在 CI 上被判定为下一个红灯风险
+  //  ② 判据为什么仍然成立（**不再清缓存 + 重新加载**，这是本轮改的重点）：
+  //     words chunk 的文件名是 `words-<hash>.js`，**不带包名**，所以只能按数量判、没法按名字判归属。
+  //     本探针跑在 mctx 这个**新开浏览器上下文**（tests/e2e.mjs:1320，独立 profile ⇒ 独立 SW 缓存），
+  //     而这个上下文只服务【14】的移动端手势用例、**从不切词库** ⇒ 缓存里的 words chunk
+  //     只可能来自 idle 预热本身 —— 也就是说「清空缓存防污染」那层保险在**当前顺序下是多余的**
+  //     （套件【15】用的是主上下文 tests/e2e.mjs:208，两边根本共享不到）。
+  //     证伪性质不因此削弱：把 main.tsx 的 warmUpVocabulary 整个删掉 ⇒ 这个上下文再也不会
+  //     拉 words chunk ⇒ 0 hits ⇒ 照样判红。本探针验的仍是「清单内的包真的被 idle 预热拉进缓存」。
+  //  ③ 预算 240×500ms=120s：CI runner 首次无缓存、拉清单内的 words-*.js（合计约 1 MB）时，
+  //     「下载 + SW 写入缓存」可能远超本地；原 30s 预算在 CI 上被判定为下一个红灯风险
   //     （见 CI run 36308273299 复盘）。提到 4 倍余量：仍能在合理时间内失败，不会无限等待。
   //     生产环境即使并发抢带宽 >18s 也远在预算内。
+  //  ④ 为什么先按状态等 SW 接管、以及为什么不再 reload：
+  //     CI 上本探针 flaky（同一份 src 三笔：绿 515941c / 红 e4b6674 / 绿 1f46ab9，
+  //     红的那次 09:09:50 起跑、09:11:50 报错，整 120s 跑满、0 个 words chunk、其余 169 项全过）。
+  //     ⚠️ 根因**没有**定死，下面两条都是实测到的，不要当成已证：
+  //       - 「不等接管就 reload ⇒ 未接管页面的动态 import 不经过 SW fetch handler ⇒ chunk 永不入缓存」
+  //         这条机制是真的（`src/main.tsx` 的 warmBanks 那段注释本就在防它），但**不是唯一原因**：
+  //          改成「先按状态等接管（上限 30s）再 reload」之后，独立证伪脚本仍然稳定复现 0 hits，
+  //          且诊断显示那时 `navigator.serviceWorker.controller` 恒为 false、`gt-shell-v3` 全程没建出来。
+  //       - 于是本轮不再去追那个 reload 竞态，而是**直接把 reload 这一步删掉**（见 ②）：
+  //         它既没在防假通过（② 已证），本身又是唯一能让 SW 控制丢失的操作。
+  //         按状态等接管 ≠ 按时间干等：接管了立刻往下走，慢机器上也不白等；等不到走「前提不成立」分支。
   const warmIds = readWarmUpIds(process.cwd())
-  await mpage.evaluate(async () => {
-    const names = await caches.keys()
-    await Promise.all(names.map((n) => caches.delete(n)))
-  })
+  const waitForSwControl = async () => {
+    const t0 = Date.now()
+    for (;;) {
+      const st = await mpage
+        .evaluate(() => ({ has: 'serviceWorker' in navigator, ctrl: !!navigator.serviceWorker.controller }))
+        .catch(() => ({ has: false, ctrl: false }))
+      if (st.ctrl) return { ok: true, ms: Date.now() - t0 }
+      if (Date.now() - t0 > 30000) return { ok: false, ms: Date.now() - t0, has: st.has }
+      await mpage.waitForTimeout(250)
+    }
+  }
   await gotoPage(mpage)
-  await waitForTestId(mpage, 'tab-memorize') // 清缓存后重新挂载，把 idle 预热的起跑点对齐到这里
+  await waitForTestId(mpage, 'tab-memorize')
+  // 只等状态、不做第二次 goto（原因见上面 ②/④）；warmup 会在 load → requestIdleCallback 之后自行起跑
+  const swCtrl = await waitForSwControl()
   const warmProbe =
     warmIds === null
       ? // 清单解析不到 ⇒ 期望包数无法确定 ⇒ 直接判红（与 check-bundle 判据 3/6 的 UNKNOWN 同口径：测不出来 ≠ 通过）
         Promise.resolve({ ok: false, hits: [], why: 'registry.ts 的 WARMUP_IDS 解析不到' })
       : mpage.evaluate(async (need) => {
+          // 诊断字段：失败时必须能区分「SW 没接管 / 缓存没建出来」这类**测不到**，
+          // 和「预热真没把 chunk 写进缓存」这类**测到没通过** —— 混成一句「超时」就又变回不可复核的红灯。
+          const diag = { sawCache: false, ctrl: false }
           for (let i = 0; i < 240; i++) {
             try {
+              diag.ctrl = !!navigator.serviceWorker.controller
               const names = await caches.keys()
               if (names.includes('gt-shell-v3')) {
+                diag.sawCache = true
                 const cache = await caches.open('gt-shell-v3')
                 const urls = (await cache.keys()).map((r) => r.url)
                 // V4-P0：大词库 chunk 从模块名(ielts-*.js)变为 ?raw JSON 命名(words-*.js)
@@ -1370,7 +1398,7 @@ async function run() {
             }
             await new Promise((r) => setTimeout(r, 500))
           }
-          return { ok: false, hits: [], why: '轮询 120s 超时' }
+          return { ok: false, hits: [], diag, why: '轮询 120s 超时' }
         }, warmIds.length)
 
   await mpage.click('[data-testid="tab-memorize"]')
@@ -1495,9 +1523,18 @@ async function run() {
   const warm = await warmProbe
   const warmIdsTxt = warmIds === null ? '（清单解析不到）' : `[${warmIds.join(', ')}]`
   check(
+    '预热探针前提：SW 已接管页面（controller 存在，预热的 chunk 才会经 fetch handler 入库）',
+    swCtrl.ok,
+    `等接管 ${swCtrl.ms}ms${swCtrl.ok ? '' : `（30s 内没等到，serviceWorker 存在=${swCtrl.has} ⇒ 探针前提不成立，下面的预热结论也不作数）`}`,
+  )
+  check(
     `预热探针：SW 缓存含 WARMUP_IDS 全部 chunk（${warmIdsTxt}）`,
     warm.ok,
-    [warm.why, `${warm.hits.length} 个 words chunk：${warm.hits.map((u) => u.split('/').pop()).join(', ')}`]
+    [
+      warm.why,
+      `${warm.hits.length} 个 words chunk：${warm.hits.map((u) => u.split('/').pop()).join(', ')}`,
+      warm.diag ? `观测：SW 接管=${warm.diag.ctrl} / gt-shell-v3 出现过=${warm.diag.sawCache}` : '',
+    ]
       .filter(Boolean)
       .join(' — '),
   )
