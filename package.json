@@ -56,6 +56,9 @@
     "gate:content-type-contract:falsify": "node scripts/gate-content-type-contract.mjs --falsify",
     "gate:license": "node scripts/gate-license.mjs",
     "gate:license:falsify": "node scripts/gate-license.mjs --falsify",
+    "gate:lint": "node scripts/gate-lint.mjs",
+    "gate:lint:falsify": "node scripts/gate-lint.mjs --falsify",
+    "gate:lint:baseline": "node scripts/gate-lint.mjs --record-baseline",
     "audit:a11y": "node scripts/audit-a11y-viewports.mjs",
     "release:gate": "node scripts/verify-release-gate.mjs"
   },

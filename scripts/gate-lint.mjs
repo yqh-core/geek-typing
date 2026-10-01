@@ -36,20 +36,36 @@ const BASELINE = join(ROOT, 'docs', 'p18', '_generated', '_baselines', 'lint-war
 
 /** 证伪注入用的临时文件：放在 scripts/ 下，必定被 oxlint 扫到 */
 const FALSIFY_TMP = join(ROOT, 'scripts', '_gate_lint_falsify_tmp.mjs')
-/** 一个必然被 no-unused-vars 命中的最小文件（文件名本身不触发任何额外规则） */
+/**
+ * 证伪注入用最小文件（用完即删）：一个**真没被用上**的顶层 const + 一个被用到的 import。
+ *
+ * ⚠️ 注入内容必须真的产生诊断，否则「证伪」会变成一条永远绿的自检 —— 这个坑我踩过一次：
+ * 第一版写成 `import { readFileSync } from 'node:fs'\nexport default readFileSync`，
+ * 结果 readFileSync 在 export 里被用掉了、没有未用绑定 ⇒ oxlint 报 0 条 ⇒ 判据看似 PASS，
+ * 实际是注入失效。判定 `no-unused-vars` 时请先看 `--falsify` 的输出里有没有
+ * 「证伪① OK：… ⇒ FAIL」这一行，没有就是注入没生效，不是判据通过。
+ */
 const FALSIFY_TMP_SRC = `// 证伪注入用临时文件（gate-lint --falsify 用完即删）
+import { readFileSync } from 'node:fs'
 const gateLintFalsifyUnused = 1
-export default gateLintFalsifyUnused
+console.log(readFileSync)
+export default 1
 `
 
 /* ------------------------------- measure ------------------------------- */
 
 /** 跑 oxlint 的 JSON 输出，解析 diagnostics[]。任何异常都抛（宁可 UNKNOWN 也不猜一个假数）。 */
 function measure() {
-  const r = spawnSync(process.execPath, ['node_modules/oxlint/bin/oxlint.js', '--format=json'], {
-    cwd: ROOT,
-    encoding: 'utf8',
-  })
+  // 必须用 `node <path>` 调 node_modules/oxlint/bin/oxlint：
+  // 它本体是个 ESM node 脚本（`#!/usr/bin/env node` + `import "../dist/cli.js"`），
+  // 既不是 .js 也不是原生 exe —— 直接 spawn 这个无扩展名文件会得到 ENOENT，
+  // 直接 node 它但路径写错（写成 bin/oxlint.js）会拿到 loader 报错、stdout 不是 JSON。
+  // 有 warnings 时 oxlint exit=1，那是正常的「扫到东西」，只看输出不看退出码。
+  const r = spawnSync(
+    process.execPath,
+    [join('node_modules', 'oxlint', 'bin', 'oxlint'), '--format=json'],
+    { cwd: ROOT, encoding: 'utf8' }
+  )
   if (r.error) throw r.error
   // oxlint 有 warnings 时退出码为 1，那是正常的「扫到东西」；这里只看输出。
   const out = r.stdout || ''

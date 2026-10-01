@@ -159,6 +159,36 @@ oxlint 默认对 `_` 前缀放行（`argsIgnorePattern` 类配置）—— 实�
 > 与既有门的边界：这条判据**不改动** `npm run lint` 的行为（仍 EXIT=0），
 > 只在外面包一层基线比对 —— 避免"为了让门绿去关规则"这种反向激励。
 
+### 3.1 L1 已实施（`scripts/gate-lint.mjs`，2026-10-01）
+
+npm 脚本：`gate:lint` / `gate:lint:falsify` / `gate:lint:baseline`。基线落在
+`docs/p18/_generated/_baselines/lint-warnings.json`（随仓库提交，共 10 条）。
+
+实测三条行为：
+
+| 情形 | 结果 |
+|---|---|
+| 当前 10 == 基线 10 | ✅ PASS，EXIT=0 |
+| 临时塞一个未用绑定 ⇒ 11 条 | ❌ FAIL「总数 11 > 基线 10」，EXIT=1 |
+| 把基线人为改成 5 再 `--record-baseline` | ❌ **拒绝**，EXIT=1（棘轮只许降不许升，不许靠改基线掩盖） |
+| 删基线文件 | ⚠️ UNKNOWN，EXIT=2（**缺基线不算放行**） |
+
+`--falsify` 自带两条注入，实跑均成立：注入致红（11 条 ⇒ FAIL）、删基线致 UNKNOWN。
+
+**踩到的坑（必须写下来，否则下次自检会假装通过）**：第一版证伪注入写的是
+`import { readFileSync } from 'node:fs'\nexport default readFileSync` ——
+`readFileSync` 在 `export default` 里**被用掉了**，根本没有未用绑定，
+于是 oxlint 报 0 条、判据照常 PASS，自检"全绿"但**注入根本没生效**。
+判定 `--falsify` 时只看有没有 `证伪① OK：… ⇒ FAIL` 这行输出；
+没这行就是注入失效，不是判据通过。**顺带纠正一个错误结论**：当时据此以为
+"oxlint 1.85 只对未用 import 报、顶层 const 不报" —— 那是误读，真正未用的顶层 const
+照样报（把 `export default readFileSync` 换成 `export default 1` 就报了）。
+
+**另一个实现细节**：`oxlint` 的可执行入口是 `node_modules/oxlint/bin/oxlint`，
+它本体是个 **ESM node 脚本**（`#!/usr/bin/env node` + `import "../dist/cli.js"`），
+既不是 `.js` 也不是原生 exe —— 直接 `spawnSync` 这个无扩展名文件拿 ENOENT，
+写成 `bin/oxlint.js` 会拿到 loader 报错、stdout 不是 JSON。只能 `node <path> --format=json`。
+
 ---
 
 ## 4. 9.6 / 9.7 两项遗留（本阶段一并收）
