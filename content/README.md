@@ -502,7 +502,7 @@ Raw → Normalize → Validate → Build → Index → Manifest → Content Regi
     `checksum === contentChecksum` 的条目（取最近一条），其 `version === contentVersion`、
     `1 ≤ revision ≤ contentRevision`（回滚场景：version 回到历史值，revision 只增不减）
 17. `build` 存在且 `toolVersion` 非空字符串、`builtAt` 可被 `Date.parse`、`sourceChecksum === contentChecksum`
-18. **manifest 体积**：单包 < **8 KiB**、全库 < **40 KiB**（当前实测：最大 1.40 KiB、总计 13.08 KiB）
+18. **manifest 体积**：单包 < **8 KiB**、全库 < **40 KiB**（当前实测：最大 1.78 KiB、总计 24.28 KiB）
 19. **inline 预算**：`offline.policy === 'inline'` 的包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB**（当前实测：5 包，Σ 296 词 / 33.65 KiB）
 20. **策略一致性**：manifest 的 `offline.policy` 必须与 `registry.ts` 实际加载方式一致 —— `words:` ↔ inline，`load:` ↔ lazy（当前 18/18：inline 5 / lazy 13）
 
@@ -582,7 +582,8 @@ manifest 只装元数据、**与词数无关**（实测单包 1.25–1.40 KiB，
 
 增量与 kaoyan `words.json` 的 **471.70 KiB** 呈**字节级 1:1.0005 全额传导** —— 词表一字节不落地进主 chunk。
 
-反向实验（清空 7 个 inline 包词表再 build）：主 chunk 390.20 → 353.10 kB、gzip 123.07 → 107.90 kB
+反向实验（清空**当时全部** 7 个 inline 包词表再 build；9.5 后 inline 只剩 5 包）：
+主 chunk 390.20 → 353.10 kB、gzip 123.07 → 107.90 kB
 ⇒ **7 个 inline 词表占主 chunk 37.10 kB raw / 15.17 kB gzip**。
 
 外推：任一大包做成 inline（系数 **157.3 KiB/千词 raw、55.5 KiB/千词 gzip**）——
@@ -596,10 +597,10 @@ Oxford 30000 词 → **1854 KiB（×13.4）**。
 
 | # | 断言 | 阈值 | 当前实测 | 余量 | 守护者 |
 |---|---|---|---|---|---|
-| 18 | manifest 体积：单包 < **8 KiB**，全库 < **40 KiB** | 8 / 40 KiB | 最大 1.40 / 总 13.08 KiB | 不红（5.7× / 3.1×） | `content:validate` |
+| 18 | manifest 体积：单包 < **8 KiB**，全库 < **40 KiB** | 8 / 40 KiB | 最大 1.78 / 总 24.28 KiB | 不红（4.5× / 1.65×） | `content:validate` |
 | 19 | inline 预算：inline 包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB** | 1000 词 / 64 KiB | 5 包 Σ 296 词 / 33.65 KiB | 不红 | `content:validate` |
 | 20 | 策略一致性：`offline.policy` 与 `registry.ts` 实际加载方式一致（`words:` ↔ inline，`load:` ↔ lazy） | 18/18 | 18/18（inline 5 / lazy 13） | 不红 | `content:validate` |
-| 21 | 主 chunk 体积：raw ≤ **420 KiB**、gzip ≤ **135 KiB** | 420 / 135 KiB | 381.06 / 118.89 KiB | 不红（10.2% / 12.0%） | `check:bundle` |
+| 21 | 主 chunk 体积：raw ≤ **439.45 KiB**、gzip ≤ **141.60 KiB**（分层预算生效层 = `ABSOLUTE_BUDGET`，见 `check-bundle.mjs:98`） | 439.45 / 141.60 KiB | 424.47 / 134.61 KiB | ⚠️ 不红但**余量只剩 3.4% / 4.9%**（2026-10-01 `9b468e0` 后 fresh build 实测） | `check:bundle` |
 | 22 | 预热预算：`warmUpVocabulary` 列入的包 gzip 总量 ≤ **600 KiB** | 600 KiB | 330.02 KiB（清单 `[kaoyan, toefl]`） | 不红（余量 **45%**） | `check:bundle` |
 
 > **第 21 条是抓 inline 误用的，不是抓 lazy 增长的**：

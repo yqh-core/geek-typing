@@ -802,8 +802,13 @@ manifest 只装元数据，**与词数无关**（实测单包 1.25–1.40 KiB，
 | 3 个 lazy chunk | 464.04 / 471.22 / 471.76 KiB raw；163.12 / 166.96 / 166.95 KiB gzip |
 | 10 个 manifest 总计 | **13.08 KiB raw / 2.21 KiB gzip**（单包 **1.25–1.40 KiB**，**与词数无关**） |
 
-包分布：7 个 inline（`ai-core` / `cloud-native` / `frontend` / `cet4` / `cet6` / `ts-code` / `go-code`，
-共 **346 词 / 37.15 KiB**）、3 个 lazy（`ielts` / `kaoyan` / `toefl`，各 **3000 词 / 约 471 KiB**）。
+包分布：**5 个 inline**（`ai-core` / `cet4` / `cet6` / `ts-code` / `go-code`，
+共 **296 词 / 33.65 KiB**）
++ **13 个 lazy**（`cloud-native` / `frontend` / `ielts` / `kaoyan` / `toefl` 五个词表包
++ 8 个 `items` 试金石包；其中 `ielts` / `kaoyan` / `toefl` 各 **3000 词 / 约 471 KiB**，
+`cloud-native` **30 词 / 1.55 KiB**、`frontend` **20 词 / 0.97 KiB**）。
+（`frontend` / `cloud-native` 在 B 步 9.5 由 inline 改 lazy，**依据见
+`docs/p18/DECISIONS-POST-P18.md` §9.5**，不是笔误。）
 
 ### 13.3 对照实验（硬证据：inline 是 1:1 全额传导，不是「大约」）
 
@@ -818,7 +823,8 @@ manifest 只装元数据，**与词数无关**（实测单包 1.25–1.40 KiB，
 - 增量与 kaoyan `words.json` 的 **471.70 KiB** 呈**字节级 1:1.0005 全额传导** —— 词表一字节不落地进主 chunk；
 - rolldown **当场报 `INEFFECTIVE_DYNAMIC_IMPORT` 警告**（见 13.6）。
 
-第二组实验（把 7 个 inline 包词表临时清空再 build）：主 chunk 390.20 → 353.10 kB，
+第二组实验（把**当时全部** 7 个 inline 包词表临时清空再 build；9.5 后 inline 只剩 5 包）：
+主 chunk 390.20 → 353.10 kB，
 gzip 123.07 → 107.90 kB ⇒ **7 个 inline 词表占主 chunk 37.10 kB raw / 15.17 kB gzip**。
 
 ### 13.4 未来推算
@@ -841,10 +847,10 @@ gzip 123.07 → 107.90 kB ⇒ **7 个 inline 词表占主 chunk 37.10 kB raw / 1
 
 | # | 断言 | 阈值 | 当前实测 | 余量 |
 |---|---|---|---|---|
-| 18 | manifest 体积：单包 < **8 KiB**，全库 < **40 KiB** | 8 / 40 KiB | 最大 **1.40** / 总 **13.08 KiB** | 不红（**5.7× / 3.1×**） |
-| 19 | inline 预算：`offline.policy==='inline'` 的包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB** | 1000 词 / 64 KiB | **346 词 / 37.15 KiB** | 不红 |
-| 20 | 策略一致性：manifest 的 `offline.policy` 必须与 `registry.ts` 实际加载方式一致（`words:` ↔ inline，`load:` ↔ lazy） | 10/10 | **10/10** | 不红 |
-| 21 | 主 chunk 体积：raw ≤ **420 KiB** 且 gzip ≤ **135 KiB** | 420 / 135 KiB | **381.06 / 118.89 KiB** | 不红（**10.2% / 12.0%**） |
+| 18 | manifest 体积：单包 < **8 KiB**，全库 < **40 KiB** | 8 / 40 KiB | 最大 **1.78** / 总 **24.28 KiB** | 不红（**4.5× / 1.65×**） |
+| 19 | inline 预算：`offline.policy==='inline'` 的包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB** | 1000 词 / 64 KiB | **5 包 Σ 296 词 / 33.65 KiB** | 不红 |
+| 20 | 策略一致性：manifest 的 `offline.policy` 必须与 `registry.ts` 实际加载方式一致（`words:` ↔ inline，`load:` ↔ lazy） | 18/18 | **18/18（inline 5 / lazy 13）** | 不红 |
+| 21 | 主 chunk 体积：raw ≤ **439.45 KiB** 且 gzip ≤ **141.60 KiB**（分层预算生效层 = `ABSOLUTE_BUDGET`，见 `check-bundle.mjs:98`） | 439.45 / 141.60 KiB | **424.47 / 134.61 KiB** | ⚠️ 不红但**余量只剩 3.4% / 4.9%**（2026-10-01 `9b468e0` 后 fresh build 实测） |
 | 22 | 预热预算：被 `warmUpVocabulary` 列入的包 gzip 总量 ≤ **600 KiB** | 600 KiB | **330.02 KiB**（清单 `[kaoyan, toefl]`） | 不红（余量 **45%**） |
 
 第 **18 / 19 / 20** 项由 `content:validate` 守护（门禁从 17 项扩到 **20** 项）；
