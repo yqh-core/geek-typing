@@ -37,13 +37,22 @@ import type {
   SplitSnapshot,
 } from './types'
 
-import { KEY_BACKUP, KEY_LEARNING_V2, KEY_LETTER_STATS, KEY_MIGRATION, KEY_TOTALS } from './storage'
+import {
+  IN_SCOPE_KEYS,
+  KEY_BACKUP,
+  KEY_LEARNING_V2,
+  KEY_LETTER_STATS,
+  KEY_MIGRATION,
+  KEY_TOTALS,
+} from './storage'
 
 export const MIGRATOR_VERSION = 'learning-migrator/1.0.0'
 export const REPORT_VERSION = 1 as const
 
-/** 参与迁移的源键与其承载的学习维度（§2.1） */
-export const IN_SCOPE_KEYS = ['gt.review.v1', 'gt.memorize.v1', 'gt.analytics.v1', 'gt.customBanks.v1'] as const
+/* 源键族已从 storage.ts 迁来（upgrade.ts 要在同步路径判「是否需要迁移」，
+ * 不能再静态 import 本文件，否则 16.2 KiB 迁移器会进主 chunk）。此处 re-export
+ * 保持外部取用 IN_SCOPE_KEYS 的方式不变（tests/learning-storage.mjs 用 M('IN_SCOPE_KEYS')）。 */
+export { IN_SCOPE_KEYS }
 /** 只读不迁移：键是日期 `YYYY-MM-DD`，DayRecord 只有 {date,words,seconds}，**一个词都不含** */
 export const NOT_IN_SCOPE_KEYS = ['gt.streak.v1'] as const
 

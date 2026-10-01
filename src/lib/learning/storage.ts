@@ -41,6 +41,15 @@ export const KEY_TOTALS = 'gt.totals.v1'
 export const KEY_MIGRATION = 'gt.migration.v1'
 export const KEY_BACKUP = 'gt.learning.v2.backup'
 
+/** 迁移源键族（参与 v1→v2 迁移的四个源键）。
+ *  ⚠️ 归属说明：迁移执行器（upgrade.ts）要在**同步**路径上判断「是否需要迁移」
+ *  （hasLegacyV1Data），而 upgrade.ts 一旦静态 import migrate.ts，migrate.ts 的
+ *  16.2 KiB 就会整块进主 chunk。因此本常量落在 storage.ts（upgrade.ts 本来就静态
+ *  依赖它）而非 migrate.ts —— 键常量的唯一事实源不变，migrate.ts 仍 re-export 本名，
+ *  外部（tests/learning-storage.mjs 的 M('IN_SCOPE_KEYS')）取用方式不变。
+ *  同序同源勿增勿删：migrate.ts §2.7 的 IN_SCOPE_KEYS 使用点依赖这个顺序。 */
+export const IN_SCOPE_KEYS = ['gt.review.v1', 'gt.memorize.v1', 'gt.analytics.v1', 'gt.customBanks.v1'] as const
+
 /** 写结果：ok=false 表示熔断后仍写不进去（数据只留在内存，下次操作会重试） */
 export interface SaveResult {
   ok: boolean

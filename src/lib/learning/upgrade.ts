@@ -20,6 +20,7 @@
  */
 
 import {
+  IN_SCOPE_KEYS,
   KEY_BACKUP,
   loadMigrationMarker,
   saveLearningV2,
@@ -27,7 +28,10 @@ import {
   saveMigrationMarker,
   saveTotals,
 } from './storage'
-import { IN_SCOPE_KEYS, migrateV1toV2, splitSnapshot } from './migrate'
+/* ⚠️ migrate.ts（≈16.2 KiB）**不静态 import**：只需(S1)要迁移时才 `await import('./migrate')`，
+ * 否则这份代码会整块进主 chunk。代价是「是否需要迁移」的判定必须留在同步路径 —— 见
+ * isMigrated() / hasLegacyV1Data()，两者都只用 IN_SCOPE_KEYS（已在 storage.ts，同步可取），
+ * 不 await 任何东西，首屏不会被拖慢。 */
 import type { ContentProvider, MigrationReport, RawStoreDump } from './types'
 import { getVocabularyPackages, loadPackage } from '../../core/content/registry'
 import { readKeyRaw, writeKeyRaw } from '../../core/learning/storage-io'
@@ -156,6 +160,9 @@ export async function runStartupMigration(): Promise<UpgradeOutcome> {
     }
 
     const raw = collectRawDump()
+    /* 只有走到这里（确实存在老格式快照、且内容包就绪）才拉取迁移器 ——
+     * 新用户与已迁移用户在上面两道同步早退里就返回了，永远不碰这个 chunk。 */
+    const { migrateV1toV2, splitSnapshot } = await import('./migrate')
     const split = splitSnapshot(raw)
     const run = migrateV1toV2(split.snapshot, provider, {
       runtime: 'browser',
