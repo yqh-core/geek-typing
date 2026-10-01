@@ -139,7 +139,7 @@ export default function Memorize({ theme, bank, paused = false, streakDays = 0 }
 
   /* ---------- 结算彩带：整组完成必触发 ---------- */
   useEffect(() => {
-    if (done) celebrate([theme.accentHex])
+    if (done) void celebrate([theme.accentHex])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done])
 

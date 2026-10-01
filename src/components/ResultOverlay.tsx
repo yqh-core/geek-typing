@@ -37,7 +37,7 @@ export default function ResultOverlay({
 
   // 高分解算彩带：正确率 ≥ 90 或最高连击 ≥ 20 时两侧喷射
   useEffect(() => {
-    if (stats.accuracy >= 90 || stats.bestCombo >= 20) celebrate([theme.accentHex])
+    if (stats.accuracy >= 90 || stats.bestCombo >= 20) void celebrate([theme.accentHex])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
