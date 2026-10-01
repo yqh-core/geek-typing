@@ -194,8 +194,19 @@ async function main() {
     },
     packages: packagesOut,
   }
-  await writeFile(OUT, JSON.stringify(artifact, null, 2) + '\n', 'utf8')
-  ok(`License Policy Matrix 已落盘：${OUT}`)
+  /* 幂等（对齐 build.mjs「仅在语义有差异时回写」）：generatedAt 是溯源时间戳，每次运行必然
+   * 变化，故不参与语义比较 —— 否则产物（已入库、受版本控制）每次运行都会产生一次工作区漂移。
+   * ⚠️ 只**排除**它参与判定，不从产物里删字段；落盘结构 / 键序 / 缩进 / 尾随换行一律不变。
+   * ⚠️ 两侧用同一方式构造 ⇒ 键序一致，可直接比字符串，不引入任何新的规范化依赖。 */
+  const semanticsOf = ({ generatedAt, ...rest }) => JSON.stringify(rest)
+  let prev = null
+  try { prev = JSON.parse(await readFile(OUT, 'utf8')) } catch { prev = null } // 不存在/不可解析 ⇒ 必须写
+  if (prev !== null && typeof prev === 'object' && semanticsOf(prev) === semanticsOf(artifact)) {
+    console.log(`  · 产物语义未变，跳过写入（generatedAt 保持 ${prev.generatedAt}）`)
+  } else {
+    await writeFile(OUT, JSON.stringify(artifact, null, 2) + '\n', 'utf8')
+    ok(`License Policy Matrix 已落盘：${OUT}`)
+  }
   console.log(`  · 汇总：allowed=${summary.allowed} allowed+attribution=${summary.allowedAttribution} review_required=${summary.reviewRequired} rejected=${summary.rejected}`)
 
   console.log(`\n[ingest] ${failures === 0 ? 'PASS' : `FAIL：${failures} 项`}`)
