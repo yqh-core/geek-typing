@@ -19,8 +19,11 @@
  * 加载方式：vite ssrLoadModule（与 tests/content-query.mjs 同源）—— Node 不能直接
  * import TS，且内容模块用了 `?raw` 导入，只有 vite 能解析。
  *
- * 产出：docs/audit-package/_generated/perf-baseline.json 的 `content` 字段
+ * 产出：docs/_generated/perf-baseline.json 的 `content` 字段
  * （read-modify-write：只更新自己这一节，不碰 boot / bundle 字段）。
+ * ⚠️ 与本仓库的 bench-boot.mjs 写的是**同一个文件、各自一个字段节**（boot → `boot`，
+ * 本脚本 → `content`）。两边都是整份 read-modify-write：**必须串行跑**。
+ * 并行跑 = 后写的那个把先写的那一节读回来后覆盖掉，静默丢一次采样。
  * 该文件是 gate-perf 预算门的输入，随仓库提交；CI 里只做「当前产物 vs 已提交基线」
  * 的比较，不在 CI 里重测。
  *
