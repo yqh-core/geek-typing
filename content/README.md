@@ -503,8 +503,8 @@ Raw → Normalize → Validate → Build → Index → Manifest → Content Regi
     `1 ≤ revision ≤ contentRevision`（回滚场景：version 回到历史值，revision 只增不减）
 17. `build` 存在且 `toolVersion` 非空字符串、`builtAt` 可被 `Date.parse`、`sourceChecksum === contentChecksum`
 18. **manifest 体积**：单包 < **8 KiB**、全库 < **40 KiB**（当前实测：最大 1.40 KiB、总计 13.08 KiB）
-19. **inline 预算**：`offline.policy === 'inline'` 的包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB**（当前实测：346 词 / 37.15 KiB）
-20. **策略一致性**：manifest 的 `offline.policy` 必须与 `registry.ts` 实际加载方式一致 —— `words:` ↔ inline，`load:` ↔ lazy（当前 10/10）
+19. **inline 预算**：`offline.policy === 'inline'` 的包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB**（当前实测：5 包，Σ 296 词 / 33.65 KiB）
+20. **策略一致性**：manifest 的 `offline.policy` 必须与 `registry.ts` 实际加载方式一致 —— `words:` ↔ inline，`load:` ↔ lazy（当前 18/18：inline 5 / lazy 13）
 
 > ⚠️ 第 18 / 19 / 20 项是 P0.6.1 新增的（门禁 17 → **20** 项）。
 > 另有**两条构建后检查不属于 `content:validate`**：主 chunk 体积（≤ 420 KiB raw / 135 KiB gzip）
@@ -558,8 +558,17 @@ manifest 只装元数据、**与词数无关**（实测单包 1.25–1.40 KiB，
 | 3 个 lazy chunk | 464.04 / 471.22 / 471.76 KiB raw；163.12 / 166.96 / 166.95 KiB gzip |
 | 10 个 manifest 总计 | **13.08 KiB raw / 2.21 KiB gzip**（单包 **1.25–1.40 KiB**） |
 
-包分布：**7 个 inline**（`ai-core` / `cloud-native` / `frontend` / `cet4` / `cet6` / `ts-code` / `go-code`，
-共 **346 词 / 37.15 KiB**）+ **3 个 lazy**（`ielts` / `kaoyan` / `toefl`，各 **3000 词 / 约 471 KiB**）。
+包分布：**5 个 inline**（`ai-core` / `cet4` / `cet6` / `ts-code` / `go-code`，
+共 **296 词 / 33.65 KiB**）
++ **13 个 lazy**（`cloud-native` / `frontend` / `ielts` / `kaoyan` / `toefl` 五个词表包
++ 8 个 `items` 试金石包；其中 `ielts` / `kaoyan` / `toefl` 各 **3000 词 / 约 471 KiB**，
+`cloud-native` **30 词 / 1.55 KiB**、`frontend` **20 词 / 0.97 KiB**）。
+
+> B 步 9.5 口径（`docs/p18/DECISIONS-POST-P18.md` §9.5.2）：`frontend` / `cloud-native` 由
+> inline 改 lazy，判定指标是 **体积 ÷ 首屏必需度**（不是单纯看体积）—— 两包合计仅 1.55 KiB，
+> 却是「首页按任意键即打字」的入口词库，提前到首屏换不来任何首屏收益，改走 lazy + 骨架屏。
+> 这两个包**不进预热清单**（预热时机在首屏之后的 `requestIdleCallback`，撞 `WARMUP_MAX_IDS`
+> 与 `warmup-ids-baseline.json` 两道棘轮），详见 `src/core/content/registry.ts` 的 `WARMUP_IDS` 注释。
 
 ### 15.3 为什么 inline 是禁区（对照实验硬证据）
 
@@ -588,8 +597,8 @@ Oxford 30000 词 → **1854 KiB（×13.4）**。
 | # | 断言 | 阈值 | 当前实测 | 余量 | 守护者 |
 |---|---|---|---|---|---|
 | 18 | manifest 体积：单包 < **8 KiB**，全库 < **40 KiB** | 8 / 40 KiB | 最大 1.40 / 总 13.08 KiB | 不红（5.7× / 3.1×） | `content:validate` |
-| 19 | inline 预算：inline 包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB** | 1000 词 / 64 KiB | 346 词 / 37.15 KiB | 不红 | `content:validate` |
-| 20 | 策略一致性：`offline.policy` 与 `registry.ts` 实际加载方式一致（`words:` ↔ inline，`load:` ↔ lazy） | 10/10 | 10/10 | 不红 | `content:validate` |
+| 19 | inline 预算：inline 包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB** | 1000 词 / 64 KiB | 5 包 Σ 296 词 / 33.65 KiB | 不红 | `content:validate` |
+| 20 | 策略一致性：`offline.policy` 与 `registry.ts` 实际加载方式一致（`words:` ↔ inline，`load:` ↔ lazy） | 18/18 | 18/18（inline 5 / lazy 13） | 不红 | `content:validate` |
 | 21 | 主 chunk 体积：raw ≤ **420 KiB**、gzip ≤ **135 KiB** | 420 / 135 KiB | 381.06 / 118.89 KiB | 不红（10.2% / 12.0%） | `check:bundle` |
 | 22 | 预热预算：`warmUpVocabulary` 列入的包 gzip 总量 ≤ **600 KiB** | 600 KiB | 330.02 KiB（清单 `[kaoyan, toefl]`） | 不红（余量 **45%**） | `check:bundle` |
 

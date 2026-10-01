@@ -617,6 +617,12 @@ async function run() {
   check(':bank 2 切到云原生词库', norm(await page.textContent('body')).includes('云原生 K8s 词库'))
 
   // :q 重开本轮：先敲 1 个正确字母，重启后归零
+  // B 步 9.5：cloud-native 改 lazy ⇒ 切库后词表是异步就位的，bankWords 为空时
+  // [data-testid="word"] 根本不渲染（PracticePanel.tsx），readWord 的一次性快照会拿到 ''
+  // ⇒ 先轮询等 word 挂载再读词（waitForTestId，本文件同款写法）。
+  // ⚠️ 不许用「加长 waitForTimeout」糊过去：那是把竞态藏起来，CI runner 比本地慢一个量级，
+  // tests/offline-audit.mjs:114 注释记着同款坑（固定 waitForTimeout + 一次性抓 body 会随机变红）。
+  await waitForTestId(page, 'word')
   const qw = await readWord(page)
   await page.keyboard.press(qw[0])
   await page.waitForTimeout(250)

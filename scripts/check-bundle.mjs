@@ -82,7 +82,11 @@ function loadWarmupBaseline() {
   }
 }
 
-/** 预热清单长度上限（门阈值）。预热是"离线可切大词库"的代价，扩词时代只许减不许增 */
+/** 预热清单长度上限（门阈值）。预热是"离线可切大词库"的代价，扩词时代只许减不许增
+ *  ⚠️ B 步 9.5 实测结论（别再试）：把 `frontend` / `cloud-native` 塞进 WARMUP_IDS 换不来任何
+ *  首屏收益 —— 预热时机在 `window load` → `requestIdleCallback`（首屏之后），而这两个包改 lazy
+ *  后走「切库按需加载 + 骨架屏」，本就在 idle 之后才可能被摸到；清单撑到 4 还会同时撞
+ *  本上限与 warmup-ids-baseline.json 棘轮两道坎。详见 registry.ts 的 WARMUP_IDS 处注释。 */
 const WARMUP_MAX_IDS = 2
 /** 清单长度棘轮基线（由 `check-bundle --record-baseline` 落盘并随仓库提交）。
  *  ⚠️ 位置是踩过坑的：最初落在 `docs/audit-package/_generated/`（P1.7 **冻结区**），

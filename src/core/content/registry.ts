@@ -51,8 +51,6 @@ import goCodeManifest from '../../../content/vocabulary/go-code/manifest.json?ru
 
 /* ---------------- inline 小库词条（同步 parse，体积小无负担） ---------------- */
 import aiCoreWords from '../../../content/vocabulary/ai-core/words.json?raw'
-import cloudNativeWords from '../../../content/vocabulary/cloud-native/words.json?raw'
-import frontendWords from '../../../content/vocabulary/frontend/words.json?raw'
 import cet4Words from '../../../content/vocabulary/cet4/words.json?raw'
 import cet6Words from '../../../content/vocabulary/cet6/words.json?raw'
 import tsCodeWords from '../../../content/vocabulary/ts-code/words.json?raw'
@@ -60,7 +58,15 @@ import goCodeWords from '../../../content/vocabulary/go-code/words.json?raw'
 
 const parseWords = (raw: string): WordPayload[] => JSON.parse(raw) as WordPayload[]
 
-/* ---------------- lazy 大库词条（动态 import，独立 chunk） ---------------- */
+/* ---------------- lazy 词库词条（动态 import，独立 chunk） ----------------
+ * B 步 9.5：`cloud-native` / `frontend` 由 inline 改 lazy（两处 manifest 的 offline.policy
+ * 同步改 lazy，否则 `scripts/content/validate.mjs` 判据 20「策略一致性」当场判红）。
+ * 判定口径 = 体积 ÷ 首屏必需度（见 docs/p18/DECISIONS-POST-P18.md §9.5.2）：
+ * 两包合计才 1.55 KiB，但都是「首页按任意键即打字」的入口词库 —— 提前到首屏换不来任何
+ * 首屏收益，却白占主 chunk 常驻内存，故改 lazy 走骨架屏（Memorize.tsx 已配套加载态）。
+ * 注意：这与预热的取舍无关（见 WARMUP_IDS 处注释）—— 改 lazy 不意味着该进预热清单。 */
+const loadCloudNative = async () => parseWords((await import('../../../content/vocabulary/cloud-native/words.json?raw')).default)
+const loadFrontend = async () => parseWords((await import('../../../content/vocabulary/frontend/words.json?raw')).default)
 const loadIelts = async () => parseWords((await import('../../../content/vocabulary/ielts/words.json?raw')).default)
 const loadKaoyan = async () => parseWords((await import('../../../content/vocabulary/kaoyan/words.json?raw')).default)
 const loadToefl = async () => parseWords((await import('../../../content/vocabulary/toefl/words.json?raw')).default)
@@ -91,8 +97,8 @@ const loadCollectionDemo = async () => parseData((await import('../../../content
 /* ---------------- 注册表（10 vocabulary + 7 类型试金石 + 1 collection = 18 包） ---------------- */
 const packages: ContentPackage[] = [
   { manifest: aiCoreManifest, localId: 'ai-core', words: parseWords(aiCoreWords) },
-  { manifest: cloudNativeManifest, localId: 'cloud-native', words: parseWords(cloudNativeWords) },
-  { manifest: frontendManifest, localId: 'frontend', words: parseWords(frontendWords) },
+  { manifest: cloudNativeManifest, localId: 'cloud-native', load: loadCloudNative },
+  { manifest: frontendManifest, localId: 'frontend', load: loadFrontend },
   { manifest: cet4Manifest, localId: 'cet4', words: parseWords(cet4Words) },
   { manifest: cet6Manifest, localId: 'cet6', words: parseWords(cet6Words) },
   { manifest: ieltsManifest, localId: 'ielts', load: loadIelts },
@@ -225,7 +231,17 @@ export function hasFeature(packageId: string, feature: string): boolean {
  *   1. 预热哪些包 = 本数组，**运行时不得自行扩张**（新增大词库默认不入清单 ⇒ 预算不自动爆）；
  *   2. 本数组被 `scripts/check-bundle.mjs` 判据 3 以同语法解析 —— 判据算的就是这份清单，
  *      而不是「候选集 / 全注册表」；清单若消失 ⇒ 判 UNKNOWN（不视为通过，绝不悄悄放行）；
- *   3. 「预热哪些」由常量决定（可被判据独立读取），「先预热哪个」留给运行时排序（不影响预算核算）。 */
+ *   3. 「预热哪些」由常量决定（可被判据独立读取），「先预热哪个」留给运行时排序（不影响预算核算）。
+ *
+ * ⚠️ 别把 `frontend` / `cloud-native` 塞进这份清单（B 步 9.5 实测过，别再试一遍）：
+ *   1. 预热时机在 `window load` → `requestIdleCallback`（src/main.tsx），发生在**首屏之后**；
+ *      这两个包改 lazy 后走的是「切库时按需加载 + 骨架屏」，本就要在 idle 之后才可能被摸到，
+ *      提前预热换不来任何首屏收益；
+ *   2. 清单从 2 撑到 4 会同时撞两道坎 —— `scripts/check-bundle.mjs:86` 的 `WARMUP_MAX_IDS = 2`
+ *      长度上限，和 `docs/p18/_generated/warmup-ids-baseline.json` 的棘轮基线
+ *      （判据 6 只许降不许升，`--record-baseline` 都被锁死）；
+ *   3. 这两个包合计 1.55 KiB，本来就不属于「离线可切大词库」这套预算要保的对象。
+ */
 export const WARMUP_IDS = ['kaoyan', 'toefl'] as const
 
 /** SW 空闲期预热（main.tsx）：按清单预拉词库 chunk 入 SW 缓存，保证首次离线可切大词库 */
