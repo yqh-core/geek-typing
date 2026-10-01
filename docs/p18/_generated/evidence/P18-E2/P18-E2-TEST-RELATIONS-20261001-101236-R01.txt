@@ -1,0 +1,26 @@
+# RunId: P18-E2-TEST-RELATIONS-20261001-101236-R01
+# Command: node tests/relations.mjs
+# Commit: 4b6ef629641c380c47fe05873025faee7a03e9a5
+# StartedAt: 2026-10-01T02:12:36.657Z
+# DurationMs: 505
+# ExitCode: 0
+
+--- stdout+stderr ---
+──────────────────────────────────────────────────────
+relations 端点可达性契约（P18-G0 · 共享模块 scripts/content/relations.mjs）
+──────────────────────────────────────────────────────
+  ✅ 对照组：真实 content/ 至少发现 1 个包（否则下面全是空转） — 18 个包
+  ✅ 取样点存在（vocabulary/ai-core 与 reading/demo-reading-01 均已加载且带载荷） — vocab ns=curated-ai-core word=transformer / reading ns=demo-demo-reading-01 item=reading-item-01
+  ✅ ① 词库端点可达：content:word:<ns>:<词形> — content:word:curated-ai-core:transformer
+  ✅ ② reading 条目端点可达：content:reading:<ns>:<条目 id>（本波修复目标 —— 未修时此条判红） — content:reading:demo-demo-reading-01:reading-item-01
+  ✅ ③ 不存在的 local 不可达（防可达性被写成恒真） — content:reading:demo-demo-reading-01:reading-item-99
+  ✅ ④ 跨族不可达：把 reading 条目 id 放进 content:word:<同 ns> 下（词桶 ⇄ 条目桶不得串） — content:word:demo-demo-reading-01:reading-item-01
+  ✅ ⑤ 包级 ContentId 可达（整包端点，先于条目桶命中） — content:vocabulary:curated-ai-core:ai-core
+  ✅ ⑤b 对照组：非词库的包级 ContentId 同样可达 — content:reading:demo-demo-reading-01:demo-reading-01
+  ✅ ⑥ 静态断言：scripts/gate-content-contract.mjs 引用共享模块 relations.mjs（防复制漂移）
+  ✅ ⑥ 静态断言：scripts/content/ingest.mjs 引用共享模块 relations.mjs（防复制漂移）
+  ✅ ⑥ 静态断言：scripts/content/validate.mjs 引用共享模块 relations.mjs（防复制漂移）
+
+──────────────────────────────────────────────────────
+共 11 项，通过 11，失败 0
+──────────────────────────────────────────────────────
