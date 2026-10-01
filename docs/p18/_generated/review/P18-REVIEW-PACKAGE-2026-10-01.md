@@ -264,3 +264,33 @@ import 不经过 SW fetch handler ⇒ chunk 永不入缓存 —— **机制为�
 | 部署到 Cloudflare Pages | ✅ | 已部署 |
 
 本地同源：`npm run test:e2e` 171/171、`oxlint` 0 warnings、`check:bundle` 6/6。
+
+---
+
+## 12. 附：下一步计划（评审人可一并看 `docs/p18/P18-NEXT-STEP-PLAN.md`）
+
+评审第十节建议 P18 之后进入 **Contract Freeze + Implementation Expansion**。计划已单独成文
+（`docs/p18/P18-NEXT-STEP-PLAN.md`），本包只放索引，**不抄内容**。
+
+三段式排期：
+
+| 段 | 内容 | 何时可开工 |
+|---|---|---|
+| **Stage 0** 闸门补强 | N1 `gate:lint` 是否进发布门、N2 `warmBanks` 的 5s 上限 + 吞错缺口、N7 `test:offline` 非幂等、N9 `gate:todo` 内容锚点、N10 CI action 版本 | **立刻**（都不动产品行为） |
+| **Stage 1** 解预算锁 | N4 主 chunk 瘦身 or 正式重订分层预算（二选一，要你拍板）；N5 注册表自动化裁定 | 等 N4 拍板 / N5 裁定 |
+| **Stage 2** 解冻增量 | D 步产品内容扩充 | **等 Stage 1 结清**（§11.5/§3.1 那 4.9% 余量） |
+
+**真正卡进度的只有三条**：
+
+- **N3 = 9.1 R2 / `AssetManifest`** —— ⏸ **`BLOCKED / WAITING EXTERNAL CREDENTIAL`**，
+  Cloudflare R2 凭据不到位，工程侧不会自行造产物、不会为了收口把它记成 PASS；
+- **N4** —— 主 chunk 余量（当前停 `ABSOLUTE_BUDGET` 层，实测余量 3.4% raw / 4.9% gzip；
+  契约阈值仍是 `439.45 / 141.60 KiB` 且 `gate-perf.mjs` **一行未动**）。要你拍**「瘦身」还是「正式重订分层预算」**——
+  重订要先过 INV-3 的例外评审，棘轮只许降不许升；
+- **N5** —— 注册表自动化（`import.meta.glob` 会把全量词库拖进主包），需单独裁定。
+
+其余九条（N6 UX 视觉复核 / N7 `test:offline` / N8 `verify-p17-frozen` / N9 `gate:todo` /
+N10 CI 到期 / N11 探针根因 / N12 判据表失真根治，以及 P18 遗留 9.6 / 9.7）都是工程侧可独立消化的中低优先项。
+
+> 计划里明确写了**下一阶段不做**的事：不追预热探针真根因（已证伪的最像根因那条、
+> 处置已验证有效，继续下沉是独立立项）；不替产品编造 R2 产物；不为数字好看放宽规则或调预算。

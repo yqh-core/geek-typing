@@ -6,6 +6,7 @@
 > - `ENGINEERING-HYGIENE-PLAN.md` —— C 步（Engineering Hygiene 53 条告警）分期与实施记录
 > - `DECISIONS-POST-P18.md` —— B 步决策、C 步收口补记（§9.2.8–9.2.10）、9.1 前置条件
 > - `P1.8-SIGN-OFF-v1.0.md` / `P1.8-DESIGN-RULINGS-v1.0.md` —— 设计裁定与签署
+> - **`P18-NEXT-STEP-PLAN.md` —— P18 之后的下一阶段排期（A/B/C/D 走完之后读这个）**
 
 ## 1. 四步对照
 
@@ -68,6 +69,9 @@
 - **9.3 注册表自动化** 待裁定；`test:offline` 非幂等保持登记；
 - **`verify-p17-frozen` 只拦增量、不查冻结区既有文件被改** —— 只登记不下决定；
 - **D 步产品内容扩充** —— 须先解 §3.1 的 4.9% 余量。
+
+> 以上遗留的**下一阶段排期**统一收在 `P18-NEXT-STEP-PLAN.md`：Stage 0（闸门补强）/ Stage 1（解预算锁）/
+> Stage 2（解冻增量），每条标注「需不需要你拍板 / 工程是否可控 / 证据落点」。
 
 ### 4.1 e2e 预热探针的 CI flaky（本轮新定位，**根因未定死**，测试侧已去敏)
 
