@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { FileDown, FileUp, Plus, Trash2, X } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
-import type { WordBank } from '../data/wordBanks'
 import {
   deleteCustomBank,
   exportBanksAsJson,
@@ -10,7 +9,7 @@ import {
   saveCustomBank,
   type CustomBank,
 } from '../lib/customBanks'
-import { useT } from '../i18n'
+import { useT } from '../i18n/hooks'
 
 interface BankManagerProps {
   theme: ThemeConfig
@@ -195,15 +194,4 @@ export default function BankManager({ theme, onBankChange, open: openProp, onOpe
       )}
     </>
   )
-}
-
-/** 把自定义词库包装成标准 WordBank 结构 */
-export function toWordBank(custom: CustomBank): WordBank {
-  return {
-    id: custom.id,
-    name: custom.name,
-    description: '我的自定义词库',
-    icon: 'FileText',
-    words: custom.words,
-  }
 }

@@ -13,7 +13,7 @@ import type { PracticeModeId } from '../lib/modes'
 import type { WordBank } from '../data/wordBanks'
 import { getVoicePref, setVoicePref } from '../lib/speech'
 import { sound } from '../lib/sound'
-import { useT, useLang } from '../i18n'
+import { useT, useLang } from '../i18n/hooks'
 import type { TabId } from '../App'
 
 interface CommandPaletteProps {

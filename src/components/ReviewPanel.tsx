@@ -5,7 +5,7 @@ import { type WordBank, type WordItem } from '../data/wordBanks'
 import { buildLoadedMap, resolveReviewWord } from '../lib/wordResolve'
 import { learningService, wordStatOf, type Analytics, type ReviewItemView } from '../core/learning'
 import { masteryOf, type MasteryLevel } from '../lib/mastery'
-import { useLang, useT } from '../i18n'
+import { useLang, useT } from '../i18n/hooks'
 
 interface ReviewPanelProps {
   theme: ThemeConfig

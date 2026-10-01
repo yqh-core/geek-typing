@@ -1,5 +1,5 @@
 import type { ThemeConfig } from '../lib/theme'
-import { useT } from '../i18n'
+import { useT } from '../i18n/hooks'
 
 /** 标准指法分区：0=左手小指 … 7=右手小指 */
 const ROWS: string[][] = [

@@ -11,7 +11,7 @@ import {
   type MemStore,
 } from '../core/learning'
 import { practiceEngine } from '../core/practice'
-import { useT } from '../i18n'
+import { useT } from '../i18n/hooks'
 
 interface MemorizeProps {
   theme: ThemeConfig

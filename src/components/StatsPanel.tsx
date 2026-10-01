@@ -7,7 +7,7 @@ import {
   wrongWords,
   type Analytics,
 } from '../core/learning'
-import { useT, useLang } from '../i18n'
+import { useT, useLang } from '../i18n/hooks'
 
 interface StatsPanelProps {
   theme: ThemeConfig

@@ -1,7 +1,7 @@
 import { Flame } from 'lucide-react'
 import { DAILY_GOAL, getStreakDays, getRecentDays, type History } from '../lib/streak'
 import type { ThemeConfig } from '../lib/theme'
-import { useT } from '../i18n'
+import { useT } from '../i18n/hooks'
 
 interface StreakBarProps {
   theme: ThemeConfig

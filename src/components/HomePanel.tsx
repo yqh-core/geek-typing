@@ -1,7 +1,7 @@
 import { BookOpenCheck, CalendarDays, Crosshair, Flame, Play, Sparkles } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
 import type { TodayRecommendation } from '../lib/recommend'
-import { useLang, useT } from '../i18n'
+import { useLang, useT } from '../i18n/hooks'
 
 interface CatalogSummary {
   /** 内容包总数（来自 catalog.packages.length） */

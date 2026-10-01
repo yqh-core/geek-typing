@@ -1,5 +1,5 @@
 import { contentChannel } from '../core/persistence/channels'
-import type { WordItem } from '../data/wordBanks'
+import type { WordBank, WordItem } from '../data/wordBanks'
 
 const KEY = 'gt.customBanks.v1'
 
@@ -97,6 +97,17 @@ export function parseWords(raw: string): WordItem[] {
       return { word: line, translation: '' }
     })
     .filter((w) => /^[A-Za-z][A-Za-z'\- ]*$/.test(w.word))
+}
+
+/** 把自定义词库包装成标准 WordBank 结构 */
+export function toWordBank(custom: CustomBank): WordBank {
+  return {
+    id: custom.id,
+    name: custom.name,
+    description: '我的自定义词库',
+    icon: 'FileText',
+    words: custom.words,
+  }
 }
 
 export function exportBanksAsJson(banks: CustomBank[]): string {

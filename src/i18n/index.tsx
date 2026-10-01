@@ -3,13 +3,16 @@
  * - 语言状态 'zh' | 'en'，持久化到本机存储键 'gt.lang'（P1.7-W2C 起经 settings 通道读写）
  * - 默认语言按 navigator.language 探测
  * - t(key) 缺 key 时回退中文，再兜底 key 本身
+ *
+ * 本文件只导出「类型 + 组件」；Context 在 src/i18n/context.ts，hook（useLang / useT）在 src/i18n/hooks.ts。
  */
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { settingsChannel } from '../core/persistence/channels'
 import { zh } from './zh'
 import { en } from './en'
+import { LangContext, type Lang, type LangContextValue } from './context'
 
-export type Lang = 'zh' | 'en'
+export type { Lang }
 
 /** 双语字典表 */
 const DICTS: Record<Lang, Record<string, string>> = { zh, en }
@@ -27,18 +30,6 @@ function detectLang(): Lang {
   }
   return navigator.language?.toLowerCase().startsWith('zh') ? 'zh' : 'en'
 }
-
-interface LangContextValue {
-  lang: Lang
-  setLang: (l: Lang) => void
-  t: (key: string) => string
-}
-
-const LangContext = createContext<LangContextValue>({
-  lang: 'zh',
-  setLang: () => {},
-  t: (key) => zh[key] ?? key,
-})
 
 export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(detectLang)
@@ -62,14 +53,4 @@ export function LangProvider({ children }: { children: ReactNode }) {
   )
 
   return <LangContext.Provider value={value}>{children}</LangContext.Provider>
-}
-
-/** 取当前语言与切换函数 */
-export function useLang(): { lang: Lang; setLang: (l: Lang) => void } {
-  return useContext(LangContext)
-}
-
-/** 取翻译函数 */
-export function useT(): (key: string) => string {
-  return useContext(LangContext).t
 }

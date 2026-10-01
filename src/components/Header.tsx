@@ -10,7 +10,7 @@ import type { Analytics } from '../core/learning'
 import Dropdown from './Dropdown'
 import BankManager from './BankManager'
 import StatsPanel from './StatsPanel'
-import { useT, useLang } from '../i18n'
+import { useT, useLang } from '../i18n/hooks'
 
 interface HeaderProps {
   theme: ThemeConfig

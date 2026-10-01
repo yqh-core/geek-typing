@@ -4,7 +4,7 @@ import type { ThemeConfig } from '../lib/theme'
 import { DAILY_GOAL } from '../lib/streak'
 import type { PracticeModeId } from '../lib/modes'
 import { celebrate } from '../lib/confetti'
-import { useT, useLang } from '../i18n'
+import { useT, useLang } from '../i18n/hooks'
 
 interface ResultProps {
   theme: ThemeConfig

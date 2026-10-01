@@ -1,6 +1,6 @@
 import { Volume2 } from 'lucide-react'
 import type { ThemeConfig } from '../lib/theme'
-import { useT, useLang } from '../i18n'
+import { useT, useLang } from '../i18n/hooks'
 
 export type PracticeMode = 'classic' | 'spell' | 'timed' | 'code'
 
