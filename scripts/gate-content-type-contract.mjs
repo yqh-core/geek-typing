@@ -153,6 +153,14 @@ const sameSet = (a, b) => a.length === b.length && sorted(a).every((x, i) => x =
  * ------------------------------------------------------------------ */
 const H3_HOST = 'content:vocabulary:ecdict-ielts:ielts'
 
+/* 控制字符用例的字符在**运行时拼**出来，源码里不落裸字节：
+ * 裸控制字符会把本文件变成二进制（git/oxlint 都不再按文本扫），而且 diff 不可读。
+ * 走 String.fromCharCode 而不是 `\uXXXX` 转义序列，纯 ASCII 源码、零歧义。 */
+const C0_NUL = String.fromCharCode(0x00)
+const C0_SOH = String.fromCharCode(0x01)
+const C0_DEL = String.fromCharCode(0x7f)
+const C0_TAB = String.fromCharCode(0x09)
+
 const ASSET_ID_CORPUS = [
   // —— 合法 ——
   { id: `${H3_HOST}#a:a-0007`, expect: { hostContentId: H3_HOST, assetLocalId: 'a-0007' }, why: '合法：<宿主 ContentId>#a:<local>' },
@@ -169,6 +177,16 @@ const ASSET_ID_CORPUS = [
   { id: ` ${H3_HOST}#a:a-1`, expect: null, why: '前置空白（host 首字符为空格 ⇒ ContentId 不匹配）' },
   { id: `${H3_HOST}#a:a-1 `, expect: null, why: '后置空白（local 尾空格 ⇒ 非规范形态）' },
   { id: `${H3_HOST}#a:a/b`, expect: null, why: 'local 段含非法字符（/）' },
+  /* —— 控制字符（C0 + DEL）：下面 4 条是「正则 → 码点判断」这次替换的判红靶 ——
+   * local 段只要含控制字符，isStableLocalId 必须判否 ⇒ parseAssetId 返回 null。
+   * 换完实现全靠这几条证明「该关的没被关掉」：把任一侧 isControlChar 改成恒 false，
+   * 这几条立刻翻红（对照实验见 DECISIONS-POST-P18.md）。
+   * 顺序也有讲究：制表符那条锁的是「isStableLocalId 先查控制字符直接判否」，
+   * 不让它走到 normalize 的「先折白、后删控制字符」那套顺序上去。 */
+  { id: `${H3_HOST}#a:a-0007${C0_NUL}b`, expect: null, why: 'local 段含 NUL U+0000' },
+  { id: `${H3_HOST}#a:a${C0_SOH}-1`, expect: null, why: 'local 段含 SOH U+0001' },
+  { id: `${H3_HOST}#a:a-1${C0_DEL}`, expect: null, why: 'local 段含 DEL U+007F' },
+  { id: `${H3_HOST}#a:a-1${C0_TAB}`, expect: null, why: 'local 段含制表符 U+0009（isStableLocalId 先查控制字符 ⇒ 判否）' },
 ]
 
 const OWNERSHIP_CORPUS = [

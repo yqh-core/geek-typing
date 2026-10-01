@@ -28,6 +28,7 @@
  */
 
 import { CONTENT_ID_RE, decideLicense } from './license-policy.mjs'
+import { hasControlChar, isControlChar } from './control-chars.mjs'
 
 /** assetId 中「宿主包 ContentId」与「本地键」的分隔符（与 asset.ts:34 的 ASSET_ID_SEP 同值） */
 export const ASSET_SEPARATOR = '#a:'
@@ -40,24 +41,30 @@ const bad = (code, message) => ({ ok: false, code, message })
 /** 违规条目（供 checkManifestAssets 汇总） */
 const violation = (code, message) => ({ code, message })
 
-/** 镜像 `src/core/content/model/content.ts:145-155` 的 normalizeLocalId（Node 无法 import TS） */
+/* 控制字符（C0 + DEL）判定走 `./control-chars.mjs`（JS 侧单一事实源，定义见该文件）。
+ * 与 src/core/content/model/content.ts 的 isControlChar **等价但不同对象**（跨层镜像，
+ * 见文件头）—— 那边的改动要同步过来，两边不能同时改出偏差。
+ * 这里不再自己写正则：字面量会被 no-control-regex 命中，RegExp 构造器照样报（oxlint
+ * 会常量折叠里面的字符串），且三处各写一份迟早改出偏差。 */
 function normalizeLocalId(raw) {
   return String(raw)
     .normalize('NFC')
     .trim()
     // 连续空白（含不间断空格 \u00A0 / 制表 / 换行）折叠为单个空格
     .replace(/[\s\u00A0]+/g, ' ')
-    // 控制字符一律删除（\u0000-\u001F、\u007F）
-    .replace(/[\u0000-\u001F\u007F]/g, '')
+    // 控制字符一律删除
+    .split('')
+    .filter((ch) => !isControlChar(ch))
+    .join('')
     // `:` 与 `/` 会破坏 4 段式 ContentId 解析，退化成 `-`
     .replace(/[:/]/g, '-')
 }
 
-/** 镜像 `src/core/content/model/content.ts:161-166` 的 isStableLocalId */
+/** 镜像 `src/core/content/model/content.ts` 的 isStableLocalId */
 function isStableLocalId(id) {
   if (!id) return false
   if (id.includes(':') || id.includes('/')) return false
-  if (/[\u0000-\u001F\u007F]/.test(id)) return false
+  if (hasControlChar(id)) return false
   return normalizeLocalId(id) === id
 }
 

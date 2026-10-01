@@ -144,14 +144,29 @@ export const SCHEMA_VERSION = 4
  * （code 词库区分大小写）。本函数只管「稳定」，不管「语义」；词条 ContentId 的 lemma
  * 也按此原则保留原词形（见 `wordId` / 契约 §2.2 C-6）。
  */
+/* 控制字符判定（C0: \u0000-\u001F + DEL \u007F）。Node 侧镜像见
+ * `scripts/content/control-chars.mjs`（两份判定必须逐字符等价，改一边要同步另一边）。
+ * 走**码点判断**而不是正则：/[\u0000-\u001F\u007F]/ 这种字面量会被 oxlint 的 no-control-regex
+ * 命中，而这里要匹配的就是控制字符本身 —— 换规则等于把该关的关掉；换成 RegExp 构造器也没用
+ * （oxlint 会常量折叠里面的字符串，照样报）。\p{Cc} 也不行：它会连 U+0080–U+009F 一起吃掉，
+ * 那不属于原集合，改了会动到 content。
+ * 本文件两处（normalizeLocalId / isStableLocalId）共用这一个判定，不各写一份。 */
+function isControlChar(ch: string): boolean {
+  const cp = ch.codePointAt(0) ?? 0
+  return cp <= 0x1f || cp === 0x7f
+}
+
 export function normalizeLocalId(raw: string): string {
-  return raw
+  // 顺序不能动：先折叠空白、再删控制字符（所以 \t \r 这类**空白型**控制字符
+  // 已经被折成空格、不会再被删掉 —— 这是既有行为，不是 bug，别"顺手修"成先删后折）
+  const folded = raw
     .normalize('NFC')
     .trim()
     // 连续空白（含不间断空格 \u00A0 / 制表 / 换行）折叠为单个空格
     .replace(/[\s\u00A0]+/g, ' ')
-    // 控制字符一律删除（\u0000-\u001F、\u007F）
-    .replace(/[\u0000-\u001F\u007F]/g, '')
+  return [...folded]
+    .filter((ch) => !isControlChar(ch))
+    .join('')
     // `:` 与 `/` 会破坏 4 段式 ContentId 的解析，必须禁止，退化成 `-`
     .replace(/[:/]/g, '-')
 }
@@ -163,7 +178,7 @@ export function normalizeLocalId(raw: string): string {
 export function isStableLocalId(id: string): boolean {
   if (!id) return false
   if (id.includes(':') || id.includes('/')) return false
-  if (/[\u0000-\u001F\u007F]/.test(id)) return false
+  if ([...id].some(isControlChar)) return false // 等价于旧写法的 /[\u0000-\u001F\u007F]/.test(id)
   return normalizeLocalId(id) === id
 }
 

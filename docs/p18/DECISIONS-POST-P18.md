@@ -120,6 +120,8 @@ export const WARMUP_IDS = ['ielts', 'toefl', 'kaoyan'] as const
 
 ### 9.2.8 收口补记：e2e 预热探针（CI 抓出来的红灯）
 
+> 后续：本节的实现已随 C 步 H2 二次改造（判据同一事实源），见 §9.2.9。
+
 9.2 落地后 **CI 立刻抓到一条红灯**，直指本项决策的**副作用面**，记在这里避免重犯：
 
 - **现象**：CI run `36822725289`，门禁③ 端到端 `共 170 项，通过 169，失败 1`，
@@ -150,6 +152,60 @@ export const WARMUP_IDS = ['ielts', 'toefl', 'kaoyan'] as const
 > 不是 `src/`。改了 `src/` 不重建就跑 e2e，等于在验证旧构建 ——
 > 我第一次做证伪就踩了（注入进 `src/main.tsx` 后直接跑，探针照样绿，证明不了任何事）。
 > **证伪前必须先 `npm run build`，并确认产物 chunk 名确实变了。**
+
+---
+
+## 9.2.9 收口补记 2：控制字符判定（C 步 H2，`no-control-regex` 5→0）
+
+### 为什么动它
+
+`content:validate` / `asset-rules.mjs` / `normalize.mjs` / `content.ts` 四处各自写了
+`[\u0000-\u001F\u007F]` 控制字符正则。三条问题叠在一起：
+
+1. **oxlint `no-control-regex` 拆不掉**——字面量报，换成 `new RegExp('[\\u0000-...]')`
+   照样报（oxlint 会常量折叠构造器里的字符串）。实测过，不是姿势问题。
+2. **规则散了四份**，而控制字符判错会直接动到 content 的 id，属于会污染 content 的那类错。
+3. 换 `\p{Cc}` 也不行：它含 U+0080–U+009F（C1 段），多吃出去的不在原集合里。
+
+### 做法
+
+- 新增 `scripts/content/control-chars.mjs` 作 **JS 侧单一事实源**：`isControlChar` /
+  `hasControlChar` / `stripControlChars`，全部走**码点判断**（`codePointAt`），源码里没有正则。
+- `asset-rules.mjs`、`normalize.mjs` 改为 import 它；`src/core/content/model/content.ts`
+  保留自己的 `isControlChar`（TS 不能 import 工程外的 .mjs），两边注释互相指向、标注必须同步。
+- 顺序语义**逐字符不动**：先折叠空白、再删控制字符。所以 `\t` `\r` 这类**空白型**控制字符
+  会被折成空格、而不是被删掉——这是既有行为，不是 bug，别"顺手修"成先删后折。
+  （第一版实现就是这么写错的：从 `raw` 而不是折叠后的串里删，已改回来。）
+
+### 等价性对照（不是靠"看着像"）
+
+临时对照器跑 U+0000–U+2FFF **全码位** + D7FF/D800/DBFF/DC00/DFFF/E000/FEFF/1F600/10FFFF 采样，
+逐码位比对「码点判断」与旧正则的 strip / has 结果：**0 处不一致**（对照器用完即删，未入库）。
+
+### 判据必须能判红（新增 4 条 fixture）
+
+在 `scripts/gate-content-type-contract.mjs` 的**手写字面真值** corpus 里补 4 条控制字符用例
+（NUL / SOH / DEL / 制表），期望值一律 `null`。字符用 `String.fromCharCode` 在运行时拼，
+源码不落裸字节（裸控制字符会让文件变成二进制，git/oxlint 都不再按文本扫）。
+
+证伪自检（两次注入，各测一侧，互不串味）：
+
+| 注入 | 门禁结果 |
+| --- | --- |
+| `scripts/content/control-chars.mjs` 的 `isControlChar` → `false` | **FAIL**，恰好 3 条新增 fixture 翻红（NUL/SOH/DEL），TS 侧不受影响 |
+| `src/core/content/model/content.ts` 的 `isControlChar` → `false` | **FAIL**，恰好 3 条新增 fixture 翻红（TS 侧），.mjs 侧不受影响 |
+
+两次注入后均 **sha256 字节级还原**（`44d44741…` / `a9b9397a…` 校验通过）并复绿 PASS。
+
+**一个值得记的发现**：只把 `hasControlChar` 改成 `false` **不会**让门禁变红——因为
+`normalizeLocalId` 里的 strip 才是真正的把关点，`hasControlChar` 的早退是冗余的（strip 之后
+必然不等）。所以这 4 条 fixture 实际钉住的是 **strip 那一侧**，不是早退。早退保留作为纵深防御，
+但它的作用是"表达契约"而不是"拦住 bug"，别因为它看着像判据就去改它。
+
+### 代价
+
+- `no-control-regex` 5→0、顺带消掉 `no-unused-vars` 1（migration-dryrun 的未用形参 `content`）
+- oxlint total 20 → 13（剩下的正是 H4 的 10 条 + H5 的 3 条，留给后续批次）
 
 ---
 

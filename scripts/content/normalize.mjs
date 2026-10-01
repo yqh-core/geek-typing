@@ -38,6 +38,7 @@ import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { canonicalFile } from './canonical.mjs'
+import { stripControlChars } from './control-chars.mjs'
 
 const ROOT = path.resolve(process.cwd())
 const VOCAB_DIR = path.join(ROOT, 'content', 'vocabulary')
@@ -53,7 +54,10 @@ const ENTITIES = [
   [/&amp;/g, '&'],
 ]
 const WS_RE = /[\s\u00A0]+/g // \s 已含空格 / \t / \r / \n / \v / \f
-const CONTROL_RE = /[\u0000-\u001F\u007F]/g
+/* 控制字符（C0 + DEL）判定走 `./control-chars.mjs`（JS 侧单一事实源）。
+ * 与 src/core/content/model/content.ts 的定义等价（跨层镜像，同步时两边都要动）。
+ * 这里不再自己写正则：字面量会被 no-control-regex 命中，RegExp 构造器照样报（oxlint
+ * 常量折叠），且三处各写一份迟早改出偏差。 */
 
 /** 单条字符串的规范形。幂等：normalize(normalize(x)) === normalize(x)
  *  stripHtml=false 时跳过标签剥离与实体解码（代码词库专用，见文件头注释） */
@@ -64,7 +68,8 @@ function normalizeText(raw, stripHtml = true) {
     s = s.replace(/<[^>]*>/g, '')
     for (const [re, to] of ENTITIES) s = s.replace(re, to)
   }
-  s = s.replace(WS_RE, ' ').replace(CONTROL_RE, '').trim()
+  // 顺序不能动：先折叠空白、再删控制字符（\t \r 这类空白型控制字符会被折成空格、不再被删）
+  s = stripControlChars(s.replace(WS_RE, ' ')).trim()
   return s
 }
 

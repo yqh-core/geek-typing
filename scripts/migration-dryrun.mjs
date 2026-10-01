@@ -800,10 +800,11 @@ function assertIdempotent(run1, run2) {
 /* ===========================================================================
  * 6. 报告自检（结构非法 ⇒ exit 1）
  * ========================================================================= */
-// 形参名必须是 `content`：第 925 行的 buildSynthetic(content) 在引用它。
-// （别被 no-unused-vars 的声明点误导 —— lint 只报声明、不报引用，改成 `_content` 会
-// 留下一个裸标识符引用 ⇒ migration:dryrun EXIT=2）
-function validateReport(report, content) {
+// 形参名必须是 `_content`：本函数体不读它（真正读内容的是 main 作用域的 `content`，
+// 见 917 行声明、928/936 行引用）。
+// ⚠️ 别把 917 行的 `content` 也改名：oxlint 只报**声明点**、不报**引用点**，改成 `_content`
+// 后 928 行的裸 `content` 依旧在 ⇒ 编译期全绿、运行期 migration:dryrun EXIT=2（实测踩过）。
+function validateReport(report, _content) {
   const errors = []
 
   // ① prompt 点名必须存在的字段
@@ -912,8 +913,9 @@ async function main() {
   let sourceDetail
   let sourceKeysPresent
 
-  // `content` 不能加下划线前缀：926 行的 buildSynthetic(content) 引用裸 `content`。
-  // oxlint 只报声明点、不报引用点，加前缀后这条崩溃彻底隐身 —— 实测 migration:dryrun EXIT=2。
+  // ⚠️ 这里的 `content` **不能**加下划线前缀（与上面 validateReport 的 `_content` 相反）：
+  // 927/928 行 buildSynthetic(content) 引用裸 `content`。oxlint 只报声明点、不报引用点，
+  // 加前缀后这条崩溃彻底隐身 —— 实测 migration:dryrun EXIT=2。
   const content = loadContentTruth()
 
   if (userStoreArg) {
