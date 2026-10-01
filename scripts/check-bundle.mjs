@@ -81,8 +81,11 @@ function loadWarmupBaseline() {
 
 /** 预热清单长度上限（门阈值）。预热是"离线可切大词库"的代价，扩词时代只许减不许增 */
 const WARMUP_MAX_IDS = 2
-/** 清单长度棘轮基线（由 `check-bundle --record-baseline` 落盘并随仓库提交；与 perf-baseline.json 同目录同源口径） */
-const WARMUP_BASELINE_JSON = path.join(ROOT, 'docs', 'audit-package', '_generated', 'warmup-ids-baseline.json')
+/** 清单长度棘轮基线（由 `check-bundle --record-baseline` 落盘并随仓库提交）。
+ *  ⚠️ 位置是踩过坑的：最初落在 `docs/audit-package/_generated/`（P1.7 **冻结区**），
+ *  新写一个基线文件就被 INV-1 判「P1.8 不得触碰 P1.7 冻结区」⇒ P18-I 证据当场挂一条。
+ *  本基线是 P1.8 之后（B 步）的产物，必须落在 P1.8 自己的证据树下，不许进冻结区。 */
+const WARMUP_BASELINE_JSON = path.join(ROOT, 'docs', 'p18', '_generated', 'warmup-ids-baseline.json')
 
 /** 主 chunk 阈值从 gate-perf 预算表读取（双基线取更严；输入缺失返回 null 由调用方判 UNKNOWN） */
 function mainChunkBudgets() {

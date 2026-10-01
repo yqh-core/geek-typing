@@ -4,6 +4,6 @@
     "kaoyan",
     "toefl"
   ],
-  "recorded": "2026-10-01T05:53:13.161Z",
+  "recorded": "2026-10-01T05:59:25.756Z",
   "note": "check-bundle --record-baseline 写入；清单只许降不许升，变长时重记会被拒绝"
 }
