@@ -19,6 +19,14 @@
  *   「放开」= 启用集 / 包路由 / 索引 / 结果形状四段齐备，缺一段由门判红（裁定 §⑨-2）。
  *   两个开关分开，是为了让"包存在"与"能查询"这两件事在证据里可分辨 —— 别用一句话糊过去。
  *
+ * ⚠️ P18-E′（裁定 §⑫）：本文件是**全量面**（含 i18n / learning / packageLevel 富元数据），
+ *   真实消费者是 Node 侧门禁脚本 —— **不进 bundle**。运行时（查询层 / 索引层）只读
+ *   `types/registry-core.ts` 的薄表。
+ *   两个面的关系是**单向派生**：本表的 type / itemType / queryEnabled / query 一律由
+ *   `CONTENT_TYPE_CORE` 展开继承（下面每条都是 `{ ...CONTENT_TYPE_CORE.x, …富元数据 }`），
+ *   **禁止**在展开后再覆盖这四个字段 —— 否则"两份清单各说各话"就会回来。
+ *   该不变量由 `scripts/gate-content-type-contract.mjs` 判据 J 机器校验。
+ *
  * 不变量（由 scripts/gate-content-type-contract.mjs 机器校验，INV-6）：
  *   1. 本注册表必须**穷尽** ContentType 联合的每个成员（漏一个即 FAIL）
  *   2. `src/core/content/model/` 下不得出现 per-type 散落文件（白名单之外即 FAIL）
@@ -28,41 +36,14 @@
  */
 import type { ContentType } from '../model/content'
 import type { AssetKind } from '../model/asset'
+import { CONTENT_TYPE_CORE } from './registry-core'
+import type { ContentTypeCoreDescriptor } from './registry-core'
 
-/**
- * 内容类型的**运行时可枚举**清单。
- *
- * 为什么需要它：`ContentType` 是 TS 类型联合，**运行时不存在**，无法在门禁脚本里遍历。
- * 但只加一个数组就会立刻产生"联合与数组各说各话"的新重复源，所以这里用**双向编译期约束**锁死：
- *
- *   ① 数组 ⊆ 联合 —— `as const satisfies readonly ContentType[]`（多写一个不存在的类型即编译报错）
- *   ② 联合 ⊆ 数组 —— `AssertNever<Exclude<ContentType, 数组元素>>`（漏写一个成员即编译报错）
- *
- * 于是"漏类型"这件事在 `tsc` 阶段就红了，不必等门禁脚本。
- */
-export const CONTENT_TYPES = [
-  'word',
-  'vocabulary',
-  'listening',
-  'audio',
-  'reading',
-  'topic',
-  'exercise',
-  'writing',
-  'speaking',
-  'grammar',
-  'document',
-  'collection',
-  'course',
-  'lesson',
-] as const satisfies readonly ContentType[]
-
-type AssertNever<T extends never> = T
-
-/* ② 联合 ⊆ 数组：若 ContentType 有成员未出现在 CONTENT_TYPES，Exclude 结果非 never → 编译报错。
- * 纯编译期约束、无运行时代码；导出仅为满足 noUnusedLocals（不导出会被 TS6133 判为未使用）。
- * 证伪方式：往 ContentType 联合里加一个成员而不同步 CONTENT_TYPES，`tsc -b` 即红。 */
-export type TypeListExhaustive = AssertNever<Exclude<ContentType, (typeof CONTENT_TYPES)[number]>>
+/* 运行时面的 re-export（门禁脚本与旧调用方都从本文件取，别改成两份定义）：
+ * CONTENT_TYPES / TypeListExhaustive / IndexFieldSpec / descriptorOf / queryEnabledTypes
+ * 的唯一定义在 `./registry-core`（核心类型也一样：ContentType 在 model/content.ts）。 */
+export { CONTENT_TYPES, descriptorOf, queryEnabledTypes } from './registry-core'
+export type { TypeListExhaustive, IndexFieldSpec } from './registry-core'
 
 /** 载荷字段的形态（校验器据此做必填/类型检查，P18-B 落地执行） */
 export type FieldKind = 'string' | 'number' | 'boolean' | 'string[]' | 'asset' | 'asset[]' | 'object'
@@ -76,12 +57,6 @@ export interface FieldSpec {
   note?: string
 }
 
-/** 索引维度：`exact` 走倒排（O(命中数)），`prefix`/`substring` 走扫描（当前是性能热点） */
-export interface IndexFieldSpec {
-  field: string
-  mode: 'exact' | 'prefix' | 'substring'
-}
-
 /** 学习消费适配（P18-E 接线；本 Wave 只声明意图） */
 export interface LearningAdapter {
   /**
@@ -93,24 +68,21 @@ export interface LearningAdapter {
   progressKind: 'word' | 'media' | 'unit'
 }
 
-export interface ContentTypeDescriptor {
-  type: ContentType
+/**
+ * 全量描述 = 运行时面（`ContentTypeCoreDescriptor`，由 CORE 展开继承）+ 富元数据。
+ * 用 `extends` 而不是重写同名字段：编译期保证两者不会各自漂移。
+ */
+export interface ContentTypeDescriptor extends ContentTypeCoreDescriptor {
   /** 类型维度文案（**禁止**再拿 `bank.*` 的词库语义硬套到听力/阅读上） */
   i18n: { labelKey: string; unitKey: string }
-  /** 该类型的条目级 ContentId 用哪个 type 段（vocabulary 的条目是 word，其余同名） */
-  itemType: ContentType
   /** 是否属"内容包"维度（false = 条目级类型，不出现在 Catalog 的类型列表里） */
   packageLevel: boolean
   /** 已有内容包（含结构探针 demo，见 catalog.ts 的诚实原则） */
   packageRegistered: boolean
-  /** 条目可被 Query 检索（P18-E 逐类型开启） */
-  queryEnabled: boolean
   /** 载荷字段模型 */
   fields: FieldSpec[]
   /** 该类型是否必须有资产（如 audio 必须有音频文件） */
   assets: { required: AssetKind[]; optional: AssetKind[] }
-  /** 检索适配：由 P18-E 的 index/query 派生消费，勿在别处另写一份 */
-  query: { index: IndexFieldSpec[]; match: IndexFieldSpec[]; sort: string[] }
   learning?: LearningAdapter
   note?: string
 }
@@ -127,55 +99,39 @@ const VOCAB_ITEM_FIELDS: FieldSpec[] = [
   { name: 'definition', required: false, kind: 'string' },
 ]
 
-const VOCAB_QUERY = {
-  index: [{ field: 'word', mode: 'exact' as const }],
-  match: [
-    { field: 'word', mode: 'prefix' as const },
-    { field: 'translation', mode: 'substring' as const },
-    // 声明补齐（P18-E）：rank2 一直也匹配 definition（旧实现里是硬编码判断），
-    // 只是本清单漏写 ⇒ 「声明少一条」的漂移。查询层改成由本清单派生后，声明必须与行为一致。
-    { field: 'definition', mode: 'substring' as const },
-  ],
-  sort: ['relevance', 'word'],
-}
-
 /**
- * 注册表的**唯一**数据。新增类型 = 在这里加一条（不要新建 per-type 文件）。
+ * 注册表的**唯一**数据（全量面）。新增类型 = 在这里加一条（不要新建 per-type 文件），
+ * 并同步在 `registry-core.ts` 加对应的运行时投影条目（判据 J 的第 1 条会双向判红）。
+ *
+ * 每条的 `...CONTENT_TYPE_CORE.x` 是**运行时四字段的唯一来源**，结构上也只能有一个来源：
+ * 展开后再写 `itemType` / `queryEnabled` / `query` 会让两个面分家 —— 那是判据 J 要抓的违规。
  * 顺序与 ContentType 联合保持一致，便于人读比对。
  */
 export const CONTENT_TYPE_REGISTRY: Readonly<Record<ContentType, ContentTypeDescriptor>> = {
   word: {
-    type: 'word',
+    ...CONTENT_TYPE_CORE.word,
     i18n: { labelKey: 'type.word.label', unitKey: 'type.word.unit' },
-    itemType: 'word',
     packageLevel: false, // 条目级类型：词条不属于任何包的子类型，不进 Catalog 类型列表
     packageRegistered: true,
-    queryEnabled: true, // ← 当前唯一可查询的**条目级**类型（vocabulary 的条目也走它）
     fields: VOCAB_ITEM_FIELDS,
     assets: { required: [], optional: ['audio'] },
-    query: VOCAB_QUERY,
     learning: { progressKind: 'word' },
   },
   vocabulary: {
-    type: 'vocabulary',
+    ...CONTENT_TYPE_CORE.vocabulary,
     i18n: { labelKey: 'type.vocabulary.label', unitKey: 'type.vocabulary.unit' },
-    itemType: 'word',
     packageLevel: true,
     packageRegistered: true,
-    queryEnabled: false, // 包级类型本身不直接可查；其条目以 `word` 类型被查询
     fields: VOCAB_ITEM_FIELDS,
     assets: { required: [], optional: ['audio'] },
-    query: VOCAB_QUERY,
     learning: { progressKind: 'word' },
     note: '包级容器类型；条目级查询走 itemType=word。10 个词汇包 = 9346 词。',
   },
   listening: {
-    type: 'listening',
+    ...CONTENT_TYPE_CORE.listening,
     i18n: { labelKey: 'type.listening.label', unitKey: 'type.listening.unit' },
-    itemType: 'listening',
     packageLevel: true,
     packageRegistered: true,
-    queryEnabled: false,
     fields: [
       ID_FIELD,
       TITLE_FIELD,
@@ -185,20 +141,13 @@ export const CONTENT_TYPE_REGISTRY: Readonly<Record<ContentType, ContentTypeDesc
       { name: 'durationSec', required: false, kind: 'number' },
     ],
     assets: { required: ['audio'], optional: ['subtitle', 'image'] },
-    query: {
-      index: [{ field: 'id', mode: 'exact' }],
-      match: [{ field: 'title', mode: 'substring' }, { field: 'transcript', mode: 'substring' }],
-      sort: ['relevance', 'title'],
-    },
     learning: { progressKind: 'media' },
   },
   audio: {
-    type: 'audio',
+    ...CONTENT_TYPE_CORE.audio,
     i18n: { labelKey: 'type.audio.label', unitKey: 'type.audio.unit' },
-    itemType: 'audio',
     packageLevel: true,
     packageRegistered: true,
-    queryEnabled: false,
     fields: [
       ID_FIELD,
       TITLE_FIELD,
@@ -206,17 +155,13 @@ export const CONTENT_TYPE_REGISTRY: Readonly<Record<ContentType, ContentTypeDesc
       { name: 'transcript', required: false, kind: 'string' },
     ],
     assets: { required: ['audio'], optional: ['subtitle'] },
-    query: { index: [{ field: 'id', mode: 'exact' }], match: [{ field: 'title', mode: 'substring' }], sort: ['relevance', 'title'] },
     learning: { progressKind: 'media' },
   },
   reading: {
-    type: 'reading',
+    ...CONTENT_TYPE_CORE.reading,
     i18n: { labelKey: 'type.reading.label', unitKey: 'type.reading.unit' },
-    itemType: 'reading',
     packageLevel: true,
     packageRegistered: true,
-    // P18-E 首个放开的非 word 类型（放开 = 启用集 / 包路由 / 索引 / 结果形状四段齐备）
-    queryEnabled: true,
     fields: [
       ID_FIELD,
       TITLE_FIELD,
@@ -225,42 +170,29 @@ export const CONTENT_TYPE_REGISTRY: Readonly<Record<ContentType, ContentTypeDesc
       { name: 'questions', required: false, kind: 'object' },
     ],
     assets: { required: [], optional: ['image', 'audio'] },
-    query: {
-      index: [{ field: 'id', mode: 'exact' }],
-      match: [{ field: 'title', mode: 'substring' }, { field: 'body', mode: 'substring' }],
-      sort: ['relevance', 'title'],
-    },
     learning: { progressKind: 'unit' },
   },
   topic: {
-    type: 'topic',
+    ...CONTENT_TYPE_CORE.topic,
     i18n: { labelKey: 'type.topic.label', unitKey: 'type.topic.unit' },
-    itemType: 'topic',
     packageLevel: true,
     packageRegistered: true,
-    queryEnabled: false,
     fields: [ID_FIELD, TITLE_FIELD, { name: 'description', required: false, kind: 'string' }],
     assets: { required: [], optional: ['image'] },
-    query: { index: [{ field: 'id', mode: 'exact' }], match: [{ field: 'title', mode: 'substring' }], sort: ['relevance', 'title'] },
   },
   exercise: {
-    type: 'exercise',
+    ...CONTENT_TYPE_CORE.exercise,
     i18n: { labelKey: 'type.exercise.label', unitKey: 'type.exercise.unit' },
-    itemType: 'exercise',
     packageLevel: true,
     packageRegistered: true,
-    queryEnabled: false,
     fields: [ID_FIELD, TITLE_FIELD, { name: 'questions', required: false, kind: 'object' }],
     assets: { required: [], optional: ['audio', 'image'] },
-    query: { index: [{ field: 'id', mode: 'exact' }], match: [{ field: 'title', mode: 'substring' }], sort: ['relevance', 'title'] },
   },
   writing: {
-    type: 'writing',
+    ...CONTENT_TYPE_CORE.writing,
     i18n: { labelKey: 'type.writing.label', unitKey: 'type.writing.unit' },
-    itemType: 'writing',
     packageLevel: true,
     packageRegistered: true,
-    queryEnabled: false,
     fields: [
       ID_FIELD,
       TITLE_FIELD,
@@ -269,16 +201,13 @@ export const CONTENT_TYPE_REGISTRY: Readonly<Record<ContentType, ContentTypeDesc
       { name: 'wordLimit', required: false, kind: 'number' },
     ],
     assets: { required: [], optional: ['image'] },
-    query: { index: [{ field: 'id', mode: 'exact' }], match: [{ field: 'title', mode: 'substring' }], sort: ['relevance', 'title'] },
     learning: { progressKind: 'unit' },
   },
   speaking: {
-    type: 'speaking',
+    ...CONTENT_TYPE_CORE.speaking,
     i18n: { labelKey: 'type.speaking.label', unitKey: 'type.speaking.unit' },
-    itemType: 'speaking',
     packageLevel: true,
     packageRegistered: true,
-    queryEnabled: false,
     fields: [
       ID_FIELD,
       TITLE_FIELD,
@@ -286,16 +215,13 @@ export const CONTENT_TYPE_REGISTRY: Readonly<Record<ContentType, ContentTypeDesc
       { name: 'sample', required: false, kind: 'string' },
     ],
     assets: { required: [], optional: ['audio'] },
-    query: { index: [{ field: 'id', mode: 'exact' }], match: [{ field: 'title', mode: 'substring' }], sort: ['relevance', 'title'] },
     learning: { progressKind: 'unit' },
   },
   grammar: {
-    type: 'grammar',
+    ...CONTENT_TYPE_CORE.grammar,
     i18n: { labelKey: 'type.grammar.label', unitKey: 'type.grammar.unit' },
-    itemType: 'grammar',
     packageLevel: true,
     packageRegistered: false, // 尚无包（catalog 诚实报 0）
-    queryEnabled: false,
     fields: [
       ID_FIELD,
       TITLE_FIELD,
@@ -303,39 +229,30 @@ export const CONTENT_TYPE_REGISTRY: Readonly<Record<ContentType, ContentTypeDesc
       { name: 'examples', required: false, kind: 'string[]' },
     ],
     assets: { required: [], optional: [] },
-    query: { index: [{ field: 'id', mode: 'exact' }], match: [{ field: 'title', mode: 'substring' }], sort: ['relevance', 'title'] },
     learning: { progressKind: 'unit' },
   },
   document: {
-    type: 'document',
+    ...CONTENT_TYPE_CORE.document,
     i18n: { labelKey: 'type.document.label', unitKey: 'type.document.unit' },
-    itemType: 'document',
     packageLevel: true,
     packageRegistered: false,
-    queryEnabled: false,
     fields: [ID_FIELD, TITLE_FIELD, { name: 'summary', required: false, kind: 'string' }],
     assets: { required: ['document'], optional: ['image'] },
-    query: { index: [{ field: 'id', mode: 'exact' }], match: [{ field: 'title', mode: 'substring' }], sort: ['relevance', 'title'] },
   },
   collection: {
-    type: 'collection',
+    ...CONTENT_TYPE_CORE.collection,
     i18n: { labelKey: 'type.collection.label', unitKey: 'type.collection.unit' },
-    itemType: 'collection',
     packageLevel: true,
     packageRegistered: true,
-    queryEnabled: false,
     fields: [ID_FIELD, TITLE_FIELD, { name: 'description', required: false, kind: 'string' }],
     assets: { required: [], optional: [] },
-    query: { index: [{ field: 'id', mode: 'exact' }], match: [{ field: 'title', mode: 'substring' }], sort: ['relevance', 'title'] },
     note: '集合靠 relation 层描述成员关系（relations.json），不在此内联成员列表。',
   },
   course: {
-    type: 'course',
+    ...CONTENT_TYPE_CORE.course,
     i18n: { labelKey: 'type.course.label', unitKey: 'type.course.unit' },
-    itemType: 'course',
     packageLevel: true,
     packageRegistered: false, // P18-A 新增类型：契约先立，内容后进
-    queryEnabled: false,
     fields: [
       ID_FIELD,
       TITLE_FIELD,
@@ -344,17 +261,14 @@ export const CONTENT_TYPE_REGISTRY: Readonly<Record<ContentType, ContentTypeDesc
       { name: 'lessonIds', required: false, kind: 'string[]', note: 'lesson 的本地 id 列表；顺序即课程顺序' },
     ],
     assets: { required: [], optional: ['image'] },
-    query: { index: [{ field: 'id', mode: 'exact' }], match: [{ field: 'title', mode: 'substring' }], sort: ['relevance', 'title'] },
     learning: { progressKind: 'unit' },
     note: 'P18-A 新增。课程 → lesson → 条目 的三级结构，成员关系用 lessonIds / relation 表达。',
   },
   lesson: {
-    type: 'lesson',
+    ...CONTENT_TYPE_CORE.lesson,
     i18n: { labelKey: 'type.lesson.label', unitKey: 'type.lesson.unit' },
-    itemType: 'lesson',
     packageLevel: true,
     packageRegistered: false,
-    queryEnabled: false,
     fields: [
       ID_FIELD,
       TITLE_FIELD,
@@ -363,7 +277,6 @@ export const CONTENT_TYPE_REGISTRY: Readonly<Record<ContentType, ContentTypeDesc
       { name: 'itemIds', required: false, kind: 'string[]' },
     ],
     assets: { required: [], optional: ['audio', 'image'] },
-    query: { index: [{ field: 'id', mode: 'exact' }], match: [{ field: 'title', mode: 'substring' }], sort: ['relevance', 'title'] },
     learning: { progressKind: 'unit' },
     note: 'P18-A 新增。Lesson 是学习单元（不直接承载媒体），媒体挂在 lesson 的条目上。',
   },
@@ -371,21 +284,15 @@ export const CONTENT_TYPE_REGISTRY: Readonly<Record<ContentType, ContentTypeDesc
 
 /* ------------------------------------------------------------------ *
  * 派生（消费者只读这些，不要各自遍历注册表）
+ *
+ * ⚠️ `descriptorOf` / `queryEnabledTypes` 已在文件头 re-export 自 `./registry-core`
+ *    （运行时面）—— 它们的**定义**只有一份，别在这里再写一遍。
  * ------------------------------------------------------------------ */
 
-/** 条目可被 Query 检索的类型集合（P18-E 接线时由 query 层消费） */
-export function queryEnabledTypes(): ContentType[] {
-  return (Object.keys(CONTENT_TYPE_REGISTRY) as ContentType[]).filter((t) => CONTENT_TYPE_REGISTRY[t].queryEnabled)
-}
-
-/** 包级类型集合（= Catalog 的类型维度应列出的类型） */
+/** 包级类型集合（= Catalog 的类型维度应列出的类型）。
+ *  `packageLevel` 是富元数据（运行时零消费者）⇒ 只在本文件（全量面）派生。 */
 export function packageLevelTypes(): ContentType[] {
   return (Object.keys(CONTENT_TYPE_REGISTRY) as ContentType[]).filter((t) => CONTENT_TYPE_REGISTRY[t].packageLevel)
-}
-
-/** 取类型描述；未知类型返回 null（不抛异常，调用方决定 fallback） */
-export function descriptorOf(type: string): ContentTypeDescriptor | null {
-  return (CONTENT_TYPE_REGISTRY as Record<string, ContentTypeDescriptor>)[type] ?? null
 }
 
 /** 该类型条目的 ContentId type 段 */

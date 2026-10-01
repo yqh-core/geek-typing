@@ -30,8 +30,10 @@ import type { ContentPackage } from '../registry'
 import { parseContentId, wordId } from '../model/content'
 import type { ContentType } from '../model/content'
 import { buildHits, ensureIndex, findById, findByPackage, findByWord, idsByPackage, normalizeWord } from '../index/content-index'
-import { CONTENT_TYPE_REGISTRY, descriptorOf, queryEnabledTypes } from '../types/registry'
-import type { ContentTypeDescriptor } from '../types/registry'
+/* P18-E′：运行时只读**薄表**（registry-core）—— 全表 registry.ts 的富元数据（i18n /
+ * learning / packageLevel）在 src/ 内零消费者，读它会把那部分死重重新拖进主包（裁定 §⑫）。 */
+import { CONTENT_TYPE_CORE, descriptorOf, queryEnabledTypes } from '../types/registry-core'
+import type { ContentTypeCoreDescriptor } from '../types/registry-core'
 
 /** 检索结果（word 族）：一条词条 + 它所在的内容包上下文 */
 export interface WordHit {
@@ -198,8 +200,8 @@ function resolveTypes(type: ContentType | 'all'): ContentType[] {
 function packageTypesOf(type: ContentType): ContentType[] {
   const itemType = descriptorOf(type)?.itemType
   if (!itemType) return []
-  return (Object.keys(CONTENT_TYPE_REGISTRY) as ContentType[]).filter(
-    (t) => CONTENT_TYPE_REGISTRY[t].itemType === itemType,
+  return (Object.keys(CONTENT_TYPE_CORE) as ContentType[]).filter(
+    (t) => CONTENT_TYPE_CORE[t].itemType === itemType,
   )
 }
 
@@ -235,7 +237,7 @@ function fieldValueOf(hit: ContentHit, field: string): string | undefined {
  *  - 都不命中 ⇒ -1。
  * 对 word 族（match = word(prefix) + translation/definition(substring)）**逐字还原**今天的三档语义。
  */
-function matchRank(hit: ContentHit, d: ContentTypeDescriptor | null, q: string): number {
+function matchRank(hit: ContentHit, d: ContentTypeCoreDescriptor | null, q: string): number {
   const specs = d?.query.match ?? []
   for (const spec of specs) {
     if (spec.mode !== 'prefix') continue
@@ -252,7 +254,7 @@ function matchRank(hit: ContentHit, d: ContentTypeDescriptor | null, q: string):
 
 /** 精确命中（rank 0）：非 word 族按 `descriptor.query.index` 的 exact 字段逐个比对。
  *  用 Set 去重由调用方负责（同一条 hit 不许因多个 exact 声明被收两次）。 */
-function isExactHit(hit: ContentHit, d: ContentTypeDescriptor | null, q: string): boolean {
+function isExactHit(hit: ContentHit, d: ContentTypeCoreDescriptor | null, q: string): boolean {
   return (d?.query.index ?? []).some(
     (spec) => spec.mode === 'exact' && norm(fieldValueOf(hit, spec.field) ?? '') === q,
   )

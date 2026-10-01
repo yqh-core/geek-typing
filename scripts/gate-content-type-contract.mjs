@@ -53,20 +53,34 @@
  *                       `query.match` 的字段：word 族必须在 `WORD_FIELDS` 键集内；非 word 族无限制。
  *                       意义：这正是「`VOCAB_QUERY.match` 漏声明 definition、代码却在匹配它」
  *                       那类**声明 ⟷ 行为漂移**的守卫（P18-E 实测捕获的那次漂移）。
+ *   J CORE⟷全表一致   —— P18-E′（裁定 §⑫）把运行时面投影成 `types/registry-core.ts`（薄表：
+ *                       type/itemType/queryEnabled/query），全表 `registry.ts` 改为**由 CORE 展开派生**。
+ *                       展开派生的好处是"结构上不可能分家"，但它**并不能**阻止有人在展开后再覆盖
+ *                       ⇒ 必须有机器判据。三条子判据：
+ *                         J1 键集合三者相等：`CONTENT_TYPES` == `keys(CONTENT_TYPE_CORE)` ==
+ *                            `keys(CONTENT_TYPE_REGISTRY)`，**双向**（源多一个 / 少一个都判红）；
+ *                         J2 逐值相等：每个类型的 `itemType` / `queryEnabled` / `query`，
+ *                            CORE 与 REGISTRY 必须相等（专抓"展开后又覆盖"）；
+ *                         J3 **反向守卫（防空转）**：CORE 非空且至少含 `word` + 一个 packageLevel
+ *                            类型 —— 否则 J2 会在空表上**恒真**，J 就成了"永远不会响的锁"。
+ *                       ⚠️ 为什么证伪注入必须落在**全表侧**（在 REGISTRY 展开后覆盖），不能落在 CORE：
+ *                          REGISTRY 是由 CORE **展开**出来的，改 CORE 会让两边同步跟着改 ⇒
+ *                          J2 的值比较恒等、J 永不判红（那样"证伪"会是假的）。真正能让两个面分家的
+ *                          只有"展开后再覆盖" —— 那正是 J 要抓的违规（实测见用例 J 的 why）。
  *
  * 退出码（与本仓其它门同族）：
  *   0 = PASS；1 = FAIL；2 = 脚本自身错误（模块加载失败 / 关键声明解析不出 —— **绝不降级成 PASS**）
  *
  * 用法：
- *   npm run gate:content-type-contract              # 常规判据 A–H（含 H3）+ I/I2
+ *   npm run gate:content-type-contract              # 常规判据 A–H（含 H3）+ I/I2 + J
  *   npm run gate:content-type-contract -- --falsify # 证伪自检（见下）
  *
  * 为什么自带 --falsify：**不会失败的门等于没有门**。
  *   常规模式只证明"当前代码通过"；--falsify 逐条植入故障、断言**恰好该判据判红**、
  *   再字节级还原并跑对照组复绿 —— 证明这些判据不是恒真的空转。
  *   断言用"命中集精确等于 {该判据}"而非"包含"：既证明它能判红，也证明它不越界误伤。
- *   用例共 **12 条**：A/B/C/D/G/H/H3 各一条 + E 一条（硬编码回退，见下）+ I 四条
- *   （I-routing 路由破坏 / I-phonetic 守卫丢失 / I-sort 主序中性 / I2 声明漂移）。
+ *   用例共 **13 条**：A/B/C/D/G/H/H3 各一条 + E 一条（硬编码回退，见下）+ I 四条
+ *   （I-routing 路由破坏 / I-phonetic 守卫丢失 / I-sort 主序中性 / I2 声明漂移）+ J 一条。
  *   I 的四条对应判据 I 的四类断言（逐条证明可证伪，不留"恒真断言"）。
  *
  *   ⚠️ 与裁定 §⑨-7 的字面差异（**实测纠正**，不是放松断言）：裁定写「E 改写用例 ⇒ 恰好 {E}」，
@@ -104,6 +118,8 @@ const MODEL_DIR_REL = 'src/core/content/model'
 const MODEL_ALLOWLIST = new Set(['content.ts', 'vocabulary.ts', 'asset.ts', 'snapshot.ts'])
 
 const F_REGISTRY = 'src/core/content/types/registry.ts'
+/** P18-E′ 的运行时薄表（判据 J 比对 CORE ⟷ REGISTRY） */
+const F_REGISTRY_CORE = 'src/core/content/types/registry-core.ts'
 const F_CONTENT = 'src/core/content/model/content.ts'
 const F_ASSET = 'src/core/content/model/asset.ts'
 const F_CATALOG = 'src/core/content/catalog/catalog.ts'
@@ -119,7 +135,7 @@ const F_VALIDATE = 'scripts/content/validate.mjs'
 const F_PKG_REGISTRY = 'src/core/content/registry.ts'
 
 /** G 判据的编译单元：契约本身 + 它的两个类型依赖（独立小程序，不必跑全项目 tsc） */
-const CONTRACT_UNITS = [F_REGISTRY, F_CONTENT, F_ASSET]
+const CONTRACT_UNITS = [F_REGISTRY, F_REGISTRY_CORE, F_CONTENT, F_ASSET]
 /** 只认这些文件里的诊断 —— 契约单元之外的报错属于构建门，不在本门职责内 */
 const DIAG_SCOPE = /\/src\/core\/content\/(types|model)\//
 
@@ -745,6 +761,80 @@ async function runChecks() {
         )
       }
     }
+
+    /* ---------- J. CORE ⟷ REGISTRY 投影一致（P18-E′，裁定 §⑫-4） ---------- */
+    {
+      const core = await load(`/${F_REGISTRY_CORE}`)
+      const { CONTENT_TYPES: coreTypes, CONTENT_TYPE_CORE } = core
+      if (!coreTypes || !CONTENT_TYPE_CORE) {
+        throw new Fatal(
+          `${F_REGISTRY_CORE} 未导出 CONTENT_TYPES / CONTENT_TYPE_CORE —— 解析失败绝不降级成 PASS`,
+        )
+      }
+      const coreKeys = Object.keys(CONTENT_TYPE_CORE)
+
+      /* J1 键集合三者相等（**双向**：源多一个 / 少一个都判红） */
+      let badKeys = 0
+      const pairs = [
+        ['CONTENT_TYPES', [...CONTENT_TYPES], 'keys(CONTENT_TYPE_CORE)', coreKeys],
+        ['CONTENT_TYPES', [...CONTENT_TYPES], 'keys(CONTENT_TYPE_REGISTRY)', registryKeys],
+        ['keys(CONTENT_TYPE_CORE)', coreKeys, 'keys(CONTENT_TYPE_REGISTRY)', registryKeys],
+      ]
+      for (const [an, a, bn, b] of pairs) {
+        const as = new Set(a)
+        const bs = new Set(b)
+        const missing = a.filter((x) => !bs.has(x))
+        const extra = b.filter((x) => !as.has(x))
+        if (missing.length) {
+          fail('J', `J1 ${an} 有而 ${bn} 无：${missing.join(', ')}`)
+          badKeys++
+        }
+        if (extra.length) {
+          fail('J', `J1 ${bn} 有而 ${an} 无：${extra.join(', ')}`)
+          badKeys++
+        }
+      }
+      if (badKeys === 0) {
+        ok(`J1 键集合三者相等（${coreKeys.length} 个：CONTENT_TYPES == CORE == REGISTRY，双向）`)
+      }
+
+      /* J2 逐值相等：专抓「展开后又覆盖」—— 那是两个面唯一可能分家的方式 */
+      let badVal = 0
+      for (const t of coreKeys) {
+        const c = CONTENT_TYPE_CORE[t]
+        const r = CONTENT_TYPE_REGISTRY[t]
+        if (!r) continue // 键缺失已由 J1 判红，这里不重复报
+        if (c.itemType !== r.itemType) {
+          fail('J', `J2 ${t}.itemType 不一致：CORE='${c.itemType}' vs REGISTRY='${r.itemType}'（展开后覆盖了 itemType）`)
+          badVal++
+        }
+        if (c.queryEnabled !== r.queryEnabled) {
+          fail('J', `J2 ${t}.queryEnabled 不一致：CORE=${c.queryEnabled} vs REGISTRY=${r.queryEnabled}（展开后覆盖了 queryEnabled）`)
+          badVal++
+        }
+        if (JSON.stringify(c.query) !== JSON.stringify(r.query)) {
+          fail('J', `J2 ${t}.query 不一致：CORE=${JSON.stringify(c.query)} vs REGISTRY=${JSON.stringify(r.query)}（展开后覆盖了 query）`)
+          badVal++
+        }
+      }
+      if (badVal === 0) {
+        ok(`J2 逐值相等（${coreKeys.length} 个类型的 itemType / queryEnabled / query：CORE == REGISTRY）`)
+      }
+
+      /* J3 反向守卫（**防空转**）：空表上 J2 恒真 ⇒ 先证明 CORE 真的有东西可比 */
+      const pkgLevelInCore = coreKeys.filter((t) => CONTENT_TYPE_REGISTRY[t]?.packageLevel)
+      if (coreKeys.length === 0 || !coreKeys.includes('word') || pkgLevelInCore.length === 0) {
+        fail(
+          'J',
+          `J3 反向守卫：CORE 键数=${coreKeys.length}、含 word=${coreKeys.includes('word')}、packageLevel 类型数=${pkgLevelInCore.length}` +
+            ' —— 三者任一为零时 J2 会在空表上恒真，本判据即空转',
+        )
+      } else {
+        ok(
+          `J3 反向守卫（CORE ${coreKeys.length} 键、含 word、packageLevel 类型 ${pkgLevelInCore.length} 个 —— 比较对象非空，J2 不恒真）`,
+        )
+      }
+    }
   } finally {
     await server.close()
   }
@@ -761,11 +851,15 @@ async function runChecks() {
 const CASES = [
   {
     letter: 'A',
-    expect: ['A', 'G'],
-    why: 'CONTENT_TYPES 摘掉成员同时破坏运行时穷尽(A) 与编译期"联合⊆数组"锁(G) —— 两把锁本就该同时响',
+    expect: ['A', 'G', 'J'],
+    why:
+      'CONTENT_TYPES 摘掉成员同时破坏运行时穷尽(A) 与编译期"联合⊆数组"锁(G) —— 两把锁本就该同时响。' +
+      'P18-E′ 起再叠加一把：CONTENT_TYPES 与 CONTENT_TYPE_CORE 的键集合由 J1 对账（摘掉 lesson ' +
+      '⇒ CORE 仍 14 键而 CONTENT_TYPES 13 ⇒ J 判红）—— 同样是三把锁本该同时响，不是用例不隔离',
     name: '从运行时清单 CONTENT_TYPES 摘掉 lesson（注册表多出一个类型）',
     kind: 'edit',
-    file: F_REGISTRY,
+    // P18-E′：CONTENT_TYPES 的唯一定义已搬到 registry-core.ts（registry.ts 只 re-export）
+    file: F_REGISTRY_CORE,
     from: "  'lesson',\n] as const satisfies",
     to: '] as const satisfies',
   },
@@ -897,11 +991,28 @@ const CASES = [
       'exact 只允许 id ⇒ 只有 I2 判红。守的是「声明 ⟷ 行为漂移」：无人建倒排却先在声明里加 exact 字段',
     name: "给 reading 的 descriptor.query.index 加 { field: 'body', mode: 'exact' }（非 word 族 exact 只允许 'id'）",
     kind: 'edit',
-    file: F_REGISTRY,
+    // P18-E′：query 声明的唯一定义已搬到 registry-core.ts（registry.ts 由 CORE 展开继承）
+    file: F_REGISTRY_CORE,
     from: `      index: [{ field: 'id', mode: 'exact' }],
       match: [{ field: 'title', mode: 'substring' }, { field: 'body', mode: 'substring' }],`,
     to: `      index: [{ field: 'id', mode: 'exact' }, { field: 'body', mode: 'exact' }],
       match: [{ field: 'title', mode: 'substring' }, { field: 'body', mode: 'substring' }],`,
+  },
+  {
+    letter: 'J',
+    expect: ['J'],
+    why:
+      '在 REGISTRY（全表）的 reading 条目里 **`...CONTENT_TYPE_CORE.reading` 展开之后**覆盖 queryEnabled ' +
+      '⇒ CORE=true / REGISTRY=false，只有 J2（逐值相等）看得见；E/I/I2 分别只读 CORE 的启用集、CORE 的 itemType、' +
+      'REGISTRY 的 query（未被改），都不受影响。' +
+      '⚠️ **实测纠正**（裁定 §⑫-4 字面写的是「在 CORE 里把某类型的 queryEnabled 翻一下」）：REGISTRY 是由 CORE ' +
+      '**展开派生**的，改 CORE 会让两边同步跟着改 ⇒ J2 恒等，**实测命中集 = ∅、EXIT=0 全绿** —— 那样的"证伪"是假的。' +
+      '能让两个面分家的只有「展开后再覆盖」，那正是 J 要抓的违规，故注入落在全表侧',
+    name: '在 REGISTRY 的 reading 条目里于展开之后覆盖 queryEnabled:false（CORE 与 REGISTRY 两个面分家）',
+    kind: 'edit',
+    file: F_REGISTRY,
+    from: '    ...CONTENT_TYPE_CORE.reading,\n    i18n:',
+    to: '    ...CONTENT_TYPE_CORE.reading,\n    queryEnabled: false,\n    i18n:',
   },
 ]
 

@@ -18,7 +18,7 @@
 import { getAllPackages, getPackage, loadPackage, loadPackageData } from '../registry'
 import { makeContentId, parseContentId } from '../model/content'
 import type { ContentType } from '../model/content'
-import { descriptorOf } from '../types/registry'
+import { descriptorOf } from '../types/registry-core'
 import { isWordHit } from '../query/content-query'
 import type { ContentHit, ContentItemHit, WordHit } from '../query/content-query'
 
