@@ -209,6 +209,45 @@ export const WARMUP_IDS = ['ielts', 'toefl', 'kaoyan'] as const
 
 ---
 
+## 9.2.10 收口补记 3：语义类警告清零（C 步 H4，`073a951`）
+
+### 为什么这批最该单独讲
+
+53 条里有 33 条是机械删除（H1），剩下 20 里 H2/H3/H5 也是"动结构不动语义"，
+**唯独 H4 这 10 条每一处都在改 effect 时序** —— `exhaustive-deps` 去掉一个依赖、`set-state-in-effect`
+改一处 setState 的时机，都会真实改变组件重渲染的节奏。所以这批的原则不是"怎么消警"，
+而是**先写清"这个 dep / 这次 setState 当初为什么存在"，再决定改法**。
+
+### 九处逐条判断（结论都写进了代码注释）
+
+| 处 | 告警 | 判断 |
+|---|---|---|
+| `useReviewFlow:48/52/55` | tab 是 unnecessary dep | `tab` 是**刷新信号**：切页签要重算（背单词页三键打分不走本 hook ⇒ 不 bump `reviewVersion`）。删掉它 = "切回复习页后到期数还是旧值"这个真实缺陷回来。改法 = memo 体显式读一次 `void tab`（与既有 `void reviewVersion` 同套路），deps 不动 |
+| `useTypingRound:310` | currentWpm 是 missing dep | `useCallback([])` 只读 refs，补进 deps 无副作用 |
+| `useBank:21/46` | set-state-in-effect ×2 | 改 React 官方 **render 阶段调整 state**；切库重载 / 「加载词库中」占位 / 两条路径边界均未变 |
+| `BankManager:36` | set-state-in-effect | 同上。**先排查语义差异**：关面板只有两条出口且都翻 false，故"A 路径关 → B 路径打开"必夹一次 false→true；`open` 恒 true 时原 effect 也不重跑 ⇒ 无漏刷点 |
+| `ReviewPanel:50/55` | purity（`Date.now()`） | 收敛成"一次版本刷新一个时间快照"，`due`/`shown` 共用。**行为差异（有意为之）**：版本不变的额外 re-render 里 `now` 冻结；被 `views` 兜住（到期清单只在版本变化重建 ⇒ 冻结只造成假阳性，不会漏判） |
+
+### 一条"反让步"的核验
+
+`ReviewPanel:63` 的 `// eslint-disable-next-line react/purity` 是这批唯一的 disable。
+**专项核验它是不是遮羞布**：临时删掉 ⇒ oxlint 立刻重报
+"`Date.now` is an impure function. Calling an impure function can produce unstable results…"；
+加回 ⇒ 0 条。结论：这是**必要且有依据的例外**，不是为了让门绿而开的口子。
+
+### 代价与本轮实测
+
+- 10 条 → 0，`gate:lint` 基线棘轮随之 record 到 0（10 → 0，只许降不许升）。
+  意味着**任何一条新 warning 都会让 CI 的 `gate-static` 红 ⇒ 部署不触发** —— 有意的硬锁，
+  但行动升级与棘轮叠在同一个 push 首次跑 CI，失败时要能分清是哪一项
+  （见 `ENGINEERING-HYGIENE-PLAN.md` §2.7）。
+- 实测：oxlint `diagnostics.length` = 0；`tsc -b` EXIT=0；`build` EXIT=0；
+  `test:e2e` **170 / 170 通过 0 失败**；`gate:todo` PASS（登记 12 / 命中 12 / 违规 0）；
+  `gate:license` / `test:content` / `content:validate` / `check:bundle` 全 EXIT=0；
+  `gate:lint:falsify` 两条注入均成立（注入 1 条未用变量 ⇒ 立刻 FAIL；删基线 ⇒ UNKNOWN）。
+
+---
+
 ## 9.5 7 个 inline 词库改 lazy 【本步定口径，实施待排】
 
 ### 9.5.1 现状（实测）

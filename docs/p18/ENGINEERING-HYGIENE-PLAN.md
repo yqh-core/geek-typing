@@ -81,10 +81,10 @@ npx oxlint --format=json > <临时文件>    # 解析 r.diagnostics[].code / .fi
 | 批 | 内容 | 条数 | 验证 | 风险 | 状态 |
 |---|---|---:|---|---|---|
 | **H1** | `no-unused-vars`(31) + `no-useless-escape`(1) + `no-irregular-whitespace`(1) —— 纯机械删除 | 33 | 全套测试 + tsc + 三个门禁 | **低**（但见下方"假清理"陷阱） | ✅ 已做（53 → **20**） |
-| **H2** | `no-control-regex`(5) —— 逐个查不可见字符来源 | 5 | 同上 + 内容门禁（`content:validate`） | 低中 | 待做 |
-| **H3** | `no-eval`(2) —— 人工审 + 加受控说明 | 2 | 安全审读留档 | **高（最该优先看）** | 待做（搁在 H1 之后做，见 §2.3） |
-| **H4** | `exhaustive-deps`(5) + `set-state-in-effect`(3) + `purity`(2) —— 语义改动 | 10 | 全套测试 + **人工过交互路径** | 中高 | 待做 |
-| **H5** | `only-export-components`(3) —— 结构拆分 | 3 | 构建 + ui-contract 探针 | 中（拆文件动 import 面） | 待做 |
+| **H2** | `no-control-regex`(5) —— 逐个查不可见字符来源 | 5 | 同上 + 内容门禁（`content:validate`） | 低中 | ✅ 已做（20 → **13**，见 §2.4） |
+| **H3** | `no-eval`(2) —— 人工审 + 加受控说明 | 2 | 安全审读留档 | **高（最该优先看）** | ✅ 已做（`29374ef`，**2 → 0**） |
+| **H4** | `exhaustive-deps`(5) + `set-state-in-effect`(3) + `purity`(2) —— 语义改动 | 10 | 全套测试 + **人工过交互路径** | 中高 | ✅ 已做（`073a951`，**10 → 0**，见 §2.5） |
+| **H5** | `only-export-components`(3) —— 结构拆分 | 3 | 构建 + ui-contract 探针 | 中（拆文件动 import 面） | ✅ 已做（`a387575`，**3 → 0**） |
 
 ### 2.1 H1 的"假清理"陷阱（必须写进实施要求）
 
@@ -138,6 +138,47 @@ oxlint 默认对 `_` 前缀放行（`argsIgnorePattern` 类配置）—— 实�
 - `src/main.tsx` 里"预拉 ielts/kaoyan/toefl 三个大库"的注释已删（9.2 之后它就是错的），
   改成指向 `registry.ts` 的 `WARMUP_IDS`。
 
+### 2.4 H2 / H3 / H5 收口（`33a9a07` / `29374ef` / `a387575`）
+
+三条机械/结构批次一并记在这里，详细论据见 `docs/p18/DECISIONS-POST-P18.md` §9.2.8 / §9.2.9。
+
+| 批 | 规则 | 处置 | 条数 |
+|---|---|---|---:|
+| H2 | `no-control-regex`(5) | 控制字符判定收敛到**单一事实源** `scripts/content/control-chars.mjs`（JS 侧）+ `src/core/content/model/content.ts` 的 `isControlChar`（TS 侧镜像）。**不用正则**：`[\u0000-\u001F\u007F]` 字面量报、`new RegExp('[\\u0000-\\u001F\\u007F]')` 因常量折叠照样报、`\p{Cc}` 会多吃 U+0080–U+009F（C1）从而动到 content。改用 `codePointAt` 码点判断 | 5 → 0 |
+| H3 | `no-eval`(2) | `tests/browser-migration-e2e.mjs` 删掉 `PROVIDER_SOURCE` 模板串与两处 `eval`，改为传 `PROVIDER_DATA` 在页内就地拼 provider —— **测试夹具里的受控 eval 本来也不是隐患，但留下它会让"安全类告警归零"永远差一条** | 2 → 0 |
+| H5 | `only-export-components`(3) | `src/i18n/` 拆成三分文件：`context.ts`（`LangContext` + `Lang` 类型）/ `index.tsx`（只剩 `LangProvider` 组件）/ `hooks.ts`（`useLang`/`useT`，原样搬、函数体未改）；`toWordBank` 从 `BankManager.tsx` 挪到 `src/lib/customBanks.ts` | 3 → 0 |
+
+H2 的等价性对照与双侧证伪（注入 `isControlChar => false` 各判红 3 条、互不串味）记在
+`DECISIONS-POST-P18.md` §9.2.9。oxlint total 因此走 53 → 20（H1）→ 13 → 10。
+
+### 2.5 H4 收口（`073a951`）：语义警告 10 → 0
+
+**这是全批风险最高的一条**（会动 effect 时序），处置原则：**每一处都先写清「这个 dep / 这次 setState 为什么存在」，再决定怎么改**，不许为了消警删掉它。
+
+| 处 | 告警 | 判断与改法 |
+|---|---|---|
+| `useReviewFlow.ts:48/52/55` | exhaustive-deps「unnecessary dependency: tab」 | `tab` 是**刷新信号不是真依赖**（注释：切页签也算刷新一次，背单词页三键打分不经过本 hook ⇒ 不 bump `reviewVersion`）。把它从 deps 删掉 = 让「切页签后到期数仍是旧值」这个真实缺陷回来。改成在 memo 体里显式读一次 `void tab`（与同文件既有 `void reviewVersion` 同一写法），deps 保持 `[reviewVersion, tab]` |
+| `useTypingRound.ts:310` | exhaustive-deps「missing dependency: currentWpm」 | `currentWpm` 是 `useCallback(..., [])` 只读 refs，闭包稳定 —— 直接补进 deps 数组，无时序变化 |
+| `useBank.ts:21/46` | set-state-in-effect ×2 | 改 React 官方的 **render 阶段调整 state**（`customBanksFor` / `bankWordsFor` 记住"这份数据是为哪个参数取的"）。切库重载、懒词库「加载词库中」占位、两条路径边界（ready 非空 ⇒ 同步填且不走异步 / ready 为空 ⇒ 占位 + 异步）均未变 |
+| `BankManager.tsx:36` | set-state-in-effect | 同上改 render 阶段调整。**先查清语义差异**：关面板只有两条出口且都翻成 false，故「A 路径关 → B 路径打开」必然夹一次 false→true；`open` 恒 true 时原 effect 也不重跑 ⇒ 不存在漏刷点 |
+| `ReviewPanel.tsx:50/55` | purity（render 里 `Date.now()`） | 收敛成「一次版本刷新一个时间快照」`now = useMemo(() => Date.now(), [reviewVersion])`，`due` 与 `shown` 共用。**行为差异（有意为之）**：reviewVersion 不变的额外 re-render（展开词条、切语言）里 `now` 冻结而非刷新；影响面被 `views` 兜住（到期清单只在版本变化重建 ⇒ 冻结只会造成假阳性，不会漏判） |
+
+**对"用 disable 掩盖问题"的专项核验**：`ReviewPanel.tsx:63` 那条 `// eslint-disable-next-line react/purity`
+实测必要 —— 临时删掉它，oxlint 立刻重报 `react(purity)`："`Date.now` is an impure function…"；
+加回即 0 条。这条 disable 是**有依据的例外**，不是遮羞布。
+
+**实测**：oxlint `diagnostics.length` = 0；`tsc -b` EXIT=0；`build` EXIT=0；
+`test:e2e` **170/170 通过 0 失败**（EXIT=0）；`gate:todo` PASS（登记 12 / 命中 12 / 违规 0）；
+`gate:license` / `test:content` / `content:validate` / `check:bundle` 全 EXIT=0；
+`gate:lint` 当前 0 == 基线 0 ⇒ PASS；`gate:lint:falsify` 两条注入均成立。
+基线棘轮随后 record 到 **0**（10 → 0）。
+
+> **一条必须记下的纠错**：实施 H4 的子代理报告「本机 spawnSync 一律 EBUSY，`gate-lint.mjs`
+> 因此跑不起来」。复核时 `npm run gate:lint` / `gate:lint:falsify` 在标准 Bash 环境下**直接跑通**
+> （当前 0 == 基线 0 ⇒ PASS；证伪① 注入 1 条未用变量 ⇒ 立刻 FAIL）。所以那是**该沙箱自己的
+> 进程环境限制，不是门的问题、也不是本机的属性** —— 后人不要据此认为"这条门在这台机器上测不了"，
+> 更不要为了绕开它去改门脚本（改了就是让判据失去独立验证能力）。
+
 ---
 
 ## 3. 棘轮判据：让 warnings 只许降不许升
@@ -155,6 +196,7 @@ oxlint 默认对 `_` 前缀放行（`argsIgnorePattern` 类配置）—— 实�
 | 分规则棘轮 | 逐规则同样只许降（比总数棘轮更严 —— 总数可能因规则迁移而假性持平） |
 | 证伪 | 本波**不实施**，但实施时必须自带两条注入：① 往某文件塞一个未用变量 ⇒ 判据必须 FAIL；② 删掉基线文件 ⇒ 必须 UNKNOWN（不是悄悄放行） |
 | 挂哪 | 加进 `verify-release-gate.mjs` 之前先独立跑；**不进 P18 闭合的 43 项**（它是 C 步新门） |
+| 现状 | H4 收口后实测 **0 条**，基线 `--record-baseline` 降到 **0**（10 → 0，棘轮只许降不许升）⇒ 任何一条新 warning 都会让 `gate:lint` FAIL，`gate-static` 红 ⇒ **部署不触发**。这是**有意的硬锁** |
 
 > 与既有门的边界：这条判据**不改动** `npm run lint` 的行为（仍 EXIT=0），
 > 只在外面包一层基线比对 —— 避免"为了让门绿去关规则"这种反向激励。
@@ -162,7 +204,8 @@ oxlint 默认对 `_` 前缀放行（`argsIgnorePattern` 类配置）—— 实�
 ### 3.1 L1 已实施（`scripts/gate-lint.mjs`，2026-10-01）
 
 npm 脚本：`gate:lint` / `gate:lint:falsify` / `gate:lint:baseline`。基线落在
-`docs/p18/_generated/_baselines/lint-warnings.json`（随仓库提交，共 10 条）。
+`docs/p18/_generated/_baselines/lint-warnings.json`（随仓库提交）。
+建立时 10 条，H4 之后实测 0 条并 `--record-baseline` 降到 **0**。
 
 实测三条行为：
 
@@ -195,8 +238,50 @@ npm 脚本：`gate:lint` / `gate:lint:falsify` / `gate:lint:baseline`。基线�
 
 | # | 项 | 方案 |
 |---|---|---|
-| 9.6 | `gate:todo` 按行号登记 | 行号是**会漂的地址**，判据不该依赖它。改**内容锚点**形态：`scripts/gate-todo.mjs` 判定"待办文本 + 其所在符号"存在，而不是"第 N 行"。实现：先用正则抓 `// TODO(<id>):` 的 id，再校验 id 集合 == 登记集合（与 `CONTENT_CONTRACT.md` 判据 20 "策略一致性"同构） |
-| 9.7 | CI 注解 `Node.js 20 is deprecated` / `ubuntu-latest → Ubuntu 26`（2026-10-19 到期） | 升 `.github/workflows/*.yml` 的 actions 版本；**到期前（2026-10-19）必须完成**，属被动变更，登记影响范围即可。风险：action 版本升级可能改缓存路径 ⇒ 顺带确认 e2e 的 `~/.cache/ms-playwright` 命中 |
+| 9.6 | `gate:todo` 按行号登记 | 行号是**会漂的地址**，判据不该依赖它。改**内容锚点**形态 —— 见 §2.6（`1b21870`） |
+| 9.7 | CI 注解 / action 主版本（2026-10-19 到期） | 升 `.github/workflows/deploy.yml` 的 actions 版本 + Lint 步骤接入 `gate:lint` 棘轮 —— 见 §2.7（`216fe8b`） |
+
+### 2.6 9.6 已收：豁免键由行号改内容锚点（`1b21870`）
+
+**这不是"把规则放宽"，是把豁免键换成不会漂的东西。**
+
+- 登记行由四列（路径 \| 行号 \| Token \| 原因）改为**五列**（路径 \| Token \| 锚点 \| 原因 \| 解封 Wave），
+  豁免键 `路径:行号:Token` → `路径:锚点:Token`。锚点规则：标识符/类型名命中取**标识符名**，
+  其余（注释）取正文前 40 字（空白折叠、`|` 换 `/`）。
+- `scripts/gate-todo.mjs` 新增 `--print-anchors`：直接打出可粘贴的登记行（锚点不许含竖线 ——
+  登记行按竖线切五列，锚点带竖线会把后面几列整体错位，表现为"登记了却仍判红"这种最难查的假失败）。
+- **动因是实测事故**：H2 让 `scripts/content/normalize.mjs` 多 5 行（一行 import、一行注释把语句拆两句），
+  6 条按行号登记的豁免（93/102/103/162/180/181）**全部失配判红**，而那 6 处其实是同一个局部计数变量
+  `blocked`、代码一行没改。
+- 迁移后 13 条按行号登记 = **5 条按锚点登记**（同锚点多命中合并一行），覆盖命中数不变（12 处）。
+- 一个实现细节：文档里"登记行格式"的模板示例长得和真登记行一模一样，会被正则当成第 6 条登记计数；
+  用 `TEMPLATE_PLACEHOLDER_PATH` 显式排除，让"登记 N 条"等于真实登记数。
+
+实测：命中 12 / 登记 5 / 违规 0 / 失效 0，`gate:todo` EXIT=0。
+
+### 2.7 9.7 已收：action 主版本升级 + Lint 接入棘轮（`216fe8b`）
+
+只动 `.github/workflows/deploy.yml`（`node-version` 本来就是 `'22'`，"Node 20 deprecated" 这条注解已不成立）。
+
+| 项 | 旧 → 新 | 处数 |
+|---|---|---:|
+| runner 标签 | `ubuntu-latest` → `ubuntu-24.04` | 4 |
+| `actions/checkout` | v4 → **v7**（现 v7.0.1） | 5 |
+| `actions/setup-node` | v4 → **v7**（v7.0.0，2026-07-14） | 5 |
+| `cloudflare/wrangler-action` | v3 → **v4** | 1 |
+| Lint 步骤 | `npm run lint` → **`npm run gate:lint`**（棘轮进 CI） | 1 |
+
+- **runner 标签选 `ubuntu-24.04` 而不是 `ubuntu-26.04`**：后者在 GitHub 文档里标 **Public preview**，
+  而显式化标签的目的就是锁定可预期底座（preview 镜像排除在 SLA 与质保外），不划算。
+- **`~/.cache/ms-playwright` 未受影响**：本 workflow 没有 `actions/cache` 步骤，chromium 由
+  `npx playwright@1.49.1 install chromium --with-deps` 每次 fresh install 写 Playwright 默认路径；
+  本次 diff 未引入任何 `PLAYWRIGHT_BROWSERS_PATH` 或 env 覆盖，`setup-node` 的 `with:` 块一行未动。
+- **CI 语义变化（要认账）**：`gate:lint` 当前基线 0 ⇒ 任何一条新 oxlint warning 或**基线文件丢失**
+  都会让 `gate-static` 红 ⇒ `deploy` 不部署。这是有意的（C 步把 warning 清零后顺势硬锁），
+  但意味着 action 升级 + 棘轮这两件事叠在同一个 push 里首次跑 CI，失败时要能分清是哪一项。
+
+> 顺带纠正方案文档里 9.7 旧口径中的一条过时信息：它写的是「Node.js 20 is deprecated」，
+> 实际 `node-version: '22'` 早已改过，真正到期的是 runner 镜像与 action 主版本。
 
 ---
 
@@ -230,3 +315,30 @@ npm 脚本：`gate:lint` / `gate:lint:falsify` / `gate:lint:baseline`。基线�
 
 本阶段会碰：`tests/**`、`scripts/**`（工具与门禁脚本的机械清理）、`src/**` 的 H4/H5 语义改动、
 `.github/workflows/**`、`scripts/gate-todo.mjs`、新增 `scripts/gate-lint.mjs` 与基线文件。
+
+---
+
+## 7. C 步收口状态（2026-10-01）
+
+| 项 | 状态 | 提交 | oxlint 总数 |
+|---|---|---|---:|
+| H1 机械批次 | ✅ | `6ccf90f` | 53 → 20 |
+| H2 `no-control-regex` | ✅ | `33a9a07` | 20 → 13 |
+| H3 `no-eval` | ✅ | `29374ef` | 13 → 12 |
+| 判据 L1 棘轮 | ✅ | `379e00d` | — |
+| H5 `only-export-components` | ✅ | `a387575` | 12 → 10 |
+| 9.6 `gate:todo` 内容锚点 | ✅ | `1b21870` | — |
+| H4 语义警告（exhaustive-deps / set-state-in-effect / purity） | ✅ | `073a951` | 10 → **0** |
+| 9.7 CI action 升级 + Lint 接棘轮 | ✅ | `216fe8b` | 基线 record 到 0 |
+
+**53 条全部清零，无一条靠放宽规则或关掉规则实现**（唯一的 disable 是 `ReviewPanel.tsx:63`
+的 `react/purity`，已专项核验为必要：删掉即复现告警）。
+
+遗留（本阶段**不**自行推进，属 A/B/D 步）：
+
+- **B 步 9.5** `frontend` / `cloud-native` 改 lazy：已决策未实施，会牵动 validate 策略、
+  inline 预算、`check-bundle` 判据 2/5，须新开波次证据；
+- **B 步 9.1 R2 / AssetManifest**：卡 Cloudflare R2 凭据，产品前置条件已定稿在
+  `DECISIONS-POST-P18.md`；
+- 9.3 注册表自动化、9.4 等裁定量；`test:offline` 非幂等保持登记；
+- `verify-p17-frozen` 只拦增量不查既有文件被改 —— **仍只登记不下决定**（见 §5 末条）。
