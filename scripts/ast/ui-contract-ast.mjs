@@ -667,6 +667,284 @@ export function checkLoadErrorRecovery({ root = REPO_ROOT } = {}) {
   }
 }
 
+/* ------------------------------------------------------------------ *
+ * 判据⑧：加载失败态的**触发侧**接通（判据⑦ 的互补面）
+ *
+ * 判据⑦ 锁的是「渲染层：第四态分支存在 + 入口真的走 location.reload()」，
+ * 但它**完全没锁触发侧** —— 只要 `if (loadFailed)` 那块 JSX 还在、useBank 里有个叫
+ * `retryBankLoad` 的 reload 声明，第四态就永远显示不出来。实测三条假绿通道（判据⑦ 全绿、
+ * 用户照样永远卡在永久 spinner）：
+ *   M6 `src/App.tsx` 把 loadFailed 传死 false；M7 useBank 的 catch 不置失败态；M8 App 不传该 prop。
+ * 判据⑧ 只管触发侧三件事，与判据⑦ 零重叠：
+ *   ① 置位：useBank 里 `ensureBankWords(…).then/.catch` 的 **catch 分支**真的有把失败态置起的 setter 调用；
+ *   ② 传导：App 真的把 `loadFailed` 以变量引用的形式传给 `<Memorize>`，且该引用接得到 `useBank(...)` 返回值
+ *      （写死布尔常量 / 干脆不传都判红）；
+ *   ③ 读取：Memorize 的失败态分支条件里真的读了那个 prop（纯文本 indexOf 分不清 `if (loadFailed)` 与 `if (true)`）。
+ * 缺文件 = 判红（fail-closed，与判据⑦ 同一纪律）。
+ * ------------------------------------------------------------------ */
+
+/** 第四态的 prop 名（Memorize 的 props 接口 / App 的 JSX 绑定 / 分支条件读的都是它）。 */
+export const LOAD_FAILED_PROP = 'loadFailed'
+/** 触发源调用名（useBank 里发起词条加载的那一个）。 */
+export const LOAD_FAILED_INIT_ANCHOR = 'ensureBankWords'
+/** 「置起失败态」的 setter 按名锚点 —— 换实现/改名即本门的配置变更，禁止散在正则里。 */
+export const LOAD_FAILED_SETTER_ANCHORS = new Set(['setLoadFailedId'])
+/** 触发侧三处输入（置位 / 传导 / 读取）。 */
+export const LOAD_TRIGGER_FILE_RELS = {
+  impl: LOAD_ERROR_IMPL_FILE_REL,
+  bind: LOAD_ERROR_BIND_FILE_REL,
+  ui: LOAD_ERROR_FILE_REL,
+}
+
+/** 找 `data-testid="<testid>"` 所在的 JSX 元素（爬 JsxAttribute → JsxAttributes → Opening → Element）。 */
+function testidElement(sf, testid) {
+  for (const attr of sf.getDescendantsOfKind(SyntaxKind.JsxAttribute)) {
+    if (attr.getNameNode().getText() !== 'data-testid') continue
+    const init = attr.getInitializer()
+    if (!Node.isStringLiteral(init) || init.getLiteralText() !== testid) continue
+    let n = attr.getParent()
+    while (n && !Node.isJsxElement(n) && !Node.isJsxSelfClosingElement(n)) n = n.getParent()
+    return n
+  }
+  return null
+}
+
+const isBoolLiteral = (n) =>
+  !!n && (n.getKind() === ts.SyntaxKind.TrueKeyword || n.getKind() === ts.SyntaxKind.FalseKeyword)
+
+const isNamedCall = (n, name) =>
+  Node.isCallExpression(n) && Node.isIdentifier(n.getExpression()) && n.getExpression().getText() === name
+
+/** 从 `initName(...)` 沿 `.then/.catch` 链往上找到 `.catch(...)` 调用（找不到返回 null）。 */
+function catchOfLoadCall(sf, initName) {
+  for (const start of sf.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const callee = start.getExpression()
+    if (!Node.isIdentifier(callee) || callee.getText() !== initName) continue
+    let n = start
+    for (let i = 0; n && i < 6; i++) {
+      if (Node.isCallExpression(n)) {
+        const e = n.getExpression()
+        if (Node.isPropertyAccessExpression(e) && e.getName() === 'catch') return n
+      }
+      n = n.getParent()
+    }
+  }
+  return null
+}
+
+/** handler 里「置起失败态」的 setter 调用：按名锚点必须命中，且必须带实参（防 `setFoo()` 假绿）。 */
+function findFailureSetter(node) {
+  for (const c of node.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const callee = c.getExpression()
+    if (!Node.isIdentifier(callee)) continue
+    if (!LOAD_FAILED_SETTER_ANCHORS.has(callee.getText())) continue
+    if (c.getArguments().length === 0) continue
+    return { name: callee.getText(), at: c.getStartLineNumber() }
+  }
+  return null
+}
+
+/** 追一个标识符接不接得到 `useBank(...)` 的返回值（最多 3 跳，防「写死常量 + 一层假透传」）。 */
+function reachesUseBank(name, sf, depth = 0) {
+  if (depth > 3) return { ok: false, reason: `标识符链超过 3 跳还没接到 useBank（疑似假透传：${name}）` }
+  for (const be of sf.getDescendantsOfKind(SyntaxKind.BindingElement)) {
+    if (be.getName() !== name) continue
+    const init = be.getInitializer()
+    if (!init) {
+      /* 本仓 ts-morph 版本没有 BindingElement.getVariableDeclaration()，按父链爬到变量声明（实测）。 */
+      let vd = be.getParent()
+      while (vd && !Node.isVariableDeclaration(vd)) vd = vd.getParent()
+      const dinit = vd?.getInitializer()
+      if (isBoolLiteral(dinit)) return { ok: false, reason: `解构自写死的布尔常量 ${dinit.getText()}` }
+      if (isNamedCall(dinit, 'useBank')) return { ok: true }
+      continue
+    }
+    if (isBoolLiteral(init)) return { ok: false, reason: `逐字写死成 ${init.getText()}` }
+    if (Node.isIdentifier(init)) return reachesUseBank(init.getText(), sf, depth + 1)
+    if (isNamedCall(init, 'useBank')) return { ok: true }
+    continue
+  }
+  return { ok: false, reason: `找不到名为 ${name} 且接得到 useBank 返回值的绑定` }
+}
+
+/** 往上爬到最近的 if 语句。 */
+function climbToIf(node) {
+  let n = node
+  while (n && !Node.isIfStatement(n)) n = n.getParent()
+  return n
+}
+
+/** 往上爬到最近的函数（声明 / 表达式 / 箭头）。 */
+function climbToFunction(node) {
+  let n = node
+  while (n) {
+    if (Node.isFunctionDeclaration(n) || Node.isFunctionExpression(n) || Node.isArrowFunction(n)) return n
+    n = n.getParent()
+  }
+  return null
+}
+
+/** 组件参数上是不是真的声明了这个 prop（解构 BindingElement，或 `props` 的类型里有同名属性）。 */
+function paramsDeclareProp(fn, name) {
+  if (!fn) return false
+  for (const p of fn.getParameters()) {
+    for (const be of p.getDescendantsOfKind(SyntaxKind.BindingElement)) {
+      if (be.getName() === name) return true
+    }
+    try {
+      if (p.getType().getProperties().some((s) => s.getName() === name)) return true
+    } catch {
+      /* 类型解析不可用 ⇒ 走上面那条 BindingElement 判定 */
+    }
+  }
+  return false
+}
+
+/** 条件表达式里有没有读名为 `name` 的东西（`x` 标识符或 `props.x` 成员；条件本身即标识符时也算）。 */
+function readsName(cond, name) {
+  if ((Node.isIdentifier(cond) || Node.isPropertyAccessExpression(cond)) && (cond.getText() === name || (Node.isPropertyAccessExpression(cond) && cond.getName() === name))) {
+    return { at: cond.getStartLineNumber() }
+  }
+  for (const id of cond.getDescendantsOfKind(SyntaxKind.Identifier)) {
+    if (id.getText() === name) return { at: id.getStartLineNumber() }
+  }
+  for (const pa of cond.getDescendantsOfKind(SyntaxKind.PropertyAccessExpression)) {
+    if (pa.getName() === name) return { at: pa.getStartLineNumber() }
+  }
+  return null
+}
+
+/**
+ * 判据⑧：加载失败态的**触发侧**三条链路都接通（置位 → 传导 → 读取）。
+ *
+ * @param {object} [opts]
+ * @param {string} [opts.root=REPO_ROOT] 相对路径基准（证伪时指向隔离副本）
+ * @returns {{setter: boolean, setterDetail: string, pass: boolean, passDetail: string,
+ *            condition: boolean, conditionDetail: string, ok: boolean}}
+ */
+export function checkLoadErrorTrigger({ root = REPO_ROOT } = {}) {
+  const missing = Object.entries(LOAD_TRIGGER_FILE_RELS).filter(([, rel]) => {
+    try {
+      return readFileSync(join(root, rel)).length === 0
+    } catch {
+      return true
+    }
+  })
+  const bail = (detail) => ({
+    setter: false,
+    setterDetail: detail,
+    pass: false,
+    passDetail: detail,
+    condition: false,
+    conditionDetail: detail,
+    ok: false,
+  })
+  if (missing.length) {
+    const names = missing.map(([k]) => k).join(', ')
+    return bail(`判据⑧ 输入缺失（${names}）—— 读不到按不存在判红，不降级成通过`)
+  }
+
+  const project = new Project({
+    useInMemoryFileSystem: true,
+    compilerOptions: { ...loadCompilerOptions(root), jsx: ts.JsxEmit.ReactJSX },
+  })
+  const sf = {}
+  for (const [k, rel] of Object.entries(LOAD_TRIGGER_FILE_RELS)) {
+    sf[k] = project.createSourceFile(`/${rel.replaceAll('\\', '/')}`, readFileSync(join(root, rel), 'utf8'), {
+      overwrite: true,
+    })
+  }
+
+  /* ---- ① 置位：catch 分支真的把失败态置起（锁 M7） ---- */
+  let setter = null
+  let setterDetail = ''
+  const catchCall = catchOfLoadCall(sf.impl, LOAD_FAILED_INIT_ANCHOR)
+  const anchors = [...LOAD_FAILED_SETTER_ANCHORS].join(' / ')
+  if (!catchCall) {
+    setterDetail = `${LOAD_ERROR_IMPL_FILE_REL} 里找不到 ${LOAD_FAILED_INIT_ANCHOR}(…) 那条链上的 .catch(…) —— 加载失败根本走不到失败处理分支`
+  } else {
+    const args = catchCall.getArguments()
+    const handler = args[args.length - 1]
+    const body = handler && (Node.isArrowFunction(handler) || Node.isFunctionExpression(handler)) ? handler.getBody() : null
+    if (!body) {
+      setterDetail = `${LOAD_ERROR_IMPL_FILE_REL} 的 .catch() 挂的不是函数体（失败分支退化成裸表达式）`
+    } else {
+      setter = findFailureSetter(body)
+      setterDetail = setter
+        ? `${LOAD_ERROR_IMPL_FILE_REL}:${setter.at} catch 分支里 ${setter.name}(…) 把失败态置起`
+        : `${LOAD_ERROR_IMPL_FILE_REL} 的 catch 分支里没有对 ${anchors} 的调用 —— 加载失败不会置起失败态（用户永远停在「正在加载词库…」）`
+    }
+  }
+
+  /* ---- ② 传导：App 真的把 loadFailed 传给 <Memorize>（锁 M6 传死 false / M8 不传） ---- */
+  let pass = false
+  let passDetail = ''
+  let memoOpening = null
+  for (const o of [
+    ...sf.bind.getDescendantsOfKind(SyntaxKind.JsxOpeningElement),
+    ...sf.bind.getDescendantsOfKind(SyntaxKind.JsxSelfClosingElement),
+  ]) {
+    if (o.getTagNameNode().getText() === 'Memorize') {
+      memoOpening = o
+      break
+    }
+  }
+  if (!memoOpening) {
+    passDetail = `${LOAD_ERROR_BIND_FILE_REL} 里找不到 <Memorize> 元素 —— 失败态没有入参渠道`
+  } else {
+    let attr = null
+    for (const a of memoOpening.getAttributes()) {
+      if (Node.isJsxAttribute(a) && a.getNameNode().getText() === LOAD_FAILED_PROP) attr = a
+    }
+    if (!attr) {
+      passDetail = `${LOAD_ERROR_BIND_FILE_REL} 的 <Memorize> 根本没传 ${LOAD_FAILED_PROP} 属性 —— 第四态接不到任何状态`
+    } else {
+      const init = attr.getInitializer()
+      const expr = init && Node.isJsxExpression(init) ? init.getExpression() : init
+      if (!Node.isIdentifier(expr)) {
+        passDetail = `${LOAD_ERROR_BIND_FILE_REL} <Memorize ${LOAD_FAILED_PROP}=…> 传的不是变量引用（${expr ? expr.getText() : '无初值'}）`
+      } else {
+        const r = reachesUseBank(expr.getText(), sf.bind)
+        pass = r.ok
+        passDetail = r.ok
+          ? `${LOAD_ERROR_BIND_FILE_REL} <Memorize ${LOAD_FAILED_PROP}={${expr.getText()}}>，且该引用接得到 useBank(…) 返回值`
+          : `${LOAD_ERROR_BIND_FILE_REL} <Memorize ${LOAD_FAILED_PROP}={${expr.getText()}}> 接不到 useBank：${r.reason}`
+      }
+    }
+  }
+
+  /* ---- ③ 读取：失败态分支条件里真的读了那个 prop（锁 M9 `if (true)`） ---- */
+  let condition = false
+  let conditionDetail = ''
+  const elem = testidElement(sf.ui, LOAD_ERROR_TESTID)
+  const stmt = elem ? climbToIf(elem) : null
+  if (!stmt) {
+    conditionDetail = `${LOAD_ERROR_FILE_REL} 的 data-testid="${LOAD_ERROR_TESTID}" 不在任何 if 分支里（没有可被触发的条件）`
+  } else {
+    const cond = stmt.getExpression()
+    const read = readsName(cond, LOAD_FAILED_PROP)
+    const declared = paramsDeclareProp(climbToFunction(stmt), LOAD_FAILED_PROP)
+    if (read && declared) {
+      condition = true
+      conditionDetail = `${LOAD_ERROR_FILE_REL}:${read.at} 失败态分支条件读了 prop ${LOAD_FAILED_PROP}`
+    } else if (!read) {
+      conditionDetail = `${LOAD_ERROR_FILE_REL}:${stmt.getStartLineNumber()} 失败态分支条件是 ${cond.getText().replace(/\s+/g, ' ')} —— 没读 ${LOAD_FAILED_PROP}（写死恒真/恒假都算没接上）`
+    } else {
+      conditionDetail = `${LOAD_ERROR_FILE_REL} 上 ${LOAD_FAILED_PROP} 没作为 prop 声明在组件参数上 —— 分支读的不是 prop`
+    }
+  }
+
+  return {
+    setter: !!setter,
+    setterDetail,
+    pass,
+    passDetail,
+    condition,
+    conditionDetail,
+    ok: !!setter && pass && condition,
+  }
+}
+
 /** 取「字符串字面量取值」：字面量 / 无替换模板 / 括号包裹的字面量；其余返回 null。 */
 function literalValueOf(node) {
   if (Node.isStringLiteral(node) || Node.isNoSubstitutionTemplateLiteral(node)) return node.getLiteralText()

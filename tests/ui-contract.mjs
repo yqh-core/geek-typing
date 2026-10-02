@@ -53,6 +53,7 @@ import {
   UiContractFatal,
   checkUiContract,
   checkLoadErrorRecovery,
+  checkLoadErrorTrigger,
   contentPackageIds,
   LOAD_ERROR_BIND_FILE_REL,
   LOAD_ERROR_FILE_REL,
@@ -300,6 +301,16 @@ function runCheck() {
     `⑦ 加载失败态存在且入口点击真的 reload（data-testid="${LOAD_ERROR_TESTID}"）`,
     rec.ok,
     `失败态分支=${rec.branch}（${rec.branchDetail}）；入口→reload=${rec.entry}（${rec.entryDetail}）`,
+  )
+
+  /* —— 2.6 判据⑧：加载失败态的**触发侧**接通（置位 → 传导 → 读取）——
+   * 判据⑦ 只锁「第四态渲染得出来 + 入口走 reload」，触发侧三条假绿通道（M6 传死 false /
+   * M7 catch 不置位 / M8 不传 prop）在判据⑦ 下全绿 —— 这里补足，两者互补不重叠。 */
+  const trig = checkLoadErrorTrigger()
+  ok(
+    `⑧ 触发侧接通：catch 置位失败态 → App 传给 Memorize → 分支条件读该 prop`,
+    trig.ok,
+    `置位=${trig.setter}（${trig.setterDetail}）；传导=${trig.pass}（${trig.passDetail}）；读取=${trig.condition}（${trig.conditionDetail}）`,
   )
 
   /* —— 3. 对照组探针（双向钳制） —— */
@@ -721,6 +732,81 @@ function falsify() {
   } else {
     bad++
     lines.push('  ✗ DCTRL 真仓库文件被判据⑦ 改写（注入必须只落在隔离副本）')
+  }
+
+  /* ---- E. 判据⑧ 探测器层：触发侧三条假绿通道 → 判红 → 字节还原 → 复绿 ----
+   * 判据⑦（D 组）只锁渲染分支 + 入口 reload；M6/M7/M8/M9 在判据⑦ 下**实测全绿**（第四态
+   * 永远显示不出来），故判据⑧ 必须在这四条注入下逐条判红，否则「第四态」会在 nobody 看得见
+   * 的地方失效。 */
+  const trigRun = () => checkLoadErrorTrigger({ root: MEMORIZE_ROOT })
+  total++
+  const trigCtrl = trigRun()
+  if (trigCtrl.ok) {
+    lines.push('  ✓ E0 对照组：真文件 repro 到隔离副本后判据⑧ 绿（catch 置位 + App 传 prop + 分支读 prop）')
+  } else {
+    bad++
+    lines.push(
+      `  ✗ E0 对照组不绿：置位=${trigCtrl.setter} / 传导=${trigCtrl.pass} / 读取=${trigCtrl.condition} —— ` +
+        `${trigCtrl.setterDetail} / ${trigCtrl.passDetail} / ${trigCtrl.conditionDetail}`,
+    )
+  }
+
+  const E_CASES = [
+    {
+      letter: 'M6',
+      mutate: 'bind',
+      name: 'App 把 loadFailed 传死 false（第四态永不显示）',
+      apply: (t) => t.replace('loadFailed={loadFailed}', 'loadFailed={false}'),
+    },
+    {
+      letter: 'M7',
+      mutate: 'impl',
+      name: 'useBank 的 catch 不置失败态（失败态永不置起）',
+      apply: (t) => t.replace(/\n\s*if \(alive\) setLoadFailedId\(bank\.id\)/, ''),
+    },
+    {
+      letter: 'M8',
+      mutate: 'bind',
+      name: 'App 不传 loadFailed 属性（只留重试入口）',
+      apply: (t) => t.replace(' loadFailed={loadFailed}', ''),
+    },
+    {
+      letter: 'M9',
+      mutate: 'ui',
+      name: '分支条件改成 if (true)（恒真，与失败态无关）',
+      apply: (t) => t.replace('    if (loadFailed) {', '    if (true) {'),
+    },
+  ]
+  for (const c of E_CASES) {
+    total++
+    const target = MEMORIZE_RELS[c.mutate]
+    writeFileSync(join(MEMORIZE_ROOT, target), c.apply(pristine[c.mutate]), 'utf8')
+    const r = trigRun()
+    if (!r.ok) {
+      lines.push(`  ✓ ${c.letter} 恰好判红（置位=${r.setter} / 传导=${r.pass} / 读取=${r.condition}）`)
+    } else {
+      bad++
+      lines.push(
+        `  ✗ ${c.letter} 未判红（判据⑧ 仍绿）—— ${r.setterDetail} / ${r.passDetail} / ${r.conditionDetail}`,
+      )
+    }
+    lines.push(`      ${c.name}`)
+    lines.push(`      ↳ ${[r.setterDetail, r.passDetail, r.conditionDetail].filter(Boolean).join(' | ')}`)
+    writeFileSync(join(MEMORIZE_ROOT, target), pristine[c.mutate], 'utf8') // 字节还原
+    if (trigRun().ok) {
+      lines.push('      ↳ 字节还原 ✓，判据⑧ 复绿 ✓（增量归零）')
+    } else {
+      bad++
+      lines.push('      ↳ ✗ 还原后未复绿（还原不干净或判据不可靠）')
+    }
+  }
+
+  total++
+  if (Object.entries(MEMORIZE_RELS).every(([k, rel]) => readFileSync(join(ROOT, rel)).equals(realBytes[k]))) {
+    lines.push('  ✓ ECTRL 真仓库只读：判据⑧ 三个源文件注入前后逐字节一致')
+  } else {
+    bad++
+    lines.push('  ✗ ECTRL 真仓库文件被判据⑧ 改写（注入必须只落在隔离副本）')
   }
 
   /* ---- 真仓库文件未被写：真基线 + 真探针目录 sha256 前后一致 ---- */
