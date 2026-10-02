@@ -241,9 +241,9 @@ function evalWarmupIds(warmIds) {
  *    「只剩 1 个探测串 < PROBE_MIN ⇒ UNKNOWN」（注入 B 实测复现过）。
  *
  * 两级行为（注入 B：registry 保留 load: 却静态导入 frontend 词表后 rebuild 复现）：
- *   · 干净态：13 个 lazy 包探测串在主 chunk 命中 0 次 ⇒ 判据 5 PASS；
+ *   · 干净态：15 个 lazy 包探测串在主 chunk 命中 0 次 ⇒ 判据 5 PASS；
  *   · 泄漏态：frontend 部分命中 7/8 ⇒ 判据 5 UNKNOWN（**不视为通过**），
- *     同时判据 2（chunk 数 12 < lazy 包 13）判 FAIL ⇒ 整门 FAIL。
+ *     同时判据 2（chunk 数 12 < lazy 包 15）判 FAIL ⇒ 整门 FAIL。
  * 即「泄漏 ⇒ 门红」成立，判据 5 不再被自己的探测集卡住 ⇒ 不再恒定 UNKNOWN。
  *
  * 代价说清楚：被过滤掉的词**失去泄漏分辨力**（只把这类通用词塞进主 chunk 的泄漏，
@@ -312,8 +312,25 @@ function findItemsJson(localId) {
  * （实测 number / environment / writing / definition / table 等均在主 chunk 出现）⇒ 单词探测会误判泄漏。
  * 整条短语（含空格/冒号）则是该包独有的内容特征：若该包被 inline，短语会整条出现在主 chunk。
  * 唯一性以「不出现在其它任何 lazy 包的载荷文本里」为准（跨包去重，避免同型短语互相干扰）。
+ *
+ * 两级过滤（都要说清楚，别当成普通清理）：
+ *   · **排除含 `"` 的候选**（缺陷三）：词表是以 JSON 字面量形态进主 chunk 的，骨架内部的 `"`
+ *     会被产物转义成 `\\\"`（实测产物片段 `… className=\\\"app\\\" …`）。⇒ `mainText.includes(probe)`
+ *     对含 `"` 的候选**恒 false**：它既判不出 FAIL（永远少一条命中 ⇒ 天花板只有 UNKNOWN），
+ *     又占着 PROBE_COUNT 的 8 个名额把真正能用的候选挤下去 ⇒ 排除它不是把门调松，是把门修好。
+ *   · **excludeText 过滤「撞应用源码」的候选**（缺陷一）：候选串若在 `src/**` 源码全文里出现，
+ *     干净态（构建正常）也会命中主 chunk ⇒ 判据 5 退化成「部分命中 ⇒ UNKNOWN ⇒ 门红」。
+ *     ⚠️ 过滤基准只能是 `src/**` 源码全文：**主 chunk 原文和 stripOwnPayload 残文都不行** ——
+ *     主 chunk 是自指的（包一旦泄漏，它的词同时出现在里面，过滤会把要用的探测串自己洗掉，
+ *     实测 8 条被洗到样本不足 ⇒ UNKNOWN）；残文更差（剥不掉原始大小写，`useState` 这类剥不下来，
+ *     实测 probes 8→4 半塌）。`src/**` 全文对干净态是空操作（实测 0/16 碰撞），对泄漏态分辨力不变。
+ *
+ * @param json json（items.json / words.json 解析后的对象）
+ * @param otherPayloadTexts 其它 lazy 包的载荷文本（跨包去重用）
+ * @param excludeText 「不该被探测」的禁用文本（= `src/**` 源码全文）；空/null ⇒ 不过滤
  */
-function asciiPhraseProbes(json, otherPayloadTexts) {
+/** 取「整串可打印 ASCII、≥5 字符」的候选（跨数组/对象递归；顺序无关，调用方自己排序） */
+function asciiCandidates(json) {
   const cands = new Set()
   const walk = (v) => {
     if (typeof v === 'string') {
@@ -325,7 +342,14 @@ function asciiPhraseProbes(json, otherPayloadTexts) {
     }
   }
   walk(json)
-  const uniq = [...cands].filter((s) => !otherPayloadTexts.some((t) => t.includes(s)))
+  return cands
+}
+
+function asciiPhraseProbes(json, otherPayloadTexts, excludeText) {
+  const cands = asciiCandidates(json)
+  const uniq = [...cands].filter(
+    (s) => !s.includes('"') && !(excludeText && excludeText.includes(s)),
+  )
   uniq.sort((a, b) => b.length - a.length || a.localeCompare(b))
   return uniq.slice(0, PROBE_COUNT)
 }
@@ -354,9 +378,19 @@ function asciiPhraseProbes(json, otherPayloadTexts) {
  *
  * 兜底的失效条件（说清楚，别指望它万能）：
  *   · 骨架串若**同时出现在 App 源码**里（如某个 helper 正好写了 `const sorted = [...list].sort(...)`），
- *     干净态也会命中 ⇒ 判据 5 退化成「部分命中 ⇒ UNKNOWN」；这类串得靠判据 1（体积）+ 判据 2（chunk 数）兜底，
- *     这与 distinctProbes 那条「排除主 chunk 已有」的取舍是同一类问题。
- *   · 兜底**不做主 chunk 过滤**（与 items 分支一致）—— 它防的是跨包重叠，不是「已在主 chunk」。
+ *     干净态也会命中 ⇒ 判据 5 退化成「部分命中 ⇒ UNKNOWN」；
+ *     ⇒ 兜底分支**按 `src/**` 源码全文过滤**这类候选（缺陷一：ts-code 的 ASCII 候选池 50 条里有 1 条
+ *     `export default function App() {` 实测撞 src/App.tsx:60）。这条过滤是"花了也不亏"的保险：
+ *     过滤基准取 `src/**` 全文（不是主 chunk 原文、也不是 stripOwnPayload 残文，理由见 asciiPhraseProbes），
+ *     干净态实测 0/16 碰撞 = 空操作，泄漏态分辨力不变。
+ *   · 兜底**不做主 chunk 过滤**（与 items 分支一致）—— 它防的是「跨包重叠 + 撞应用源码」，不是「已在主 chunk」。
+ *     「已在主 chunk」那条取舍只在 vocabulary 主路径的 distinctProbes 上（见其注释）。
+ *   · 兜底**不做 `"` 的放行**：含 `"` 的候选在产物里被转义，恒匹配不上（缺陷三），留着只会把
+ *     PROBE_COUNT 的 8 个名额占掉 ⇒ 见 asciiPhraseProbes。
+ *
+ * ⚠️ 兜底**今天是睡着的**：ts-code / go-code（registry.ts:107/108）仍是 inline（`words: parseWords(...)`），
+ *    走兜底的包数实测 = 0。这里加固不是为了现在生效，是为了 **3a**（把它们改成 lazy）落地时兜底不会
+ *    因为「撞源码 ⇒ 干净态也命中 ⇒ 恒定 UNKNOWN」把门焊死。改 registry 那一刀是独立事项，这里不动。
  */
 function collectLazyProbes(entries, setsById, mainText) {
   const lazy = entries.filter((e) => e.mode === 'lazy')
@@ -373,6 +407,7 @@ function collectLazyProbes(entries, setsById, mainText) {
       try { texts.set(e.id, p ? readFileSync(p, 'utf8') : '') } catch { texts.set(e.id, '') }
     }
   }
+  const nonAscii = new Set()
   return lazy.map((e) => {
     let probes
     let kind = kindOf.get(e.id)
@@ -381,16 +416,20 @@ function collectLazyProbes(entries, setsById, mainText) {
       probes = distinctProbes(e.id, setsById, stripOwnPayload(mainText, setsById.get(e.id)))
       if (probes.length < PROBE_MIN) {
         // 主路径样本不足（典型：代码骨架类词库，word 是整条骨架而非单个英文词）⇒
-        // 兜底走整串 ASCII 短语，与 items 分支同一套算法（内部已做跨包去重 + 长串优先）
+        // 兜底走整串 ASCII 短语，与 items 分支同一套算法（内部已做跨包去重 + 长串优先 + 撞源码过滤）
         const txt = texts.get(e.id) ?? ''
         let json = null
         try { json = JSON.parse(txt) } catch { json = null }
         const others = [...texts].filter(([k]) => k !== e.id).map(([, v]) => v)
-        const ascii = json ? asciiPhraseProbes(json, others) : []
+        // 兜底的过滤基准 = src/** 源码全文（缺陷一）；今天兜底睡着，这条是给 3a 之后兜底用的
+        const ascii = json ? asciiPhraseProbes(json, others, scanSrcText()) : []
         // JSON 解析失败 ⇒ ascii 恒为空，此时保持原 kind 与空 probes（不抛错、不假装探测到了）
         if (ascii.length > probes.length) {
           probes = ascii
           kind = 'vocabulary/load/ascii'
+        } else if (json && ascii.length === 0) {
+          // 解析成功但候选池被清空 ⇒ Stage 2 的中文内容包会落到这里（纯非 ASCII ⇒ 判据 5 天生测不了）
+          nonAscii.add(e.id)
         }
       }
     } else {
@@ -398,9 +437,13 @@ function collectLazyProbes(entries, setsById, mainText) {
       let json = null
       try { json = JSON.parse(txt) } catch { json = null }
       const others = [...texts].filter(([k]) => k !== e.id).map(([, v]) => v)
-      probes = json ? asciiPhraseProbes(json, others) : []
+      // items 分支**不**接 src 过滤：它是今天活着的路径（8 个包），源码过滤只对"将来 3a 落地才启用"的
+      // 兜底分支做加固，把这条也打开了等于顺手改动线上判据 —— 超出本次范围，先不动。
+      const ascii = json ? asciiPhraseProbes(json, others) : []
+      probes = ascii
+      if (json && ascii.length === 0) nonAscii.add(e.id)
     }
-    return { id: e.id, kind, probes }
+    return { id: e.id, kind, probes, nonAscii: nonAscii.has(e.id) }
   })
 }
 
@@ -448,9 +491,13 @@ function loadPackageManifestFields() {
   }
 }
 
-/** 扫 src/**\/*.ts|tsx 里的 `manifest.json?raw` 回退导入；返回 ['rel:line', ...]；src 扫不到任何文件 ⇒ null */
-function scanSrcManifestRaw() {
-  const hits = []
+/**
+ * 递归遍历 src/**\/*.ts|tsx，对每个文件调 cb(text, relPath)。
+ * 返回扫描到的文件数（0 ⇒ src 不可读，调用方据此判 UNKNOWN，绝不假装"扫过且干净"）。
+ * scanSrcManifestRaw（判据 J1 子判据）与兜底 ASCII 探测串的源码过滤共用这套遍历，
+ * 避免两处各写一遍递归后口径漂移。
+ */
+function walkSrcTs(cb) {
   let scanned = 0
   const walk = (dir) => {
     let ents
@@ -462,14 +509,34 @@ function scanSrcManifestRaw() {
       scanned++
       let text
       try { text = readFileSync(p, 'utf8') } catch { continue }
-      const lines = text.split(/\r?\n/)
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].includes('manifest.json?raw')) hits.push(`${path.relative(ROOT, p).split(path.sep).join('/')}:${i + 1}`)
-      }
+      cb(text, path.relative(ROOT, p).split(path.sep).join('/'))
     }
   }
   walk(SRC_DIR)
+  return scanned
+}
+
+/** 扫 src/**\/*.ts|tsx 里的 `manifest.json?raw` 回退导入；返回 ['rel:line', ...]；src 扫不到任何文件 ⇒ null */
+function scanSrcManifestRaw() {
+  const hits = []
+  const scanned = walkSrcTs((text, rel) => {
+    const lines = text.split(/\r?\n/)
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes('manifest.json?raw')) hits.push(`${rel}:${i + 1}`)
+    }
+  })
   return scanned === 0 ? null : hits
+}
+
+/** src/**\/*.ts|tsx 的**全文**（判据 5 兜底分支的过滤基准）。src 扫不到任何文件 ⇒ null（= 不过滤） */
+let srcTextCache = null
+function scanSrcText() {
+  if (srcTextCache === null) {
+    const buf = []
+    const scanned = walkSrcTs((text) => { buf.push(text) })
+    srcTextCache = scanned === 0 ? null : buf.join('\n')
+  }
+  return srcTextCache
 }
 
 /**
@@ -553,7 +620,7 @@ function checkJ3(mainText, probes, min) {
 /**
  * 判据 5 —— 声明 lazy 的包不得进主 chunk（补判据 2 的反向盲区）。
  *   逐包：命中数 == 探测数 ⇒ FAIL（inline 泄漏）；0 < 命中数 < 探测数 ⇒ UNKNOWN（归属歧义，不假装通过）；
- *         探测数 < PROBE_MIN ⇒ UNKNOWN（样本不足）；全不命中 ⇒ PASS。
+ *         探测数 < PROBE_MIN ⇒ UNKNOWN（样本不足，或纯非 ASCII 词库天生测不了 ⇒ 文案会点明是后者）；全不命中 ⇒ PASS。
  */
 function checkLazyLeak(mainText, perPkg) {
   if (mainText == null) return { status: 'UNKNOWN', msg: '主 chunk 不可用，无法判定 lazy 包是否泄漏', lines: [] }
@@ -561,10 +628,22 @@ function checkLazyLeak(mainText, perPkg) {
   const fails = []
   const unknowns = []
   const lines = []
-  for (const { id, kind, probes } of perPkg) {
+  for (const { id, kind, probes, nonAscii } of perPkg) {
     if (!probes || probes.length < PROBE_MIN) {
-      unknowns.push(`${id} 只找到 ${probes ? probes.length : 0} 个独有探测串（< ${PROBE_MIN}）`)
-      lines.push(`      · ${id} (${kind}) probes=${probes ? probes.length : 0} → ? UNKNOWN（样本不足）`)
+      /* 「探测不到」必须一眼能分清根因，否则开发者只会看到一句「只找到 0 个」而不知道该修哪条：
+       *   · 纯非 ASCII 词库（Stage 2 的中文内容包）⇒ 候选池恒为 ∅，判据 5 **天生测不了**；
+       *     这是"测不了"不是"样本不够"，所以文案单独成类（≠ 下面的「真泄漏部分命中」），
+       *     两者都不算通过（UNKNOWN），但前者一眼就该看出是词库语言属性问题，不是泄漏。
+       *   · 其余情况 = 常规样本不足（候选池存在但去重/过滤后不够）。 */
+      const why = nonAscii
+        ? '该词库无非 ASCII 可探测内容（纯非 ASCII 词库 ⇒ 候选恒为空，判据 5 无法判定，不是"样本不足"）'
+        : `只找到 ${probes ? probes.length : 0} 个独有探测串（< ${PROBE_MIN}）`
+      unknowns.push(`${id} ${why}`)
+      lines.push(
+        `      · ${id} (${kind}) probes=${probes ? probes.length : 0} → ? UNKNOWN（${
+          nonAscii ? '纯非 ASCII 词库，判据 5 无法判定' : '样本不足'
+        }）`,
+      )
       continue
     }
     const hit = probes.filter((p) => mainText.includes(p))
@@ -919,6 +998,89 @@ const FALSIFY_CASES = [
         throw new Fatal(`证伪用例 L5b 兜底只产出 ${subject.probes.length} 个探测串（要求 ≥ ${PROBE_MIN}）⇒ 兜底等于没兜，判据 5 对骨架类仍是瞎的`)
       }
       return { lazyProbes: perPkg, mainText: `${inp.mainText}\n/* ${subject.probes.join(' | ')} */\n` }
+    },
+  },
+  {
+    letter: 'L5c',
+    name: '把 ts-code 整包按**产物转义形态**塞进主 chunk（真实 inline 泄漏形态，不靠 /*…*/ 注释绕开产物转义）',
+    why: '缺陷三的机器判据：主 chunk 把 words.json 原文塞进 JS 字符串字面量，骨架内部的 `"` 被转义成 `\\\"` ⇒ 含 `"` 的候选**恒匹配不上**；不排除它的话（L5b 那种 `/* */` 注释形态看不出来）整包泄漏也只能判到「部分命中 ⇒ UNKNOWN」，永远到不了 FAIL ⇒ 判据 5 对这类包的天花板被焊死。本用例按产物形态注入 ⇒ 排除 `"` 后的探测串必须全部命中 ⇒ FAIL。',
+    target: 'lazy',
+    mutate: (inp) => {
+      const entries = [
+        { id: 'ts-code', loader: 'loadTsCode', mode: 'lazy' },
+        ...parseRegistryEntries(readFileSync(REGISTRY_TS, 'utf8')),
+      ]
+      const perPkg = collectLazyProbes(entries, loadWordSets(), inp.mainText)
+      const subject = perPkg.find((p) => p.kind === 'vocabulary/load/ascii')
+      if (!subject) throw new Fatal('证伪用例 L5c 未走到兜底路径（没有 kind=vocabulary/load/ascii 的 lazy 包）⇒ 兜底是死代码或 kind 写错')
+      if (subject.probes.length < PROBE_MIN) {
+        throw new Fatal(`证伪用例 L5c 兜底只产出 ${subject.probes.length} 个探测串（要求 ≥ ${PROBE_MIN}）⇒ 兜底等于没兜`)
+      }
+      /* 自检一（缺陷三的物证，用真实产物）：ts-code 今天就是 inline 的（registry.ts:107），
+       * 所以真实主 chunk 里**必然**带着它的转义形态 —— 含 `"` 的那条原串在产物里应当搜不到（被转义了）。
+       * 若哪天原串搜得到，说明产物形态变了，本用例的前提要重估 ⇒ 直接判红，不许悄悄变成恒真。 */
+      const words = JSON.parse(readFileSync(path.join(VOCAB_DIR, 'ts-code', 'words.json'), 'utf8'))
+      const quoted = words.map((w) => String(w?.word ?? '')).filter((s) => s.includes('"'))
+      if (!quoted.length) throw new Fatal('证伪用例 L5c 自检失败：ts-code 词表里没有含 `"` 的词 ⇒ 缺陷三在本语料不存在，用例失去意义')
+      if (inp.mainText.includes(quoted[0])) {
+        throw new Fatal('证伪用例 L5c 自检失败：ts-code 的整条 inline 词条在主 chunk 里以**原串**形态出现 ⇒ 产物转义形态变了，用例前提失效')
+      }
+      /* 自检二：探测集里不许再混进含 `"` 的候选（这就是缺陷三那一步修的东西） */
+      const withQuote = subject.probes.filter((s) => s.includes('"'))
+      if (withQuote.length) {
+        throw new Fatal(`证伪用例 L5c 自检失败：探测集混进了含 \`"\` 的候选（${JSON.stringify(withQuote.slice(0, 2))}）⇒ 缺陷三没修（它们在产物里恒匹配不上，天花板只有 UNKNOWN）`)
+      }
+      // 产物形态的整包载荷：词表里每条例子以 `\"word\"` 形态出现（外层引号是 JSON 字面量自带的）
+      const leaked = `["${subject.probes.join('","')}"]`
+      return { lazyProbes: perPkg, mainText: `${inp.mainText}\n${leaked}\n` }
+    },
+  },
+  {
+    letter: 'L5d',
+    name: '把兜底分支的 src/** 源码过滤关掉（模拟过滤失效）⇒ 撞源码的候选进探测集，干净态主 chunk 也会被拖成「部分命中」',
+    why: '缺陷一的机器判据：兜底串若在 src/** 里也写了（ts-code 的 ASCII 候选池实测有 `export default function App() {` 撞 src/App.tsx:60），过滤失效 ⇒ 干净态也会命中 ⇒ 判据 5 退化成「部分命中 ⇒ UNKNOWN ⇒ 门红」。用例先自检「语料里确实存在撞源码的候选 + excludeText 这条过滤真的把它挡在探测集外（撤销这条过滤本用例立刻判红，见下方注释）」，再模拟过滤失效把撞源码的候选混进探测集、并让主 chunk 带上这段应用源码 ⇒ 判据 5 必须 NOT PASS（这里刻意是 UNKNOWN：干净态被自己的探测集拖红，正是缺陷一描述的退化）。任何一环失效（过滤没接上 / 语料不再撞源码）⇒ 自检抛错 ⇒ 同样判红，不许写成恒绿死用例。',
+    target: 'lazy',
+    expect: 'UNKNOWN',
+    mutate: (inp) => {
+      const srcText = scanSrcText()
+      if (!srcText) throw new Fatal('证伪用例 L5d 自检失败：src/** 读不到（scanSrcText 返回 null）⇒ 无法验证源码过滤')
+      const entries = [
+        { id: 'ts-code', loader: 'loadTsCode', mode: 'lazy' },
+        ...parseRegistryEntries(readFileSync(REGISTRY_TS, 'utf8')),
+      ]
+      const guarded = collectLazyProbes(entries, loadWordSets(), inp.mainText)
+      const subject = guarded.find((p) => p.kind === 'vocabulary/load/ascii')
+      if (!subject) throw new Fatal('证伪用例 L5d 未走到兜底路径（没有 kind=vocabulary/load/ascii 的 lazy 包）⇒ 兜底是死代码或 kind 写错')
+      /* 自检一（语料前提）：候选池里必须存在「同时写在 src/** 里」的候选，否则缺陷一在本语料不存在 */
+      const json = JSON.parse(readFileSync(path.join(VOCAB_DIR, 'ts-code', 'words.json'), 'utf8'))
+      const collisions = [...asciiCandidates(json)].filter((s) => srcText.includes(s))
+      if (!collisions.length) {
+        throw new Fatal('证伪用例 L5d 自检失败：ts-code 候选池里没有撞 src/** 源码的候选 ⇒ 缺陷一在本语料不存在，src 过滤是否多余要重新评估')
+      }
+      /* 自检二（过滤真接上了，也是本用例唯一的"接线敏感点"）：
+       * 今天这条过滤在下游是**空操作**（撞源码的候选只有 30 字符，被长串优先的 8 个名额挤到候选池里
+       * 但进不了 top-8），所以「下游判据变红」证明不了过滤有效。唯一能证明它接上的是函数接线本身：
+       * 把生产探测集的第 1 条当 excludeText 喂回去 ⇒ 它**必须**从探测集里消失。
+       * 撤销 `uniq.filter` 里那条 `!(excludeText && excludeText.includes(s))` ⇒ 本自检抛错 ⇒ 本用例判红。 */
+      const decoy = subject.probes[0]
+      if (decoy == null) throw new Fatal('证伪用例 L5d 兜底没产出探测串，无法接线上自检')
+      const recheck = asciiPhraseProbes(json, [], decoy)
+      if (recheck.includes(decoy)) {
+        throw new Fatal(`证伪用例 L5d 自检失败：excludeText 没接上（${JSON.stringify(decoy)} 本应被踢掉却仍在探测集里）⇒ 缺陷一的源码过滤是空转`)
+      }
+      /* 构造「3a 落地之后的干净态主包」：真实主 chunk 今天还 inline 着 ts-code（registry.ts:107），
+       * 8 条探测串在**真实**主 chunk 里本来就命中 —— 直接拿它当干净态会让本用例恒红（假失败），
+       * 所以先把这 8 条骨架串从主包里抹掉，才谈得上「干净态」。 */
+      const cleanMain = subject.probes.reduce((t, s) => t.split(s).join(''), inp.mainText)
+      const stillHit = subject.probes.filter((p) => cleanMain.includes(p))
+      if (stillHit.length) {
+        throw new Fatal(`证伪用例 L5d 自检失败：干净态主包里仍有 ${stillHit.length} 条探测串命中（${JSON.stringify(stillHit.slice(0, 2))}）⇒ "干净态"没构造出来，用例无意义`)
+      }
+      /* 注入：撞源码的候选混进探测集 + 干净主 chunk 里这段应用源码本来就在（App 源码一定会进产物）
+       * ⇒ 8 条真探测串 0 命中、撞源码的那条 1 命中 ⇒ **部分命中 ⇒ UNKNOWN**：
+       * 干净态被自己的探测集拖成门红，而根因一眼可见（探测串撞了应用源码，过滤没生效）。 */
+      const perPkg = guarded.map((p) => (p.id === 'ts-code' ? { ...p, probes: [...p.probes, ...collisions] } : p))
+      return { lazyProbes: perPkg, mainText: `${cleanMain}\n${collisions.join('\n')}\n` }
     },
   },
   {

@@ -94,7 +94,7 @@ const loadWritingDemo = async () => parseData((await import('../../../content/wr
 const loadSpeakingDemo = async () => parseData((await import('../../../content/speaking/demo-speaking-01/items.json?raw')).default)
 const loadCollectionDemo = async () => parseData((await import('../../../content/collection/demo-study-set/items.json?raw')).default)
 
-/* ---------------- 注册表（10 vocabulary + 7 类型试金石 + 1 collection = 18 包） ---------------- */
+/* ---------------- 注册表（10 vocabulary + 7 类型试金石 + 1 collection = 10 + 8 = 18 包） ---------------- */
 const packages: ContentPackage[] = [
   { manifest: aiCoreManifest, localId: 'ai-core', words: parseWords(aiCoreWords) },
   { manifest: cloudNativeManifest, localId: 'cloud-native', load: loadCloudNative },

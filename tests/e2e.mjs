@@ -1809,6 +1809,21 @@ async function run() {
   const realErrors = consoleErrors.filter((e) => !e.includes('favicon'))
   check('无 console / page 运行时错误', realErrors.length === 0, realErrors.slice(0, 2).join(' | '))
 
+  /* ---------------- 用例数锁死（以前只有文档纪律，没有机器断言） ----------------
+   * 项目纪律「e2e 用例数锁死 171，不许增减一条」原先只活在文档陈述里：
+   * 代码里没有任何 ===171 的断言，加减一条 check() 让 CI 照样绿。
+   * 这里把纪律钉成机器判据：断言**实际执行到的 check 总数** == 期望值（不符 ⇒ exit 1）。
+   * 期望值 = `npm run test:e2e` 输出「共 N 项」的实测值（当前 171），不是拍脑袋抄来的。
+   * 想加/减用例 ⇒ 连同这个常量一起改，并在提交里说清为什么 —— 这是刻意的棘轮。 */
+  const E2E_CASES_EXPECTED = 171
+  if (results.length !== E2E_CASES_EXPECTED) {
+    console.error(
+      `\n✗ e2e 用例数漂移：实际执行 ${results.length} 项，期望 ${E2E_CASES_EXPECTED} 项` +
+        `（增减用例必须同时改 tests/e2e.mjs 的 E2E_CASES_EXPECTED，不许静默加减让 CI 变绿）`,
+    )
+    failures++
+  }
+
   console.log(`\n${'─'.repeat(54)}`)
   console.log(`共 ${results.length} 项，通过 ${results.length - failures}，失败 ${failures}`)
   console.log(`${'─'.repeat(54)}`)
