@@ -34,7 +34,7 @@
 | **S2-2** | **内容链路 ingest → validate → 远程媒体** | `content:validate` 22 项 + `gate:license` | ✅ 机器判已有，INV-5 |
 | **S2-3** | **主 chunk 余量 ≥ 12.6% raw / 15.9% gzip** | 判据 1 | ⚠️ **门槛值缺口**：「可以开始扩容了」这件事**没有判据**，目前是人工拍 + 机器判结果，中间那一段空着。建议补一条「可扩容」判据（阈值待人工给定） |
 | **S2-4** | **判据 5 三合一补强** | `check-bundle` 判据 5 | ✅ **已由 Slice 3 满足**（`5db4227` + `c36f54c`，falsify 11/11，含 `L5c`/`L5d` 双证伪，经独立 mutation 验收） |
-| **S2-5** | **N5 注册表 codegen** | `registry.ts` | 🔴 **零实现**。真上 codegen 会同时打坏三处文本判据：`validate:20`、`parseRegistryEntries`、`parseWarmUpLiteral` ⇒ CI 全红。**解冻前必须至少先裁「做 / 不做」** |
+| **S2-5** | **N5 注册表 codegen** | `registry.ts` | ✅ **已裁「不做」**（见 `../stage2/N5-REGISTRY-CODEGEN-DECISION-2026-10-02.md` §5）。registry.ts 保持手写单一事实源，判据 2/3/5/6 + validate 判据 20 一律不改 |
 | **S2-6** | **N6 UX 三条机器判化**（骨架固定 6 行 AST 桶 / 布局零跳动 CDP Δ≤2px / loading-error 分支禁裸字符串） | `STAGE1-CLOSURE-REVIEW` §5 | 🟡 **J4 已裁「N6 不阻塞 Stage 2」** ⇒ 它从「解冻前置」降级为「Stage 2 内部项」；三条机器判化本身**仍零实现**，按计时入 Stage 2 |
 
 > **J4 裁定带来的状态迁移**：N6 从「挡在解冻门口」变成「Stage 2 里要顺手做的一条」。
@@ -45,8 +45,11 @@
 ## §3 解冻后仍然冻结的（不许当"顺手"解掉）
 
 1. **面板 lazy（101.6 KiB）** —— 等 N6 UX 视觉复核签字（J4 后半句）。
-2. **N5 codegen** —— 零实现 + 会打坏三处文本判据，至少先裁定方向再动。
-3. **S2-3 的「可扩容」门槛值** —— 阈值是人工拍的数字，机器只能判结果不能判"该不该开始"。
+2. **S2-3 的「可扩容」门槛值** —— 阈值是人工拍的数字，机器只能判结果不能判"该不该开始"。
+
+> **S2-5（N5 codegen）已从「解冻前置」转成「已裁定不做」**，不再属于"仍冻结"清单，
+> 也不再是解冻后待办的第一项 —— 它只是一句已落定的裁定，见
+> `docs/p18/_generated/stage2/N5-REGISTRY-CODEGEN-DECISION-2026-10-02.md` §5。
 
 ---
 
