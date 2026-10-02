@@ -52,6 +52,14 @@ docs/audit-package.zip
 .audit-chrome-profile*/
 .diag-profile/
 
+# Stage 2 真机验收（scripts/verify-learning-unit.mjs）的产物与临时 profile。
+# 同 tests/_evidence/*.png 的口径：截图与 report.json 每次跑都会重写（进度百分比、
+# 首词都会随轮次漂），入库等于制造永久 dirty。
+# 验收**判据**在 scripts/verify-learning-unit.mjs（入库），产物不入库。
+_evidence/
+.unit-chrome-profile*/
+.diag-chrome/
+
 # Esafenet 密文文件隔离区（INCIDENT-ESAFENET，2026-09-28）
 docs/_quarantine-esafenet/
 

@@ -266,4 +266,25 @@ export const en: Record<string, string> = {
   'memorize.swipeFlip': 'Tap card or swipe up to flip',
   'memorize.swipeGrade': '← Nope · Swipe up Fuzzy · Know →',
   'memorize.medal': 'Daily quest complete',
+
+  /* Learning unit (Stage 2 · product exploration): unit = word slice + attached items + entry.
+   * The three placeholder strings carry the "no faked availability" rule: no audio binaries,
+   * no exercise payload, no subtitle content at all — say "pending" instead of shipping
+   * a fake player or a fake exercise panel. */
+  'unit.card': 'Current learning unit',
+  'unit.enter': 'Open unit',
+  'unit.back': 'Back to home',
+  'unit.start': 'Start this unit',
+  'unit.progress': 'Unit progress',
+  'unit.wordsError': 'Unit word list does not match the content package (unknown word forms)',
+  'unit.section.words': 'Unit vocabulary',
+  'unit.section.audio': 'Audio',
+  'unit.section.subtitle': 'Subtitle',
+  'unit.section.listening': 'Listening',
+  'unit.section.exercise': 'Exercise',
+  'unit.status.audioPending': 'Audio not wired yet (no audio files; remote hosting pending)',
+  'unit.status.exercisePending': 'Exercise payload not wired yet (items only, nothing to answer)',
+  'unit.status.subtitlePending': 'Subtitle content layer does not exist yet (subtitle is an asset, not a content type)',
+  'unit.01.title': 'Unit-01 · 100 high-frequency words',
+  'unit.01.summary': 'Listening input track',
 }

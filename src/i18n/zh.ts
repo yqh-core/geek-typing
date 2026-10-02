@@ -267,4 +267,24 @@ export const zh: Record<string, string> = {
   'memorize.swipeFlip': '点击卡片或上滑翻面',
   'memorize.swipeGrade': '← 不认识 · 上滑模糊 · 认识 →',
   'memorize.medal': '今日修行完成',
+
+  /* 学习单元（Stage 2 第一刀 · 产品探索）：单元 = 词段 + 挂载条目 + 入口。
+   * 三条 placeholder 文案是「零伪造可用性」的落地 —— 音频没有二进制 / 练习没有题目 /
+   * 字幕连内容包都不存在，一律明说「待接入」，不做假播放器与假作答面板。 */
+  'unit.card': '当前学习单元',
+  'unit.enter': '进入单元',
+  'unit.back': '返回首页',
+  'unit.start': '开始学习本单元',
+  'unit.progress': '本单元完成度',
+  'unit.wordsError': '单元词表与内容包不一致（有词形未命中）',
+  'unit.section.words': '本单元词汇',
+  'unit.section.audio': '音频',
+  'unit.section.subtitle': '字幕',
+  'unit.section.listening': '听力',
+  'unit.section.exercise': '练习',
+  'unit.status.audioPending': '音频尚未接入（暂无音频文件，R2 托管待接入）',
+  'unit.status.exercisePending': '题目数据尚未接入（当前只有条目，无法作答）',
+  'unit.status.subtitlePending': '字幕内容层尚未存在（字幕为资产位，不是内容类型）',
+  'unit.01.title': 'Unit-01 · 高频 100 词',
+  'unit.01.summary': '听力输入方向',
 }

@@ -2,6 +2,8 @@ import { BookOpenCheck, CalendarDays, Crosshair, Flame, Play, Sparkles } from 'l
 import type { ThemeConfig } from '../lib/theme'
 import type { TodayRecommendation } from '../lib/recommend'
 import { useLang, useT } from '../i18n/hooks'
+import LearningUnitCard from './LearningUnitCard'
+import type { LearningUnit } from '../data/learningUnits'
 
 interface CatalogSummary {
   /** 内容包总数（来自 catalog.packages.length） */
@@ -19,6 +21,11 @@ interface HomePanelProps {
   bankCount: number
   /** 内容目录汇总（P1.7-W5C：仅组合展示，复用 nav.banks / bank.wordsUnit，零新键） */
   catalogSummary?: CatalogSummary
+  /** 当前学习单元（Stage 2 第一刀：首页新增的单元入口，三张词库动作卡之外唯一的入口） */
+  unit?: LearningUnit
+  /** 本单元完成度（0–100，来自 analytics 词级总账） */
+  unitProgress?: number
+  onOpenUnit?: () => void
   onReviewRound: () => void
   onWeakRound: () => void
   onNewRound: () => void
@@ -31,6 +38,9 @@ export default function HomePanel({
   bankName,
   bankCount,
   catalogSummary,
+  unit,
+  unitProgress = 0,
+  onOpenUnit,
   onReviewRound,
   onWeakRound,
   onNewRound,
@@ -174,6 +184,11 @@ export default function HomePanel({
           </button>
         </div>
       </div>
+
+      {/* 当前学习单元：首页唯一指向「非词汇内容」的入口 */}
+      {unit && onOpenUnit && (
+        <LearningUnitCard theme={theme} unit={unit} progress={unitProgress} onOpen={onOpenUnit} />
+      )}
     </div>
   )
 }

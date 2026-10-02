@@ -276,18 +276,64 @@ Stage 1  CLOSED
 | 判据 5（lazy 探测集） | **0** | 不新增包 ⇒ 探测集不增 |
 | 判据 6（预热清单长度） | **0** | 不碰 `WARMUP_IDS` |
 | `tests/e2e.mjs` 用例数 | **0** | 页签集合不变 ⇒ 171 条不动 |
-| **判据 1（主 chunk 体积）** | ⚠️ **唯一可能撞的判据** | 单元容器组件 + 150 词白名单进主包。粗估 ≤2 KiB raw，余量 55.24 KiB 内；**但必须构建后实测** |
+| **判据 1（主 chunk 体积）** | ✅ **实测 PASS（唯一有实际影响的判据）** | 见下方实测回填 |
 
 **动手前必须做的一步**：先在 `dist` 上跑一次 `check-bundle`，确认主 chunk 仍在
 `384.21 ≤ 439.45 KiB raw / 119.06 ≤ 141.60 KiB gzip` 余量内。若超 ⇒ 单元容器改
 `React.lazy` 动态 import（走独立 chunk），**这时也不必动判据 5 / 判据 6**（它们是包维度的，不是组件维度的）。
 
+### §6.1 实测回填（2026-10-02，实现完成后）
+
+**实现前基线**（`node scripts/check-bundle.mjs` EXIT=0）：主 chunk
+**384.21 KiB raw / 119.06 KiB gzip**（余量 12.6% / 15.9%）。
+
+**实现后实测**（`CODEBUDDY_SAFE_DELETE_ENABLED=0 npm run build` 后同脚本，EXIT=0）：
+主 chunk **395.58 KiB raw / 122.00 KiB gzip**，余量 **10.0% / 13.8%**。
+
+| 判据 | 结果 | 说明 |
+|---|---|---|
+| 判据 1 主 chunk | ✅ PASS | 395.58 / 122.00 ≤ 439.45 / 141.60。**增量 +11.37 / +2.94 KiB**，预算常量一行未改、棘轮方向正确 |
+| 判据 2 数据 chunk 数 | ✅ PASS | 15（words 7 + items 8），未新增包 |
+| 判据 3 预热预算 | ✅ PASS | gzip 330.02 ≤ 600 KiB，与基线同值 |
+| 判据 4 manifest 投影 | ✅ PASS | J1/J2/J3 全 PASS |
+| 判据 5 lazy 语义 | ✅ PASS | 15 个 lazy 包探测串在主 chunk 命中 **0** 次 |
+| 判据 6 预热清单长度 | ✅ PASS | 2 ≤ 2（`[kaoyan, toefl]` 未动） |
+
+> 增量比方案粗估（≤2 KiB）大，主因是**门面 `core/content/index.ts` 新导出
+> `loadPackage` / `loadPackageData`**（见 §6.2）—— 这两个 API 是单元加载通道的必需件，
+> 而 `ui-contract` 的 `bypassFacadeImports` 棘轮基线是 0，不允许 UI 深路径直引 registry，
+> 所以只能从门面开口子。10 KiB 量级可接受，且仍留 44 KiB raw 余量。
+
+### §6.2 一处必要的门面开口（不改 registry.ts）
+
+`src/core/content/index.ts` 增加 `export { warmUpVocabulary, loadPackage, loadPackageData }`。
+**`registry.ts` 本身零改动**（§6 表第一行仍然成立）—— 只是把已有的导出在门面重导出，
+不改任何注册表内容、不新增包、不动 `WARMUP_IDS`。
+
 **验收方式**（沿用上一刀的真机口径，headless Chrome + CDP）：
+产出脚本 `scripts/verify-learning-unit.mjs`（零Playwright 依赖，复用本机 Chrome + CDP）：
 
 - **V1**：从首页点进单元 → 看到词段 100 词 → 打字页学的正是这 100 词（不是全 3000）；
 - **V2**：音频 / 字幕 / 练习三处**都有可见的「待接入」文案**，且**零 console error**、**零点了没反应**；
 - **V3**：打字 → 背单词 → 复习 → 进度 **全链路走通且进度真的被记下来**；
 - **V4**：`check-bundle` exit 0、`e2e` 171/171。
+
+**实测结果（2026-10-02）**：V1–V3 真机 **24/24 通过**（EXIT=0），V4 离线
+`check-bundle` EXIT=0 + `tests/e2e.mjs` **171/171** + `gate-architecture` **10/10** +
+`boundary-ast` **20/20** + `ui-contract` **21/21**。
+
+两个关键实测值（证明「学的正是这 100 词」不是推断）：
+- 单元视图实际渲染 **100** 个 `unit-word` 节点，白名单首词 `eagle` / 末词 `bay`；
+- 打字页首词实测落在白名单内（多次运行分别取到 `fatuous` / `licence` / `tropic`），
+  打完后 `unit-progress` 由 `0%` 涨到 `1%` → `2%`，且 `localStorage['gt.learning.v2']`
+  里能回读到刚打的词。
+
+> 验收脚本本身踩了两个**可复用的坑**，已写进脚本注释：
+> ① Home 页签的中文文案是「今日」不是「首页」——按文案找页签永远落空，
+>  症状会被误读成「App 的 sub-view 状态坏了」；应按 `tab-*` 的 DOM id 选。
+> ② 合成 `new KeyboardEvent('keydown')` **打不动字**（`isTrusted=false`，
+>   React 收不到），必须走 CDP `Input.dispatchKeyEvent`（= Playwright
+>   `page.keyboard.type()` 同一条通道，`tests/e2e.mjs:177` 用的就是它）。
 
 ---
 

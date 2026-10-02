@@ -17,7 +17,7 @@
  * 学习语义的唯一接线点在本文件：onCompleteWord → practiceEngine.completeTypingWord。
  * 这样 practice-engine 门禁天然成立（hook 里不出现「完成三连」）。
  */
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Header from './components/Header'
 import StatsBar from './components/StatsBar'
 import PracticePanel from './components/PracticePanel'
@@ -26,6 +26,7 @@ import StreakBar from './components/StreakBar'
 import KeyMap from './components/KeyMap'
 import Memorize from './components/Memorize'
 import HomePanel from './components/HomePanel'
+import LearningUnitPanel from './components/LearningUnitPanel'
 import ReviewPanel from './components/ReviewPanel'
 import ProgressPanel from './components/ProgressPanel'
 import CommandPalette from './components/CommandPalette'
@@ -36,6 +37,12 @@ import { getCatalog } from './core/content'
 import { speak, warmSpeech } from './lib/speech'
 import { Terminal } from 'lucide-react'
 import { useT, useLang } from './i18n/hooks'
+import {
+  ACTIVE_LEARNING_UNIT,
+  loadUnitWords,
+  unitProgressOf,
+  type UnitWordList,
+} from './data/learningUnits'
 import { useTabNav, type TabId } from './hooks/useTabNav'
 import { useSettings } from './hooks/useSettings'
 import { useCommandMode } from './hooks/useCommandMode'
@@ -84,6 +91,35 @@ export default function App() {
   const { history, setHistory, todayCount, streakDays } = useStreak()
 
   const theme = THEMES[themeId]
+
+  /* ---------------- 学习单元（Stage 2 第一刀）----------------
+   * 首页单元卡要显示「本单元完成度」，所以 App 这里也要拿到单元词（与面板共用
+   * registry.loadPackage 的缓存，不产生第二份 3000 词内存）。
+   * 单元展开视图是 Home 页内的 sub-view：不新增页签（页签集合是 UI 契约锚点）、
+   * 不引入路由（第一刀不需要可分享的 URL，这是已知取舍）。 */
+  const [unitOpen, setUnitOpen] = useState(false)
+  const [unitPicked, setUnitPicked] = useState<UnitWordList | null>(null)
+
+  /* 词段加载在 data 层（loadUnitWords）：App 域里不出现任何「词表来源点 / 词表句柄」，
+   * 否则会被架构门 ui-contract 计入 wordTableSources / handleReads 棘轮（只许降不许升）。 */
+  useEffect(() => {
+    let alive = true
+    loadUnitWords(ACTIVE_LEARNING_UNIT)
+      .then((picked) => {
+        if (alive && picked) setUnitPicked(picked)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  /* 完成度计算在 data 层（unitProgressOf）—— UI 域只收一个 number，
+   * 不持有词表句柄做算子，避免顶破 ui-contract 的 handleReads / bannedArrayOps 棘轮。 */
+  const unitProgress = useMemo(
+    () => unitProgressOf(analytics, ACTIVE_LEARNING_UNIT, unitPicked),
+    [unitPicked, analytics],
+  )
 
   /* ---------------- 依赖环的显式破环点 ----------------
    * useReviewFlow 需要 startRound（复习轮开轮），而 useTypingRound 的完成回调需要
@@ -310,12 +346,29 @@ export default function App() {
             </div>
           )}
           {tab === 'home' ? (
+            unitOpen ? (
+              <LearningUnitPanel
+                theme={theme}
+                unit={ACTIVE_LEARNING_UNIT}
+                canStart={Boolean(unitPicked)}
+                progress={unitProgress}
+                onStart={() => {
+                  sound.tap()
+                  setTab('typing')
+                  if (unitPicked) startRound(unitPicked)
+                }}
+                onBack={() => setUnitOpen(false)}
+              />
+            ) : (
             <HomePanel
               theme={theme}
               recommendation={recommendation}
               bankName={lang === 'en' ? bank?.nameEn ?? bank?.name ?? '' : bank?.name ?? ''}
               bankCount={bank?.count ?? bank?.words.length ?? 0}
               catalogSummary={{ packages: contentCatalog.packages.length, items: contentCatalog.totalItems }}
+              unit={ACTIVE_LEARNING_UNIT}
+              unitProgress={unitProgress}
+              onOpenUnit={() => setUnitOpen(true)}
               onReviewRound={() => {
                 sound.tap()
                 void startReviewRound()
@@ -329,6 +382,7 @@ export default function App() {
                 startRound()
               }}
             />
+            )
           ) : tab === 'review' ? (
             <ReviewPanel
               theme={theme}
