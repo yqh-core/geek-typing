@@ -45,6 +45,14 @@ jobs:
       # 实测不依赖 dist。
       - name: 内容门禁（content:validate）
         run: npm run content:validate
+      # P18-C′ 注册表生成一致性门：registry.ts 由 scripts/content/generate-registry.mjs 生成，
+      # 本门比对「content/ 实际包 ↔ 生成结果 ↔ 磁盘 registry.ts」三者的 localId / policy /
+      # ?runtime / 双顺序，有漂移即 EXIT=1。只读 content/ 与 registry.ts，不触碰 dist。
+      # 配套测试 `npm run test:generate-registry` 做故障注入（证明这道门确实会判红）。
+      - name: 注册表生成一致性门（generate-registry --check · P18-C′）
+        run: npm run verify:registry
+      - name: 注册表生成器测试（test:generate-registry · P18-C′）
+        run: npm run test:generate-registry
       # 许可硬门（INV-5 / Plan §4.2）：内容入库**前置**硬门 —— 复用 asset-rules.mjs 与 license-policy.mjs，
       # 不复制任何规则；未过门的内容不得落盘到 content/**。自带 --falsify（N 条用例 + 判绿对照组），
       # 本地跑 `npm run gate:license:falsify` 可复核这道门确实会判红。

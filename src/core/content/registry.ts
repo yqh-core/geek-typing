@@ -49,52 +49,57 @@ import frontendManifest from '../../../content/vocabulary/frontend/manifest.json
 import tsCodeManifest from '../../../content/vocabulary/ts-code/manifest.json?runtime'
 import goCodeManifest from '../../../content/vocabulary/go-code/manifest.json?runtime'
 
-/* ---------------- inline 小库词条（同步 parse）—— 保留 ai-core（默认库）+ ts-code / go-code（本刀不动） ---------------- */
+/* ---------------- 非 vocabulary 试金石包（P1.7-Wave4 B-2） ----------------
+ * manifest 静态 import（常驻主 chunk，单个 ~1.2 KiB，O(包数) 线性小步涨）；
+ * items.json 一律动态 import（独立 items-*.js chunk，绝不进主 chunk），
+ * 与 words-*.js 同一判据口径（构建后体积门禁按 (words|items)-*.js 计数）。
+ * ⚠️ 同上，本段由 generate-registry.mjs 生成，不要手改。
+ */
+import demoListening01Manifest from '../../../content/listening/demo-listening-01/manifest.json?runtime'
+import demoAudio01Manifest from '../../../content/audio/demo-audio-01/manifest.json?runtime'
+import demoReading01Manifest from '../../../content/reading/demo-reading-01/manifest.json?runtime'
+import demoTopic01Manifest from '../../../content/topic/demo-topic-01/manifest.json?runtime'
+import demoExercise01Manifest from '../../../content/exercise/demo-exercise-01/manifest.json?runtime'
+import demoWriting01Manifest from '../../../content/writing/demo-writing-01/manifest.json?runtime'
+import demoSpeaking01Manifest from '../../../content/speaking/demo-speaking-01/manifest.json?runtime'
+import demoStudySetManifest from '../../../content/collection/demo-study-set/manifest.json?runtime'
+
+/* ---------------- inline 小库词条（同步 parse）---------------- */
 import aiCoreWords from '../../../content/vocabulary/ai-core/words.json?raw'
 import tsCodeWords from '../../../content/vocabulary/ts-code/words.json?raw'
 import goCodeWords from '../../../content/vocabulary/go-code/words.json?raw'
 
 const parseWords = (raw: string): WordPayload[] => JSON.parse(raw) as WordPayload[]
+const parseData = (raw: string): unknown[] => JSON.parse(raw) as unknown[]
 
-/* ---------------- lazy 词库词条（动态 import，独立 chunk） ----------------
+/* ---------------- lazy 词库词条（动态 import，独立 chunk）----------------
  * B 步 9.5：`cloud-native` / `frontend` 由 inline 改 lazy（两处 manifest 的 offline.policy
  * 同步改 lazy，否则 `scripts/content/validate.mjs` 判据 20「策略一致性」当场判红）。
  * 判定口径 = 体积 ÷ 首屏必需度（见 docs/p18/DECISIONS-POST-P18.md §9.5.2）：
  * 两包合计才 1.55 KiB，但都是「首页按任意键即打字」的入口词库 —— 提前到首屏换不来任何
  * 首屏收益，却白占主 chunk 常驻内存，故改 lazy 走骨架屏（Memorize.tsx 已配套加载态）。
- * 注意：这与预热的取舍无关（见 WARMUP_IDS 处注释）—— 改 lazy 不意味着该进预热清单。 */
-const loadCloudNative = async () => parseWords((await import('../../../content/vocabulary/cloud-native/words.json?raw')).default)
-const loadFrontend = async () => parseWords((await import('../../../content/vocabulary/frontend/words.json?raw')).default)
+ * 注意：这与预热的取舍无关（见 WARMUP_IDS 处注释）—— 改 lazy 不意味着该进预热清单。
+ *
+ * ⚠️ 本段由 scripts/content/generate-registry.mjs 生成；改 policy 走改 manifest + 跑
+ *   `npm run content:generate-registry`，**不要手改本文件**（会被 --check 判红）。
+ */
 const loadIelts = async () => parseWords((await import('../../../content/vocabulary/ielts/words.json?raw')).default)
 const loadKaoyan = async () => parseWords((await import('../../../content/vocabulary/kaoyan/words.json?raw')).default)
 const loadToefl = async () => parseWords((await import('../../../content/vocabulary/toefl/words.json?raw')).default)
 const loadCet4 = async () => parseWords((await import('../../../content/vocabulary/cet4/words.json?raw')).default)
 const loadCet6 = async () => parseWords((await import('../../../content/vocabulary/cet6/words.json?raw')).default)
+const loadCloudNative = async () => parseWords((await import('../../../content/vocabulary/cloud-native/words.json?raw')).default)
+const loadFrontend = async () => parseWords((await import('../../../content/vocabulary/frontend/words.json?raw')).default)
+const loadDemoListening01 = async () => parseData((await import('../../../content/listening/demo-listening-01/items.json?raw')).default)
+const loadDemoAudio01 = async () => parseData((await import('../../../content/audio/demo-audio-01/items.json?raw')).default)
+const loadDemoReading01 = async () => parseData((await import('../../../content/reading/demo-reading-01/items.json?raw')).default)
+const loadDemoTopic01 = async () => parseData((await import('../../../content/topic/demo-topic-01/items.json?raw')).default)
+const loadDemoExercise01 = async () => parseData((await import('../../../content/exercise/demo-exercise-01/items.json?raw')).default)
+const loadDemoWriting01 = async () => parseData((await import('../../../content/writing/demo-writing-01/items.json?raw')).default)
+const loadDemoSpeaking01 = async () => parseData((await import('../../../content/speaking/demo-speaking-01/items.json?raw')).default)
+const loadDemoStudySet = async () => parseData((await import('../../../content/collection/demo-study-set/items.json?raw')).default)
 
-/* ---------------- 非 vocabulary 试金石包（P1.7-Wave4 B-2） ----------------
- * manifest 静态 import（常驻主 chunk，单个 ~1.2 KiB，O(包数) 线性小步涨）；
- * items.json 一律动态 import（独立 items-*.js chunk，绝不进主 chunk），
- * 与 words-*.js 同一判据口径（构建后体积门禁按 (words|items)-*.js 计数）。 */
-import listeningManifest from '../../../content/listening/demo-listening-01/manifest.json?runtime'
-import audioManifest from '../../../content/audio/demo-audio-01/manifest.json?runtime'
-import readingManifest from '../../../content/reading/demo-reading-01/manifest.json?runtime'
-import topicManifest from '../../../content/topic/demo-topic-01/manifest.json?runtime'
-import exerciseManifest from '../../../content/exercise/demo-exercise-01/manifest.json?runtime'
-import writingManifest from '../../../content/writing/demo-writing-01/manifest.json?runtime'
-import speakingManifest from '../../../content/speaking/demo-speaking-01/manifest.json?runtime'
-import collectionManifest from '../../../content/collection/demo-study-set/manifest.json?runtime'
-
-const parseData = (raw: string): unknown[] => JSON.parse(raw) as unknown[]
-const loadListeningDemo = async () => parseData((await import('../../../content/listening/demo-listening-01/items.json?raw')).default)
-const loadAudioDemo = async () => parseData((await import('../../../content/audio/demo-audio-01/items.json?raw')).default)
-const loadReadingDemo = async () => parseData((await import('../../../content/reading/demo-reading-01/items.json?raw')).default)
-const loadTopicDemo = async () => parseData((await import('../../../content/topic/demo-topic-01/items.json?raw')).default)
-const loadExerciseDemo = async () => parseData((await import('../../../content/exercise/demo-exercise-01/items.json?raw')).default)
-const loadWritingDemo = async () => parseData((await import('../../../content/writing/demo-writing-01/items.json?raw')).default)
-const loadSpeakingDemo = async () => parseData((await import('../../../content/speaking/demo-speaking-01/items.json?raw')).default)
-const loadCollectionDemo = async () => parseData((await import('../../../content/collection/demo-study-set/items.json?raw')).default)
-
-/* ---------------- 注册表（10 vocabulary + 7 类型试金石 + 1 collection = 10 + 8 = 18 包） ---------------- */
+/* ---------------- 注册表（10 vocabulary + 8 非 vocabulary = 18 包） ---------------- */
 const packages: ContentPackage[] = [
   { manifest: aiCoreManifest, localId: 'ai-core', words: parseWords(aiCoreWords) },
   { manifest: cloudNativeManifest, localId: 'cloud-native', load: loadCloudNative },
@@ -106,16 +111,15 @@ const packages: ContentPackage[] = [
   { manifest: toeflManifest, localId: 'toefl', load: loadToefl },
   { manifest: tsCodeManifest, localId: 'ts-code', words: parseWords(tsCodeWords) },
   { manifest: goCodeManifest, localId: 'go-code', words: parseWords(goCodeWords) },
-  { manifest: listeningManifest, localId: 'demo-listening-01', loadData: loadListeningDemo },
-  { manifest: audioManifest, localId: 'demo-audio-01', loadData: loadAudioDemo },
-  { manifest: readingManifest, localId: 'demo-reading-01', loadData: loadReadingDemo },
-  { manifest: topicManifest, localId: 'demo-topic-01', loadData: loadTopicDemo },
-  { manifest: exerciseManifest, localId: 'demo-exercise-01', loadData: loadExerciseDemo },
-  { manifest: writingManifest, localId: 'demo-writing-01', loadData: loadWritingDemo },
-  { manifest: speakingManifest, localId: 'demo-speaking-01', loadData: loadSpeakingDemo },
-  { manifest: collectionManifest, localId: 'demo-study-set', loadData: loadCollectionDemo },
+  { manifest: demoListening01Manifest, localId: 'demo-listening-01', loadData: loadDemoListening01 },
+  { manifest: demoAudio01Manifest, localId: 'demo-audio-01', loadData: loadDemoAudio01 },
+  { manifest: demoReading01Manifest, localId: 'demo-reading-01', loadData: loadDemoReading01 },
+  { manifest: demoTopic01Manifest, localId: 'demo-topic-01', loadData: loadDemoTopic01 },
+  { manifest: demoExercise01Manifest, localId: 'demo-exercise-01', loadData: loadDemoExercise01 },
+  { manifest: demoWriting01Manifest, localId: 'demo-writing-01', loadData: loadDemoWriting01 },
+  { manifest: demoSpeaking01Manifest, localId: 'demo-speaking-01', loadData: loadDemoSpeaking01 },
+  { manifest: demoStudySetManifest, localId: 'demo-study-set', loadData: loadDemoStudySet },
 ]
-
 /** vocabulary 槽位（既有 API 口径：UI / 持久化 / 学习层只看词库包） */
 const vocabularyPackages = packages.filter((p) => p.manifest.type === 'vocabulary')
 
