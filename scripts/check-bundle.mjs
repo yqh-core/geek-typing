@@ -328,6 +328,9 @@ function findItemsJson(localId) {
  * @param json json（items.json / words.json 解析后的对象）
  * @param otherPayloadTexts 其它 lazy 包的载荷文本（跨包去重用）
  * @param excludeText 「不该被探测」的禁用文本（= `src/**` 源码全文）；空/null ⇒ 不过滤
+ * @param dropStats 可选出参：函数把「本次被 excludeText 踢掉几条候选」记进来。
+ *   这条必须由**函数内部**报：调用点自己拿 excludeText 变量去重筛候选只会证明「调用点取到了源码全文」，
+ *   证不出「真的把参数传了下去」—— 调用点传 '' 时那个自算值照样是 1（实测过，L5d 因此全绿）。
  */
 /** 取「整串可打印 ASCII、≥5 字符」的候选（跨数组/对象递归；顺序无关，调用方自己排序） */
 function asciiCandidates(json) {
@@ -345,11 +348,14 @@ function asciiCandidates(json) {
   return cands
 }
 
-function asciiPhraseProbes(json, otherPayloadTexts, excludeText) {
+function asciiPhraseProbes(json, otherPayloadTexts, excludeText, dropStats) {
   const cands = asciiCandidates(json)
-  const uniq = [...cands].filter(
-    (s) => !s.includes('"') && !(excludeText && excludeText.includes(s)),
-  )
+  const uniq = [...cands].filter((s) => {
+    const hitQuote = s.includes('"')
+    const hitExclude = !hitQuote && !!(excludeText && excludeText.includes(s))
+    if (hitExclude && dropStats) dropStats.srcDropped++
+    return !hitQuote && !hitExclude
+  })
   uniq.sort((a, b) => b.length - a.length || a.localeCompare(b))
   return uniq.slice(0, PROBE_COUNT)
 }
@@ -411,6 +417,7 @@ function collectLazyProbes(entries, setsById, mainText) {
   return lazy.map((e) => {
     let probes
     let kind = kindOf.get(e.id)
+    let srcDropped = 0
     if (kind === 'vocabulary/load') {
       // 过滤用残文 = mainText 摘掉本包自己的词条（自指陷阱见 distinctProbes 注释）
       probes = distinctProbes(e.id, setsById, stripOwnPayload(mainText, setsById.get(e.id)))
@@ -422,7 +429,19 @@ function collectLazyProbes(entries, setsById, mainText) {
         try { json = JSON.parse(txt) } catch { json = null }
         const others = [...texts].filter(([k]) => k !== e.id).map(([, v]) => v)
         // 兜底的过滤基准 = src/** 源码全文（缺陷一）；今天兜底睡着，这条是给 3a 之后兜底用的
-        const ascii = json ? asciiPhraseProbes(json, others, scanSrcText()) : []
+        const excludeText = scanSrcText()
+        const dropStats = { srcDropped: 0 }
+        const ascii = json ? asciiPhraseProbes(json, others, excludeText, dropStats) : []
+        /* srcDropped = 上一次 asciiPhraseProbes 调用里 excludeText **实际踢掉**了几条候选（接线证据）。
+         * 只验 asciiPhraseProbes 内部那句 filter 是会被骗的（判据⑧ 那类病：锁住函数内部、锁不住调用点）：
+         * 调用点要是传了 ''（过滤失效），filter 还在、一句不落，但踢掉 0 条 —— 下游探测集因此毫无变化。
+         * 所以「踢掉几条」必须由调用点报出来，才能证明 :425 真的把源码全文传进去了。
+         * （不能拿探测集反推：撞源码的候选只有 30 字符，长串优先的 top-8 永远挤不进它，
+         *   即使过滤失效，"探测集里混进撞源码串"也压根不会发生 —— 实测过，见 L5d 的自检注释。） */
+        // srcDropped 必须取**函数内部**报上来的数（dropStats），不能调用点自己再算一遍：
+        // 调用点自算只会证明「我自己取到了源码全文」，证不出「真的传下去了」——
+        // 改成自算后实测过：调用点传 '' 时它照样算出 1，L5d 依旧全绿（本届复核抓的就是这个）。
+        srcDropped = dropStats.srcDropped
         // JSON 解析失败 ⇒ ascii 恒为空，此时保持原 kind 与空 probes（不抛错、不假装探测到了）
         if (ascii.length > probes.length) {
           probes = ascii
@@ -443,7 +462,7 @@ function collectLazyProbes(entries, setsById, mainText) {
       probes = ascii
       if (json && ascii.length === 0) nonAscii.add(e.id)
     }
-    return { id: e.id, kind, probes, nonAscii: nonAscii.has(e.id) }
+    return { id: e.id, kind, probes, nonAscii: nonAscii.has(e.id), srcDropped }
   })
 }
 
@@ -1038,7 +1057,7 @@ const FALSIFY_CASES = [
   {
     letter: 'L5d',
     name: '把兜底分支的 src/** 源码过滤关掉（模拟过滤失效）⇒ 撞源码的候选进探测集，干净态主 chunk 也会被拖成「部分命中」',
-    why: '缺陷一的机器判据：兜底串若在 src/** 里也写了（ts-code 的 ASCII 候选池实测有 `export default function App() {` 撞 src/App.tsx:60），过滤失效 ⇒ 干净态也会命中 ⇒ 判据 5 退化成「部分命中 ⇒ UNKNOWN ⇒ 门红」。用例先自检「语料里确实存在撞源码的候选 + excludeText 这条过滤真的把它挡在探测集外（撤销这条过滤本用例立刻判红，见下方注释）」，再模拟过滤失效把撞源码的候选混进探测集、并让主 chunk 带上这段应用源码 ⇒ 判据 5 必须 NOT PASS（这里刻意是 UNKNOWN：干净态被自己的探测集拖红，正是缺陷一描述的退化）。任何一环失效（过滤没接上 / 语料不再撞源码）⇒ 自检抛错 ⇒ 同样判红，不许写成恒绿死用例。',
+    why: '缺陷一的机器判据：兜底串若在 src/** 里也写了（ts-code 的 ASCII 候选池实测有 `export default function App() {` 撞 src/App.tsx:60），过滤失效 ⇒ 干净态也会命中 ⇒ 判据 5 退化成「部分命中 ⇒ UNKNOWN ⇒ 门红」。用例三层自检缺一不可：① 语料里确实存在撞源码的候选；② **调用点** `:425` 真把 src/** 全文传了进去（否则踢掉 0 条 ⇒ 判红）；③ **函数** `:351` 真的按 excludeText 过滤（撤销那句 filter ⇒ 判红）。② 是这次补的：只验函数内部的 filter 会被「调用点传空串」骗过去（那时 filter 还在但踢掉 0 条，探测集逐字节不变）。三层都过之后，再模拟过滤失效把撞源码的候选混进探测集、并让主 chunk 带上这段应用源码 ⇒ 判据 5 必须 NOT PASS（这里刻意是 UNKNOWN：干净态被自己的探测集拖红，正是缺陷一描述的退化）。任何一环失效 ⇒ 自检抛错 ⇒ 判红，不许写成恒绿死用例。',
     target: 'lazy',
     expect: 'UNKNOWN',
     mutate: (inp) => {
@@ -1057,16 +1076,23 @@ const FALSIFY_CASES = [
       if (!collisions.length) {
         throw new Fatal('证伪用例 L5d 自检失败：ts-code 候选池里没有撞 src/** 源码的候选 ⇒ 缺陷一在本语料不存在，src 过滤是否多余要重新评估')
       }
-      /* 自检二（过滤真接上了，也是本用例唯一的"接线敏感点"）：
-       * 今天这条过滤在下游是**空操作**（撞源码的候选只有 30 字符，被长串优先的 8 个名额挤到候选池里
-       * 但进不了 top-8），所以「下游判据变红」证明不了过滤有效。唯一能证明它接上的是函数接线本身：
-       * 把生产探测集的第 1 条当 excludeText 喂回去 ⇒ 它**必须**从探测集里消失。
-       * 撤销 `uniq.filter` 里那条 `!(excludeText && excludeText.includes(s))` ⇒ 本自检抛错 ⇒ 本用例判红。 */
+      /* 自检二（**锁调用点** `:425` 的实参）：subject 是生产路径 collectLazyProbes 的真实产出，
+       * 它的 srcDropped = 那一次调用里 src/** 全文实际踢掉的候选数。
+       * `:425` 一旦传 ''（过滤失效）⇒ 踢掉 0 条 ⇒ 这里抛错 ⇒ L5d 判红。
+       * 不能靠「探测集里有没有混进撞源码的串」来判（就是自检三 那条的另一种写法）：
+       * 撞源码的那条候选只有 30 字符，长串优先的 top-8 永远挤不进它，传 '' 时探测集逐字节不变 ——
+       * 实测（临时探针打印）`:425`→'' 时 subject.probes 与正常版完全一致、`leaked=[]`，那条判据必然空转。 */
+      if (!(subject.srcDropped > 0)) {
+        throw new Fatal(`证伪用例 L5d 自检失败：生产路径的源码过滤踢掉了 ${subject.srcDropped} 条候选（应 > 0）⇒ :425 没把 src/** 全文传进 asciiPhraseProbes，缺陷一的过滤是空转`)
+      }
+      /* 自检三（**锁函数内部** `:351` 的实现）：把生产探测集的第 1 条当 excludeText 喂回去 ⇒
+       * 它**必须**从探测集里消失。撤销 `uniq.filter` 里那条 `!(excludeText && excludeText.includes(s))`
+       * ⇒ 本自检抛错 ⇒ L5d 判红。与自检二 各锁一层：一条锁调用点的实参，一条锁函数里的过滤实现。 */
       const decoy = subject.probes[0]
-      if (decoy == null) throw new Fatal('证伪用例 L5d 兜底没产出探测串，无法接线上自检')
+      if (decoy == null) throw new Fatal('证伪用例 L5d 兜底没产出探测串，无法做函数层自检')
       const recheck = asciiPhraseProbes(json, [], decoy)
       if (recheck.includes(decoy)) {
-        throw new Fatal(`证伪用例 L5d 自检失败：excludeText 没接上（${JSON.stringify(decoy)} 本应被踢掉却仍在探测集里）⇒ 缺陷一的源码过滤是空转`)
+        throw new Fatal(`证伪用例 L5d 自检失败：asciiPhraseProbes 内部没按 excludeText 过滤（${JSON.stringify(decoy)} 本应被踢掉却仍在探测集里）⇒ 缺陷一的源码过滤只写在注释里`)
       }
       /* 构造「3a 落地之后的干净态主包」：真实主 chunk 今天还 inline 着 ts-code（registry.ts:107），
        * 8 条探测串在**真实**主 chunk 里本来就命中 —— 直接拿它当干净态会让本用例恒红（假失败），
