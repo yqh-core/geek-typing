@@ -53,7 +53,7 @@
  * 用法（CLI）：node scripts/ast/ui-contract-ast.mjs [--scan-root=<dir>] [--json]
  */
 import { Node, Project, SyntaxKind, ts } from 'ts-morph'
-import { readdirSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { REPO_ROOT, foldString, walkSourceFiles } from './boundary-ast.mjs'
 
@@ -447,6 +447,223 @@ export function checkUiContract({ root = REPO_ROOT, scanRoot, project } = {}) {
     scanned: files.length,
     root,
     durationMs: performance.now() - t0,
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * 判据⑦：加载失败态 + 自救入口（N13 补丁的机器判据，与六个桶正交）
+ * ------------------------------------------------------------------ */
+
+/** 失败态分支所在的 UI 文件（相对仓库根，随判据一起改）。 */
+export const LOAD_ERROR_FILE_REL = 'src/components/Memorize.tsx'
+/** 失败态入口在 App 层绑定的 JSX 属性所在文件。 */
+export const LOAD_ERROR_BIND_FILE_REL = 'src/App.tsx'
+/** 失败态入口的实现所在 hook 文件。 */
+export const LOAD_ERROR_IMPL_FILE_REL = 'src/hooks/useBank.ts'
+/** 失败态分支的 `data-testid` —— 必须与 JSX 属性字面量逐字一致，改 UI 就该判红。 */
+export const LOAD_ERROR_TESTID = 'memorize-load-error'
+/**
+ * 失败态自救入口的**按名锚点**（显式清单，新增/改名即本门的配置变更，禁止散在正则里）。
+ *
+ * 为什么必须是「按名跨文件锚点」而不是「同文件内解析」：
+ *   `Memorize` 的失败态按钮把 `onRetryBankLoad` 交给 `App.tsx` 的 JSX 绑定，再由 App 绑定到
+ *   `useBank` 返回的 `retryBankLoad` —— 往下两跳都在**别的文件**里。任何「只扫 Memorize.tsx
+ *   文本里有没有 location.reload()」的实现，都会在这次改动上假绿（reload 根本不在 Memoerize 里）。
+ *   反过来，只查 `useBank.ts` 里有没有 reload 也会假绿（按钮没绑上去照样判过）。
+ *   故判据要求**一条真实可达链**：分支内的 onClick →（prop 名锚点）→ App 绑定 →（锚点）→
+ *   useBank 实现 → `location.reload()`。
+ */
+export const LOAD_RETRY_ENTRY_ANCHORS = new Set(['onRetryBankLoad', 'retryBankLoad'])
+
+/** `X.reload()` 且 X ∈ {location, window.location} ⇒ 判定为「整页重载」。 */
+function isReloadCall(node) {
+  if (!Node.isCallExpression(node)) return false
+  const callee = node.getExpression()
+  if (!Node.isPropertyAccessExpression(callee)) return false
+  if (callee.getName() !== 'reload') return false
+  return /^(?:window\.)?location$/.test(callee.getExpression().getText())
+}
+
+/** 节点（表达式 / 函数体）里是否出现整页重载调用。 */
+function bodyHasReload(node) {
+  if (!node) return false
+  if (isReloadCall(node)) return true
+  return node.getDescendantsOfKind(SyntaxKind.CallExpression).some(isReloadCall)
+}
+
+/** 节点上「被调用的」标识符 / 成员名（不带参数）。 */
+function calleeNames(node) {
+  const out = []
+  for (const call of node.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const e = call.getExpression()
+    if (Node.isIdentifier(e)) out.push(e.getText())
+    else if (Node.isPropertyAccessExpression(e)) out.push(e.getText())
+  }
+  return [...new Set(out)]
+}
+
+/** 在 `sf` 里找同名声明（变量初始化 / 函数声明 / 对象属性）的初始化表达式。 */
+function declInits(name, sf) {
+  const out = []
+  for (const v of sf.getVariableDeclarations()) {
+    if (v.getName() === name) {
+      const init = v.getInitializer()
+      if (init) out.push(init)
+    }
+  }
+  for (const f of sf.getFunctions()) if (f.getName() === name) out.push(f)
+  for (const pa of sf.getDescendantsOfKind(SyntaxKind.PropertyAssignment)) {
+    if (pa.getName() === name) {
+      const init = pa.getInitializer?.()
+      if (init) out.push(init)
+    }
+  }
+  return out
+}
+
+/** `sf` 里名为 `name` 的 JSX 属性的初始化标识符名（如 `onRetryBankLoad={retryBankLoad}` → `retryBankLoad`）。 */
+function jsxBindName(name, sf) {
+  for (const attr of sf.getDescendantsOfKind(SyntaxKind.JsxAttribute)) {
+    if (attr.getNameNode().getText() !== name) continue
+    const init = attr.getInitializer()
+    if (!init || !Node.isJsxExpression(init)) continue
+    const expr = init.getExpression()
+    if (Node.isIdentifier(expr)) return expr.getText()
+  }
+  return null
+}
+
+/**
+ * 判据⑦：「加载失败态」必须存在，且该分支里的点击入口真的会把页面 reload。
+ *
+ * 背景（不是内容契约桶，是**交互契约**）：N13 加了 `memorize-load-error` 失败态和
+ * `memorize-load-retry` 按钮，但入口实现是 `setRetryToken(n => n + 1)` —— Chrome 的模块 map
+ * 会把失败的 chunk 条目留在 fetched 态，同一 URL 再次 `import()` 直接 reject 且**不再发请求**。
+ * 故障注入实测：解除网络阻断后点该按钮，新增网络请求 0 个、UI 仍停在 error（**点了零反馈**）。
+ * 这条判据锁死「失败态不许被删回纯 spinner」+「入口不许是无副作用的假重试」两件事。
+ *
+ * @param {object} [opts]
+ * @param {string} [opts.root=REPO_ROOT] 相对路径基准（证伪时指向隔离副本）
+ * @returns {{branch: boolean, branchDetail: string, entry: boolean, entryDetail: string, ok: boolean}}
+ *   缺文件 = 判红（fail-closed：读不到就当不存在，绝不因「扫不到」放行）。
+ */
+export function checkLoadErrorRecovery({ root = REPO_ROOT } = {}) {
+  const rels = {
+    ui: LOAD_ERROR_FILE_REL,
+    bind: LOAD_ERROR_BIND_FILE_REL,
+    impl: LOAD_ERROR_IMPL_FILE_REL,
+  }
+  const missing = Object.entries(rels).filter(([, rel]) => {
+    try {
+      return readFileSync(join(root, rel)).length === 0
+    } catch {
+      return true
+    }
+  })
+  if (missing.length) {
+    return {
+      branch: false,
+      branchDetail: `判据⑦ 输入缺失（${missing.map(([, rel]) => rel).join(', ')}）—— 读不到按不存在判红，不降级成通过`,
+      entry: false,
+      entryDetail: '',
+      ok: false,
+    }
+  }
+
+  const texts = Object.fromEntries(
+    Object.entries(rels).map(([k, rel]) => [k, readFileSync(join(root, rel), 'utf8')]),
+  )
+  const project = new Project({
+    useInMemoryFileSystem: true,
+    compilerOptions: { ...loadCompilerOptions(root), jsx: ts.JsxEmit.ReactJSX },
+  })
+  const sf = {}
+  for (const [k, rel] of Object.entries(rels)) {
+    sf[k] = project.createSourceFile(`/${rel.replaceAll('\\', '/')}`, texts[k], { overwrite: true })
+  }
+
+  /* ---- ① 失败态分支必须存在（删掉它就退回永久 spinner） ---- */
+  let branch = false
+  let branchNode = null
+  for (const attr of sf.ui.getDescendantsOfKind(SyntaxKind.JsxAttribute)) {
+    if (attr.getNameNode().getText() !== 'data-testid') continue
+    const init = attr.getInitializer()
+    if (!Node.isStringLiteral(init) || init.getLiteralText() !== LOAD_ERROR_TESTID) continue
+    branch = true
+    /* 往上一路爬到语法上的元素节点：JsxAttribute → JsxAttributes → JsxOpeningElement → JsxElement。
+     * 直接 `attr.getParent()` 只会拿到 JsxAttributes（实测），再取父是 OpeningElement，
+     * 二者都扫不到子元素（按钮上的 onClick）—— 会假判成「分支内没有点击入口」。 */
+    let n = attr.getParent()
+    while (n && !Node.isJsxElement(n) && !Node.isJsxSelfClosingElement(n)) n = n.getParent()
+    branchNode = n
+    break
+  }
+  if (!branch) {
+    return {
+      branch: false,
+      branchDetail: `${LOAD_ERROR_FILE_REL} 里找不到 data-testid="${LOAD_ERROR_TESTID}" 的 JSX 元素 —— 失败态被删了（用户会退回「正在加载词库…」永久 spinner）`,
+      entry: false,
+      entryDetail: '',
+      ok: false,
+    }
+  }
+  const branchDetail = `${LOAD_ERROR_FILE_REL}:${branchNode.getStartLineNumber()} data-testid="${LOAD_ERROR_TESTID}"`
+
+  /* ---- ② 分支里的点击入口必须可达 location.reload() ---- */
+  const handlers = []
+  for (const attr of branchNode.getDescendantsOfKind(SyntaxKind.JsxAttribute)) {
+    if (attr.getNameNode().getText() !== 'onClick') continue
+    const init = attr.getInitializer()
+    if (!init || !Node.isJsxExpression(init)) continue
+    handlers.push(init.getExpression())
+  }
+
+  const visited = new Set()
+  /** 从被调名出发，看能不能走通到 reload（锚点跨两跳：Memorize → App → useBank）。 */
+  const chase = (name, depth) => {
+    if (depth > 3 || visited.has(name)) return null
+    visited.add(name)
+    for (const target of ['ui', 'bind', 'impl']) {
+      for (const init of declInits(name, sf[target])) {
+        if (bodyHasReload(init)) return `${rels[target]}: ${name} → ${init.getText().replace(/\s+/g, ' ').slice(0, 80)}`
+        for (const next of calleeNames(init)) {
+          const r = chase(next, depth + 1)
+          if (r) return r
+        }
+      }
+    }
+    if (LOAD_RETRY_ENTRY_ANCHORS.has(name)) {
+      const bound = jsxBindName(name, sf.bind)
+      if (bound) {
+        const r = chase(bound, depth + 1)
+        if (r) return r
+      }
+    }
+    return null
+  }
+
+  const entryDetail = []
+  let entry = false
+  for (const h of handlers) {
+    for (const name of calleeNames(h)) {
+      if (!entry) {
+        const r = chase(name, 0)
+        if (r) {
+          entry = true
+          entryDetail.push(`${h.getText().replace(/\s+/g, ' ').slice(0, 60)} → ${r}`)
+        }
+      }
+    }
+    if (!entry) entryDetail.push(`onClick=${h.getText().replace(/\s+/g, ' ').slice(0, 60)}：未解析到 location.reload()`)
+  }
+  if (handlers.length === 0) entryDetail.push('失败态分支内没有任何带 onClick 的元素（点了没反应 / 纯文案）')
+
+  return {
+    branch: true,
+    branchDetail,
+    entry,
+    entryDetail: entry ? `${entryDetail.join(' | ')}（整页重载，模块图重建）` : entryDetail.join(' | '),
+    ok: branch && entry,
   }
 }
 

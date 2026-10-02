@@ -23,7 +23,7 @@ interface MemorizeProps {
   streakDays?: number
   /** 词条异步拉取已失败（chunk 404 / 断网 / sw 504） —— 与 loading / empty 并列开第四态 */
   loadFailed?: boolean
-  /** 失败态里的重试入口：点击重新拉取当前词库的词条 */
+  /** 失败态里的自救入口：点击 = 整页 reload（词库 chunk 的模块 map 缓存失败条目，页内重试不可能自愈） */
   onRetryBankLoad?: () => void
 }
 

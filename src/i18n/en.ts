@@ -254,8 +254,10 @@ export const en: Record<string, string> = {
   'memorize.again': 'Another batch',
   'memorize.emptyBank': 'This bank is empty',
   'memorize.loadingBank': 'Loading word bank…',
-  'memorize.loadError': 'Failed to load the word bank. Check your connection and retry',
-  'memorize.retryLoad': 'Retry loading',
+  'memorize.loadError': 'Failed to load the word bank. Check your connection',
+  /* 按钮点了 = 整页 reload（Chrome 模块 map 会永久缓存失败的 chunk，页内重试不可能自愈），
+   * 故文案直说 Reload page，不用 Retry loading 这种会误认为原地重试的措辞。 */
+  'memorize.retryLoad': 'Reload page',
   'memorize.allDone': 'All new words in this bank are learned',
   'memorize.definition': 'Definition',
   'memorize.keyFlip': 'Space to flip',

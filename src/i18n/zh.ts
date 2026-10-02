@@ -255,8 +255,10 @@ export const zh: Record<string, string> = {
   'memorize.again': '再来一组',
   'memorize.emptyBank': '当前词库为空',
   'memorize.loadingBank': '正在加载词库…',
-  'memorize.loadError': '词库加载失败，请检查网络后重试',
-  'memorize.retryLoad': '重试加载',
+  'memorize.loadError': '词库加载失败，请检查网络连接',
+  /* 按钮点了 = 整页刷新重来（Chrome 模块 map 会永久缓存失败的 chunk，页内重试不可能自愈），
+   * 故文案直说「刷新页面」，不用「重试加载」这种点了会以为原地重试的措辞。 */
+  'memorize.retryLoad': '刷新页面重试',
   'memorize.allDone': '本库新词已全部学完',
   'memorize.definition': '释义',
   'memorize.keyFlip': 'Space 翻面',

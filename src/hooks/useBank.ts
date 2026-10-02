@@ -2,7 +2,8 @@
  *
  * 懒加载语义保持：小词库同步；懒加载词库异步填充（模块级缓存兜底），
  * 拉取失败**不塞空释义**（CONTENT_CONTRACT 明令禁止占位），而是记下失败态交给 UI 显示
- * 失败态 + 重试入口（N13：原来只 warn 后永远停在「正在加载词库…」，用户以为卡死）。
+ * 失败态 + 自救入口（N13：原来只 warn 后永远停在「正在加载词库…」，用户以为卡死；
+ * 28a311c 的页内 retryToken 入口是假的 —— 换回整页 reload 见下方 retryBankLoad 注释）。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -60,8 +61,6 @@ export function useBank(bankId: string) {
   /* 词条异步拉取的失败态。记 bank.id（不是 bool）而不是「有没有失败」：
    * 换库时才能只清掉旧库那一条，不用额外判断「这次失败是不是上一个库留下的」。 */
   const [loadFailedId, setLoadFailedId] = useState<string | null>(null)
-  /** 重试计数：+1 即让下面的 effect 再发起一次 ensureBankWords（失败后 UI 点重试走这里） */
-  const [retryToken, setRetryToken] = useState(0)
   /* 换库（含切回原库）时清掉上一个库的失败态 —— 渲染阶段调整 state，与上面 bankWordsFor 同一写法，
    * 避免「A 库断网失败」的失败态粘到切过来的 B 库上，把 B 库误判成失败态。 */
   const [loadFailedFor, setLoadFailedFor] = useState<string | null>(null)
@@ -91,8 +90,7 @@ export function useBank(bankId: string) {
     return () => {
       alive = false
     }
-    // retryToken：重试入口把计数 +1 时重新发起一次拉取（失败态本身不入依赖，否则会和 setFailed 互踢）
-  }, [bank, retryToken])
+  }, [bank])
 
   return {
     banks,
@@ -101,7 +99,13 @@ export function useBank(bankId: string) {
     customBanks,
     /** 当前词库的词条异步拉取已失败（供 Memorize 开第四态） */
     loadFailed: loadFailedId === bank.id,
-    /** 重试当前词库的词条拉取 */
-    retryBankLoad: useCallback(() => setRetryToken((n) => n + 1), []),
+    /* 自救入口 = **整页重载**（reload），不是页内重试：
+     * Chrome 的模块 map 会把取模块失败的条目留在 fetched 态（record=null），
+     * 之后同一个 URL 再 `import()` 直接 reject 且**不再发出任何网络请求** ——
+     * 页内重试在浏览器层面就不可能自愈（实测：解除网络阻断后再点重试，新增请求 0、UI 仍 error）。
+     * 唯一能重建模块图的是整页重载，故本入口只能是 location.reload()。
+     * N13（28a311c）这里写的是 `setRetryToken(n => n + 1)`：effect 确实重跑，
+     * 但第二次 import() 依旧不发请求、依旧 reject ⇒ 按钮点了**零反馈**，比不加还糟。 */
+    retryBankLoad: useCallback(() => location.reload(), []),
   }
 }

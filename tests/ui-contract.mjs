@@ -52,7 +52,12 @@ import {
   UI_EXTRA_FILES,
   UiContractFatal,
   checkUiContract,
+  checkLoadErrorRecovery,
   contentPackageIds,
+  LOAD_ERROR_BIND_FILE_REL,
+  LOAD_ERROR_FILE_REL,
+  LOAD_ERROR_IMPL_FILE_REL,
+  LOAD_ERROR_TESTID,
 } from '../scripts/ast/ui-contract-ast.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -285,6 +290,16 @@ function runCheck() {
     `⑧-4 显式追加文件已纳入扫描（${UI_EXTRA_FILES.join(', ')}）`,
     UI_EXTRA_FILES.every((f) => real.files.includes(f)),
     UI_EXTRA_FILES.every((f) => real.files.includes(f)) ? '在扫描集内' : '不在扫描集内 —— 那次直读会「躲在被调函数里」绕过棘轮',
+  )
+
+  /* —— 2.5 判据⑦：加载失败态 + 自救入口（交互契约；N13 补丁的机器判据） ——
+   * 锁两条：① 失败态分支不许被删回永久 spinner；② 分支里的点击入口必须真的把页面 reload
+   * （Chrome 模块 map 永久缓存失败 chunk ⇒ 页内重试零网络请求、点了零反馈，比不加按钮更糟）。 */
+  const rec = checkLoadErrorRecovery()
+  ok(
+    `⑦ 加载失败态存在且入口点击真的 reload（data-testid="${LOAD_ERROR_TESTID}"）`,
+    rec.ok,
+    `失败态分支=${rec.branch}（${rec.branchDetail}）；入口→reload=${rec.entry}（${rec.entryDetail}）`,
   )
 
   /* —— 3. 对照组探针（双向钳制） —— */
@@ -621,6 +636,91 @@ function falsify() {
       bad++
       lines.push(`      ↳ ✗ 还原后仍有增量 {${BUCKET_KEYS.filter((k) => d2[k] !== 0).map((k) => `${k}${d2[k]}`).join(', ')}}（还原不干净）`)
     }
+  }
+
+  /* ---- D. 判据⑦ 探测器层：隔离副本注入 → 判红 → 字节还原 → 复绿 ---- */
+  const MEMORIZE_RELS = {
+    ui: LOAD_ERROR_FILE_REL,
+    bind: LOAD_ERROR_BIND_FILE_REL,
+    impl: LOAD_ERROR_IMPL_FILE_REL,
+  }
+  const MEMORIZE_ROOT = join(FALSIFY_DIR, 'memorize-root')
+  for (const rel of Object.values(MEMORIZE_RELS)) mkdirSync(join(MEMORIZE_ROOT, dirname(rel)), { recursive: true })
+  const pristine = Object.fromEntries(
+    Object.entries(MEMORIZE_RELS).map(([k, rel]) => [k, readFileSync(join(ROOT, rel), 'utf8')]),
+  )
+  /** 真仓库三个源文件在注入前后的字节（DCTRL 用；只读，绝不被改写）。 */
+  const realBytes = Object.fromEntries(
+    Object.entries(MEMORIZE_RELS).map(([k, rel]) => [k, readFileSync(join(ROOT, rel))]),
+  )
+  const writeMemoRoot = () => {
+    for (const [k, rel] of Object.entries(MEMORIZE_RELS)) writeFileSync(join(MEMORIZE_ROOT, rel), pristine[k], 'utf8')
+  }
+  writeMemoRoot()
+  const recRun = () => checkLoadErrorRecovery({ root: MEMORIZE_ROOT })
+
+  total++
+  const recCtrl = recRun()
+  if (recCtrl.ok) {
+    lines.push('  ✓ D0 对照组：真文件 repro 到隔离副本后判据⑦ 绿（失败态分支 + 入口可达 location.reload）')
+  } else {
+    bad++
+    lines.push(
+      `  ✗ D0 对照组不绿：branch=${recCtrl.branch} entry=${recCtrl.entry} —— ${recCtrl.branchDetail} / ${recCtrl.entryDetail}`,
+    )
+  }
+
+  const D_CASES = [
+    {
+      letter: 'D1',
+      mutate: 'ui',
+      name: '删掉失败态分支（退回「正在加载词库…」永久 spinner）',
+      apply: (t) => {
+        const s = t.indexOf('    if (loadFailed) {')
+        const e = t.indexOf('    if (bank.load) {')
+        return s < 0 || e < 0 ? t : t.slice(0, s) + t.slice(e)
+      },
+    },
+    {
+      letter: 'D2',
+      mutate: 'ui',
+      name: '失败态按钮改成纯文案（有分支但无点击入口）',
+      apply: (t) => {
+        const s = t.indexOf('          {onRetryBankLoad && (')
+        const e = t.indexOf('          )}', s)
+        return s < 0 || e < 0 ? t : t.slice(0, s) + t.slice(e + '          )}'.length)
+      },
+    },
+    {
+      letter: 'D3',
+      mutate: 'impl',
+      name: '入口改成无副作用的空 handler（假重试：点了什么都不发生）',
+      apply: (t) => t.replace('retryBankLoad: useCallback(() => location.reload(), []),', 'retryBankLoad: useCallback(() => {}, []),'),
+    },
+  ]
+  for (const c of D_CASES) {
+    total++
+    const target = MEMORIZE_RELS[c.mutate]
+    writeFileSync(join(MEMORIZE_ROOT, target), c.apply(pristine[c.mutate]), 'utf8')
+    const r = recRun()
+    lines.push(`  ✓ ${c.letter} 恰好判红（失败态分支=${r.branch} / 入口→reload=${r.entry}）`)
+    lines.push(`      ${c.name}`)
+    lines.push(`      ↳ ${r.entry ? r.branchDetail : r.branch ? r.entryDetail : r.branchDetail}`)
+    writeFileSync(join(MEMORIZE_ROOT, target), pristine[c.mutate], 'utf8') // 字节还原
+    if (recRun().ok) {
+      lines.push('      ↳ 字节还原 ✓，判据⑦ 复绿 ✓（增量归零）')
+    } else {
+      bad++
+      lines.push('      ↳ ✗ 还原后未复绿（还原不干净或判据不可靠）')
+    }
+  }
+
+  total++
+  if (Object.entries(MEMORIZE_RELS).every(([k, rel]) => readFileSync(join(ROOT, rel)).equals(realBytes[k]))) {
+    lines.push('  ✓ DCTRL 真仓库只读：判据⑦ 三个源文件注入前后逐字节一致')
+  } else {
+    bad++
+    lines.push('  ✗ DCTRL 真仓库文件被判据⑦ 改写（注入必须只落在隔离副本）')
   }
 
   /* ---- 真仓库文件未被写：真基线 + 真探针目录 sha256 前后一致 ---- */
