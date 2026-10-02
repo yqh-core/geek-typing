@@ -333,3 +333,44 @@ M3 ui-contract / M4 e2e 171 / M5 INV-3 未上调 `grep -c` = 0 / M6 冻结区空
 Stage 2 ⏸｜R2 🔴｜主包 384.21 / 119.06 KiB、余量 12.6% / 15.9%、阈值一行未动。
 
 Stage 1 还没 CLOSED —— 卡在 J1（3b `ai-core` 是否 lazy）这一句上。
+
+---
+
+## §11 Stage 1 🟢 CLOSED + Stage 2 解冻（评审第五轮，2026-10-02 15:0x）
+
+**四个人工核全部落定**（评审第五轮一轮裁完，没有再开第五轮工程发现）：
+
+| # | 议题 | 裁定 | 落定后的世界 |
+|---|---|---|---|
+| **J1** | 3b `ai-core` 是否 lazy（≈2.3 KiB） | **不做** | 保持 inline，默认词库路径不变；不为 CLOSED 引入改变默认首屏路径的产品行为变更 |
+| **J2** | 3a `ts-code`+`go-code` 是否 lazy（≈9.7 KiB） | **不做** | 保持 inline，**判据 5 盲区① 因此永久不激活** |
+| **J3** | `PLANNED_BASELINE` 棘轮是否重订 | **不重订** | 维持 `428324 / null / 483087` 现值；**它不参与 effective binding，实际约束以 `ABSOLUTE_BUDGET` binding 为准** |
+| **J4** | N6 是否 Stage 2 前置 | **不阻塞 Stage 2** | 两概念拆开：**N6 不阻塞整个 Stage 2 解冻**；但**面板 lazy（101.6 KiB）在 N6 UX 签字之前仍不做** |
+
+> **J3 的实测依据**（本轮查出来的，不是印象）：`PLANNED_BASELINE` 只是 `computeEffective`
+> （`scripts/gate-perf.mjs:82-90`）的一个候选，`effective = min(absolute, planned×1.15, current×1.15)`。
+> 三行 effective 的 binding 源**全是 absolute**：main-raw 450000（余候选 492573 / 512821）、
+> main-gzip 145000（余 158987）、words-raw 550000（余 555551）。⇒ **重订是行为惰性的**，
+> 为一个确认不生效的参考值改基线，只是净亏损（多一次基线变更 + 一遍 M5/文档复核 + 多一个可反复讨论的变量）。
+
+**两份新文档**：
+
+- **`docs/p18/_generated/stage1/STAGE1-CLOSED-SIGNOFF-2026-10-02.md`**（第 ⑦ 步）——
+  C-12 的落地签字：M1–M7 七条机器判本轮独立复跑全绿 + J1–J4 四格全部签字 + 闭合表无悬空分支。
+  附 §4「明确不做的动作」5 条，防止下一轮拿遗留当顺手修。
+- **`docs/p18/_generated/stage1/STAGE2-UNFREEZE-CONDITIONS-2026-10-02.md`**（第 ⑧ 步）——
+  Stage 2 解冻的唯一清单，6 条站立条件（S2-1 ~ S2-6）逐条给当前状态。
+
+**解冻的一句话边界**：**开放「内容扩充」这个方向，不是「Stage 2 里所有优化同时解封」**；
+面板 lazy（101.6 KiB）单独维持冻结等 N6；R2 凭据继续 🔴，不许拿 CLOSED 掩盖。
+
+**状态定级（2026-10-02 15:0x 口径。已更新）**：
+P18 🟢｜Stage 0 🟢｜**Stage 1 🟢 CLOSED**｜**Stage 2 🟡 已解冻（内容扩充方向开放；面板 lazy 仍冻结）**｜
+R2 🔴｜主包 384.21 / 119.06 KiB、余量 12.6% / 15.9%、预算阈值一行未动。
+
+**解冻后第一步（待人工）**：S2-5 **N5 codegen 的方向裁定**（做 / 不做）—— 它是 Stage 2 里唯一
+「零实现且会打坏三处文本判据（`validate:20` / `parseRegistryEntries` / `parseWarmUpLiteral`）」的入口，
+不定方向就不该动 `registry.ts`。在此之前 Stage 2 可正常加内容域（S2-1 / S2-2 机器判已就位）。
+
+**遗留（不进收口动作，继续挂着）**：`items` 分支未接 `src/**` 过滤；`loadFailedFor` 冗余；
+e2e 第四态零覆盖（171 只锁总数不锁分布）；`PLANNED_BASELINE` staleness（428324 对当前 393432）。

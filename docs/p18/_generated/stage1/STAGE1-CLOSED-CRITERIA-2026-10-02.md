@@ -49,6 +49,42 @@ M4 在 `5db4227` 之后由 worker 验过 171/171，本轮复跑见文末记录�
 | J3 | **`PLANNED_BASELINE` 棘轮是否重订** | 重订 / 不重订 | ⚠️ 有 INV-3 兜底（只许降不许升），但「要不要重」是人为 |
 | J4 | **N6 是不是 Stage 2 前置** | 是 / 否 | ❌ 视觉复核，本来只能人工；且现有三句文档互相矛盾（见下） |
 
+### 裁定落定记录（评审第五轮，2026-10-02）
+
+| # | 裁定 | 落定后对结清的影响 |
+|---|---|---|
+| **J1** | **不做** —— 3b `ai-core` 保持 inline，不为 Stage 1 CLOSED 引入改变默认首屏路径的产品行为变更 | 无额外条件（闭合表左列不触发） |
+| **J2** | **不做** —— 3a `ts-code`+`go-code` 保持暂缓 | 无额外条件。**盲区① 因此永久不激活**（兜底今天走 0 包，`ts-code`/`go-code` 仍在 inline） |
+| **J3** | **不重订** —— 维持 `PLANNED_BASELINE`（`428324 / null / 483087`）现值。**它不参与 effective binding，实际约束以 `ABSOLUTE_BUDGET` binding 为准** | 无额外条件。见下方「J3 的实质」 |
+| **J4** | **不阻塞 Stage 2** —— 但 **面板 lazy 那 101.6 KiB 大杠杆在 N6 UX 签字之前仍不做**。两个概念拆开：N6 不阻塞整个 Stage 2；N6 阻塞这个特定优化 | 需要改写闭合表 J4 行的右格（原本是空的分叉），见 §3 |
+
+> J1/J2 的裁定与闭合表里「默认（不做）」那一列一致，因此**不需要任何工程动作**；
+> 这一刀的价值是把「倾向」变成「已裁定」，让 CLOSED 状态在机器上是可判定的。
+
+### J3 的实质（裁定前先看这个，免得凭印象拍）
+
+`PLANNED_BASELINE`（`scripts/gate-perf.mjs:56-60`）不是 enforced budget 本身 —— 它只是
+`computeEffective`（`:82-90`）里的一个候选，参与 `effective = min(absolute, planned×1.15, current×1.15)`。
+三行实测谁在 binding（`node scripts/gate-perf.mjs`）：
+
+| 行 | effective | binding 源 | 其他候选 |
+|---|---|---|---|
+| `main-chunk-raw` | 450000 B | **absolute** | derived_planned 492573、derived_current 512821 |
+| `main-chunk-gzip` | 145000 B | **absolute** | derived_current 158987 |
+| `words-chunk-raw-single` | 550000 B | **absolute** | derived_planned 555551、derived_current 555551 |
+
+⇒ **三行全由 `ABSOLUTE_BUDGET` 兜住，`PLANNED_BASELINE` 今天一行都不 binding。**
+
+推论（对裁定最关键的一条）：**`PLANNED_BASELINE` 取任何值都不可能把门放松** ——
+effective 是取 min，planned-derived 已经 492573 > 450000，把它重订到当前实测（393432 → 452446）
+仍大于 absolute，absolute 继续兜底；取更小只会让门更紧。
+**⇒ 重订是行为惰性的（direction 上唯一能做的是收紧、缩小余量），不重订也零风险。**
+
+代价对比：`重订` = 动 `scripts/gate-perf.mjs:56-60`（M5 的 grep 只看 absolute 那两行常量，**重订一样是 0**，
+所以"重订了但 M5 还是绿"不构成反证）；`不重订` = 零 diff，M1–M7 现状一字不动。
+附带一个诚实的口子：`PLANNED_BASELINE` 现在是 `a8d10c0` 的旧快照（428324 对上当前 393432，陈旧 34.9 KiB），
+这个"文档说了但实际不是"的 staleness 属于卫生问题，**建议记进遗留、不混进收口动作**。
+
 **J4 的矛盾原文**（三处口径打架，必须先裁一句）：
 - `P18-NEXT-STEP-PLAN.md:31` —— N6 是 P1 遗留项、UI 那一票；
 - `P18-NEXT-STEP-PLAN.md:69` ——「N6 / N3 与 Stage 2 并行待命，UX 视觉复核不阻塞 Stage 0/1」；
@@ -65,9 +101,21 @@ M4 在 `5db4227` 之后由 worker 验过 171/171，本轮复跑见文末记录�
 | **J1 · 3b `ai-core` lazy** | ① 新用户首屏路径要有一套 e2e 断言（**改造既有用例，不增数**，171 锁死）；② 明确接受「离线 + 首次加载 ai-core ⇒ 空词库」这个回归（`WARMUP_IDS` 上限 2，塞不进去）；③ 重跑 M1/M4 | 无额外条件。默认不动 |
 | **J2 · 3a `ts-code`+`go-code` lazy** | 必须先在 **M2 已绿**的基础上做（已完成，见 §4）；改完重跑 M1/M2/M4，确认兜底包数 ≥ 1 且仍 PASS | 无额外条件。**盲区① 因此永久不激活** —— 兜底今天睡着（实测走兜底的包 = 0），3a 不做就永远不会被咬 |
 | **J3 · 棘轮重订** | 重订后仍须过 M5（只许降不许升），新基线要写进提交说明与本文档 | 维持现基线。默认 |
-| **J4 · N6 阻塞 Stage 2** | 若「是」⇒ Stage 2 解冻前要补 N6 三条的机器判（骨架 6 行 AST 桶 / 布局零跳动 CDP Δ≤2px / loading-error 分支禁裸字符串）；若「否」⇒ 面板 lazy 那 101.6 KiB 的大杠杆**在 N6 签之前仍不做**（`STAGE1-SLICE1:42` 那句话依然成立） | |
+| **J4 · N6 阻塞 Stage 2**（**已裁：不阻塞**） | ~~若「是」⇒ Stage 2 解冻前要补 N6 三条的机器判（骨架 6 行 AST 桶 / 布局零跳动 CDP Δ≤2px / loading-error 分支禁裸字符串）~~ | ✅ **已裁定「否」**⇒ 补上这一格的收口：**N6 不阻塞整个 Stage 2 解冻**；但 **面板 lazy 那 101.6 KiB 的大杠杆在 N6 UX 签字之前仍不做**（`STAGE1-SLICE1:42` 那句继续成立）。两个概念就此分开 |
 
-**⇒ 按现在的倾向（3a 暂缓、3b 待裁、棘轮待定、N6 待裁），结清只需要：7 条机器判全绿 + J1 拍一句「做/不做」。**
+**⇒ J1「不做」/ J2「不做」/ J3「不重订」/ J4「不阻塞且不解除面板 lazy 冻结」四格已在评审第五轮全部落定。**
+**⇒ 条件式闭合表现在没有任何悬空分支：C-12 的组成 = 7 条机器判全绿 ∧ 4 条人工核全部签字。**
+
+> **J4 拆成两句的必要性**：不写这句，"N6 不阻塞 Stage 2" 会被读成「Stage 2 里所有东西都解封」，
+> 而面板 lazy 恰恰是 Stage 2 里最大的那笔工程（101.6 KiB）—— 它的方法和「N6 是不是前置」是两件事，
+> 混在一句里就会在解冻时重新引起一轮「那能不能先做面板 lazy」的争论。
+
+> **J3 为什么是「不重订」而不是「重订到当前实测」**：`PLANNED_BASELINE` 经核实**不参与 effective enforcement**
+> （三行 effective 全由 `ABSOLUTE_BUDGET` binding，见「J3 的实质」），为一个确认不生效的参考值改一次基线，
+> 只会新增一次基线变更 + 一遍 M5/文档一致性复核，还让 CLOSED 多一个可反复讨论的变量 ——
+> 这与「最小变更、证据优先」的收口策略相反。
+> **留下的证据**：`PLANNED_BASELINE` 是 `a8d10c0` 旧快照（428324 对当前实测 393432，陈旧 34.9 KiB），
+> 基线不动、staleness 记入遗留（§6），不在收口动作里顺手修。
 
 ---
 
