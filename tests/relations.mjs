@@ -22,7 +22,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { loadPackages, CONTENT_ID_RE } from '../scripts/content/license-policy.mjs'
-import { buildReachability, isReachable } from '../scripts/content/relations.mjs'
+import { buildReachability, isReachable, isValidRelationType, relationEndpoints, RELATION_TYPES } from '../scripts/content/relations.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -128,6 +128,63 @@ for (const [rel, label] of CALL_SITES) {
     src.startsWith('__READ_ERROR__') ? src : '',
   )
 }
+
+/* ---------- ⑦ 判据①：`relation.type ∈ RelationType`（Stage 2 · 2026-10-02）----------
+ * 这条判据的由来是一个**实测假绿**：校验器原本只查端点格式 + 可达性、不查 type，
+ * 于是 `content/reading/demo-reading-01/relations.json` 里的 `type:"mentions"`
+ * （不属于 RelationType）一路 PASS 到「18 包全部通过」。
+ *
+ * ★ 形态必须可证伪（沿用本文件第 ② 条的纪律）：
+ *   ⑦-a 证明「非法 type 会被判红」—— 这条在**没有**判据①时必然判红（实测假绿基线）；
+ *   ⑦-b 证明「合法 type 不会被误判红」—— 否则 ⑦-a 就是「一律判红」也能过的假判据；
+ *   ⑦-c 证明「大小写 / 空白漂移不被归一放行」（fail-closed，不是替脏数据擦屁股）；
+ *   ⑦-d 静态同源断言：脚本侧白名单必须与运行侧 TS 联合类型一致（防两份清单漂移）。 */
+const ALL_LEGAL_TYPES = [...RELATION_TYPES]
+ok(
+  `⑦-a 非法 type 被判红（本刀修复目标 —— 未修时现存 mentions 判红会消失）`,
+  !isValidRelationType('mentions'),
+  `isValidRelationType("mentions") = ${isValidRelationType('mentions')}`,
+)
+ok(
+  '⑦-b 6 个合法 type 全部不被误判红（防「一律判红」式假判据）',
+  ALL_LEGAL_TYPES.every((t) => isValidRelationType(t)),
+  `${ALL_LEGAL_TYPES.length} 个：${ALL_LEGAL_TYPES.join(', ')}`,
+)
+ok(
+  '⑦-c type 缺失 / 大小写漂移 / 空白填充 一律判红（fail-closed，不做归一放行）',
+  !isValidRelationType(undefined) &&
+    !isValidRelationType(null) &&
+    !isValidRelationType('') &&
+    !isValidRelationType('Mentions') &&
+    !isValidRelationType('MENTIONS') &&
+    !isValidRelationType(' contains'),
+  'undefined / null / "" / "Mentions" / "MENTIONS" / " contains" 全判红',
+)
+ok(
+  '⑦-cb relationEndpoints 口径与既有实现一致（endpoints数组 或 from/to/source/target）',
+  JSON.stringify(relationEndpoints({ endpoints: ['a', 'b'] })) === JSON.stringify(['a', 'b']) &&
+    JSON.stringify(relationEndpoints({ from: 'a', to: 'b' })) === JSON.stringify(['a', 'b']) &&
+    JSON.stringify(relationEndpoints({ source: 'a', target: 'b' })) === JSON.stringify(['a', 'b']),
+  '三种形状均正确取出两端',
+)
+
+/* ⑦-d 静态同源断言：脚本侧 RELATION_TYPES vs 运行侧 relation.ts 的 RelationType 联合类型。
+ * 两份清单必然漂移（P18-A「12→14 白名单漂移」的原型），故把它变成机器判据而非注释提醒。 */
+let relationTsSrc = ''
+try {
+  relationTsSrc = readFileSync(resolve(root, 'src/core/content/relation/relation.ts'), 'utf8')
+} catch (e) {
+  relationTsSrc = `__READ_ERROR__${e.message}`
+}
+const tsTypeBlock = /export type RelationType\s*=([\s\S]*?)\n\}/.exec(relationTsSrc)?.[1] ?? ''
+const tsTypes = [...new Set((tsTypeBlock.match(/'([a-z_]+)'/g) ?? []).map((s) => s.slice(1, -1)))]
+ok(
+  '⑦-d 脚本侧 RELATION_TYPES 与运行侧 relation.ts 的 RelationType 联合类型逐项一致（防两份清单漂移）',
+  tsTypes.length > 0 &&
+    tsTypes.length === RELATION_TYPES.size &&
+    tsTypes.every((t) => RELATION_TYPES.has(t)),
+  `TS 侧 ${tsTypes.length} 个 [${tsTypes.join(', ')}] vs 脚本侧 ${RELATION_TYPES.size} 个 [${[...RELATION_TYPES].join(', ')}]`,
+)
 
 console.log(`\n──────────────────────────────────────────────────────`)
 console.log(`共 ${pass + fail} 项，通过 ${pass}，失败 ${fail}`)

@@ -25,7 +25,7 @@ import { CONTENT_ID_RE, loadPackages, decideLicense, resolveContentDir } from '.
 /* relations 端点可达性**只从 relations.mjs 取**（P18-G0 裁定 §⑪-3）：本文件不得再有第二份实现。
  * 历史上这里与 content/ingest.mjs 是**逐字复制**，与 content/validate.mjs 是第三份 ——
  * 「必须同步」只写在注释里，就是下一场 P18-A「12→14 白名单漂移」。 */
-import { buildReachability, isReachable } from './content/relations.mjs'
+import { buildReachability, isReachable, isValidRelationType, relationEndpoints } from './content/relations.mjs'
 
 /* —— CLI 参数校验（对齐 validate.mjs：--help exit 0；未知参数 exit 2，不猜语义）—— */
 const HELP_TEXT = `用法：
@@ -87,11 +87,16 @@ async function main() {
         else {
           const probs = []
           list.forEach((r, i) => {
-            const ends = Array.isArray(r?.endpoints) ? r.endpoints : [r?.from ?? r?.source, r?.to ?? r?.target]
-            for (const e of ends) if (typeof e === 'string' && !reachable(e)) probs.push(`#${i} ${e}`)
+            // 判据①（Stage 2 · 2026-10-02）：type ∈ RelationType。先于端点检查，理由同另两处。
+            if (!isValidRelationType(r?.type)) {
+              probs.push(`#${i} 非法 relation type：${JSON.stringify(r?.type ?? null)}（不在 RelationType 白名单内）`)
+              return
+            }
+            const ends = relationEndpoints(r)
+            for (const e of ends) if (typeof e === 'string' && !reachable(e)) probs.push(`#${i} 孤儿端点：${e}`)
           })
-          if (probs.length) fail(`relation 孤儿端点 ${probs.length} 处：${probs.slice(0, 3).join('；')}`)
-          else ok(`relations.json ${list.length} 条端点可达`)
+          if (probs.length) fail(`relation 校验失败 ${probs.length} 处：${probs.slice(0, 3).join('；')}`)
+          else ok(`relations.json ${list.length} 条：type 合法且端点可达`)
         }
       } catch (e) { fail(`relations.json 不可解析：${e.message}`) }
     }

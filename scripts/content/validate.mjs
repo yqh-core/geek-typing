@@ -75,7 +75,7 @@ import { CONTENT_TYPES, checksumPayload } from './license-policy.mjs'
 /* relations 端点可达性**只从 relations.mjs 取**（P18-G0 裁定 §⑪-3）：本文件不得再有第二份实现。
  * 历史上这里是第三份（registry Map + normWords，只认 type === 'word'），与
  * gate-content-contract.mjs / ingest.mjs 的逐字复制互不同步。 */
-import { buildReachability, isReachable } from './relations.mjs'
+import { buildReachability, isReachable, isValidRelationType, relationEndpoints } from './relations.mjs'
 /* 资产规则**只从 asset-rules.mjs 取**（P1.8 裁定 ③/④-7）：本文件不得内联任何资产规则逻辑。
  * 资产规则的第二份副本由 gate:content-type-contract 判据 H3 上锁，与 CONTENT_TYPES 的 H1/H2 同一手法。 */
 import { checkManifestAssets, checkPackageAssetDeclarations, checkLicenseDecision } from './asset-rules.mjs'
@@ -511,14 +511,21 @@ async function main() {
         else {
           const problems = []
           list.forEach((r, i) => {
-            const ends = Array.isArray(r?.endpoints) ? r.endpoints : [r?.from ?? r?.source, r?.to ?? r?.target]
+            //判据①（Stage 2 ·2026-10-02）：type ∈ RelationType。
+            // 这条**刻意放在端点检查之前**：type 非法时边本身就不成立，
+            // 继续校验它的端点只会把「type 写错了」和「端点也写错了」混成一堆噪声。
+            if (!isValidRelationType(r?.type)) {
+              problems.push(`#${i} 非法 relation type：${JSON.stringify(r?.type ?? null)}（不在 RelationType 白名单内）`)
+              return
+            }
+            const ends = relationEndpoints(r)
             for (const e of ends) {
               const m2 = typeof e === 'string' ? CONTENT_ID_RE.exec(e) : null
               if (!m2) { problems.push(`#${i} 端点非法：${JSON.stringify(e)}`); continue }
               if (!isReachable(reach, e)) problems.push(`#${i} 孤儿端点：${e}`)
             }
           })
-          if (problems.length === 0) ok(`relations.json ${list.length} 条：端点合法且可达`)
+          if (problems.length === 0) ok(`relations.json ${list.length} 条：type 合法、端点合法且可达`)
           else fail(`relation 校验失败 ${problems.length} 处：${problems.slice(0, 3).join('；')}`)
         }
       }
