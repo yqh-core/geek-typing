@@ -294,4 +294,42 @@ e2e 对第四态**零覆盖**（171 用例锁死，只能改造既有用例，�
 ② `PLANNED_BASELINE` 棘轮重订不重订；③ N6 到底是不是 Stage 2 前置 —— `P18-NEXT-STEP-PLAN.md:31` / `:69` 与
 `STAGE1-SLICE1:42` 三句互相矛盾（一个说 P1 遗留、一个说不阻塞 Stage 2、一个说面板 lazy 必须等它先签），要裁一句。
 
-Stage 1 还没 CLOSED。
+---
+
+## 10. Stage 1 Slice 3：判据 5 三合一落地 + CLOSED 条件钉死（2026-10-02）
+
+**① 判据 5 三合一补强已落地**：`5db4227`（兜底串 src 过滤 + 排除含 `"` 候选 + `L5c` + `L5d` + e2e 用例数机器断言）
+与 `c36f54c`（修 `L5d` 假绿）。**只动 `scripts/check-bundle.mjs` + `tests/e2e.mjs` + `registry.ts` 一行注释，
+预算常量、源码架构、3a/3b 一律没碰。**
+
+- `node scripts/check-bundle.mjs` → exit 0、6 项全 PASS
+- `node scripts/check-bundle.mjs --falsify` → **11/11 恰好判红**（9 → 11，新增 `L5c` / `L5d`）
+- `npm run test:e2e` → `共 171 项，通过 171、失败 0`，exit 0
+- `npm run test:ui-contract` / `test:storage` / `test:offline` → 均 exit 0
+- e2e 用例数锁死终于有了机器断言（`tests/e2e.mjs:1812-1825`，`E2E_CASES_EXPECTED = 171`）——
+  **以前 171 只活在文档纪律里，加减一条 `check()` CI 照样绿，现在钉死了。**
+
+**② 复核抓到 `L5d` 自己一条假绿（跟判据⑧ 那轮同一类病）**：`L5d` 第一版的「接线自检」是自己重算一遍
+`asciiPhraseProbes(json, [], decoy)`，于是只验了函数内部那句 filter 在不在；我把 `:432` 的
+`scanSrcText()` 换成 `''`（接线拆掉），**`L5d` 依然 `✓`**。改成让函数通过 `dropStats` 出参上报
+「本次实际踢掉几条」之后：MUT-1（`:432` 传 `''`）⇒ L5d 判红 ✅；MUT-3（撤销 `hitQuote`）⇒ L5c 判红 ✅；
+两条还原 ⇒ 11/11、exit 0、工作树空 ✅。
+
+**③ C-12「Stage 1 结清」终于有定义了**（`_generated/stage1/STAGE1-CLOSED-CRITERIA-2026-10-02.md`）：
+**7 条机器判 + 4 条人工核 + 1 张条件式闭合表**，7 条机器判实测全绿（M1 六判据 / M2 falsify 11·11 /
+M3 ui-contract / M4 e2e 171 / M5 INV-3 未上调 `grep -c` = 0 / M6 冻结区空 / M7 offline+storage）。
+**条件式闭合表是关键**：3b / 3a / 棘轮 / N6 四件不是「做了才 CLOSED」，而是
+**「裁了哪边就自动落定到哪边」** —— 按现在的倾向（3a 暂缓、3b 待裁、棘轮待定、N6 待裁），
+**结清只差 J1（3b 拍一句「做/不做」）**。
+
+**④ 两条经验写进文档了**：判据要锁**调用点的接线**而非函数内部；
+**mutation 注入必须带 `assert t != s`** —— 我第一次复核按旧行号 sed，打到注释行上、文件压根没变，
+却显示「L5d 还是绿」，差点误判成假绿（其实是注入没生效）。
+
+**遗留（不混进结清动作）**：`items` 分支（今天活着的 8 个 `demo-*` 包）**没接** `src/**` 过滤（`:461` 仍三参），
+本轮刻意没动、会动到线上判据行为；`loadFailedFor` 冗余；e2e 第四态零覆盖（171 只锁总数不锁分布）。
+
+**状态定级（2026-10-02 14:xx 口径）**：P18 🟢｜Stage 0 🟢｜**Stage 1 🟡 进行中（Slice 3 已交付、CLOSED 条件已钉死）**｜
+Stage 2 ⏸｜R2 🔴｜主包 384.21 / 119.06 KiB、余量 12.6% / 15.9%、阈值一行未动。
+
+Stage 1 还没 CLOSED —— 卡在 J1（3b `ai-core` 是否 lazy）这一句上。
