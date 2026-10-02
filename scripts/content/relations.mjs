@@ -21,21 +21,42 @@
  * ── Stage 2 · Relation Validator Hardening（2026-10-02）────────────────
  * 本模块新增**判据①：`relation.type ∈ RelationType`**。
  *
- * 加这条之前（实测假绿）：校验器只查端点格式 + 可达性，**完全不查 type**。
- *   实证：`content/reading/demo-reading-01/relations.json` 含 `type: "mentions"`，
+ * 加这条之前的实测假绿：校验器只查端点格式 + 可达性，**完全不查 type**。
+ *   实证：当时 `content/reading/demo-reading-01/relations.json` 含 `type: "mentions"`，
  *   而 RelationType 只有 6 个值（belongs_to / contains / related_to / prerequisite /
  *   appears_in / same_as）—— 没有 mentions；`node scripts/content/validate.mjs`
  *   仍 EXIT=0 并报「18 包全部通过」。
+ *   （该条已于 43e4620 依评审裁定 D→A 删除——它不是业务事实，是 P18-G1 门禁测试留痕。）
  *
- * ⚠️ **刻意不做判据②（`to` 按 RELATION_TARGET_TYPES 校验）**，理由是模型表本身不完整：
- *   `RELATION_TARGET_TYPES.contains` 只列 ['word','audio','document','exercise']，
- *   缺 reading / topic / listening / writing / speaking / grammar / collection / course / lesson 共 9 类；
- *   而 `src/core/content/types/registry.ts:249` 明写「集合靠 relation 层描述成员关系
- *   （relations.json）」—— 即 `collection --contains--> reading/topic` 是本仓设计上明确要求的用法。
- *   实测：照搬该表会让现存 **5 条合法边**判红（逐条核算见
- *   docs/p18/_generated/stage2/STAGE2-RELATION-VALIDATOR-PRECHECK-2026-10-02.md §1）。
- *   补全该表 = 改模型语义，须走评审；**不在 validator 加固这一刀里顺手做**
- *   （与「不为过门禁擅自扩 RelationType」同一纪律）。
+ * ⚠️ **刻意不做判据②（`to` 按 RELATION_TARGET_TYPES 校验）**——**2026-10-03 评审裁定：暂缓扩表**。
+ *
+ *   裁定要点（不要重新翻案，也不要用「表与数据不一致」当作扩表理由）：
+ *   RELATION_TARGET_TYPES 是**未接入的死约束**，不完整目前不造成任何实际故障：
+ *     · `src/` 内**零 import**；无 `keyof typeof` 用法；`tests/` 对该表**零引用**（实测）。
+ *     · `ContentRelation.to` 的类型是 plain `string`（relation.ts:47），
+ *       与该表**无任何 TypeScript 层关联**—— 写 `to: "content:banana:x:y"` 类型上合法。
+ *     · 该表把「条目级 word」与「包级 content type」混在同一个数组里，
+ *       **设计意图本身尚未钉死**；此时扩表 = 把一个未定型的表升级成活约束，
+ *       而非修复。会掩盖「模型语义未钉死」这个问题。
+ *
+ *   若将来真要接入判据②，以下是 HEAD=`43e4620` 的实测基线（务必自己重跑一遍再决策，
+ *   不要引用历史文档里的旧数字——那批数字已确认过期，见下方「旧数字已作废」）：
+ *     · 现存 relation共**10 条 / 2 个文件**：
+ *       `content/reading/demo-reading-01/relations.json` 3 条、
+ *       `content/collection/demo-study-set/relations.json` 7 条。
+ *     · 真实数据只用了 **2 个 type**：`contains` 9 条 + `belongs_to` 1 条；
+ *       `related_to` / `prerequisite` / `appears_in` / `same_as` 各**0 条**（纯声明、无数据支撑）。
+ *     · 照本表逐条校验 → **9 条 / 10 条判红**，拆解为：
+ *         reading 5 条 + topic 1 条 = 6 条，源于 `contains` 缺 9 类包级类型（registry.ts:249
+ *         明写「集合靠 relation 层描述成员关系（relations.json）」，即这些用法是设计上明确要求的）；
+ *         **另 3 条是 `to=vocabulary`** —— `vocabulary` 同样不在 `contains` 现有的 4 项里。
+ *       ⇒ **即使把 9 类全补齐，仍剩 3 条判红。** 只算「已知缺口 × 已知数据」会漏账。
+ *
+ * ⚠️ **旧数字已作废**：本注释早期版本写「照搬该表会让现存 **5 条**合法边判红」，
+ *   并指向 `docs/p18/_generated/stage2/STAGE2-RELATION-VALIDATOR-PRECHECK-2026-10-02.md §1`。
+ *   **该5 条是错的**（2026-10-03 实测更正）：错因是当时只清点了 `demo-reading-01` 一个文件，
+ *   **漏掉了 `demo-study-set` 的 7 条**（其中 4 条判红）—— 分母从 10 被压成 3、分子从 9 被压成 5。
+ *   **不要再把那个 5 条当依据。**
  *
  * ⚠️ **RelationType 白名单必须与 src/core/content/relation/relation.ts 保持同源**：
  *   本模块是**脚本侧**（node 跑，无 TS 类型），那边是**运行侧**（TS 联合类型）。
@@ -53,8 +74,10 @@ import { CONTENT_ID_RE } from './license-policy.mjs'
  * `tests/relations.mjs` 第 ⑦ 条做静态同源断言（不一致即判红）——**不是**靠注释提醒同步。
  *
  * **不要为了让现存数据重新变绿而往这里加值**：加一个 type 是**改模型语义**，须走评审。
- * （现存`content/reading/demo-reading-01/relations.json` 里的 `mentions` 就是待评审项，
- *   它不合法但本刀只负责**判红**，不负责清理、不负责把它塞进这个白名单。）
+ * （`content/reading/demo-reading-01/relations.json` 曾有一条 `mentions`，
+ *   它不合法但本刀只负责**判红**，不负责清理、不负责把它塞进这个白名单——
+ *   该条已于 43e4620 依评审裁定 D→A 删除，因为它不是业务事实而是门禁测试留痕。
+ *   **不得为「保住测试留痕」而扩RelationType**：那是测试数据反向驱动生产模型。）
  */
 export const RELATION_TYPES = new Set([
   'belongs_to',
