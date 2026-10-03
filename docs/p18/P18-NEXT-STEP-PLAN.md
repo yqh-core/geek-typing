@@ -29,7 +29,7 @@
 | **N4** | **P1** | **D 步内容扩充的前置：主 chunk 瘦身 or 正式重订分层预算** | 卡 §3.1 的 4.9% 余量 | ✅ **是**（选瘦身还是重订） | 部分 | `npm run check:bundle` 判据 1；`scripts/gate-perf.mjs` |
 | **N5** | **P1** | **9.3 注册表自动化**（`import.meta.glob` 会把全量词库拖进主包） | 侦察结论已有，待裁定 | ✅ **是** | 部分 | `check-bundle` 判据 2/4/5 与 `validate.mjs` 判据 20 都是文本扫描 `registry.ts`，动了会一起动 |
 | **N6** | **P1** | **9.5 的 UX 加载态真机视觉复核**（固定 6 行骨架 / 布局零跳动 / 文案走 i18n 三条） | 工程侧只交付到「门全绿 + e2e 全过」 | ✅ **是**（UX 那一票） | 部分 | `P1.8-SIGN-OFF-v1.0.md` §9.5 留给 UX 的那一票；真机截图 |
-| **N7** | **P2** | **`test:offline` 非幂等**：每次跑都会改写已入库的 `tests/_evidence/offline-audit-result.json`（抽样词随机） | 已登记，判断为「非幂等缺陷、不能照 P18-G2 修法处理」 | 否 | ✅ | `git status --porcelain` 跑完是否干净 |
+| **N7** | **P2** | **`test:offline` 产物非幂等**：每次跑都会重写 `tests/_evidence/offline-audit-result.json`（抽样词随机，**不是**时间戳漂移 ⇒ 「跑完再还原」等于伪造证据，此路已堵死） | ✅ **已修** —— `16bb11a` 把该产物**移出 git 跟踪**（`git rm --cached`）+ `.gitignore:34` 兜底；路径不变、仍照常落盘可读，只是不再进版本库 | 否 | ✅ | 判据已达成：跑完 `npm run test:offline`（EXIT=0 / 20 PASS）后 `git status --porcelain` 为空 |
 | **N8** | **P2** | **`verify-p17-frozen` 只拦增量，不查冻结区既有文件被改** | 只登记不下决定 | ✅ **是**（补强 or 维持） | ✅ | `npm run verify:p17-frozen` 的覆盖说明 |
 | **N9** | **P2** | **`gate:todo` 按行号登记** —— 行号漂移会误登记/漏登记，宜改内容锚点（P18 遗留 9.6） | 低优先 | 否 | ✅ | `npm run gate:todo` 输出 |
 | **N10** | **P2** | **CI 外部到期**：`Node.js 20 is deprecated`、`ubuntu-latest → Ubuntu 26`（2026-10-19） | 低优先，时间驱动 | 否 | ✅ | CI run 日志的 warning 行 |
@@ -44,8 +44,9 @@
    若不进，把「不进」写成一行结论而不是继续挂着。
 2. **N2**：单独一笔提交修 `warmBanks` 的 controller 等待与吞错（可加日志/可放宽上限），
    配一条能判红的证伪用例。**不要**顺手改预热清单。
-3. **N7**：把 `test:offline` 的产物改成写入 `tests/_evidence/` 之外的地方（或明确「跑完必还原」写进 README），
-   目标是跑完全套 `git status --porcelain` 干净。
+3. **N7**：~~把 `test:offline` 的产物改成写入 `tests/_evidence/` 之外的地方（或明确「跑完必还原」写进 README）~~
+   —— **此方案未采用，已作废**。实际采用的是「产物移出 git 跟踪」：路径不变、仍照常落盘可读，
+   跑完 `git status --porcelain` 干净即达标。详见 §1 表格 N7 行。
 4. **N9 / N10**：两笔零风险的机械活（内容锚点、action 版本升级）。
 
 > Stage 0 做完的验收标准只有一条：**不新增任何产品行为，且 `npm run release:gate` 与
