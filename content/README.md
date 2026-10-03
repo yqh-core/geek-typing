@@ -532,7 +532,7 @@ Duplicate Detection 分级（按「可判定性」分级：能判的判死，判
 | `npm run content:validate`（= `content:check`） | **20 项**门禁；全绿 exit 0，任一 FAIL exit 1 |
 | `npm run content:list` | 包清单（`--json` 结构化） |
 | `npm run test:content` | 查询层 / Catalog / Index / ContentId / Scope / Sort 契约测试（含 I-19：id 侧禁止 lowercase） |
-| `npm run check:bundle` | **构建产物体积门禁**：主 chunk raw ≤ 420 KiB / gzip ≤ 135 KiB；`warmUpVocabulary` 预热 gzip ≤ 600 KiB（对应契约第 21 / 22 项，属于构建后检查） |
+| `npm run check:bundle` | **构建产物体积门禁**：主 chunk raw ≤ **439.45 KiB** / gzip ≤ **141.60 KiB**（分层预算生效层 = `ABSOLUTE_BUDGET`，见 `scripts/gate-perf.mjs`）；`warmUpVocabulary` 预热 gzip ≤ 600 KiB（对应契约第 21 / 22 项，属于构建后检查）。阈值以脚本为唯一事实源，本表不抄实测 |
 | `npm run test:ui` | **P1 UI Contract 棘轮检查**（P1 落地时随 `tests/ui-contract.mjs` 接入，当前未实现）：UI 直读词数组（白名单 `types.Clear`）计数**只许降不许升**，基线在该文件锁定 |
 | `node scripts/content/canonical.mjs` | Canonical JSON 自检（幂等 + 数组不重排 + 指纹与排版无关），无 npm script 包装 |
 
