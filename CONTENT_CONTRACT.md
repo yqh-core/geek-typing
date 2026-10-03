@@ -833,9 +833,13 @@ manifest 只装元数据，**与词数无关**（实测单包 1.25–1.40 KiB，
 - 增量与 kaoyan `words.json` 的 **471.70 KiB** 呈**字节级 1:1.0005 全额传导** —— 词表一字节不落地进主 chunk；
 - rolldown **当场报 `INEFFECTIVE_DYNAMIC_IMPORT` 警告**（见 13.6）。
 
-第二组实验（把**当时全部** 7 个 inline 包词表临时清空再 build；9.5 后 inline 只剩 5 包）：
+第二组实验（把**当时全部** 7 个 inline 包词表临时清空再 build）：
 主 chunk 390.20 → 353.10 kB，
 gzip 123.07 → 107.90 kB ⇒ **7 个 inline 词表占主 chunk 37.10 kB raw / 15.17 kB gzip**。
+
+> 「7 个 inline」是**那次实验当时**的状态。后续 9.5 把 `cloud-native` / `frontend` 改 lazy、
+> Stage 1 又把 `cet4` / `cet6` 改 lazy（`5ebc65e`），**当前 inline 包数以 §13.5 判据 20 的命令输出为准**
+> —— 本节不写现状包数，避免历史叙述再次混入动态值。
 
 ### 13.4 未来推算（planning estimate —— 基于 §13.3 那组历史实验的系数外推，
 ### 回答的是「以后再加词库会不会爆」，**不构成**对当前构建的断言；当前构建见 §13.5）
@@ -856,15 +860,27 @@ gzip 123.07 → 107.90 kB ⇒ **7 个 inline 词表占主 chunk 37.10 kB raw / 1
 
 ### 13.5 五条可验收阈值
 
-| # | 断言 | 阈值 | 当前实测 | 余量 |
-|---|---|---|---|---|
-| 18 | manifest 体积：单包 < **8 KiB**，全库 < **40 KiB** | 8 / 40 KiB | 最大 **1.78** / 总 **24.28 KiB** | 不红（**4.5× / 1.65×**） |
-| 19 | inline 预算：`offline.policy==='inline'` 的包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB** | 1000 词 / 64 KiB | **5 包 Σ 296 词 / 33.65 KiB** | 不红 |
-| 20 | 策略一致性：manifest 的 `offline.policy` 必须与 `registry.ts` 实际加载方式一致（`words:` ↔ inline，`load:` ↔ lazy） | 18/18 | **18/18（inline 5 / lazy 13）** | 不红 |
-| 21 | 主 chunk 体积：raw ≤ **439.45 KiB** 且 gzip ≤ **141.60 KiB**（分层预算生效层 = `ABSOLUTE_BUDGET`，见 `check-bundle.mjs:98`） | 439.45 / 141.60 KiB | **424.47 / 134.61 KiB** | ⚠️ 不红但**余量只剩 3.4% / 4.9%**（2026-10-01 `9b468e0` 后 fresh build 实测） |
-| 22 | 预热预算：被 `warmUpVocabulary` 列入的包 gzip 总量 ≤ **600 KiB** | 600 KiB | **330.02 KiB**（清单 `[kaoyan, toefl]`） | 不红（余量 **45%**） |
+> **本表只列「阈值」与「守护者」，不抄写实测值。** 实测是**动态量**（随包数、词数、构建产物变化），
+> 抄进文档就必然过期 —— 本表历史上曾因 `5ebc65e`（cet4 / cet6 改 lazy）一次性失真 4 行，
+> 且失真的「余量只剩 3.4% / 4.9%」把宽裕说成吃紧，误导过下游决策。
+> **实测一律以后台输出为准**（那才是权威源，且每次都自带余量百分比）：
+> - 第 **18 / 19 / 20** 项 → `npm run content:validate`，每条 `✓` 行自带实测值
+> - 第 **21 / 22** 项 → `npm run check:bundle` 判据 **1** / 判据 **3**，每条 PASS 行自带 raw / gzip / 余量
+>
+> 这就是 `I-20`「**数值不在此抄写**」纪律在本表的落实（与 §13.2 的历史基线表同一手法）。
 
-第 **18 / 19 / 20** 项由 `content:validate` 守护（门禁从 17 项扩到 **20** 项）；
+| # | 断言 | 阈值 | 守护者 |
+|---|---|---|---|
+| 18 | manifest 体积：单包 < **8 KiB**，全库 < **40 KiB** | 8 / 40 KiB | `content:validate` 判据 **18** |
+| 19 | inline 预算：`offline.policy==='inline'` 的包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB** | 1000 词 / 64 KiB | `content:validate` 判据 **19** |
+| 20 | 策略一致性：manifest 的 `offline.policy` 必须与 `registry.ts` 实际加载方式一致（`words:` ↔ inline，`load:` ↔ lazy） | **全库包数 100% 一致** | `content:validate` 判据 **20** |
+| 21 | 主 chunk 体积：raw ≤ **439.45 KiB** 且 gzip ≤ **141.60 KiB**（分层预算生效层 = `ABSOLUTE_BUDGET`，见 `scripts/gate-perf.mjs`） | 439.45 / 141.60 KiB | `check:bundle` 判据 **1** |
+| 22 | 预热预算：被 `warmUpVocabulary` 列入的包 gzip 总量 ≤ **600 KiB** | 600 KiB | `check:bundle` 判据 **3** |
+
+> 判据 20 的阈值**不写死包数**（曾写「18/18」）：包数是动态量，加包即过期。
+> 断言本身是「全库每个包都一致」，与包数无关。
+
+第 **18 / 19 / 20** 项由 `content:validate` 守护（门禁已从 17 项扩到 **20** 项）；
 第 **21 / 22** 项是**构建后检查**，由 `check:bundle` 守护，**不属于 `content:validate`**。
 
 > **第 21 条阈值的设计意图**（别误读）：它是为**抓 inline 误用**设计的，**不是抓 lazy 增长**。
