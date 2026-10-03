@@ -397,9 +397,13 @@ Stage 1 还没 CLOSED —— 卡在 J1（3b `ai-core` 是否 lazy）这一句上
 P18 🟢｜Stage 0 🟢｜**Stage 1 🟢 CLOSED**｜**Stage 2 🟡 已解冻（内容扩充方向开放；面板 lazy 仍冻结）**｜
 R2 🔴｜主包 384.21 / 119.06 KiB、余量 12.6% / 15.9%、预算阈值一行未动。
 
-**解冻后第一步（待人工）**：S2-5 **N5 codegen 的方向裁定**（做 / 不做）—— 它是 Stage 2 里唯一
-「零实现且会打坏三处文本判据（`validate:20` / `parseRegistryEntries` / `parseWarmUpLiteral`）」的入口，
-不定方向就不该动 `registry.ts`。在此之前 Stage 2 可正常加内容域（S2-1 / S2-2 机器判已就位）。
+**解冻后第一步（2026-10-03 更新）**：~~S2-5 **N5 codegen 的方向裁定**（做 / 不做）~~ ——
+**该项已于 §12 裁定关闭：N5 = 不做 codegen**，`registry.ts` 保持手写单一事实源，
+不引入构建期生成链；A / B 两方案降为待启专项（等「registry 维护成本成为真实瓶颈」再单开一轮）。
+**故 N5 不再是 Stage 2 的前置，也不挡路。**
+Stage 2 的实际下一步 = **攒第一批标准化内容包的最小样板**（课程 → 章节 → 词汇/文本 → metadata →
+audio → subtitle → 练习 → validate → lazy loading → check:bundle → e2e）；
+**样板跑通前不上生成器**。机器判已就位：S2-1（新增内容不得进主 chunk）/ S2-2（ingest→validate→远程媒体）。
 
 **遗留（不进收口动作，继续挂着）**：`items` 分支未接 `src/**` 过滤；`loadFailedFor` 冗余；
 e2e 第四态零覆盖（171 只锁总数不锁分布）；`PLANNED_BASELINE` staleness（428324 对当前 393432）。
