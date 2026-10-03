@@ -287,4 +287,10 @@ export const zh: Record<string, string> = {
   'unit.status.subtitlePending': '字幕内容层尚未存在（字幕为资产位，不是内容类型）',
   'unit.01.title': 'Unit-01 · 高频 100 词',
   'unit.01.summary': '听力输入方向',
+  'unit.02.title': 'Unit-02 · 次高频 100 词',
+  'unit.02.summary': '阅读输入方向',
+  /* 多单元切换（A1）：单元数 > 1 后，「当前单元」不再唯一，必须给用户显式切换入口。
+   * `unit.switch` 是切换器的可访问名（aria-label），`unit.current` 标注当前选中项。 */
+  'unit.switch': '切换学习单元',
+  'unit.current': '当前',
 }

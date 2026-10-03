@@ -287,4 +287,11 @@ export const en: Record<string, string> = {
   'unit.status.subtitlePending': 'Subtitle content layer does not exist yet (subtitle is an asset, not a content type)',
   'unit.01.title': 'Unit-01 · 100 high-frequency words',
   'unit.01.summary': 'Listening input track',
+  'unit.02.title': 'Unit-02 · 100 second-tier words',
+  'unit.02.summary': 'Reading input track',
+  /* Multi-unit switching (A1): with more than one unit the "current unit" is no longer
+   * unique, so the UI needs an explicit switcher. `unit.switch` is its accessible name
+   * (aria-label); `unit.current` labels the selected entry. */
+  'unit.switch': 'Switch learning unit',
+  'unit.current': 'Current',
 }

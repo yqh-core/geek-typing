@@ -38,7 +38,9 @@ import { speak, warmSpeech } from './lib/speech'
 import { Terminal } from 'lucide-react'
 import { useT, useLang } from './i18n/hooks'
 import {
-  ACTIVE_LEARNING_UNIT,
+  DEFAULT_LEARNING_UNIT_ID,
+  LEARNING_UNITS,
+  learningUnitById,
   loadUnitWords,
   unitProgressOf,
   type UnitWordList,
@@ -63,6 +65,62 @@ const contentCatalog = getCatalog()
 /** 页签 id / 面板 id：tabpanel 的 aria-labelledby 需指回页签 id，故两者成对生成 */
 const tabDomId = (id: TabId) => `tab-${id}`
 const tabPanelDomId = (id: TabId) => `tabpanel-${id}`
+
+/**
+ * 学习单元切换器（A1 · 单元数 > 1 后的必需控件）。
+ *
+ * 位置：Home 页内、单元卡与单元展开视图**之上** —— 两种状态下都可见，
+ * 所以「切单元」不需要先返回首页（面板开着也能原地切）。
+ *
+ * 刻意用 `aria-pressed` 的按钮组而不是 tablist：单元切换**不改页签**，
+ * 页签集合是 UI 契约锚点（见 LearningUnitCard 头注），把单元伪装成 tab 会让
+ * 读屏用户以为发生了页级导航。`aria-pressed` 准确表达「同一区域内的选中态」。
+ *
+ * ⚠️ 本组件只渲染 `LEARNING_UNITS` 的 id + titleKey，**不碰任何词表句柄**
+ * （遍历的是编排表条目数组，不是 WordItem[]）。
+ */
+function UnitSwitcher({
+  theme,
+  currentId,
+  onSelect,
+}: {
+  theme: import('./lib/theme').ThemeConfig
+  currentId: string
+  onSelect: (id: string) => void
+}) {
+  const t = useT()
+  return (
+    <div
+      data-testid="unit-switcher"
+      role="group"
+      aria-label={t('unit.switch')}
+      className="flex flex-wrap items-center gap-2"
+    >
+      {LEARNING_UNITS.map((u) => {
+        const active = u.id === currentId
+        return (
+          <button
+            key={u.id}
+            data-testid={`unit-switch-${u.id}`}
+            data-active={active ? 'true' : 'false'}
+            aria-pressed={active}
+            onClick={() => onSelect(u.id)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold active:scale-95 transition-all ${
+              active ? `${theme.accent} bg-white/10 border-emerald-500/50` : `${theme.sub} ${theme.border}`
+            }`}
+          >
+            {t(u.titleKey)}
+            {active && (
+              <span className={`text-[10px] px-1 rounded ${theme.sub}`} data-testid="unit-switch-current">
+                {t('unit.current')}
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function App() {
   const t = useT()
@@ -92,34 +150,63 @@ export default function App() {
 
   const theme = THEMES[themeId]
 
-  /* ---------------- 学习单元（Stage 2 第一刀）----------------
+  /* ---------------- 学习单元（Stage 2 第一刀 / A1 多实例化）----------------
    * 首页单元卡要显示「本单元完成度」，所以 App 这里也要拿到单元词（与面板共用
    * registry.loadPackage 的缓存，不产生第二份 3000 词内存）。
    * 单元展开视图是 Home 页内的 sub-view：不新增页签（页签集合是 UI 契约锚点）、
-   * 不引入路由（第一刀不需要可分享的 URL，这是已知取舍）。 */
+   * 不引入路由（第一刀不需要可分享的 URL，这是已知取舍）。
+   *
+   * A1：单元数从 1 变成 N，「当前单元」由**单值常量**变成**运行时状态**：
+   * `unitId` 是唯一事实源，`unit` 由它经 data 层 `learningUnitById` 解析
+   * （遍历留在 data 层，UI 域不新增数组算子）。初始值取数据层的默认单元，UI 不硬编码 id。
+   * ⚠️ LearningUnitPanel 仍是**单 `unit` prop** —— 多单元只停留在本层编排。 */
   const [unitOpen, setUnitOpen] = useState(false)
-  const [unitPicked, setUnitPicked] = useState<UnitWordList | null>(null)
+  const [unitId, setUnitId] = useState<string>(DEFAULT_LEARNING_UNIT_ID)
+  const unit = useMemo(() => learningUnitById(unitId), [unitId])
+  /* 已解析词段**连同它属于哪个单元**一起存**（`{ unitId, list }`），当前单元的词段由渲染期派生。
+   * 为什么不用「useState<WordItem[]|null> + 切单元时 setState(null)」：那样必须**在 effect 里
+   * 同步 setState**（oxlint react/set-state-in-effect：级联渲染），且存在一个真实错配窗口 ——
+   * 切单元后到异步 resolve 完成之间，`unitPicked` 仍是**上一个单元**的词，面板会拿
+   * unit-01 的词表配unit-02 的标题渲染，且「开始学习」会把错的词交出去。
+   * 打上 unitId 后，错配在**类型层面不可能发生**：不属于当前单元的词段一律当未加载。
+   *
+   * ⚠️ 字段名**刻意不叫 `words`**：架构门 ui-contract 判「属性名为 `words` 且类型是
+   * WordItem[] 的属性访问」为 wordTableSources（棘轮只许降不许升）—— 命名成 `words`
+   * 会让这一行凭空 +1 而顶破棘轮（同learningUnits.ts 的 `lexemes` 镜像约定）。 */
+  const [picked, setPicked] = useState<{ unitId: string; list: UnitWordList } | null>(null)
+  const unitPicked = picked && picked.unitId === unit.id ? picked.list : null
 
   /* 词段加载在 data 层（loadUnitWords）：App 域里不出现任何「词表来源点 / 词表句柄」，
-   * 否则会被架构门 ui-contract 计入 wordTableSources / handleReads 棘轮（只许降不许升）。 */
+   * 否则会被架构门 ui-contract 计入 wordTableSources / handleReads棘轮（只许降不许升）。
+   * 依赖 `unit` 而非 `unitId`：切单元即重取该单元的词段（两个单元同包，命中同一份
+   * loadPackage 缓存，不产生第二份 3000 词内存）。effect 内**不做同步 setState**。 */
   useEffect(() => {
     let alive = true
-    loadUnitWords(ACTIVE_LEARNING_UNIT)
-      .then((picked) => {
-        if (alive && picked) setUnitPicked(picked)
+    loadUnitWords(unit)
+      .then((list) => {
+        if (alive && list) setPicked({ unitId: unit.id, list })
       })
       .catch(() => undefined)
     return () => {
       alive = false
     }
-  }, [])
+  }, [unit])
 
   /* 完成度计算在 data 层（unitProgressOf）—— UI 域只收一个 number，
-   * 不持有词表句柄做算子，避免顶破 ui-contract 的 handleReads / bannedArrayOps 棘轮。 */
+   * 不持有词表句柄做算子，避免顶破 ui-contract 的 handleReads / bannedArrayOps 棘轮。
+   * 依赖 `unit`：完成度是「本单元」的指标，切单元必须跟着换分母/词段。 */
   const unitProgress = useMemo(
-    () => unitProgressOf(analytics, ACTIVE_LEARNING_UNIT, unitPicked),
-    [unitPicked, analytics],
+    () => unitProgressOf(analytics, unit, unitPicked),
+    [unit, unitPicked, analytics],
   )
+
+  /* 单元切换：只改选中 id（面板若已打开则原地换单元，不关面板 ——
+   * 让「切单元后词表/进度当场变」这件事不需要先返回首页）。
+   * 面板自身的词条/完成度由上面的 effect 与 unitProgress 自动跟随。 */
+  const onSelectUnit = useCallback((id: string) => {
+    sound.tap()
+    setUnitId(id)
+  }, [])
 
   /* ---------------- 依赖环的显式破环点 ----------------
    * useReviewFlow 需要 startRound（复习轮开轮），而 useTypingRound 的完成回调需要
@@ -346,10 +433,13 @@ export default function App() {
             </div>
           )}
           {tab === 'home' ? (
-            unitOpen ? (
+            <div className="w-full max-w-4xl flex flex-col gap-4">
+              {/* 单元切换器：单元卡与单元展开视图之上，两种状态都可见（A1） */}
+              <UnitSwitcher theme={theme} currentId={unit.id} onSelect={onSelectUnit} />
+              {unitOpen ? (
               <LearningUnitPanel
                 theme={theme}
-                unit={ACTIVE_LEARNING_UNIT}
+                unit={unit}
                 canStart={Boolean(unitPicked)}
                 progress={unitProgress}
                 onStart={() => {
@@ -359,30 +449,31 @@ export default function App() {
                 }}
                 onBack={() => setUnitOpen(false)}
               />
-            ) : (
-            <HomePanel
-              theme={theme}
-              recommendation={recommendation}
-              bankName={lang === 'en' ? bank?.nameEn ?? bank?.name ?? '' : bank?.name ?? ''}
-              bankCount={bank?.count ?? bank?.words.length ?? 0}
-              catalogSummary={{ packages: contentCatalog.packages.length, items: contentCatalog.totalItems }}
-              unit={ACTIVE_LEARNING_UNIT}
-              unitProgress={unitProgress}
-              onOpenUnit={() => setUnitOpen(true)}
-              onReviewRound={() => {
-                sound.tap()
-                void startReviewRound()
-              }}
-              onWeakRound={() => {
-                setTab('typing')
-                startWeakRound()
-              }}
-              onNewRound={() => {
-                setTab('typing')
-                startRound()
-              }}
-            />
-            )
+              ) : (
+              <HomePanel
+                theme={theme}
+                recommendation={recommendation}
+                bankName={lang === 'en' ? bank?.nameEn ?? bank?.name ?? '' : bank?.name ?? ''}
+                bankCount={bank?.count ?? bank?.words.length ?? 0}
+                catalogSummary={{ packages: contentCatalog.packages.length, items: contentCatalog.totalItems }}
+                unit={unit}
+                unitProgress={unitProgress}
+                onOpenUnit={() => setUnitOpen(true)}
+                onReviewRound={() => {
+                  sound.tap()
+                  void startReviewRound()
+                }}
+                onWeakRound={() => {
+                  setTab('typing')
+                  startWeakRound()
+                }}
+                onNewRound={() => {
+                  setTab('typing')
+                  startRound()
+                }}
+              />
+              )}
+            </div>
           ) : tab === 'review' ? (
             <ReviewPanel
               theme={theme}

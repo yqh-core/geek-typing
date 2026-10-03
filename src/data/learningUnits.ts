@@ -23,6 +23,14 @@
  * 本文件**不注册任何内容包**：单元挂载的包已经都在 registry 里（demo-audio-01 /
  * demo-listening-01 / demo-exercise-01），这里只按 localId 引用。
  * 所以本刀对 registry.ts 的改动是 **0**。
+ *
+ * ── A1（多实例化）：本表从「单值」变成「多单元 + 运行时选中」──
+ * 第一刀只有 unit-01 一个单元，所以「当前单元」被写成了单值常量 `ACTIVE_LEARNING_UNIT`。
+ * A1 让同一模型支持多个单元：`LEARNING_UNITS` 追加 unit-02（**同 bankId 'ielts'** ——
+ * 多实例化不引入新数据源、不新增许可），「当前单元」改为运行时状态（App 的 unitId +本文件的
+ * `learningUnitById` / `DEFAULT_LEARNING_UNIT_ID`）。**本表仍是 UI 编排表**：
+ * 铁律 1（不升格为 Content Relation）、铁律 2（placeholder 必须给 reasonKey）逐条不变，
+ * 对 registry.ts / relations / 词表 / schema 的改动依旧为 **0 行**。
  */
 import { loadPackage } from '../core/content'
 import type { WordItem } from '../core/content/schema'
@@ -129,10 +137,92 @@ export const LEARNING_UNITS: LearningUnit[] = [
     subtitleStatus: 'placeholder',
     subtitleReasonKey: 'unit.status.subtitlePending',
   },
+  {
+    id: 'unit-02',
+    // ⚠️ 与 unit-01 **同源同包**（都是 ielts）：A1 是「已有模型的多实例化」，
+    //不引入新数据源、不新增许可 —— 单元之间只有词段不同，bankId 必然相同。
+    bankId: 'ielts',
+    titleKey: 'unit.02.title',
+    summaryKey: 'unit.02.summary',
+    /* 词段 = ielts 包词频序的**下标 100..200**（与 unit-01 的 0..99 首尾相接、不重叠）。
+     * 同 unit-01 的约定：显式词形白名单，`words` 与 `lexemes` 两份**逐项镜像**、同序即学习顺序。
+     *
+     * 本刀实测确认（不是推断，见交付报告）：ielts 3000 词中有 14 个**没有 `phonetic` 字段**，
+     * `reinforced` 就是其中之一 —— 而 unit-01 的 100 词全部带音标，所以「音标缺失」这条渲染
+     * 路径在此之前从未被本单元走过。数据侧按铁律**保持原样不补**（不补音标、不换词）：
+     * 缺音标是词表事实，不是数据缺陷，UI 侧的容错由 A1 的第 ③ 步单独验证。 */
+    words: [
+      'perceptible', 'unconvincing', 'matrimony', 'meteorology', 'practicable', 'eke', 'gaily',
+      'headstrong', 'sulphur', 'fortnight', 'perspire', 'timidity', 'microfilm', 'thesaurus',
+      'reinforced', 'august', 'defile', 'fester', 'trinity', 'horticulture', 'petrol',
+      'meteoric', 'offence', 'leprosy', 'combustible', 'infirmary', 'perturb', 'obstinate',
+      'oblong', 'typhoon', 'reverent', 'zoology', 'baldness', 'dictation', 'defence',
+      'gratuity', 'manifold', 'superstructure', 'forte', 'frost', 'kelp', 'venerate',
+      'ostensible', 'teem', 'bookshop', 'ruinous', 'flabby', 'pliable', 'transgress',
+      'excrement', 'microbiology', 'perishable', 'sportswear', 'slander', 'repatriate', 'hubbub',
+      'tweezers', 'vehement', 'equivocal', 'ungainly', 'appreciable', 'insolvent', 'neurosis',
+      'granular', 'fastidious', 'sociable', 'platitude', 'badminton', 'drudgery', 'abbreviation',
+      'jeer', 'lubricate', 'negotiable', 'mercantile', 'delirium', 'expedient', 'piecemeal',
+      'chaste', 'naught', 'scrupulous', 'pervert', 'bookkeeper', 'tyrannical', 'extort',
+      'ponderous', 'storehouse', 'plankton', 'alphabetical', 'corrode', 'succinct', 'laudable',
+      'oscillate', 'posthumous', 'plumb', 'quench', 'prologue', 'prospectus', 'plaintive',
+      'isle', 'muddle',
+    ],
+    // `words` 的展示镜像（与 words 逐项一致）。理由见 LearningUnit.lexemes 的注释：
+    // UI 域里不出现属性名为 `words` 的词表句柄读。
+    lexemes: [
+      'perceptible', 'unconvincing', 'matrimony', 'meteorology', 'practicable', 'eke', 'gaily',
+      'headstrong', 'sulphur', 'fortnight', 'perspire', 'timidity', 'microfilm', 'thesaurus',
+      'reinforced', 'august', 'defile', 'fester', 'trinity', 'horticulture', 'petrol',
+      'meteoric', 'offence', 'leprosy', 'combustible', 'infirmary', 'perturb', 'obstinate',
+      'oblong', 'typhoon', 'reverent', 'zoology', 'baldness', 'dictation', 'defence',
+      'gratuity', 'manifold', 'superstructure', 'forte', 'frost', 'kelp', 'venerate',
+      'ostensible', 'teem', 'bookshop', 'ruinous', 'flabby', 'pliable', 'transgress',
+      'excrement', 'microbiology', 'perishable', 'sportswear', 'slander', 'repatriate', 'hubbub',
+      'tweezers', 'vehement', 'equivocal', 'ungainly', 'appreciable', 'insolvent', 'neurosis',
+      'granular', 'fastidious', 'sociable', 'platitude', 'badminton', 'drudgery', 'abbreviation',
+      'jeer', 'lubricate', 'negotiable', 'mercantile', 'delirium', 'expedient', 'piecemeal',
+      'chaste', 'naught', 'scrupulous', 'pervert', 'bookkeeper', 'tyrannical', 'extort',
+      'ponderous', 'storehouse', 'plankton', 'alphabetical', 'corrode', 'succinct', 'laudable',
+      'oscillate', 'posthumous', 'plumb', 'quench', 'prologue', 'prospectus', 'plaintive',
+      'isle', 'muddle',
+    ],
+    wordCount: 100,
+    attached: [
+      // 与 unit-01 挂同一批 demo 包（A1 不新增内容包、不改 registry）：可用性判定逐项照抄，
+      // 理由见 unit-01 的同名字段 —— 音频无二进制、练习无题目，一律显式「待接入」。
+      { localId: 'demo-audio-01', status: 'placeholder', reasonKey: 'unit.status.audioPending' },
+      { localId: 'demo-listening-01', status: 'listed' },
+      { localId: 'demo-exercise-01', status: 'placeholder', reasonKey: 'unit.status.exercisePending' },
+    ],
+    subtitleStatus: 'placeholder',
+    subtitleReasonKey: 'unit.status.subtitlePending',
+  },
 ]
 
-/** 当前单元（第一刀只有一个；取第一个即可，将来多单元时改这里按产品需求选） */
-export const ACTIVE_LEARNING_UNIT: LearningUnit = LEARNING_UNITS[0]
+/**
+ * 默认选中单元（多实例化后的初始值）。
+ *
+ * ⚠️ 这里**不再**有「当前单元」的单值常量：A1 把「当前单元」变成**运行时状态**
+ * （见 App 的 `unitId` state + `learningUnitById`），默认单元只是初始值而非唯一入口。
+ * 保留一个「默认」而不是删掉，是为了让初始选中项仍是**单一事实源**（写在数据层，UI 不硬编码 id）。
+ */
+export const DEFAULT_LEARNING_UNIT_ID: string = LEARNING_UNITS[0].id
+
+/**
+ * 按 id 取单元 —— **找不到时回落到默认单元**（不返回 null）。
+ *
+ * 为什么放在 data 层：App 要按 id 解析单元，解析需要遍历 `LEARNING_UNITS`。
+ * 架构门 ui-contract 的扫描域含 `src/App.tsx`，遍历放在那里会给 UI 域增加一处
+ * 数组算子（`find` 属 READ_OPS）。放数据层则 UI 只收一个结果，与
+ * `loadUnitWords` / `unitProgressOf` 同一口径。
+ *
+ * 回落到默认单元而不是抛错：id 只来自本表的 `id` 字段与 `LEARNING_UNITS` 自身，
+ * 逻辑上不可达；真不可达时给一个可用单元（显式降级）好过整页崩掉。
+ */
+export function learningUnitById(id: string): LearningUnit {
+  return LEARNING_UNITS.find((u) => u.id === id) ?? LEARNING_UNITS[0]
+}
 
 /** 单元词段解析结果的类型别名：词对象来自 registry.loadPackage，白名单只当选择器 */
 export type UnitWordList = WordItem[]
