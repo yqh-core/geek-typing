@@ -211,6 +211,10 @@ export const LEARNING_UNITS: LearningUnit[] = [
      * 相应地 scripts/verify-learning-unit.mjs 的 100 词断言已改为「从本表派生当前单元词数」，
      * 而不是把 Education 硬补到 100 词。
      *
+     * 后续 unit-04 = 第二套正式内容包（Environment/Climate，30 词，前缀 ielts-env-02），
+     * 两套单元的关系是「同一个 playing 层里并列的正式单元」：各自带自己的词汇包，
+     * 互不复用 bankId；unit-01/02 仍是探索期词段切片，只有 unit-03/04 走内容包驱动。
+     *
      * 挂载的两个包都是 status 'listed' —— 它们**有真实载荷**（正文 / 15 题），
      * 不是「条目存在但内容没有」的 placeholder。这里不给 reasonKey：
      * 铁律 2 要求 placeholder 才给原因，给 listed 的条目挂原因文案是自相矛盾的假提示。 */
@@ -243,6 +247,50 @@ export const LEARNING_UNITS: LearningUnit[] = [
       { localId: 'ielts-edu-01-reading', status: 'listed' },
       // 练习：15 题（含 answer / explanation / skill）已入库，可作答 ⇒ listed
       { localId: 'ielts-edu-01-exercise', status: 'listed' },
+    ],
+    subtitleStatus: 'placeholder',
+    subtitleReasonKey: 'unit.status.subtitlePending',
+  },
+  {
+    /* Unit-04 —— A2：IELTS Academic Unit 02「Environment / Climate」。
+     *
+     * ⚠️ 与 unit-03 是**并列的第二套正式内容包**，不是它的变体：
+     *   bankId 用自己的词汇包 ielts-env-02-vocab（30 词，与 unit-03 的 ielts-edu-01-vocab 不共用），
+     *   reading / exercise 也是同前缀的独立包（ielts-env-02-reading / -exercise）。
+     *   两套单元走同一条接入路径（同款注释结构、同款 listed 判定），后续再加第 N 套照抄即可。
+     *
+     * 词段规模 30 词同样是**内容事实**（PM 的 Unit 02 规格 20–40 词），不是凑门禁。
+     *
+     * 挂载的两个包都是 status 'listed' —— 它们**有真实载荷**（8 段正文 / 15 题），
+     * 不是「条目存在但内容没有」的 placeholder。这里不给 reasonKey：
+     * 铁律 2 要求 placeholder 才给原因，给 listed 的条目挂原因文案是自相矛盾的假提示。 */
+    id: 'unit-04',
+    // 本单元自己的词汇包（30 词）；与 unit-01/02/03 的 bankId 不同源，属新增内容包。
+    bankId: 'ielts-env-02-vocab',
+    titleKey: 'unit.04.title',
+    summaryKey: 'unit.04.summary',
+    words: [
+      'albedo', 'anthropogenic', 'canopy', 'evapotranspiration', 'impermeable', 'mitigation',
+      'vulnerability', 'susceptibility', 'threshold', 'ambient', 'exposure', 'urbanization',
+      'emission', 'density', 'inequality', 'ventilation', 'suburban', 'reservoir',
+      'exceed', 'pronounced', 'release', 'accumulate', 'compound', 'allocate', 'infrastructure',
+      'fragment', 'mature', 'excursion', 'regulatory', 'moderate',
+    ],
+    // `words` 的展示镜像（与 words 逐项一致）。理由见 LearningUnit.lexemes 的注释：
+    // UI 域里不出现属性名为 `words` 的词表句柄读。
+    lexemes: [
+      'albedo', 'anthropogenic', 'canopy', 'evapotranspiration', 'impermeable', 'mitigation',
+      'vulnerability', 'susceptibility', 'threshold', 'ambient', 'exposure', 'urbanization',
+      'emission', 'density', 'inequality', 'ventilation', 'suburban', 'reservoir',
+      'exceed', 'pronounced', 'release', 'accumulate', 'compound', 'allocate', 'infrastructure',
+      'fragment', 'mature', 'excursion', 'regulatory', 'moderate',
+    ],
+    wordCount: 30,
+    attached: [
+      // 阅读：8 段正文（814 词）已入库，可消费 ⇒ listed
+      { localId: 'ielts-env-02-reading', status: 'listed' },
+      // 练习：15 题（10 mcq + 5 tfng，含 answer / explanation / skill）已入库，可作答 ⇒ listed
+      { localId: 'ielts-env-02-exercise', status: 'listed' },
     ],
     subtitleStatus: 'placeholder',
     subtitleReasonKey: 'unit.status.subtitlePending',

@@ -83,10 +83,11 @@ ok(
 /* 全库词条数基准（I-16 依赖本条守护）：
  * 词数变化必须被显式注意到 —— 增删词是内容产品行为，不该静默发生。
  * 9346 → 9378：A1-E 新增 ielts-edu-01-vocab（32 词，单元核心词汇）。
+ * 9378 → 9408：A2 新增 ielts-env-02-vocab（30 词，Unit-04 Environment 核心词汇）。
  * ⚠️ docs/audit-package/04-content/CONTENT_CONTRACT.md 里写的仍是 **9346**，那是
  *    **P1.7 冻结基线**的历史值，按冻结纪律**不得回改**（`npm run verify:p17-frozen` 把关）。
  *    当前权威值就是本文件的 BASELINE_ITEMS —— 别照着那句「同步更新基准数」去改冻结包。 */
-const BASELINE_ITEMS = 9378
+const BASELINE_ITEMS = 9408
 ok('全库 Σitems = 契约基准（词数变化必须显式确认）', manifestTotal === BASELINE_ITEMS, `${manifestTotal} vs ${BASELINE_ITEMS}`)
 ok('getPackage 支持裸 id', registry.getPackage('ielts')?.localId === 'ielts')
 ok(

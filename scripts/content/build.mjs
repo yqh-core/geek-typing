@@ -64,6 +64,7 @@ const PROVIDER = {
    * ⚠️ 这张表是**显式登记表**，不在表里的包会被写成 provider:'unknown'（溯源字段缺失）。
    *    新增自研 vocabulary 包必须在这里登记，不要指望 `?? 'unknown'` 兜底。 */
   'ielts-edu-01-vocab': PROVIDER_ORIGINAL,
+  'ielts-env-02-vocab': PROVIDER_ORIGINAL,
   ielts: 'ecdict', kaoyan: 'ecdict', toefl: 'ecdict', cet4: 'ecdict', cet6: 'ecdict',
 }
 /** 外部来源方 → 仓库地址；自有内容省略 */
