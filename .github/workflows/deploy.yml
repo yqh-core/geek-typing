@@ -53,6 +53,11 @@ jobs:
         run: npm run verify:registry
       - name: 注册表生成器测试（test:generate-registry · P18-C′）
         run: npm run test:generate-registry
+      # 单元内容脚手架测试（test:scaffold-unit）：「加第 N+1 个单元」这条命令的判据自证。
+      # 全部用例跑在 mkdtemp 临时根；D 组用真实 content/ 但走只读 --check。
+      # 覆盖 12 条坏源拦截 + 10 条漂移注入（含 build 戳与载荷排版两个**必须判绿**的对照组）。
+      - name: 单元脚手架测试（test:scaffold-unit）
+        run: npm run test:scaffold-unit
       # 许可硬门（INV-5 / Plan §4.2）：内容入库**前置**硬门 —— 复用 asset-rules.mjs 与 license-policy.mjs，
       # 不复制任何规则；未过门的内容不得落盘到 content/**。自带 --falsify（N 条用例 + 判绿对照组），
       # 本地跑 `npm run gate:license:falsify` 可复核这道门确实会判红。

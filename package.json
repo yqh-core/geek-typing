@@ -33,6 +33,8 @@
     "content:generate-registry": "node scripts/content/generate-registry.mjs",
     "verify:registry": "node scripts/content/generate-registry.mjs --check",
     "test:generate-registry": "node tests/generate-registry.mjs",
+    "content:scaffold-unit": "node scripts/content/scaffold-unit.mjs",
+    "test:scaffold-unit": "node tests/scaffold-unit.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",
     "gate:perf": "node scripts/gate-perf.mjs",
     "bench:content": "node scripts/bench-content.mjs",

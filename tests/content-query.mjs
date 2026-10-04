@@ -7,7 +7,7 @@
  * 用法：node tests/content-query.mjs
  */
 import { createServer } from 'vite'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
@@ -34,6 +34,40 @@ const q = await server.ssrLoadModule('/src/core/content/query/content-query.ts')
 const model = await server.ssrLoadModule('/src/core/content/model/content.ts')
 
 /* ---------- 0. 基线：manifest 全量读取（不依赖被测代码，作为独立真值） ---------- */
+/* 磁盘真值：直接扫 content/<type>/<pkg>/manifest.json，**不经过 registry/query**。
+ * 为什么必须有这一份：本文件原先写死「10 个 vocabulary 包 / 18 个包 / reading 6 条」，
+ * A1-E 加了 3 个包后 12 条断言一次性全红 —— 红的全是数字，不是功能（典型假红）。
+ * 凡是「包数 / 条数 / 按 tag 聚合」的期望值，一律从这里派生。
+ * ⚠️ content/ 根下有 README.md 等非目录文件，扫描必须先 isDirectory() 过滤。 */
+const FS_PKGS = []
+for (const t of readdirSync(resolve(root, 'content'))) {
+  const td = resolve(root, 'content', t)
+  if (!statSync(td).isDirectory()) continue
+  for (const d of readdirSync(td)) {
+    const mf = resolve(td, d, 'manifest.json')
+    if (!existsSync(mf)) continue
+    const m = JSON.parse(readFileSync(mf, 'utf8'))
+    FS_PKGS.push({ type: m.type ?? t, dir: d, id: m.packageId, ns: m.namespace, items: m.stats?.items ?? 0, tags: m.tags ?? [] })
+  }
+}
+/** 按类型聚合的磁盘真值：{ vocabulary: {packages, items}, reading: …, … } */
+const fsByType = {}
+for (const p of FS_PKGS) {
+  const e = (fsByType[p.type] ||= { packages: 0, items: 0 })
+  e.packages += 1
+  e.items += p.items
+}
+const fsVocabPkgs = FS_PKGS.filter((p) => p.type === 'vocabulary')
+/** 带某个包级 tag 的**词条**总数（磁盘真值，仅 vocabulary）—— 新增同 tag 包时自动跟上，不假红。
+ *  用于 `count({type:'word', tags:[…]})`：word 族只含 vocabulary 包。 */
+const fsWordItemsByTag = (tag) => fsVocabPkgs.filter((p) => p.tags.includes(tag)).reduce((s, p) => s + p.items, 0)
+/** 带某个包级 tag 的**全部条目**数（磁盘真值，**不限类型**）—— 用于 index.byTag。
+ *  ⚠️ byTag 覆盖所有已索引类型：reading / exercise 包也带 ielts 标签 ⇒ 各多 1 条，
+ *     用 word 口径去比会差 2（实测 3034 vs 3032）。两种口径别混用。 */
+const fsItemsByTag = (tag) => FS_PKGS.filter((p) => p.tags.includes(tag)).reduce((s, p) => s + p.items, 0)
+const fsIeltsWordItems = fsWordItemsByTag('ielts')
+const fsIeltsTagItems = fsItemsByTag('ielts')
+
 const pkgDirs = registry.getVocabularyPackages().map((p) => p.localId)
 const manifestTotal = pkgDirs.reduce((sum, id) => {
   const m = JSON.parse(readFileSync(resolve(root, `content/vocabulary/${id}/manifest.json`), 'utf8'))
@@ -41,11 +75,18 @@ const manifestTotal = pkgDirs.reduce((sum, id) => {
 }, 0)
 
 console.log('\n【1】registry 契约')
-ok('注册 10 个 vocabulary 包', pkgDirs.length === 10, pkgDirs.join(','))
-/* 全库词条数基准（CONTENT_CONTRACT.md §11 I-16 依赖本条守护）：
+ok(
+  `注册 ${fsVocabPkgs.length} 个 vocabulary 包（与 content/ 目录一致）`,
+  pkgDirs.length === fsVocabPkgs.length && fsVocabPkgs.every((p) => pkgDirs.includes(p.id)),
+  pkgDirs.join(','),
+)
+/* 全库词条数基准（I-16 依赖本条守护）：
  * 词数变化必须被显式注意到 —— 增删词是内容产品行为，不该静默发生。
- * 变更时请同步更新 CONTENT_CONTRACT.md 的基准数与本节期望值。 */
-const BASELINE_ITEMS = 9346
+ * 9346 → 9378：A1-E 新增 ielts-edu-01-vocab（32 词，单元核心词汇）。
+ * ⚠️ docs/audit-package/04-content/CONTENT_CONTRACT.md 里写的仍是 **9346**，那是
+ *    **P1.7 冻结基线**的历史值，按冻结纪律**不得回改**（`npm run verify:p17-frozen` 把关）。
+ *    当前权威值就是本文件的 BASELINE_ITEMS —— 别照着那句「同步更新基准数」去改冻结包。 */
+const BASELINE_ITEMS = 9378
 ok('全库 Σitems = 契约基准（词数变化必须显式确认）', manifestTotal === BASELINE_ITEMS, `${manifestTotal} vs ${BASELINE_ITEMS}`)
 ok('getPackage 支持裸 id', registry.getPackage('ielts')?.localId === 'ielts')
 ok(
@@ -53,7 +94,7 @@ ok(
   registry.getPackage('content:vocabulary:ecdict:ielts')?.localId === 'ielts',
 )
 ok('getPackage 未知 id 返回 undefined', registry.getPackage('content:vocabulary:ecdict:nope') === undefined)
-ok('listContent("vocabulary") 返回全部 manifest', registry.listContent('vocabulary').length === 10)
+ok('listContent("vocabulary") 返回全部 manifest', registry.listContent('vocabulary').length === fsVocabPkgs.length)
 ok('listContent("listening") 返回 1 个结构探针包（B-2 已接入）', registry.listContent('listening').length === 1)
 ok('hasFeature 未知 feature 为 false 且不崩溃', registry.hasFeature('ai-core', 'nope') === false)
 ok('getRelations 恒为数组（关系模型就位、无数据）', Array.isArray(registry.getRelations('content:vocabulary:ecdict-ielts:ielts')))
@@ -209,12 +250,30 @@ ok('contentQuery.get 非法 id 返回 null', (await cq.get('abandon')) === null)
 ok('count({type:"word"}) = 全库合计', (await cq.count({ type: 'word' })) === manifestTotal, `${await cq.count({ type: 'word' })} vs ${manifestTotal}`)
 ok('count({type:"listening"}) = 0', (await cq.count({ type: 'listening' })) === 0)
 ok('count({packageId:"ielts"}) = 3000', (await cq.count({ type: 'word', packageId: 'ielts' })) === ieltsManifest.stats.items)
-ok('count({tags:["ielts"]}) = 3000', (await cq.count({ type: 'word', tags: ['ielts'] })) === ieltsManifest.stats.items)
+// 按 tag 聚合 = **所有**带该 tag 的包之和（磁盘真值）。
+// A1-E 起 ielts-edu-01-vocab 也带 tag 'ielts' ⇒ 不能再等于 ielts 包自己的 3000。
+ok(
+  `count({tags:["ielts"]}) = 带 ielts 标签的 ${fsVocabPkgs.filter((p) => p.tags.includes('ielts')).length} 个词汇包合计（${fsIeltsWordItems}）`,
+  (await cq.count({ type: 'word', tags: ['ielts'] })) === fsIeltsWordItems,
+  `${await cq.count({ type: 'word', tags: ['ielts'] })} vs ${fsIeltsWordItems}`,
+)
 const lp1 = await cq.list({ type: 'word', packageId: 'ielts', page: 1, pageSize: 5 })
 const lp2 = await cq.list({ type: 'word', packageId: 'ielts', page: 2, pageSize: 5 })
 ok('list 分页生效（page1/page2 各 5 条且无交集）', lp1.length === 5 && lp2.length === 5 && !lp1.some((h) => lp2.some((x) => x.id === h.id)))
 const tagged = await cq.list({ type: 'word', tags: ['ielts'], pageSize: 5 })
-ok('list tags 过滤生效', tagged.length > 0 && tagged.every((h) => h.packageLocalId === 'ielts'), `${tagged.length} 条`)
+// ⚠️ 原来写 `every(h => h.packageLocalId === 'ielts')`：A1-E 起另一个包也带 ielts 标签，
+// pageSize=5 时恰好前 5 条都出自 ielts 包 ⇒ 断言靠**排序运气**通过（潜在假绿/假红）。
+// 改成顺序无关：命中项的包必须带该标签，且**每个**带标签的包都真被命中。
+const ieltsTagPkgIds = fsVocabPkgs.filter((p) => p.tags.includes('ielts')).map((p) => p.id)
+const perPkgHit = []
+for (const id of ieltsTagPkgIds) perPkgHit.push([id, (await cq.list({ type: 'word', tags: ['ielts'], packageId: id, pageSize: 1 })).length])
+ok(
+  'list tags 过滤生效（顺序无关：命中项均带标签，且每个带标签包都被命中）',
+  tagged.length > 0 &&
+    tagged.every((h) => ieltsTagPkgIds.includes(h.packageLocalId)) &&
+    perPkgHit.every(([, n]) => n > 0),
+  `${tagged.length} 条；每包命中 ${perPkgHit.map(([i, n]) => `${i}=${n}`).join(' ')}`,
+)
 ok('list 未知 tag 返回空', (await cq.list({ type: 'word', tags: ['nope-not-a-tag'] })).length === 0)
 ok('list 未知包返回空', (await cq.list({ type: 'word', packageId: 'nope' })).length === 0)
 ok('list 未放开类型返回空', (await cq.list({ type: 'listening', packageId: 'ielts' })).length === 0)
@@ -235,7 +294,7 @@ for (const p of allPkgs) {
   e.items += p.manifest.stats.items
 }
 const voc = catalog.types.find((t) => t.type === 'vocabulary')
-ok('catalog.types vocabulary = 10 包', voc?.packages === 10, `${voc?.packages}`)
+ok('catalog.types vocabulary = 磁盘 vocabulary 包数', voc?.packages === fsByType.vocabulary?.packages, `${voc?.packages} vs ${fsByType.vocabulary?.packages}`)
 ok('catalog.types vocabulary items = manifest 真值', voc?.items === manifestTotal, `${voc?.items} vs ${manifestTotal}`)
 ok(
   'catalog 已接入 listening（B-2 结构探针包，真实数字）',
@@ -252,7 +311,11 @@ ok(
   ['audio', 'reading', 'topic', 'exercise', 'writing', 'speaking', 'collection'].map((t) => `${t}=${catalog.types.find((x) => x.type === t)?.packages}p/${catalog.types.find((x) => x.type === t)?.items}i`).join(' '),
 )
 ok('catalog.totalItems = 全类型 manifest 真值合计', catalog.totalItems === expectedTotal, `${catalog.totalItems} vs ${expectedTotal}`)
-ok('catalog.packages 覆盖 18 个包（10 vocabulary + 8 探针/组合）', catalog.packages.length === allPkgs.length && catalog.packages.length === 18, `${catalog.packages.length}`)
+ok(
+  `catalog.packages 覆盖全部 ${FS_PKGS.length} 个包（磁盘真值）`,
+  catalog.packages.length === allPkgs.length && catalog.packages.length === FS_PKGS.length,
+  `${catalog.packages.length} vs 注册表 ${allPkgs.length} / 磁盘 ${FS_PKGS.length}`,
+)
 ok('catalog.schemaVersion 为数字', typeof catalog.schemaVersion === 'number', `${catalog.schemaVersion}`)
 const pc = cat.getPackageCatalog('ielts')
 ok(
@@ -282,7 +345,7 @@ ok(
   idx.normalizeWord(`  ${sample.word.toUpperCase()}  `) === wordKey && idx.normalizeWord('ABANDON') === idx.normalizeWord('abandon'),
 )
 ok('byPackage 按包聚合', (index.byPackage.get('ielts') ?? []).length === ieltsManifest.stats.items)
-ok('byTag 收录包级 tag', (index.byTag.get('ielts') ?? []).length === ieltsManifest.stats.items)
+ok('byTag 收录包级 tag', (index.byTag.get('ielts') ?? []).length === fsIeltsTagItems, `${(index.byTag.get('ielts') ?? []).length} vs ${fsIeltsTagItems}`)
 idx.invalidateIndex('ielts')
 const stats1 = idx.getIndexStats()
 ok(
@@ -297,7 +360,13 @@ ok(
 )
 ok('失效后 byPackage 不再含 ielts', index.byPackage.get('ielts') === undefined)
 ok('失效后 byWord 不再含 ielts 词条', !(index.byWord.get(wordKey) ?? []).some((id2) => id2.startsWith('content:word:ecdict-ielts:')))
-ok('失效后 byTag 不再含 ielts 词条', !(index.byTag.get('ielts') ?? []).length)
+// 精确口径：失效的是 **ielts 包**，不是「tag 为 ielts 的一切」。
+// A1-E 起另一个包也带 ielts 标签 ⇒ `byTag.get('ielts').length === 0` 已不再成立。
+ok(
+  '失效后 byTag 不再含 ielts 包词条（其他带同标签的包仍在）',
+  !(index.byTag.get('ielts') ?? []).some((id2) => id2.startsWith('content:word:ecdict-ielts:')),
+  `${(index.byTag.get('ielts') ?? []).length} 条残留（应来自其他 ielts 标签包）`,
+)
 const rebuilt = await idx.ensureIndex()
 ok('重新 ensureIndex 恢复全量', idx.getIndexStats().entries === expectedTotal, `${idx.getIndexStats().entries} vs ${expectedTotal}`)
 ok('重建后 byWord 恢复 ielts 词条', (rebuilt.byWord.get(wordKey) ?? []).includes(sample.id))
@@ -665,10 +734,14 @@ console.log('\n【14】queryWord —— UI 唯一需要的单条寻址入口')
 /* ---------- 15. P18-E：reading 放开（首个非 word 类型，四段齐备的行为级验收） ---------- */
 console.log('\n【15】P18-E reading 放开（启用集 / 包路由 / 索引 / 结果形状）')
 {
+  // READING_PKG 只是**取样包**（用于跨族外溢、ContentId 自洽这类单点断言）；
+  // 计数/列表类断言必须覆盖**全部** reading 包 —— A1-E 加了 ielts-edu-01-reading 后，
+  // 「readingItems = demo-reading-01 的 6」会让 count 的 7 判红（红的是数字不是功能）。
   const READING_PKG = 'demo-reading-01'
   const readingPkg = registry.getPackage(READING_PKG)
   const readingNs = model.parseContentId(readingPkg.manifest.id).namespace
-  const readingItems = readingPkg.manifest.stats.items // 从注册表派生，不写死 6
+  const readingPkgIds = registry.getAllPackages().filter((p) => p.manifest.type === 'reading').map((p) => p.localId)
+  const readingItems = readingPkgIds.reduce((s, id) => s + registry.getPackage(id).manifest.stats.items, 0)
   const readingIdOf = (rows) => rows.map((h) => h.id).join('|')
 
   await idx.ensureIndex() // 确保索引含全库（含 reading demo 包）
@@ -683,12 +756,13 @@ console.log('\n【15】P18-E reading 放开（启用集 / 包路由 / 索引 / �
   // ② 列表：非空 + 每条都是 reading 族 + 归属正确 + title 为字符串
   const readingList = await cq.list({ type: 'reading', pageSize: 100000 })
   ok(
-    "list({type:'reading'}) 非空且每条 type='reading' / 归属 demo-reading-01 / title 为 string",
+    `list({type:'reading'}) 非空且每条 type='reading' / 归属 ${readingPkgIds.length} 个 reading 包之一 / title 为 string`,
     readingList.length === readingItems &&
+      readingList.length > 0 &&
       readingList.every((h) => h.type === 'reading') &&
-      readingList.every((h) => h.packageLocalId === READING_PKG) &&
+      readingList.every((h) => readingPkgIds.includes(h.packageLocalId)) &&
       readingList.every((h) => typeof h.title === 'string'),
-    `${readingList.length} 条`,
+    `${readingList.length} 条 / 包 ${readingPkgIds.join(',')}`,
   )
 
   // ③ hasPhonetic 的中性语义（word 族专属过滤）：非 word 族**不参与筛选**，不是被筛成空

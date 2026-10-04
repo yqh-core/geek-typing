@@ -366,9 +366,12 @@ export function auditGenerated(generated, onDisk) {
   }
 
   const g = checkOne(generated, '生成结果')
-  let d = g
+  // onDisk 那份的返回值**故意不用**：checkOne 的副作用是往 problems 追加，
+  // 这里要的是「生成结果与磁盘 registry.ts 两份都审」，不是取谁的结论。
+  // 之前写成 `let d = g; d = checkOne(…)` —— 赋值后从不读，是死变量，
+  // oxlint no-unused-vars 判红（基线 total=0 ⇒ lint 棘轮门会红，CI 上必挂）。
   if (typeof onDisk === 'string' && onDisk !== generated) {
-    d = checkOne(onDisk, '磁盘 registry.ts')
+    checkOne(onDisk, '磁盘 registry.ts')
   }
 
   return { problems, actual: actual.length, registered: g.localIds.length, runtimeCount: g.runtimeCount }
