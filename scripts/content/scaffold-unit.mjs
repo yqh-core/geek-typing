@@ -30,6 +30,19 @@ const CONTENT = join(ROOT, 'content')
 const GEN_REG = join(HERE, 'generate-registry.mjs')
 const BUILD = join(HERE, 'build.mjs')
 
+/** 本地日历日，格式为 YYYY-MM-DD（d 缺省为当前时刻）。
+ *  ⚠️ 必须走 getFullYear/getMonth/getDate 拼本地日，**不能**用 toISOString().slice(0,10)：
+ *  后者给的是 **UTC** 日历日，而「内容发布日期」的语义是**本地**日历日。
+ *  在 GMT+8 的 00:00–08:00 窗口里，本地已经是新的一天、UTC 还停在前一天，
+ *  UTC 口径会把 PM 按本地写的「今天」判成未来日期并 process.exit(2)，
+ *  当场挡住合法内容（2026-10-05 01:12 本地 / 01:12 UTC 前一天，实测复现）。
+ *  这个窗口本仓库天天踩（南京的 PM 写内容 + 凌晨跑 CI 都在里面）。
+ *  月/日要补零：getMonth() 从 0 起，且 1 月 9 日不补零会得到 "2026-1-9" ——
+ *  既不是合法日期格式，也破坏「定长 ⇒ 字典序 == 时间序」这个前提。
+ *  补零后 YYYY-MM-DD 定长，字符串 > 比较 == 时间先后比较，故比较方式不用改。 */
+const localDay = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
 const USAGE_TEXT = `用法：
   node scripts/content/scaffold-unit.mjs --src=<unit-source.json> [--check] [--out-root=<dir>]
   --check      只校验：把源渲染出的内容与磁盘上已有包逐字节比对（不写盘）
@@ -92,9 +105,11 @@ if (typeof prefix !== 'string' || !/^[a-z0-9-]+$/.test(prefix)) {
   console.error(`packagePrefix 非法：${JSON.stringify(prefix)}（只允许小写字母/数字/连字符）`)
   process.exit(2)
 }
-const publishedAt = src.publishedAt ?? new Date().toISOString().slice(0, 10)
-if (publishedAt > new Date().toISOString().slice(0, 10)) {
-  console.error(`publishedAt 是未来日期：${publishedAt} —— 内容发布日期不能提前（A1-E 实测踩过）`)
+// 缺省值与未来判定**必须同一口径**（都是 localDay）：混用会让缺省值永远等于参照日，
+// 判据直接失效（UTC 口径 + UTC 参照 = 永远判绿）。
+const publishedAt = src.publishedAt ?? localDay()
+if (publishedAt > localDay()) {
+  console.error(`publishedAt 是未来日期：${publishedAt} —— 内容发布日期不能提前（按本地日历日比较；A1-E 实测踩过）`)
   process.exit(2)
 }
 const origin = src.origin ?? 'original authored content'

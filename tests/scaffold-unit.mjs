@@ -11,12 +11,13 @@
  *   ② 载荷「非逐字节」时统一打印「JSON 语义一致」⇒ 语义其实也不同时会误导
  *      （C-3 治「真不一致必须判红」，C-7 治「仅排版不同必须判绿」）
  *
- * ── 四组 ──
+ * ── 分组 ──
  *   A 源契约 —— 坏源必须挡在写盘之前
  *   B 写盘   —— 落盘内容本身正确（checksum 走唯一实现、stats 自洽、可重复写）
  *   C 漂移   —— 门必须能判红，且**报得出是哪个键**
  *   D 真实仓库 —— Unit-01 三个包能被「从磁盘反向构造的源」重现（幂等证明）
  *   E 静态   —— 禁止手搓 checksum、禁止自动改顺序表与 PROVIDER 表
+ *   F 本地日 —— 发布日期判据必须按**本地**日历日比较（缺这个门就天天假红）
  *              （⚠️ 注释里别写「ORDER_ 星号 + 斜杠 + PROVIDER」这种字面量：
  *                 那个斜杠加星号会把块注释提前闭合 —— 本文件实测踩过两次）
  *
@@ -331,6 +332,37 @@ section('E · 静态契约')
   ok('E-6 待办指向的 generate-registry.mjs 确实有双顺序表', /ORDER_REGISTRY/.test(genRegSrc) && /ORDER_IMPORT/.test(genRegSrc))
   ok('E-7 待办指向的 build.mjs 确实有 PROVIDER 登记表', /const PROVIDER = \{/.test(buildSrc))
   ok('E-5 --check 只校验不写盘（写盘前有 process.exit）', /if \(CHECK\)[\s\S]*?process\.exit\(bad === 0 \? 0 : 1\)/.test(scSrc))
+}
+
+/* ═══════════════ F · 发布日期判据必须按本地日历日比较 ═══════════════ */
+section('F · 本地日历日判据（UTC 00:00–08:00 窗口也必须过）')
+{
+  const pd = (n) => String(n).padStart(2, '0')
+  // ⚠️ 今天 / 明天都**动态算**，写死字符串跑过零点就变假红。
+  // ⚠️ 也绝不能拿 **UTC** 日历日去生成源：UTC 00:00–08:00 时 UTC 日还是本地昨日，
+  //    拿它当「今天」写进源会被当场判成未来日期 ⇒ 用例假红（本刀要治的恰恰是这个窗口）。
+  //    同理「今天」的字面量也不能用。本组实测跑在 2026-10-05 01:12 本地（UTC 仍 10-04）下。
+  const now = new Date()
+  const today = `${now.getFullYear()}-${pd(now.getMonth() + 1)}-${pd(now.getDate())}`
+  // 用构造器 +1 天而不是 +86400000：跨月/跨年/夏令时都安全
+  const tmr = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  const tomorrow = `${tmr.getFullYear()}-${pd(tmr.getMonth() + 1)}-${pd(tmr.getDate())}`
+
+  // ① 对照组（必须绿）：源里写**本地今天** ⇒ 脚手架必须 exit 0。
+  //    这条专治「为了不再假红把判据改松」—— 本地今天能过，才说明判据真在按本地日历日比对。
+  //    走**写盘**模式而不是 --check：--check 打空根会因「包不存在」判红，测的就不是日期判据了。
+  const fRoot = join(TMP, 'f-content')
+  const s1 = writeSrc('F_1', (s) => { s.publishedAt = today; return s })
+  const r1 = scaffoldTo('F-1', s1, fRoot)
+  ok('F-1 publishedAt = 本地今天 ⇒ PASS（判据按本地日历日工作，不是被放宽）', r1.code === 0, `exit=${r1.code} publishedAt=${today}`)
+
+  // ② 证伪组（必须红）：源里写**本地明天** ⇒ 必须判红 + stderr 含「未来日期」。
+  //    这条证明判据没被 ①「放宽」掉：本地今天过、本地明天红，判据才是真的在工作。
+  const fEmpty = join(TMP, 'f-empty')
+  mkdirSync(fEmpty, { recursive: true })
+  const s2 = writeSrc('F_2', (s) => { s.publishedAt = tomorrow; return s })
+  const r2 = checkAt(s2, fEmpty)
+  ok('F-2 publishedAt = 本地明天 ⇒ FAIL 且报「未来日期」', r2.code !== 0 && /未来日期/.test(r2.out), `exit=${r2.code} publishedAt=${tomorrow}`)
 }
 
 /* ═══════════════ 收尾：真实文件零改动 ═══════════════ */
