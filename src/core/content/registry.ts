@@ -63,6 +63,8 @@ import demoExercise01Manifest from '../../../content/exercise/demo-exercise-01/m
 import demoWriting01Manifest from '../../../content/writing/demo-writing-01/manifest.json?runtime'
 import demoSpeaking01Manifest from '../../../content/speaking/demo-speaking-01/manifest.json?runtime'
 import demoStudySetManifest from '../../../content/collection/demo-study-set/manifest.json?runtime'
+import ieltsEdu01ReadingManifest from '../../../content/reading/ielts-edu-01-reading/manifest.json?runtime'
+import ieltsEdu01ExerciseManifest from '../../../content/exercise/ielts-edu-01-exercise/manifest.json?runtime'
 
 /* ---------------- inline 小库词条（同步 parse）---------------- */
 import aiCoreWords from '../../../content/vocabulary/ai-core/words.json?raw'
@@ -98,8 +100,10 @@ const loadDemoExercise01 = async () => parseData((await import('../../../content
 const loadDemoWriting01 = async () => parseData((await import('../../../content/writing/demo-writing-01/items.json?raw')).default)
 const loadDemoSpeaking01 = async () => parseData((await import('../../../content/speaking/demo-speaking-01/items.json?raw')).default)
 const loadDemoStudySet = async () => parseData((await import('../../../content/collection/demo-study-set/items.json?raw')).default)
+const loadIeltsEdu01Reading = async () => parseData((await import('../../../content/reading/ielts-edu-01-reading/items.json?raw')).default)
+const loadIeltsEdu01Exercise = async () => parseData((await import('../../../content/exercise/ielts-edu-01-exercise/items.json?raw')).default)
 
-/* ---------------- 注册表（10 vocabulary + 8 非 vocabulary = 18 包） ---------------- */
+/* ---------------- 注册表（10 vocabulary + 10 非 vocabulary = 20 包） ---------------- */
 const packages: ContentPackage[] = [
   { manifest: aiCoreManifest, localId: 'ai-core', words: parseWords(aiCoreWords) },
   { manifest: cloudNativeManifest, localId: 'cloud-native', load: loadCloudNative },
@@ -119,6 +123,8 @@ const packages: ContentPackage[] = [
   { manifest: demoWriting01Manifest, localId: 'demo-writing-01', loadData: loadDemoWriting01 },
   { manifest: demoSpeaking01Manifest, localId: 'demo-speaking-01', loadData: loadDemoSpeaking01 },
   { manifest: demoStudySetManifest, localId: 'demo-study-set', loadData: loadDemoStudySet },
+  { manifest: ieltsEdu01ReadingManifest, localId: 'ielts-edu-01-reading', loadData: loadIeltsEdu01Reading },
+  { manifest: ieltsEdu01ExerciseManifest, localId: 'ielts-edu-01-exercise', loadData: loadIeltsEdu01Exercise },
 ]
 /** vocabulary 槽位（既有 API 口径：UI / 持久化 / 学习层只看词库包） */
 const vocabularyPackages = packages.filter((p) => p.manifest.type === 'vocabulary')

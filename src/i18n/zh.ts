@@ -289,8 +289,21 @@ export const zh: Record<string, string> = {
   'unit.01.summary': '听力输入方向',
   'unit.02.title': 'Unit-02 · 次高频 100 词',
   'unit.02.summary': '阅读输入方向',
+  'unit.03.title': 'Unit-03 · IELTS 学术阅读 · Education',
+  'unit.03.summary': '读一篇学术短文 + 15 题 IELTS 题型练习',
+  'unit.section.reading': '阅读',
   /* 多单元切换（A1）：单元数 > 1 后，「当前单元」不再唯一，必须给用户显式切换入口。
    * `unit.switch` 是切换器的可访问名（aria-label），`unit.current` 标注当前选中项。 */
   'unit.switch': '切换学习单元',
   'unit.current': '当前',
+  /* 练习题作答面板（A1-E）。本刀结果**不落盘**，所以这里的文案一律只描述「本次作答」，
+   * 不出现「已记录 / 已保存 / 已计入进度」这类会让人误以为写进了学习记录的措辞。 */
+  'exercise.progress': '已作答',
+  'exercise.score': '正确',
+  'exercise.retry': '再做一次',
+  'exercise.question': '第',
+  'exercise.correct': '回答正确',
+  'exercise.incorrect': '回答错误',
+  'exercise.answer': '正确答案：',
+  'exercise.collocations': '篇章搭配',
 }

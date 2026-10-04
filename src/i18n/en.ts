@@ -289,9 +289,23 @@ export const en: Record<string, string> = {
   'unit.01.summary': 'Listening input track',
   'unit.02.title': 'Unit-02 · 100 second-tier words',
   'unit.02.summary': 'Reading input track',
+  'unit.03.title': 'Unit-03 · IELTS Academic Reading · Education',
+  'unit.03.summary': 'One academic passage + 15 IELTS-style questions',
+  'unit.section.reading': 'Reading',
   /* Multi-unit switching (A1): with more than one unit the "current unit" is no longer
    * unique, so the UI needs an explicit switcher. `unit.switch` is its accessible name
    * (aria-label); `unit.current` labels the selected entry. */
   'unit.switch': 'Switch learning unit',
   'unit.current': 'Current',
+  /* Exercise answering panel (A1-E). Results are **not persisted** in this slice, so the
+   * wording deliberately avoids "saved / recorded / counted toward progress" — it only
+   * describes the current attempt. */
+  'exercise.progress': 'Answered',
+  'exercise.score': 'Correct',
+  'exercise.retry': 'Try again',
+  'exercise.question': 'Question',
+  'exercise.correct': 'Correct',
+  'exercise.incorrect': 'Incorrect',
+  'exercise.answer': 'Correct answer: ',
+  'exercise.collocations': 'Collocations',
 }

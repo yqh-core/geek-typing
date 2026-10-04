@@ -12,7 +12,7 @@
  *   跑完必须证明真实文件零改动（末条断言）。
  */
 
-import { readFileSync, writeFileSync, mkdtempSync, cpSync, rmSync } from 'node:fs'
+import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdtempSync, cpSync, rmSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -40,10 +40,16 @@ function section(t) {
   console.log(`\n── ${t}`)
 }
 
-/** 跑生成器，返回 {code, out}。不抛异常——判红本身就是期望结果。 */
-function runGen(args = []) {
+/** 跑生成器，返回 {code, out}。不抛异常——判红本身就是期望结果。
+ *  extraEnv 用于把生成器指到临时根（REGISTRY_GEN_ROOT / REGISTRY_GEN_TARGET），
+ *  这样写盘模式的用例也碰不到真实 src/core/content/registry.ts。 */
+function runGen(args = [], extraEnv = {}) {
   try {
-    const out = execFileSync(process.execPath, [GEN, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    const out = execFileSync(process.execPath, [GEN, ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, ...extraEnv },
+    })
     return { code: 0, out }
   } catch (e) {
     return { code: e.status ?? 1, out: `${e.stdout ?? ''}${e.stderr ?? ''}` }
@@ -81,19 +87,73 @@ const built = { content: (() => {
   // 复用 --check 的正常输出作为「生成可行」证据；内容从真实 registry 读回（--check 证明二者一致）
   return readFileSync(REGISTRY, 'utf8')
 })() }
-const audit = { problems: [], actual: 18, registered: 18, runtimeCount: 18 }
+/* ⚠️ A 组**不写死包数**。
+ * 历史教训：A-3..A-6 曾把 18 / loadData=8 写死，content/ 加到 20 个包后这 4 条集体假红 ——
+ * 而且红的是「数字过期」不是「门坏了」，最容易误导人去改门。
+ * 现在全部从**两个独立事实**交叉派生：① content/ 下 manifest 数 ② 生成器自报数，
+ * 两者必须相等；槽位三档之和、localId 数、一致性门三数也都必须收敛到同一个 N。
+ * 这样加包/删包都不会再让这组断言过期。 */
+const CONTENT_DIR = join(ROOT, 'content')
+function countRealPackages() {
+  let n = 0
+  for (const type of readdirSync(CONTENT_DIR)) {
+    const td = join(CONTENT_DIR, type)
+    if (!statSync(td).isDirectory()) continue
+    for (const d of readdirSync(td)) {
+      if (statSync(join(td, d)).isDirectory() && existsSync(join(td, d, 'manifest.json'))) n++
+    }
+  }
+  return n
+}
+const REAL_PKGS = countRealPackages()
+const OUT_PKGS = Number(/包数 (\d+)/.exec(realCheck.out)?.[1] ?? NaN)
+const SLOT = /槽位 words=(\d+) \/ load=(\d+) \/ loadData=(\d+)/.exec(realCheck.out)
+const LOCALIDS = (built.content.match(/localId: '/g) ?? []).length
+const GATE = /一致性门 OK：实际 (\d+) 包 ↔ 注册 (\d+) 个 ↔ \?runtime (\d+) 条/.exec(realCheck.out)
 
 ok('A-1 真实 content/ 下 --check 通过（生成结果与 registry.ts 一致）',
   realCheck.code === 0, realCheck.code === 0 ? 'EXIT=0' : realCheck.out.split('\n').find((l) => l.includes('FAIL')) ?? `EXIT=${realCheck.code}`)
 ok('A-2 真实 registry.ts 无漂移', realCheck.out.includes('PASS：registry.ts 与生成结果一致'), realCheck.out.split('\n').pop()?.slice(0, 60) ?? '')
-ok('A-3 实际包数 = 18', /包数 18/.test(realCheck.out), (/包数 \d+/.exec(realCheck.out)?.[0]) ?? '')
-ok('A-4 槽位分布 words=3 / load=7 / loadData=8',
-  /槽位 words=3 \/ load=7 \/ loadData=8/.test(realCheck.out), (/槽位[^\n]*/.exec(realCheck.out)?.[0]) ?? '')
-ok('A-5 生成的 localId 数量 = 18',
-  (readFileSync(REGISTRY, 'utf8').match(/localId: '/g) ?? []).length === 18)
-ok('A-6 一致性门自审输出存在（实际↔注册↔?runtime 三数对齐）',
-  /一致性门 OK：实际 18 包 ↔ 注册 18 个 ↔ \?runtime 18 条/.test(realCheck.out),
-  (/一致性门[^\n]*/.exec(realCheck.out)?.[0]) ?? '')
+ok('A-3 生成器自报包数 == content/ 下实际 manifest 数',
+  OUT_PKGS === REAL_PKGS, `自报 ${OUT_PKGS} / 实际 ${REAL_PKGS}`)
+ok('A-4 槽位三档之和 == 包数',
+  !!SLOT && Number(SLOT[1]) + Number(SLOT[2]) + Number(SLOT[3]) === OUT_PKGS,
+  SLOT ? `${SLOT[0]}（和 ${Number(SLOT[1]) + Number(SLOT[2]) + Number(SLOT[3])} vs ${OUT_PKGS}）` : '未匹配到槽位行')
+ok('A-5 registry.ts 的 localId 数 == 包数',
+  LOCALIDS === REAL_PKGS, `localId ${LOCALIDS} / 包 ${REAL_PKGS}`)
+ok('A-6 一致性门三数对齐（实际↔注册↔?runtime）且都 == 包数',
+  !!GATE && GATE[1] === GATE[2] && GATE[2] === GATE[3] && Number(GATE[1]) === REAL_PKGS,
+  GATE ? `${GATE[0]}（实际包 ${REAL_PKGS}）` : '未匹配到一致性门行')
+
+/* A-7 / A-8：写盘模式不能自锁。
+ * A1-E 实测撞到的死锁：往 content/ 加 2 个包后跑生成器（写盘模式），
+ * 自审把**磁盘上那份旧的 registry.ts** 也审了一遍 ⇒ 它缺那 2 个包 ⇒ 判「漏注册」⇒ exit 1 ⇒ 永不写盘。
+ * 也就是「新增内容包」这个生成器最本职的动作被自己的门挡死了，而历史测试只跑 --check，从没走到写盘路径。
+ * 这里在临时根里复现「磁盘落后于 content/」，断言写盘模式照样能写、写完 --check 通过。 */
+{
+  const tmp = mkdtempSync(join(tmpdir(), 'reggen-write-'))
+  try {
+    cpSync(CONTENT_DIR, join(tmp, 'content'), { recursive: true })
+    const target = join(tmp, 'registry.ts')
+    // 制造磁盘落后：把 demo-writing-01 的 import 行与注册行整行去掉
+    const stale = readFileSync(REGISTRY, 'utf8').split('\n').filter((l) => !l.includes('demo-writing-01')).join('\n')
+    writeFileSync(target, stale, 'utf8')
+    const before = (stale.match(/localId: '/g) ?? []).length
+
+    const w = runGen([], { REGISTRY_GEN_ROOT: tmp, REGISTRY_GEN_TARGET: target })
+    const after = readFileSync(target, 'utf8')
+    ok('A-7 磁盘 registry.ts 落后于 content/ 时，写盘模式仍能写入（不自锁）',
+      w.code === 0 && after.includes('demo-writing-01'),
+      w.code === 0
+        ? `EXIT=0；落后前 ${before} 个 localId ⇒ 写入后 ${(after.match(/localId: '/g) ?? []).length} 个`
+        : `EXIT=${w.code}：${(w.out.split('\n').find((l) => l.includes('·')) ?? '').trim().slice(0, 90)}`)
+    const c = runGen(['--check'], { REGISTRY_GEN_ROOT: tmp, REGISTRY_GEN_TARGET: target })
+    ok('A-8 写盘后再跑 --check 通过（写入结果与生成结果一致）',
+      c.code === 0 && c.out.includes('PASS：registry.ts 与生成结果一致'), `EXIT=${c.code}`)
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
+}
 
 /* ═══════════════ B. 漂移必须判红（端到端：临时根 + 真跑生成器） ═══════════════ */
 section('B · 漂移注入（门必须判红）')

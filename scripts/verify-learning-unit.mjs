@@ -16,7 +16,7 @@
  *   - 失败项不吞：任一 V 判红 ⇒ EXIT=1。
  */
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -30,6 +30,21 @@ const argOf = (name, dflt) => {
 const BASE = argOf('--base', 'http://127.0.0.1:4173')
 const KEEP = process.argv.includes('--keep-screens')
 const OUT = join(ROOT, '_evidence', 'stage2-unit')
+
+/* ── 当前单元的期望词数：**从数据层读，不写死** ──
+ * 这一条曾经把 100 写死在三处判据里。Unit-03（IELTS Education）只有 32 词，写死的 100
+ * 会让它一上来就假红 —— 而红的是「数字过期」，不是「功能坏了」，最容易被误当成功能缺陷去改产品。
+ * 现在期望值从 `src/data/learningUnits.ts` 静态派生：默认单元 = LEARNING_UNITS[0]，
+ * 取它的 `wordCount`。加单元 / 改词段都不会再让这组判据过期。
+ * ⚠️ 解析失败必须 FAIL，绝不退回「当作 100」—— 静默回落正是这类门禁的假绿源。 */
+function expectedWordCount() {
+  const src = readFileSync(join(ROOT, 'src', 'data', 'learningUnits.ts'), 'utf8')
+  const units = [...src.matchAll(/\n\s*id: '(unit-[^']+)',[\s\S]*?\n\s*wordCount: (\d+),/g)]
+    .map((m) => ({ id: m[1], wordCount: Number(m[2]) }))
+  if (units.length === 0) throw new Error('learningUnits.ts 里解析不出任何单元（id + wordCount）—— 不回落到默认值')
+  return units[0]
+}
+const EXPECTED = expectedWordCount()
 
 const CHROME_CANDIDATES = [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -275,7 +290,8 @@ const openUnitPanel = async () => {
     const cardTitle = await textOf('unit-card-title')
     const cardWords = await textOf('unit-card-words')
     check('V1-a', 'Home 页出现当前学习单元入口卡', cardTitle.length > 0, `title="${cardTitle}" / words="${cardWords}"`)
-    check('V1-a', '单元卡显示 100 词', /100/.test(cardWords), `unit-card-words="${cardWords}"`)
+    check('V1-a', `单元卡显示当前单元词数 ${EXPECTED.wordCount}（${EXPECTED.id}，源自数据层）`,
+      new RegExp(`\\b${EXPECTED.wordCount}\\b`).test(cardWords), `unit-card-words="${cardWords}"`)
     await shot('v1-home-card')
 
     // V1-b 点开单元 → 展开视图渲染
@@ -285,8 +301,10 @@ const openUnitPanel = async () => {
     const wordsCount = await textOf('unit-words-count')
     const wordCount = await s.eval(`document.querySelectorAll('[data-testid="unit-word"]').length`)
     check('V1-b', '单元展开视图渲染出标题', panelTitle.length > 0, `unit-title="${panelTitle}"`)
-    check('V1-b', '词段计数显示 100', wordsCount === '100', `unit-words-count="${wordsCount}"`)
-    check('V1-b', '词表实际渲染 100 个词形', wordCount === 100, `unit-word 节点数=${wordCount}`)
+    check('V1-b', `词段计数显示 ${EXPECTED.wordCount}（源自数据层）`,
+      wordsCount === String(EXPECTED.wordCount), `unit-words-count="${wordsCount}"`)
+    check('V1-b', `词表实际渲染 ${EXPECTED.wordCount} 个词形`,
+      wordCount === EXPECTED.wordCount, `unit-word 节点数=${wordCount}`)
     await shot('v1-unit-panel')
 
     // V1-c「开始学习」→ 切到打字页；首词取 data-testid="word"（PracticePanel.tsx:35）
@@ -304,8 +322,8 @@ const openUnitPanel = async () => {
     // V1-d 打字页首词必须落在单元白名单内（真机断言「学的正是这 100 词」）
     check(
       'V1-d',
-      '打字页首词 ∈ 单元 100 词白名单',
-      Array.isArray(lexemes) && lexemes.length === 100 && lexemes.includes(typingWord.toLowerCase()),
+      `打字页首词 ∈ 单元 ${EXPECTED.wordCount} 词白名单`,
+      Array.isArray(lexemes) && lexemes.length === EXPECTED.wordCount && lexemes.includes(typingWord.toLowerCase()),
       `首词="${typingWord}"；白名单 ${Array.isArray(lexemes) ? lexemes.length : 'null'} 词（首=${lexemes?.[0]}，末=${lexemes?.[lexemes.length - 1]}）`,
     )
 
@@ -314,10 +332,14 @@ const openUnitPanel = async () => {
     const panelState = await openUnitPanel()
     check('V2-a', '单元展开视图可进入', panelState !== 'no-entry-card', `openUnitPanel → ${panelState}`)
 
+    /* 挂载区 testid 已随 A1-E 泛化为 `unit-attached-<localId>`（形态由包类型决定，
+     * 不再按 localId 文本写死三个分区）。默认单元仍挂 demo-audio-01 / demo-exercise-01，
+     * 所以这里按 localId 取，将来换挂载包只需改这一处 localId 常量。 */
+    const ATT = { audio: 'demo-audio-01', listening: 'demo-listening-01', exercise: 'demo-exercise-01' }
     const pend = {
-      audio: await textOf('unit-audio-pending'),
+      audio: await textOf(`unit-attached-${ATT.audio}-pending`),
       subtitle: await textOf('unit-subtitle-pending'),
-      exercise: await textOf('unit-exercise-pending'),
+      exercise: await textOf(`unit-attached-${ATT.exercise}-pending`),
     }
     for (const [k, v] of Object.entries(pend)) {
       // 文案口径：i18n unit.status.* / unit.subtitleReasonKey 里实际存在四种措辞 ——
@@ -326,13 +348,13 @@ const openUnitPanel = async () => {
       // 但仍然是封闭集合：出现一个不在这四种里的新措辞会判红（要显式承认，而不是默默放过）。
       check('V2-a', `${k} 位显式「待接入」可见`, v.length > 0 && /尚未接入|待接入|尚未存在|没有接入/.test(v), `${k}-pending="${v}"`)
     }
-    const audioRows = await s.eval(`(${testid('unit-audio')})?.querySelectorAll('span').length ?? 0`)
-    const listenRows = await s.eval(`(${testid('unit-listening')})?.querySelectorAll('span').length ?? 0`)
+    const audioRows = await s.eval(`(${testid(`unit-attached-${ATT.audio}`)})?.querySelectorAll('span').length ?? 0`)
+    const listenRows = await s.eval(`(${testid(`unit-attached-${ATT.listening}`)})?.querySelectorAll('span').length ?? 0`)
     check('V2-b', '音频/听力条目已列出（可见性而非空壳）', audioRows > 0 && listenRows > 0,
       `audio 区块 span=${audioRows} / listening 区块 span=${listenRows}`)
     // 「点了没反应」判据：三处待接入位里不允许出现任何可点按钮
     const fakeButtons = await s.eval(`(() => {
-      const ids = ['unit-audio','unit-subtitle','unit-exercise']
+      const ids = ['unit-attached-${ATT.audio}','unit-subtitle','unit-attached-${ATT.exercise}']
       return ids.flatMap((id) => [...(document.querySelector('[data-testid="'+id+'"]')?.querySelectorAll('button') ?? [])].map((b)=>id+':'+(b.textContent||'').trim())).join('|') || '(none)'
     })()`)
     check('V2-b', '三处待接入位内零可点按钮（不做假播放器/假作答）', fakeButtons === '(none)', fakeButtons)

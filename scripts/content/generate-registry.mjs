@@ -72,6 +72,9 @@ const ORDER_NONVOCAB = [
   'writing/demo-writing-01',
   'speaking/demo-speaking-01',
   'collection/demo-study-set',
+  // A1-E：IELTS Academic Unit 01 — Education（正式内容包，非 demo 探针）
+  'reading/ielts-edu-01-reading',
+  'exercise/ielts-edu-01-exercise',
 ]
 
 /** 注册表首行注释里的包数说明（随 ORDER_REGISTRY + ORDER_NONVOCAB 变动，生成时同步算）。 */
@@ -381,10 +384,17 @@ if (isMain) {  const args = process.argv.slice(2)
   }
 
   // 生成后立刻自审（不信任生成过程）。
-  // ⚠️ 磁盘上的实际内容也一并审计 —— 否则「有人手改了 registry.ts」这个漂移形态查不出来
-  //   （只审生成结果只能发现生成器算错；实测踩过这个坑）。
+  //
+  // ⚠️ 磁盘审一份还是两份，取决于**是不是写盘模式**：
+  //   · `--check`（CI 的 verify:registry）：两份都审。目的是抓「有人手改了 registry.ts」
+  //     —— 只审生成结果只能发现生成器算错，查不出手改（实测踩过：删一行只报「文本不一致」，
+  //     报不出「漏注册 go-code」）。这个模式不改磁盘，审计它是有意义的。
+  //   · 写盘模式：**不审磁盘**。磁盘那份马上就要被本次生成结果整体覆盖，审它是自指死锁 ——
+  //     「往 content/ 加一个包」这个生成器最本职的动作，会因磁盘那份还是旧的（没有新包）
+  //     被自己的门判成「漏注册」而永远写不进去（A1-E 实测撞到：新增 2 个包 ⇒ 18≠20 ⇒ 拒绝写盘）。
+  //     手改检测没有因此丢失：改完跑 `--check`，两份不一致依然判红。
   const onDisk = readFileSync(REGISTRY, 'utf8')
-  const audit = auditGenerated(result.content, onDisk)
+  const audit = auditGenerated(result.content, checkOnly ? onDisk : null)
   if (audit.problems.length) {
     console.error('[generate-registry] FAIL：生成结果未通过一致性门')
     for (const p of audit.problems) console.error(`  · ${p}`)
