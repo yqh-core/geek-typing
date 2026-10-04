@@ -54,12 +54,17 @@ const REGISTRY = process.env.REGISTRY_GEN_TARGET
 const ORDER_IMPORT = [
   'ielts', 'kaoyan', 'toefl', 'cet4', 'cet6',
   'ai-core', 'cloud-native', 'frontend', 'ts-code', 'go-code',
+  // A1-E：Unit 03 — Education 的正式词汇包（32 词）
+  'ielts-edu-01-vocab',
 ]
 
 /** `packages` 数组的 vocabulary 注册序（实测自 registry.ts 注册表段；**与上面不同**）。 */
 const ORDER_REGISTRY = [
   'ai-core', 'cloud-native', 'frontend', 'cet4', 'cet6',
   'ielts', 'kaoyan', 'toefl', 'ts-code', 'go-code',
+  // A1-E：Unit 03 — Education 的正式词汇包（32 词）。两张表**内容必须不同**，
+  // 追加同一项不会让它们相等（前 10 项顺序本就不同），门会逐项比对。
+  'ielts-edu-01-vocab',
 ]
 
 /** 非 vocabulary 包的顺序（import 段与注册表段**恰好相同**，故共用一张表）。 */

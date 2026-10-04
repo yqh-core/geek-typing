@@ -48,6 +48,7 @@ import cloudNativeManifest from '../../../content/vocabulary/cloud-native/manife
 import frontendManifest from '../../../content/vocabulary/frontend/manifest.json?runtime'
 import tsCodeManifest from '../../../content/vocabulary/ts-code/manifest.json?runtime'
 import goCodeManifest from '../../../content/vocabulary/go-code/manifest.json?runtime'
+import ieltsEdu01VocabManifest from '../../../content/vocabulary/ielts-edu-01-vocab/manifest.json?runtime'
 
 /* ---------------- 非 vocabulary 试金石包（P1.7-Wave4 B-2） ----------------
  * manifest 静态 import（常驻主 chunk，单个 ~1.2 KiB，O(包数) 线性小步涨）；
@@ -92,6 +93,7 @@ const loadCet4 = async () => parseWords((await import('../../../content/vocabula
 const loadCet6 = async () => parseWords((await import('../../../content/vocabulary/cet6/words.json?raw')).default)
 const loadCloudNative = async () => parseWords((await import('../../../content/vocabulary/cloud-native/words.json?raw')).default)
 const loadFrontend = async () => parseWords((await import('../../../content/vocabulary/frontend/words.json?raw')).default)
+const loadIeltsEdu01Vocab = async () => parseWords((await import('../../../content/vocabulary/ielts-edu-01-vocab/words.json?raw')).default)
 const loadDemoListening01 = async () => parseData((await import('../../../content/listening/demo-listening-01/items.json?raw')).default)
 const loadDemoAudio01 = async () => parseData((await import('../../../content/audio/demo-audio-01/items.json?raw')).default)
 const loadDemoReading01 = async () => parseData((await import('../../../content/reading/demo-reading-01/items.json?raw')).default)
@@ -103,7 +105,7 @@ const loadDemoStudySet = async () => parseData((await import('../../../content/c
 const loadIeltsEdu01Reading = async () => parseData((await import('../../../content/reading/ielts-edu-01-reading/items.json?raw')).default)
 const loadIeltsEdu01Exercise = async () => parseData((await import('../../../content/exercise/ielts-edu-01-exercise/items.json?raw')).default)
 
-/* ---------------- 注册表（10 vocabulary + 10 非 vocabulary = 20 包） ---------------- */
+/* ---------------- 注册表（11 vocabulary + 10 非 vocabulary = 21 包） ---------------- */
 const packages: ContentPackage[] = [
   { manifest: aiCoreManifest, localId: 'ai-core', words: parseWords(aiCoreWords) },
   { manifest: cloudNativeManifest, localId: 'cloud-native', load: loadCloudNative },
@@ -115,6 +117,7 @@ const packages: ContentPackage[] = [
   { manifest: toeflManifest, localId: 'toefl', load: loadToefl },
   { manifest: tsCodeManifest, localId: 'ts-code', words: parseWords(tsCodeWords) },
   { manifest: goCodeManifest, localId: 'go-code', words: parseWords(goCodeWords) },
+  { manifest: ieltsEdu01VocabManifest, localId: 'ielts-edu-01-vocab', load: loadIeltsEdu01Vocab },
   { manifest: demoListening01Manifest, localId: 'demo-listening-01', loadData: loadDemoListening01 },
   { manifest: demoAudio01Manifest, localId: 'demo-audio-01', loadData: loadDemoAudio01 },
   { manifest: demoReading01Manifest, localId: 'demo-reading-01', loadData: loadDemoReading01 },

@@ -439,6 +439,71 @@ const openUnitPanel = async () => {
     const cardProgAfter = await textOf('unit-card-progress')
     check('V3-c', 'Home 单元卡进度同步', cardProgAfter.length > 0, `${backHome}；unit-card-progress="${cardProgAfter}"`)
 
+    /* ================= V5：Unit-03（IELTS Education）正式内容包全链 =================
+     * V1–V3 跑的是**默认单元**（unit-01，词段切片单元）。A1-E 新增的 unit-03 是另一种
+     * 性质的单元：词段来自本单元自己的词汇包，并挂载 reading / exercise 正式包。
+     * 只跑 V1–V3 的话 unit-03 整条链（正文渲染 / 15 题作答）完全没有证据，所以这里单独验。
+     * 判据锚定 testid 与 data-correct，**不锚定 i18n 文案**（切语言不该假红）。 */
+    console.log('\n【V5】Unit-03 · Education：词段 32 + 阅读正文 + 15 题作答')
+    await goto(BASE + '/')
+    await clickTab('tab-home')
+    await sleep(700)
+
+    const switched = await s.eval(`(() => {
+      const b = document.querySelector('[data-testid="unit-switch-unit-03"]')
+      if (!b) return 'no-switch-btn'
+      b.click(); return 'clicked'
+    })()`)
+    check('V5-a', '单元切换器可切到 Unit-03', switched === 'clicked', `switch=${switched}`)
+    await sleep(900)
+    await openUnitPanel()
+    await sleep(900)
+    const t3Title = await textOf('unit-title')
+    check('V5-a', '展开视图渲染 Unit-03 标题', t3Title.length > 0, `unit-title="${t3Title}"`)
+
+    const t3Count = await textOf('unit-words-count')
+    const t3Words = await s.eval(`document.querySelectorAll('[data-testid="unit-word"]').length`)
+    check('V5-b', '词段计数与渲染均为 32（内容事实：PM 规格 20–40 词，不是凑门禁凑出来的）',
+      t3Count === '32' && t3Words === 32, `count="${t3Count}" / unit-word 节点=${t3Words}`)
+
+    const paras = await s.eval(`document.querySelectorAll('[data-testid="unit-reading-para"]').length`)
+    const bodyLen = await s.eval(`(document.querySelector('[data-testid="unit-reading-body"]')?.textContent ?? '').trim().length`)
+    check('V5-c', '阅读正文真的渲染出来（7 段，不是只列条目）',
+      paras === 7 && bodyLen > 1500, `段落=${paras} / 正文字符=${bodyLen}`)
+
+    const qCount = await s.eval(`document.querySelectorAll('[data-testid^="exercise-q-"]').length`)
+    const colCount = await s.eval(`document.querySelectorAll('[data-testid="exercise-collocation"]').length`)
+    check('V5-d', '练习面板渲染 15 题 + 18 条篇章搭配', qCount === 15 && colCount === 18,
+      `题=${qCount} / 搭配=${colCount}`)
+
+    // 作答：q01 选 B（正确答案）⇒ data-correct=true
+    await s.eval(`document.querySelector('[data-testid="exercise-option-q01-B"]').click()`)
+    await sleep(400)
+    const okAttr = await s.eval(`document.querySelector('[data-testid="exercise-result-q01"]')?.getAttribute('data-correct') ?? '(none)'`)
+    const resLen = await s.eval(`(document.querySelector('[data-testid="exercise-result-q01"]')?.textContent ?? '').trim().length`)
+    check('V5-e', 'q01 选 B ⇒ 判正确且给出解析', okAttr === 'true' && resLen > 20,
+      `data-correct=${okAttr} / 解析长度=${resLen}`)
+
+    // q02 选 A（错误答案）⇒ data-correct=false，且必须显示正确答案 C
+    await s.eval(`document.querySelector('[data-testid="exercise-option-q02-A"]').click()`)
+    await sleep(400)
+    const badAttr = await s.eval(`document.querySelector('[data-testid="exercise-result-q02"]')?.getAttribute('data-correct') ?? '(none)'`)
+    // 读 data-answer 属性，不做文本正则：跨节点 textContent 会把 "…C" 和解析首词连成 "CThe"，\b 会失配
+    const answerShown = await s.eval(`document.querySelector('[data-testid="exercise-answer-q02"]')?.getAttribute('data-answer') ?? '(none)'`)
+    check('V5-e', 'q02 选 A ⇒ 判错误且显示正确答案 C',
+      badAttr === 'false' && answerShown === 'C', `data-correct=${badAttr} / data-answer=${answerShown}`)
+
+    const score = await textOf('exercise-score')
+    const prog = await textOf('exercise-progress')
+    check('V5-f', '得分/进度按本次作答累计（正确 1 / 已答 2）',
+      /1\s*\/\s*15/.test(score) && /2\s*\/\s*15/.test(prog), `score="${score}" / progress="${prog}"`)
+
+    // 不做假可用性：unit-03 的 reading / exercise 都是 listed（有真载荷），
+    // 两个挂载区都不该出现「待接入」横幅 —— 出现就是自相矛盾。
+    const t3Pending = await s.eval(`(['ielts-edu-01-reading','ielts-edu-01-exercise'].map((id) => document.querySelector('[data-testid="unit-attached-'+id+'-pending"]')?.textContent ?? '').join('|'))`)
+    check('V5-g', '两个有真载荷的挂载区无「待接入」横幅（listed 不挂原因文案）',
+      t3Pending === '|', `pending=" ${t3Pending} "`)
+
     /* ================= console 零报错 ================= */
     console.log('\n【零报错】全程 console error / pageerror')
     check('ERR', '全程零 console error / pageerror', consoleErrors.length === 0,

@@ -71,7 +71,7 @@ export default function ExercisePanel({ theme, questions, collocations }: Exerci
       {/* 得分条 */}
       <div className={`${theme.card} ${cardCls}`}>
         <div className="flex items-center justify-between gap-2">
-          <span className={`text-xs ${theme.sub}`}>
+          <span className={`text-xs ${theme.sub}`} data-testid="exercise-progress">
             {t('exercise.progress')} {answeredCount} / {total}
           </span>
           <span className={`text-xs font-semibold ${theme.accent}`} data-testid="exercise-score">
@@ -137,6 +137,9 @@ export default function ExercisePanel({ theme, questions, collocations }: Exerci
             {done ? (
               <div
                 data-testid={`exercise-result-${q.id}`}
+                /* 判对错的**机器可读**出口：验收脚本据此断言，不依赖 i18n 文案
+                 * （否则切到英文界面「回答正确 / Correct」两种措辞会让门禁假红）。 */
+                data-correct={right ? 'true' : 'false'}
                 className={`flex flex-col gap-1 text-xs rounded-lg px-2.5 py-2 border ${
                   right ? 'border-emerald-500/40' : 'border-red-500/40'
                 }`}
@@ -145,7 +148,10 @@ export default function ExercisePanel({ theme, questions, collocations }: Exerci
                   {right ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
                   {right ? t('exercise.correct') : t('exercise.incorrect')}
                 </span>
-                <span className={theme.sub}>
+                {/* 正确答案的**机器可读**出口：跨兄弟节点的 textContent 会把
+                 * 「正确答案： C」和后面的解析拼成 "…CThe passage…"，用 \b 边界断言会失配
+                 * （实测踩到）。给答案单独一个 data-answer，验收直接读属性，不玩文本正则。 */}
+                <span className={theme.sub} data-testid={`exercise-answer-${q.id}`} data-answer={q.answer}>
                   {t('exercise.answer')} {q.answer}
                 </span>
                 <span className="leading-relaxed">{q.explanation}</span>

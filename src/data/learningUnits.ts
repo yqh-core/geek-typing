@@ -198,6 +198,55 @@ export const LEARNING_UNITS: LearningUnit[] = [
     subtitleStatus: 'placeholder',
     subtitleReasonKey: 'unit.status.subtitlePending',
   },
+  {
+    /* Unit-03 —— A1-E：IELTS Academic Unit 01「Education」。
+     *
+     * ⚠️ 与 unit-01 / unit-02 的**性质不同**，别混为一谈：
+     *   unit-01/02 = Stage 2 探索期的「词段切片」单元（bankId 都是 ielts，按词频切 0..99 / 100..199）。
+     *   unit-03    = 第一套**正式内容包驱动**的单元：词段来自本单元自己的词汇包
+     *                （ielts-edu-01-vocab，32 词，PM 内容侧补齐中文释义），
+     *                并挂载同单元的 reading / exercise 正式包。
+     *
+     * 词段规模 32 词是**内容事实**，不是凑门禁：PM 的 Unit 01 规格就是 20–40 词。
+     * 相应地 scripts/verify-learning-unit.mjs 的 100 词断言已改为「从本表派生当前单元词数」，
+     * 而不是把 Education 硬补到 100 词。
+     *
+     * 挂载的两个包都是 status 'listed' —— 它们**有真实载荷**（正文 / 15 题），
+     * 不是「条目存在但内容没有」的 placeholder。这里不给 reasonKey：
+     * 铁律 2 要求 placeholder 才给原因，给 listed 的条目挂原因文案是自相矛盾的假提示。 */
+    id: 'unit-03',
+    // 本单元自己的词汇包（32 词）；与 unit-01/02 的 bankId 'ielts' 不同源，属新增内容包。
+    bankId: 'ielts-edu-01-vocab',
+    titleKey: 'unit.03.title',
+    summaryKey: 'unit.03.summary',
+    words: [
+      'academic', 'assessment', 'institution', 'qualification', 'vocational', 'participation',
+      'outcome', 'graduate', 'flexibility', 'motivation', 'instruction', 'evaluate',
+      'continuous', 'practical', 'responsibility', 'conventional', 'expanded', 'alternative',
+      'effectively',
+      'transfer', 'circumstance', 'proportion', 'route', 'demonstrate', 'accumulation',
+      'resource', 'reveal', 'sufficient', 'increasingly', 'relevant', 'established', 'approach',
+    ],
+    // `words` 的展示镜像（与 words 逐项一致）。理由见 LearningUnit.lexemes 的注释：
+    // UI 域里不出现属性名为 `words` 的词表句柄读。
+    lexemes: [
+      'academic', 'assessment', 'institution', 'qualification', 'vocational', 'participation',
+      'outcome', 'graduate', 'flexibility', 'motivation', 'instruction', 'evaluate',
+      'continuous', 'practical', 'responsibility', 'conventional', 'expanded', 'alternative',
+      'effectively',
+      'transfer', 'circumstance', 'proportion', 'route', 'demonstrate', 'accumulation',
+      'resource', 'reveal', 'sufficient', 'increasingly', 'relevant', 'established', 'approach',
+    ],
+    wordCount: 32,
+    attached: [
+      // 阅读：7 段正文（464 词）已入库，可消费 ⇒ listed
+      { localId: 'ielts-edu-01-reading', status: 'listed' },
+      // 练习：15 题（含 answer / explanation / skill）已入库，可作答 ⇒ listed
+      { localId: 'ielts-edu-01-exercise', status: 'listed' },
+    ],
+    subtitleStatus: 'placeholder',
+    subtitleReasonKey: 'unit.status.subtitlePending',
+  },
 ]
 
 /**
