@@ -89,6 +89,21 @@ jobs:
       # 实测只读 content/ 与 src/，不触碰 dist。
       - name: 内容契约测试（test:content）
         run: npm run test:content
+      # INV-6 · 类型契约唯一（gate:content-type-contract）：A3.1-③ 接入。
+      # 为什么进 gate-static 而不是 gate-build —— 本门只需要 dev server + 只读 content/ 与 src/，
+      # **不读 dist/**、不依赖任何构建产物；gate-static 的设计意图是「不依赖构建产物、最快报红」，
+      # 放这里不破坏该意图（gate-perf 需要 dist/，那是另一回事，已裁定暂缓接入）。
+      # 为什么排在 test:content **之后**：两者同域（都读 content/）；且本门经
+      # src/core/content/registry.ts 的 `import … '?runtime'` 加载内容包，须在 registry 相关
+      # 生成器（verify:registry / test:generate-registry）之后跑。
+      # 不会重演「本机绿 / CI 红」的依据：① 自带 13 条 falsify 注入自证，本机实跑 13/13
+      # 恰好判红且还原后复绿（门能判红这件事本身是机器判据）；② **无环境相关断言** ——
+      # 路径全部 `join(ROOT, rel)` 相对化，脚本内搜遍 `C:\` / `/c/` / `win32` 字面量 0 命中；
+      # ③ 无浏览器 / 无 sleep / 无固定端口，G 判据刻意用进程内 `ts.createProgram` 而非 spawn
+      # 子进程，故不受本机 node→node spawn 间歇性 EBUSY 影响（F-8 类 UNKNOWN 不会发生在本门）。
+      # 判据清单 = scripts/gate-content-type-contract.mjs 头部，**单一事实源，此处不重述**。
+      - name: 类型契约门（gate:content-type-contract · INV-6）
+        run: npm run gate:content-type-contract
       # P18-D · INV-2：UI 内容契约棘轮门（纯静态 AST 扫描 —— 只读 src/ 与 content/ 的目录名，
       # 不需要 dist，故属本条闸）。硬零 2 桶（直读词表 JSON / 内容包 id 分支）+ 棘轮 4 桶
       # （只许降不许升，基线 docs/p18/_generated/ui-contract-baseline.json）+ 对照组探针双向钳制。

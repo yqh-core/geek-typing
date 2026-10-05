@@ -167,10 +167,10 @@ perf 门已于 Wave 5 落地（`scripts/gate-perf.mjs`），按「脚本文件�
 |---|--------|----------|----------|-----------|
 | **INV-1** | **P1.7 冻结交付物零改动**（P1.8 提交必须 additive） | **闸门**：`npm run verify:p17-frozen`（`scripts/verify-p17-frozen.mjs`） | 冻结 HEAD 存在 + `merge-base --is-ancestor` + `git diff <P1.7_HEAD>..HEAD -- docs/audit-package/` 为空 + `verify-manifest-hashes` 逐字节 0 不符 | P18-0 |
 | INV-2 | UI 只经 Catalog / Query / Learning 访问数据 | **闸门**：`tests/ui-contract.mjs`（**已建 · 在 CI** `test:ui-contract`，棘轮只许降） | 静态扫描 + 基线比对 | P18-D |
-| INV-3 | 体积/配额预算**不得上调** | **闸门**：`gate:perf`（**已建 · 未进 CI** ⚠️）+ `check:bundle`（**在 CI**） | 预算表变更即 FAIL | 已有，P1.8 沿用 |
+| INV-3 | 体积/配额预算**不得上调** | **闸门**：`gate:perf`（**已建 · 已裁定暂缓接入 CI** ⛔）+ `check:bundle`（**在 CI**）；缺口 = `--record-baseline` 无拒绝上调守卫 + 无 falsify | 预算表变更即 FAIL | 已有，P1.8 沿用 |
 | INV-4 | 媒体一律远程，库内出现二进制即 FAIL | `content:validate` **判据 22**（**已建 · 随 `content:validate` 在 CI**，`scripts/content/validate.mjs:172`） | 内容仓扫二进制/大文件，fail-closed（遍历/读取异常即 FAIL，不当 0） | P18-F |
 | INV-5 | 真实素材必须过来源/版权**硬门** | **闸门**：`gate:license`（**已建 · 在 CI** `gate:license`，复用 `license-policy.mjs`） | 缺必填/未知 SPDX/非商用 → 拒 | P18-B |
-| INV-6 | 类型契约唯一，禁止 per-type 散落文件 | **闸门**：`gate:content-type-contract`（**已建 · 未进 CI** ⚠️，另有 `--falsify`） | `CONTENT_TYPE_REGISTRY` 覆盖性 + model 目录无散落 | P18-A/E |
+| INV-6 | 类型契约唯一，禁止 per-type 散落文件 | **闸门**：`npm run gate:content-type-contract`（`scripts/gate-content-type-contract.mjs`，**已建 · 已进 CI**：`deploy.yml` 的 `gate-static` job；另有 `--falsify` 13 条注入） | `CONTENT_TYPE_REGISTRY` 覆盖性 + model 目录无散落 | **A3.1-③** |
 | **INV-7** | **内容包 provider 溯源登记完整**：每个落盘 content package 必须有明确、合法、且与其来源一致的 provider；禁止 `undefined` / 空串 / `unknown`；外部 provider 必须能解析到登记仓库 | **闸门**：`npm run verify:provider`（`scripts/gate-provider.mjs` + `scripts/content/provider-rules.mjs`，**已建 · 在 CI**；`--falsify` 自带证伪） | 判据 A 漏登记/落盘缺失（provider 非 undefined/空串/`unknown`）· 判据 B 孤儿登记（表 key 磁盘上必须存在，双向失衡同判）· 判据 C 外部来源须在 `PROVIDER_REPOSITORY` 查到仓库（哨兵 `PROVIDER_ORIGINAL` 豁免） | **A3.1（2026-10-05 登记）** |
 
 > **状态列的实测依据（2026-10-05，A2 收口复核时统一核对）**：原表把 INV-2/4/5 标成
@@ -180,13 +180,24 @@ perf 门已于 Wave 5 落地（`scripts/gate-perf.mjs`），按「脚本文件�
 > `test:ui-contract` / `gate:content-type-contract` / `gate:perf` 本机全 PASS。
 > （判据不采信「文件在」—— 与 F-8/F-9 同一条纪律：存在 ≠ 能跑 ≠ 会被执行。）
 >
-> ⚠️ **本表新暴露的两个缺口（不在 CI 的门）**：`gate:perf`（INV-3）与
+> ⚠️ **本表曾暴露的两个缺口（当时不在 CI 的门）**：`gate:perf`（INV-3）与
 > `gate:content-type-contract`（INV-6）脚本都存在，但**都不在 `deploy.yml` 的任何
 > 门禁里**。按 A3.1 纪律条款 ④「不在 CI 里的检查 = 迟早腐坏且无人发现」，
-> 这两条是**下一个同类腐坏点**，已登记为 A3.1 待办（见
-> `docs/content/A2-CLOSURE-AND-NEXT-CUT.md`）—— 需要单独裁定是否并入 A3.1 的
-> N2，还是另开一刀；**本刀不擅自把它们塞进 CI**（进 CI 会改变门禁集合与耗时，
-> 属需裁定的范围变更）。
+> 这两条被登记为 A3.1 待办（见 `docs/content/A2-CLOSURE-AND-NEXT-CUT.md`）。
+>
+> **A3.1-③ 实施结果（2026-10-05，裁定见 `docs/content/N3-GATE-INVARIANT-ADJUDICATION.md`，
+> 拆开处理）**：
+> - **INV-6 已接入 CI** —— 落点 `npm run gate:content-type-contract`，排在 `gate-static`
+>   的 `test:content` 之后（本门不读 `dist/`，只需 dev server + `content/`，不破坏该闸
+>   「不依赖构建产物、最快报红」的意图）。接入前实跑复核：常规模式 16 条判据全绿、
+>   `--falsify` 13 条注入恰好判红且还原后复绿；脚本内无 `win32` / 绝对路径字面量，
+>   G 判据用进程内 `ts.createProgram` 不 spawn 子进程 ⇒ 无环境相关断言。
+> - **INV-3 仍暂缓接入 CI** —— 按裁定二**先补守卫再进**，不得跳步。三项解锁条件：
+>   ① `--record-baseline` 加拒绝上调守卫；② 补至少一条 falsify；③ 刷新陈旧基线（观察项 O1）。
+>   归属（解锁后）= `gate-build`，紧跟 `check:bundle`。
+>
+> 本表状态列纪律不变：**不采信「文件在」** —— 存在 ≠ 能跑 ≠ 会被执行，
+> 每次改状态都要以实跑 + `deploy.yml` 里确有 `run: npm run …` 为准。
 >
 > **INV-7 的实施期裁定（2026-10-05，PM）**：本条**不是新写判据**，而是把已有的
 > `verify:provider` 从「工程门」升格为「登记不变量」—— 门、falsify、CI 均已就位
