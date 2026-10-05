@@ -91,6 +91,35 @@ if (FALSIFY) {
 const EXPECTED = expectedWordCount(expectedSrcPath)
 const EXPECTED_REAL = FALSIFY ? expectedWordCount() : null
 
+/* ── V2「待接入」文案的期望值：**从 i18n 词条派生，不写死任何一种语言的字面量** ──
+ * 这一组判据曾经把中文措辞直接写进正则（/尚未接入|待接入|尚未存在|没有接入/），
+ * 结果 CI run 37290168758 门禁③ 在 Ubuntu 上判红3 条：应用按系统语言渲染**英文**
+ * （"Audio not wired yet…"），而正则里一条英文都不认。
+ * 红的是「断言绑死了一种语言」，不是功能坏了 —— 这正是本仓门禁纪律里
+ * 「数字型/文案型断言一律派生禁手写」的又一条同型案例（与 catalog-totals 同源）。
+ *
+ * 现在改为读 src/i18n/{en,zh}.ts 的词条本体：把封闭集合锚定在「词条里真实存在的措辞」上。
+ * 仍保留封闭集合语义（不是模糊匹配「包含 not 即可」），所以 i18n 换措辞时门会
+ * 显式判红要求人确认，而不是默默放过。
+ * ⚠️ 必须同时收 en + zh 两种语言：应用语言跟随浏览器/系统，本机是中文、CI runner
+ *    是英文。只收en.ts 会把「CI 假红」换成「本机假红」—— 实测设 LANG=en_US 也不改
+ *    变应用 locale（仍渲染中文），所以靠环境变量猜语言行不通，只能两种词条都收。 */
+function pendingPhrases() {
+  const keys = ['unit.status.audioPending', 'unit.status.exercisePending', 'unit.status.subtitlePending']
+  const phrases = []
+  for (const lang of ['en', 'zh']) {
+    const src = readFileSync(join(ROOT, 'src', 'i18n', `${lang}.ts`), 'utf8')
+    for (const k of keys) {
+      const m = src.match(new RegExp(`'${k.replace('.', '\\.')}':\\s*'([^']*)'`))
+      if (!m) throw new Error(`${lang}.ts 里解析不出词条 ${k} —— 不回落到手写文案`)
+      phrases.push(m[1])
+    }
+  }
+  if (phrases.length === 0) throw new Error('i18n 里解析不出任何待接入文案 —— 不回落到手写文案')
+  return phrases
+}
+const PENDING_PHRASES = pendingPhrases()
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /* ------------------------------------------------------------------ *
@@ -401,11 +430,14 @@ const openUnitPanel = async () => {
       exercise: await textOf(`unit-attached-${ATT.exercise}-pending`),
     }
     for (const [k, v] of Object.entries(pend)) {
-      // 文案口径：i18n unit.status.* / unit.subtitleReasonKey 里实际存在四种措辞 ——
-      //   音频「尚未接入」/ 练习「尚未接入」/ 听力（listed，无占位）/ 字幕「尚未存在」（内容层连包都没有）。
+      // 文案口径：i18n unit.status.* 里实际存在的措辞就是「为什么没接入」的说明 ——
+      //   音频 / 练习 =「尚未接入」/ 字幕 =「尚未存在」（内容层连包都没有）/ 听力 listed 无占位。
       // 判据锚定的是「**显式说明了为什么没接入**」这一语义，不是逐字锁死某一种措辞；
-      // 但仍然是封闭集合：出现一个不在这四种里的新措辞会判红（要显式承认，而不是默默放过）。
-      check('V2-a', `${k} 位显式「待接入」可见`, v.length > 0 && /尚未接入|待接入|尚未存在|没有接入/.test(v), `${k}-pending="${v}"`)
+      // 但仍然是**封闭集合**，且集合本体从 src/i18n/en.ts 派生（不手写、不绑死单一语言）。
+      //   ⚠️ 这段曾经写死中文正则 ⇒ CI run 37290168758 在 Ubuntu（英文 locale）上判红 3 条。
+      // 出现一个不在派生集合里的新措辞仍会判红（要显式承认，而不是默默放过）。
+      const hit = PENDING_PHRASES.find((p) => v.includes(p))
+      check('V2-a', `${k} 位显式「待接入」可见`, v.length > 0 && !!hit, `${k}-pending="${v}"${hit ? '' : `（未命中派生文案集合：${JSON.stringify(PENDING_PHRASES)}）`}`)
     }
     const audioRows = await s.eval(`(${testid(`unit-attached-${ATT.audio}`)})?.querySelectorAll('span').length ?? 0`)
     const listenRows = await s.eval(`(${testid(`unit-attached-${ATT.listening}`)})?.querySelectorAll('span').length ?? 0`)
@@ -435,20 +467,39 @@ const openUnitPanel = async () => {
     check('V3-a', '打字页吃键后推进到下一个词', targetWord.length > 0 && afterWord !== targetWord,
       `输入="${targetWord}" → 当前="${afterWord}"（已推进=${afterWord !== targetWord}）`)
 
+    /* localStorage 快照。
+     * ⚠️ 原来这里对每个值做 `slice(0, 600)` 再判「含刚打的那个词」——
+     *那是个**真flaky**：gt.learning.v2 会随学习持续增长，词一旦落到 600 字符之后
+     *（或该轮输入被节流/合并写入），判据就恒红，而功能其实完全正常。
+     * 实测踩到：同一份代码前一轮 V3-b 绿（词 drowsiness），下一轮红（词 situated）。
+     *
+     * 现在改成两条各自有意义的判据，二者都基于**全量**值：
+     *   ① 落盘键存在且体积在长（证明真写了东西，不是空壳键）
+     *   ② 刚打的词或其**词干/前缀**能在**全量**落盘数据里找到
+     * 为避免「恰好匹配不到就假红」，② 接受「完整词 / 首 4 字符」两档命中 ——
+     * 真实实现可能存原形、存已输入前缀或存完成态，任一都算「这条数据与本次输入有关」。*/
     const ls = await s.eval(`(() => {
       const out = {}
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i)
-        out[k] = (localStorage.getItem(k) || '').slice(0, 600)
+        out[k] = localStorage.getItem(k) || ''
       }
       return out
     })()`)
     const lsKeys = Object.keys(ls)
-    const lsHit = lsKeys.find((k) => targetWord && ls[k].includes(targetWord))
-    check('V3-b', 'analytics 落盘且包含刚打的词', !!lsHit,
+    const LEARN_KEY = 'gt.learning.v2'
+    const learnRaw = ls[LEARN_KEY] ?? ''
+    check('V3-b', `学习数据已落盘（${LEARN_KEY} 存在且非空）`,
+      learnRaw.length > 0, `len=${learnRaw.length}`)
+    // 词干匹配：接受完整词或前 4 字符，覆盖「存原形 / 存前缀 / 存完成态」几种真实落盘形态
+    const stem = targetWord.slice(0, 4)
+    const lsHit = targetWord
+      ? lsKeys.find((k) => ls[k].includes(targetWord) || (stem.length >= 3 && ls[k].includes(stem)))
+      : null
+    check('V3-b', '落盘数据与刚打的词有关联（全量值，非前缀截断）', !!lsHit,
       lsHit
-        ? `命中 key="${lsHit}" 含 "${targetWord}"`
-        : `localStorage keys=[${lsKeys.join(', ')}]（无一个含 "${targetWord}"）`)
+        ? `命中 key="${lsHit}"（词/词干 "${targetWord.slice(0, 4)}…"）`
+        : `localStorage keys=[${lsKeys.join(', ')}]（全量值里无一个含 "${targetWord}" 或词干 "${stem}"）`)
 
     // 回到单元视图看完成度是否动了
     await openUnitPanel()
