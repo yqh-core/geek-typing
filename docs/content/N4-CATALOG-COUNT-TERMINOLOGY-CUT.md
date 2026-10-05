@@ -147,7 +147,7 @@ vocabulary-only 口径已失效，不回落写死数字`。
 | 相关 gate | ✅ | `test:content` 179/179（**条数未变**）；`gate:content-type-contract` 16 条全绿 |
 | e2e 无回归 | ✅ | 171/171 |
 | 字段名拼错自检 | ✅ | 负向对照组：`itemType`/`contentType`/`kind` 各得 0 |
-| CI 权威 | ⏳ 见下方 run | — |
+| CI 权威 | ✅ | run `37304525318` success；门禁①②③ + 部署全绿，`test:content` / `gate:content-type-contract` / `gate:lint` 均 success |
 
 **两处「与规格不符」的判断（已复核，认可）**：
 1. 未额外导出独立的 `vocabularyOnlyItems` 函数/常量，而是让 `catalogTotals()` 一并返回
@@ -169,6 +169,6 @@ vocabulary-only 口径已失效，不回落写死数字`。
 |---|---|
 | A3.1-② verify-learning-unit | ✅ CLOSED / PASS（yqh 裁定） |
 | A3.1-③ N3 | ✅ CLOSED / PASS（yqh 裁定；INV-6 进 CI、INV-3 暂缓带三解锁条件） |
-| **A3.1-④ N4** | ✅ **实施完成，待 CI 权威证据** |
+| **A3.1-④ N4** | ✅ **CLOSED / PASS**（CI `37304525318` success；提交 `b909625`） |
 | INV-3 解锁 | ⛔ 需另起一刀，三条件齐备前不得进 CI |
 | O1–O4 / 14 份 findChrome | 📋 不阻塞、不扩范围 |
