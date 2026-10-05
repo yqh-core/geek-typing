@@ -8,46 +8,27 @@
  *   CHROME_PATH=<chrome.exe>                            # 手动指定浏览器
  */
 import { chromium } from 'playwright-core'
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { existsSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { ensurePreviewServer, stopPreview } from './preview-server.mjs'
 // 预热清单的解析实现与 check-bundle 判据 3/6 共用（scripts/content/warmup-ids.mjs）：
 // 事实源只有 registry.ts 一个，这里不再自己写一遍正则 —— 两套口径迟早漂移。
 import { readWarmUpIds } from '../scripts/content/warmup-ids.mjs'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-const REPO_ROOT = join(HERE, '..')
+// Home 汇总两个数字的算法已抽成共享模块（tests/helpers/catalog-totals.mjs）：
+// prod-catalog-check.mjs 断言的是同一组数字，曾各自硬钉一份字面量而分叉
+// （e2e 侧 A1-E 已改派生，生产检查侧一直留到 18/9388 ⇒ 假红）。单一实现，别再抄回去。
+// ⚠️ 连带效应：本文件原有的 HERE / REPO_ROOT（只为 catalogTotals 定位 content/）随之失去用途，
+//    连 dirname / fileURLToPath 一起删干净 —— 留着就是 lint 棘轮上的一条新增 warning。
+import { catalogTotals } from './helpers/catalog-totals.mjs'
 
 /* ── Home 内容目录汇总的期望值：**从 content/ 读，不写死** ──
  * 这里原来写死「18 词库 · 9388 词」。A1-E 新增 reading / exercise 两个正式包后变成
  * 20 / 9390，判据立刻假红 —— 红的又是「数字过期」而不是「功能坏了」。
  * 期望值改为按 content/ 下的 manifest 现算：packages = manifest 数，items = Σ stats.items。
  * 解析不出就抛错，绝不退回写死的旧数字（静默回落 = 假绿）。
- *
- * ⚠️ 口径说明（既有行为，非本刀引入）：`totalItems` 统计的是**所有类型的条目**，
- *    所以一篇 reading 篇章也计 1。也就是说「9388 词」里本来就含 42 条非词汇条目。
- *    这是 UI 文案把 items 一律叫「词」的老问题，本刀不改（超边界），只把期望值改为派生。 */
-function catalogTotals() {
-  const contentDir = join(REPO_ROOT, 'content')
-  let packages = 0
-  let items = 0
-  for (const type of readdirSync(contentDir)) {
-    const td = join(contentDir, type)
-    if (!statSync(td).isDirectory()) continue
-    for (const name of readdirSync(td)) {
-      const pd = join(td, name)
-      if (!statSync(pd).isDirectory()) continue
-      const mf = join(pd, 'manifest.json')
-      if (!existsSync(mf)) continue
-      packages++
-      const m = JSON.parse(readFileSync(mf, 'utf8'))
-      if (typeof m.stats?.items === 'number') items += m.stats.items
-    }
-  }
-  if (packages === 0) throw new Error('content/ 下解析不出任何包 —— 不回落到写死的旧数字')
-  return { packages, items }
-}
+ * 算法本体在 tests/helpers/catalog-totals.mjs（与 prod-catalog-check.mjs 共用），
+ * 口径说明见该文件头 —— 含「items 统计全类型条目」这个既有行为。 */
 const CATALOG = catalogTotals()
 
 const PROD_BASE = 'https://geek-typing.pages.dev'
