@@ -94,12 +94,83 @@
 
 ---
 
-## L5 状态
+## L5 实施与验收结果（2026-10-05）
+
+**最终 HEAD = `a3a8f73` == `origin/main`，tree clean。**
+
+### 接线 diff（`5800462`，纯新增 9 行，零删除）
+
+`.github/workflows/deploy.yml` 的 `gate-build` job，`check:bundle` 之后 / `安装 Chromium` 之前：
+
+```yaml
+- name: 体积/配额预算门禁（gate:perf · INV-3）
+  run: npm run gate:perf
+```
+
+`needs: [gate-static, gate-build, gate-e2e]` 与 `timeout-minutes: 20` **零改动**（diff 层面核实）。
+
+### 验收 8 条逐条结果
+
+| # | 项 | 结果 | 证据 |
+|---|---|---|---|
+| ① | 固定同一 HEAD SHA | ✅ | 实施 `5800462`；恢复 `a3a8f73` |
+| ② | 核对全部相关 CI runs | ✅ | 每个 commit 各 1 个 run，均逐一核对（见文末台账） |
+| ③ | step 实际执行（双证据） | ✅ | step 列表 `7. 体积/配额预算门禁（gate:perf · INV-3） -> success` + 日志 `##[group]Run npm run gate:perf` / `> node scripts/gate-perf.mjs`，并含 Ubuntu 上的实际判定输出（`当前 483087 B ≤ effective 550000 B`） |
+| ④ | `check:bundle` 覆盖主 chunk raw/gzip | ✅ | `scripts/check-bundle.mjs:100-101` 复用 `computeEffective` 取 `main-chunk-raw` / `main-chunk-gzip`；run `37335107854` step 6 `success` |
+| ⑤ | 唯一增量约束 = words chunk ≤ 550000 B | ✅ | `grep -E "words-chunk-raw-single\|wordsChunkMax\|550000" scripts/check-bundle.mjs` → **0 命中**（已复核）；falsify run 里 `check:bundle` 绿而 `gate:perf` 红，构成运行时反证 |
+| ⑥ | 故意失败 falsify | ✅ | commit `4462015`（`test(inv3-falsify):` 前缀，可丢弃）→ run **`37336122139` failure** |
+| ⑦ | 恢复后同一 HEAD 最新成功 run | ✅ | revert commit `a3a8f73` → run `37336880236` success |
+| ⑧ | 证据闭环 ⇒ 放行 | ⏸ | 待 yqh 最终裁定 |
+
+### ⑥ falsify 的完整证据（本刀核心）
+
+注入：`ABSOLUTE_BUDGET['words-chunk-raw-single']` 550000 → **1000**（`scripts/gate-perf.mjs:77`，单行）。
+
+**本机预验（先证明归因精确，再推 CI）**：
+- `npm run gate:perf` → **exit 1**，且**只有** `words-*.js 单个最大 raw` 一行 FAIL；
+- `npm run check:bundle` → **exit 0** ⇒ 二者判的确实不是同一子集。
+
+**CI 实测（run `37336122139`，conclusion = `failure`）**：
+
+| job | 结论 |
+|---|---|
+| 门禁① 静态与内容 | success |
+| 门禁③ 端到端 | success |
+| **门禁② 构建产物** | **failure** |
+| **部署到 Cloudflare Pages** | **skipped** |
+
+门禁② 内唯一失败 step = `7. 体积/配额预算门禁（gate:perf · INV-3）`，
+日志含 `##[error]Process completed with exit code 1`。
+**部署 job `skipped` 即证明 `needs` 拓扑真实有效** —— 这不是顺手得到的，是故意失败换来的。
+
+### 还原
+
+`a3a8f73` 为 `4462015` 的 revert。`git diff 5800462..a3a8f73 -- scripts/gate-perf.mjs` **为空**（逐字节还原，含注释）。
+本机复验：`gate:perf` exit 0（3 行 PASS）；`gate:perf -- --falsify` exit 0（自证自检仍成立）。
+
+### CI run 台账（本刀全部相关 run）
+
+| run | HEAD | 结论 | 说明 |
+|---|---|---|---|
+| `37335107854` | `5800462` | success | 接线后首跑，gate:perf step success |
+| `37336122139` | `4462015` | **failure** | **故意失败 falsify**，部署被挡 |
+| `37336880236` | `a3a8f73` | success | 恢复后权威成功 run |
+
+---
+
+## L6 状态
 
 | 项 | 状态 |
 |---|---|
 | SW 预热稳定性专项 | ✅ CLOSED / PASS（`9cebca7`；CI `37327033262`） |
 | INV-3 三条件 | ✅ 已兑现（`1fa9947`） |
-| **INV-3 CI 接入** |🔄 **实施中**（本裁定） |
+| **INV-3 CI 接入** | ✅ **证据闭环成立**（①–⑦ 全部 PASS）⇒ **待 yqh 最终裁定放行** |
 | O2–O4 | 📋 观察项，不扩范围 |
 | 14 份 `findChrome` | 📋 技术债，不阻塞 |
+
+## L7 本刀遗留（不阻塞）
+
+- **`gate:lint` 本机 exit 2（UNKNOWN）**：根因实测为本机 `node` → `node` 的 `spawnSync` 被环境挡住
+  （`EBUSY`，已独立复现），非本刀改动（本刀零 `.ts` 改动）。lint 棘轮基线 `total: 0`，
+  oxlint 直跑 `diagnostics` 为空。该门在 CI 的 `gate-static` 真跑且绿
+  （run `37335107854` step 15）⇒ **该 UNKNOWN 已被 CI 证据消解**，无需处理。
