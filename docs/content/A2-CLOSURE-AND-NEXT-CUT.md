@@ -101,15 +101,17 @@ A2 文档里出现的 **包数 24 / 9408 / 9454** 是**当时的仓库快照**�
 
 **目标：不增加任何学习内容，只把已经暴露出来的内容工程缺口收成长期门禁。**
 
-### N1 · 正式登记 INV-7（Provider Integrity）
+### N1 · 正式登记 INV-7（Provider Integrity）—— **本刀已完成**
 
 - 门已存在（`verify:provider` + falsify 4/4 + 在 CI），**只差把「工程门」升格为「登记不变量」**。
 - 判定：登记表 `docs/ARCHITECTURE-INVARIANTS.md` 现有 INV-1..INV-6。本刀**经 PM 裁定新增 INV-7**，
   这是「裁定后才增表」，不是擅自扩表。
-- INV-7 定义（拟）：每一个落盘 content package 必须具有明确、合法、且与其来源一致的 provider；
+- INV-7 定义：每一个落盘 content package 必须具有明确、合法、且与其来源一致的 provider；
   禁止 `undefined` / 空串 / `unknown`；外部 provider 必须能解析到登记仓库。
 - 判据落点：直接引用 `gate:provider` 的 A/B/C，**不在新脚本里重写实现**（单一实现纪律）。
-- 棘轮：登记后**不得下调**（与 INV-1..INV-6 同口径）。
+- 棘轮：登记后**不得下调**（与 INV-1..INV-6 同口径）。当前基线：27 包 / 0 个 `unknown`。
+- **登记时顺带修正了表里 4 行陈旧状态**（INV-2/4/5 标「待建」但实际已装且在 CI；
+  INV-4 的判据 22 在 `validate.mjs:172`）。往一张状态失真的表里加新条不行。
 
 ### N2 · 接通 `verify-learning-unit`
 
@@ -120,6 +122,15 @@ A2 文档里出现的 **包数 24 / 9408 / 9454** 是**当时的仓库快照**�
   2. `package.json` 加脚本并**实跑一次**确认能执行（不是「文件在」）；
   3. 接进 CI；
   4. **负向测试**：故意构造错误 LearningUnit ⇒ 必须 FAIL，否则又是一次「测试在跑但没证明自己会抓错」。
+
+### N3 ·（新发现，需单独裁定）两个**存在但不在 CI** 的门
+
+收口复核 INV 登记表时实测：`gate:perf`（INV-3）与 `gate:content-type-contract`（INV-6）
+脚本都存在，**都不在 `deploy.yml` 的任何门禁里**。按条款 ④，这就是「下一个同类腐坏点」
+—— 本轮刚修的 `verify:prod-catalog` 正是同一形状（不在 CI ⇒ 烂了三个刀没人发现）。
+
+**本刀不擅自把它们塞进 CI**：进 CI 会改变门禁集合与耗时，属需裁定的范围变更。
+待你裁定：并入 A2.1 的 N2 一并接，还是另开一刀？
 
 ### A2.1 Acceptance
 
