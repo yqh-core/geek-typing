@@ -46,7 +46,7 @@
 | 1 | 词汇包 `ielts-tech-03-vocab` | **30 词**，中文释义 + 英文 definition 必填；沿用 Tier A / Tier B 分层（**A 层 18 / B 层 12**，与 A1-E、A2 同口径）；主题约束在 **Technology / AI / 研究与验证方法** |
 | 2 | 阅读包 `ielts-tech-03-reading` | 正文总词数必须落在 **700–900 区间**（沿用 A2 规格，**不得**沿用 Unit-01 的 464 词量级）；段落 **8 段**；主题：**AI 辅助医学影像诊断的验证与责任归属**（validation, cohort, bias, audit, accountability），原创学术英语 |
 | 3 | 练习包 `ielts-tech-03-exercise` | **15 题** = MCQ ×10 + TFNG ×5，其中 **5 题 `skill` 标 `Vocabulary in context`**；每题 `answer` + `explanation` + `skill` 齐备；`collocations` **18 条** |
-| 4 | 接线 | `generate-registry.mjs` 的 `ORDER_IMPORT` / `ORDER_REGISTRY` / `ORDER_NONVOCAB` 三处；`build.mjs` 的 `PROVIDER`；`learningUnits.ts` 新增 `unit-05`；`src/i18n/{zh,en}.ts` 新增 `unit.05.title` / `unit.05.summary`；`tests/content-query.mjs` 的 `BASELINE_ITEMS` 按实测更新 |
+| 4 | 接线 | `generate-registry.mjs` 的 `ORDER_IMPORT` / `ORDER_REGISTRY` / `ORDER_NONVOCAB` 三处；**`provider-rules.mjs`（原 `build.mjs`，provider 门那刀已搬）** 的 `PROVIDER`；`learningUnits.ts` 新增 `unit-05`；`src/i18n/{zh,en}.ts` 新增 `unit.05.title` / `unit.05.summary`；`tests/content-query.mjs` 的 `BASELINE_ITEMS` 按实测更新 |
 
 ### Out（本刀**不做**，明确写下以免下一轮翻案时以为漏了）
 

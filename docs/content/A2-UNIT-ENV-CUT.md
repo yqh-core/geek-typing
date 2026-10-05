@@ -36,7 +36,7 @@
 | 1 | 词汇包 `ielts-env-02-vocab` | **30 词**，中文释义 + 英文 definition 必填；沿用 Unit-01 的 Tier A / Tier B 分层（A 层 18 / B 层 12），音标可选 |
 | 2 | 阅读包 `ielts-env-02-reading` | **正文总词数必须落在 700–900 区间**（Unit-01 实测 464 词，**未达规格**，本刀不得沿用该尺寸）。段落 **7–8 段**。主题：Urban Heat Island（城市热岛），原创学术英语 |
 | 3 | 练习包 `ielts-env-02-exercise` | **15 题** = MCQ（主旨/细节）×5 + TFNG ×5 + Vocabulary in Context ×5；每题 `answer` + `explanation` + `skill` 齐备；`collocations` **18 条** |
-| 4 | 接线 | `generate-registry.mjs` 两张 vocabulary 顺序表 + `ORDER_NONVOCAB`；`build.mjs` 的 `PROVIDER`；`learningUnits.ts` 新增 `unit-04`；`src/i18n/{zh,en}.ts` 新增 `unit.04.title` / `unit.04.summary` |
+| 4 | 接线 | `generate-registry.mjs` 两张 vocabulary 顺序表 + `ORDER_NONVOCAB`；**`provider-rules.mjs`（原 `build.mjs`，provider 门那刀已搬）** 的 `PROVIDER`；`learningUnits.ts` 新增 `unit-04`；`src/i18n/{zh,en}.ts` 新增 `unit.04.title` / `unit.04.summary` |
 
 ### Out（本刀**不做**，明确写下以免下一轮翻案时以为漏了）
 
