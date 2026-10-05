@@ -82,11 +82,11 @@
     }
   },
   "bundle": {
-    "mainChunkRaw": 445931,
-    "mainChunkGzip": 138249,
+    "mainChunkRaw": 426002,
+    "mainChunkGzip": 130263,
     "wordsChunkMaxRaw": 483087,
-    "mainChunkFile": "index-CXA9m-G5.js",
-    "recordedAt": "2026-09-30T01:56:42.273Z",
+    "mainChunkFile": "index-CVpiA2_r.js",
+    "recordedAt": "2026-10-05T12:13:34.524Z",
     "note": "gate-perf --record-baseline 写入；gzip 口径与 check-bundle 一致（zlib level 9）"
   }
 }

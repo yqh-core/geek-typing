@@ -42,6 +42,7 @@
     "test:scaffold-unit": "node tests/scaffold-unit.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",
     "gate:perf": "node scripts/gate-perf.mjs",
+    "gate:perf:falsify": "node scripts/gate-perf.mjs --falsify",
     "bench:content": "node scripts/bench-content.mjs",
     "bench:boot": "node scripts/bench-boot.mjs",
     "audit:learning": "node scripts/learning-consistency.mjs",
