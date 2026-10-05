@@ -58,15 +58,16 @@ for (const p of FS_PKGS) {
   e.items += p.items
 }
 const fsVocabPkgs = FS_PKGS.filter((p) => p.type === 'vocabulary')
-/** 带某个包级 tag 的**词条**总数（磁盘真值，仅 vocabulary）—— 新增同 tag 包时自动跟上，不假红。
+/** 带某个包级 tag 的 **vocabulary-only 词条**总数（磁盘真值，仅 vocabulary 包）—— 新增同 tag 包时自动跟上，不假红。
  *  用于 `count({type:'word', tags:[…]})`：word 族只含 vocabulary 包。 */
-const fsWordItemsByTag = (tag) => fsVocabPkgs.filter((p) => p.tags.includes(tag)).reduce((s, p) => s + p.items, 0)
-/** 带某个包级 tag 的**全部条目**数（磁盘真值，**不限类型**）—— 用于 index.byTag。
+const vocabularyOnlyItemsByTag = (tag) =>
+  fsVocabPkgs.filter((p) => p.tags.includes(tag)).reduce((s, p) => s + p.items, 0)
+/** 带某个包级 tag 的 **all-types 条目**数（磁盘真值，**不限类型**）—— 用于 index.byTag。
  *  ⚠️ byTag 覆盖所有已索引类型：reading / exercise 包也带 ielts 标签 ⇒ 各多 1 条，
- *     用 word 口径去比会差 2（实测 3034 vs 3032）。两种口径别混用。 */
-const fsItemsByTag = (tag) => FS_PKGS.filter((p) => p.tags.includes(tag)).reduce((s, p) => s + p.items, 0)
-const fsIeltsWordItems = fsWordItemsByTag('ielts')
-const fsIeltsTagItems = fsItemsByTag('ielts')
+ *     用 vocabulary-only 口径去比会差 2（实测 3034 vs 3032）。两种口径别混用。 */
+const allTypesItemsByTag = (tag) => FS_PKGS.filter((p) => p.tags.includes(tag)).reduce((s, p) => s + p.items, 0)
+const fsIeltsVocabularyOnlyItems = vocabularyOnlyItemsByTag('ielts')
+const fsIeltsAllTypesItems = allTypesItemsByTag('ielts')
 
 const pkgDirs = registry.getVocabularyPackages().map((p) => p.localId)
 const manifestTotal = pkgDirs.reduce((sum, id) => {
@@ -89,9 +90,19 @@ ok(
  *    本刀的 reading / exercise 两个包**不计入本基数** —— 本基准只统计 vocabulary 类型条目。
  * ⚠️ docs/audit-package/04-content/CONTENT_CONTRACT.md 里写的仍是 **9346**，那是
  *    **P1.7 冻结基线**的历史值，按冻结纪律**不得回改**（`npm run verify:p17-frozen` 把关）。
- *    当前权威值就是本文件的 BASELINE_ITEMS —— 别照着那句「同步更新基准数」去改冻结包。 */
-const BASELINE_ITEMS = 9438
-ok('全库 Σitems = 契约基准（词数变化必须显式确认）', manifestTotal === BASELINE_ITEMS, `${manifestTotal} vs ${BASELINE_ITEMS}`)
+ *    当前权威值就是本文件的 VOCABULARY_ONLY_ITEMS —— 别照着那句「同步更新基准数」去改冻结包。
+ *
+ * ⚠️ N4 改名纪律：本常量**只改名、不改口径**。它是 **vocabulary-only** 口径
+ *    （registry.getVocabularyPackages() 视角，天然只含 vocabulary 包），
+ *    **不是** `tests/helpers/catalog-totals.mjs` 的 all-types 口径（9486）。
+ *    两个视角（registry 注册表 vs 磁盘遍历）**故意不合并**，合并会改变本文件语义。
+ *    上面这段增量历史承担「词数变化必须被显式注意到」的守卫职责，改名不得毁掉它。*/
+const VOCABULARY_ONLY_ITEMS = 9438
+ok(
+  '全库 Σitems = 契约基准（vocabulary-only 口径，词数变化必须显式确认）',
+  manifestTotal === VOCABULARY_ONLY_ITEMS,
+  `${manifestTotal} vs ${VOCABULARY_ONLY_ITEMS}`,
+)
 ok('getPackage 支持裸 id', registry.getPackage('ielts')?.localId === 'ielts')
 ok(
   'getPackage 支持 4 段式 ContentId',
@@ -257,9 +268,9 @@ ok('count({packageId:"ielts"}) = 3000', (await cq.count({ type: 'word', packageI
 // 按 tag 聚合 = **所有**带该 tag 的包之和（磁盘真值）。
 // A1-E 起 ielts-edu-01-vocab 也带 tag 'ielts' ⇒ 不能再等于 ielts 包自己的 3000。
 ok(
-  `count({tags:["ielts"]}) = 带 ielts 标签的 ${fsVocabPkgs.filter((p) => p.tags.includes('ielts')).length} 个词汇包合计（${fsIeltsWordItems}）`,
-  (await cq.count({ type: 'word', tags: ['ielts'] })) === fsIeltsWordItems,
-  `${await cq.count({ type: 'word', tags: ['ielts'] })} vs ${fsIeltsWordItems}`,
+  `count({tags:["ielts"]}) = 带 ielts 标签的 ${fsVocabPkgs.filter((p) => p.tags.includes('ielts')).length} 个词汇包合计（vocabulary-only 口径 ${fsIeltsVocabularyOnlyItems}）`,
+  (await cq.count({ type: 'word', tags: ['ielts'] })) === fsIeltsVocabularyOnlyItems,
+  `${await cq.count({ type: 'word', tags: ['ielts'] })} vs ${fsIeltsVocabularyOnlyItems}`,
 )
 const lp1 = await cq.list({ type: 'word', packageId: 'ielts', page: 1, pageSize: 5 })
 const lp2 = await cq.list({ type: 'word', packageId: 'ielts', page: 2, pageSize: 5 })
@@ -349,7 +360,11 @@ ok(
   idx.normalizeWord(`  ${sample.word.toUpperCase()}  `) === wordKey && idx.normalizeWord('ABANDON') === idx.normalizeWord('abandon'),
 )
 ok('byPackage 按包聚合', (index.byPackage.get('ielts') ?? []).length === ieltsManifest.stats.items)
-ok('byTag 收录包级 tag', (index.byTag.get('ielts') ?? []).length === fsIeltsTagItems, `${(index.byTag.get('ielts') ?? []).length} vs ${fsIeltsTagItems}`)
+ok(
+  'byTag 收录包级 tag（all-types 口径不限类型，勿与 vocabulary-only 混用）',
+  (index.byTag.get('ielts') ?? []).length === fsIeltsAllTypesItems,
+  `${(index.byTag.get('ielts') ?? []).length} vs ${fsIeltsAllTypesItems}`,
+)
 idx.invalidateIndex('ielts')
 const stats1 = idx.getIndexStats()
 ok(

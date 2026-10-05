@@ -66,13 +66,16 @@ try {
    *    看到的就是「断言说 18、线上是 27」。同一处硬编码在 e2e.mjs 里 A1-E 已经改成派生，
    *    这里被漏掉 ⇒ 两份各自为政的副本就是这样分叉的，故抽成共享模块而不是再抄一份。 */
   const expected = catalogTotals()
+  /* ⚠️ N4：`expected.allTypesItems` 是 **all-types 口径**（含48 条非词汇条目），
+   *    而线上 UI 文案沿用产品口径「M 词」—— UI 文案属产品口径，超边界不改。
+   *    这里只让**测试内部标签**说清口径，避免「标签写词、实际全类型」的歧义。 */
   check(
-    `生产环境 home-catalog-summary 渲染（词库 ${expected.packages} · ${expected.items} 词）`,
+    `生产环境 home-catalog-summary 渲染（词库 ${expected.packages} · ${expected.allTypesItems} 词；数值取自 all-types 口径 allTypesItems）`,
     text.includes(String(expected.packages))
-      && text.includes(String(expected.items))
+      && text.includes(String(expected.allTypesItems))
       && text.includes('词库')
       && text.includes('词'),
-    `text="${text}" / 期望 词库 ${expected.packages} · ${expected.items} 词`,
+    `text="${text}" / 期望 词库 ${expected.packages} · ${expected.allTypesItems} 词（all-types 口径）`,
   )
   check('生产环境无 console / page 运行时错误', consoleErrors.length === 0, consoleErrors.slice(0, 2).join(' | '))
 } finally {

@@ -31,10 +31,12 @@ import { findChrome } from './helpers/chrome.mjs'
 /* ── Home 内容目录汇总的期望值：**从 content/ 读，不写死** ──
  * 这里原来写死「18 词库 · 9388 词」。A1-E 新增 reading / exercise 两个正式包后变成
  * 20 / 9390，判据立刻假红 —— 红的又是「数字过期」而不是「功能坏了」。
- * 期望值改为按 content/ 下的 manifest 现算：packages = manifest 数，items = Σ stats.items。
+ * 期望值改为按 content/ 下的 manifest 现算：packages = manifest 数，
+ * allTypesItems = Σ stats.items（**all-types 口径**，含非词汇条目；N4 起字段名自带口径）。
+ * ⚠️ UI 文案沿用产品口径「词」，故「N 词」里含 48 条非词汇条目 —— UI 文案属产品口径，超边界不改。
  * 解析不出就抛错，绝不退回写死的旧数字（静默回落 = 假绿）。
- * 算法本体在 tests/helpers/catalog-totals.mjs（与 prod-catalog-check.mjs 共用），
- * 口径说明见该文件头 —— 含「items 统计全类型条目」这个既有行为。 */
+ * 算法本体在 tests/helpers/catalog-totals.mjs（与 prod-catalog-check.mjs 共用，
+ * 两个口径由**同一次遍历**同时累出），口径说明见该文件头。 */
 const CATALOG = catalogTotals()
 
 const PROD_BASE = 'https://geek-typing.pages.dev'
@@ -1567,16 +1569,19 @@ async function run() {
   )
 
   // 16.0a P1.7-W5C：Home 组合展示内容目录汇总（仅组合、零新键，复用 nav.banks / bank.wordsUnit）
+  // ⚠️ N4：下面断言的是 **all-types 口径 allTypesItems**（含 48 条非词汇条目），
+  //    而 UI 渲染出来的是产品文案「M 词」—— UI 文案属产品口径，超边界不改。
+  //    这里只让**测试内部标签**说清口径，避免「标签写词、实际全类型」的歧义。
   await waitForTestId(page, 'home-catalog-summary')
   const catText = norm(await page.textContent('[data-testid="home-catalog-summary"]'))
   check(
-    `Home 组合：内容目录汇总渲染（${CATALOG.packages} 词库 · ${CATALOG.items} 词，复用 nav.banks / bank.wordsUnit，零新键）`,
+    `Home 组合：内容目录汇总渲染（${CATALOG.packages} 词库 · ${CATALOG.allTypesItems} 词；数值取自 all-types 口径 allTypesItems，UI 文案沿用产品口径「词」，复用 nav.banks / bank.wordsUnit，零新键）`,
     (await page.locator('[data-testid="home-catalog-summary"]').count()) === 1 &&
       catText.includes(String(CATALOG.packages)) &&
-      catText.includes(String(CATALOG.items)) &&
+      catText.includes(String(CATALOG.allTypesItems)) &&
       catText.includes('词库') &&
       catText.includes('词'),
-    `text=${catText}（期望 ${CATALOG.packages} / ${CATALOG.items}，自 content/ 现算）`,
+    `text=${catText}（期望 ${CATALOG.packages} / ${CATALOG.allTypesItems}，自 content/ 现算，all-types 口径）`,
   )
 
   // 16.1 Daily Goal + streak：预置今天 30 词、近 3 天连续打卡
