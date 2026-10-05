@@ -125,12 +125,24 @@ content/exercise/ielts-tech-03-exercise/{items.json,manifest.json}
 
 ### 3.4 门禁（只许降不许升，禁止上调任何棘轮）
 
-`content:validate` → `content:generate-registry`（写 registry.ts）→ `content:build`
+`content:generate-registry`（写 registry.ts）→ `content:validate` → `content:build`
 → `verify:registry` → `test:generate-registry` → `test:scaffold-unit`
 → `test:content` → `test:ui-contract` → `gate:license` → `gate:architecture`
 → `verify:manifests` → `verify:p17-frozen` → `npm run build` → `check:bundle` → `test:e2e`
 → oxlint（基线 0）。
 
+> ⚠️ **`content:validate` 不能打头（本刀实测撞到，A2 文档的同一处顺序是错的）**：
+> `content:validate` 读的是 `src/core/content/registry.ts`，而 registry.ts 由
+> `content:generate-registry` 生成；新包刚落盘、registry.ts 还是上一版时，validate 会判红 3 项：
+> ```
+> ✗ 策略不一致：ielts-tech-03-{vocab,reading,exercise} manifest policy=lazy，
+>   但 registry.ts 中找不到 localId: 'ielts-tech-03-*' 的注册项
+> [content:validate] FAIL：3 项
+> ```
+> 正确顺序是 `generate-registry → validate`。scaffold 自己打印的收口命令也是这个顺序。
+> （A2 落档文档 §3.4 把 validate 写在最前面，是当时没实测出来的笔误；本刀已按实测改，
+> 且这一条对未来任何「加内容包」都有用。）
+>
 > ⚠️ 序列里 `npm run build` **不能省**（A2 实测踩过）：`check:bundle` 与 `test:e2e`
 > 都读 `dist/`，`dist/` 陈旧时它们在加包后立刻假红，容易被误分诊成功能缺陷
 > （A2 首轮 170/171 就是这个形态，分诊结论是 `dist/assets` 只有 18 个数据 chunk）。
@@ -149,25 +161,35 @@ content/exercise/ielts-tech-03-exercise/{items.json,manifest.json}
 
 ### 4.1 硬指标
 
-| 判据 | 要求 | 实测（落地后回填） |
+| 判据 | 要求 | 实测 |
 |------|------|------|
-| 阅读正文词数 | **700–900**，不虚报 | 待回填 |
-| 词汇数 | 30（Tier A 18 / Tier B 12） | 待回填 |
-| 题目数 | 15（mcq 10 + tfng 5），Vocab in context 恰好 5 题 | 待回填 |
-| collocations | 18 | 待回填 |
-| 段落数 | 8 | 待回填 |
-| 包数 | 25（vocabulary 13 + 非 vocab 12） | 待回填 |
-| 词数基准 | `BASELINE_ITEMS` 9408 → **实测增量**（+30 预期，必须是实测不是估算） | 待回填 |
-| 门禁 | 3.4 **全部绿**，oxlint 0，UI 棘轮（13 / 11 / 11 / 0）**未上调** | 待回填 |
-| 幂等 | 源能原样重现磁盘包（含 publish 日期） | 待回填 |
-| e2e | 171/171 | 待回填 |
+| 阅读正文词数 | **700–900**，不虚报 | **804**（空白切分）/ 字母串 808 / 纯字母整词 705，**8 段** ✅ |
+| 词汇数 | 30（Tier A 18 / Tier B 12） | **30** ✅ |
+| 题目数 | 15（mcq 10 + tfng 5），Vocab in context 恰好 5 题 | **15**（mcq 10 + tfng 5；Vocab in context 恰好 5）✅ |
+| collocations | 18 | **18** ✅ |
+| 包数 | 27（vocabulary 13 + 非 vocab 14） | **27**（13 + 14）✅ |
+| 词数基准 | `BASELINE_ITEMS` 9408 → **实测增量**（必须是实测不是估算） | **9438** ✅（= 9408 + 30） |
+| 门禁 | 3.4 **全部绿**，oxlint 0，UI 棘轮（13 / 11 / 11 / 0）**未上调** | 16 门跑完 **14 绿**；`gate:lint` 本机 UNKNOWN（见 §4.4） |
+| 幂等 | 源能原样重现磁盘包（含 publish 日期） | `--check` **6/6** ✅（vocab 为「JSON 语义一致（排版不同）」，reading/exercise 逐字节一致） |
+| e2e | 171/171 | **171/171**，首页实测「27 词库 · 9486 词」✅ |
+| unit-05 数据 | words / lexemes 30 项逐项同序全等，且与磁盘 `words.json` 同序同内容 | ✅ 独立提取复核通过（不采信工程师转述） |
+
+> ⚠️ **三个「词数」口径别混用**（本刀首次出现三数并存，写清楚免得下一轮再查）：
+> 对同一段正文，**804**（按空白切分，含 `Deep-learning,` 这类带标点 token）、
+> **808**（`[A-Za-z]+` 匹配出的字母串总数）、**705**（`^[A-Za-z]+$` 完全命中、不含标点与连字符的整词）。
+> 本刀对外统一口径 = **804**（与 A2 报的 814 同口径，env-02 复算亦为 814 / 715），
+> 落在 700–900 规格内。**A2 落档文档 §4.1 写的「814（纯字母 token 824）」里 824 这个数不对**
+> —— 它应该与 A3 一样给三数，正确主口径是 814（空白切分），「纯字母整词」是 715。
 
 ### 4.2 两套「词数」口径（延续 A2 §4.2，勿重复推导）
 
-- **9408 → 9438**（预期）= 仅 `vocabulary` 类型的 `stats.items` 之和（`tests/content-query.mjs` 的 `BASELINE_ITEMS`）。
-- **9454 → 9484**（预期）= **所有类型** `stats.items` 之和（`tests/e2e.mjs` 的 `catalogTotals()`、首页「内容目录汇总」）。
-- 差 **46**（A2 值）拆分为 audio 5 / collection 5 / exercise 7 / listening 6 / reading 8 / speaking 5 / topic 5 / writing 5；
-  本刀只让 vocabulary 那 30 项进两边，**预期差值不变为 46**。落地后按实测回填，不得直接引用上面的预期数。
+- **9438** = 仅 `vocabulary` 类型的 `stats.items` 之和（`tests/content-query.mjs` 的 `BASELINE_ITEMS`，本刀写死 9438）。
+- **9486** = **所有类型** `stats.items` 之和（`tests/e2e.mjs` 的 `catalogTotals()`、首页「内容目录汇总」）。
+- 差 **48**（本刀实测，A2 时是 46）——增量 2 的来源：本单元新增的 `ielts-tech-03-reading` **1 条条目**
+  与 `ielts-tech-03-exercise` **1 条条目**都进 all-types 统计，但都不进 vocabulary-only 统计。
+  按类型拆：audio 5 / collection 5 / exercise 8 / listening 6 / reading 9 / speaking 5 / topic 5 / writing 5（合计 48）。
+- 注意这个差值**不是常量**：每加一套「词汇包 + 阅读 + 练习」三件套，差值就 +2（1 条阅读条目 + 1 条练习条目）。
+  下次再加单元时，差值会从 48 变 50，不要拿本文件的 48 当定值。
 - `tests/e2e.mjs:22-26` 早已声明「`totalItems` 统计所有类型条目，所以一篇 reading 也计 1，
   UI 文案把 items 一律叫「词」的老问题，本刀不改（超边界）」—— 本刀同样不改。
 
@@ -180,9 +202,36 @@ content/exercise/ielts-tech-03-exercise/{items.json,manifest.json}
 
 `HEAD` / `WORKTREE` / `Changed` / `Gates` / `Bundle` / `Regression` / `Boundary` / `Result`。
 
+### 4.4 本刀实跑结果（commit `cf7db16`，未推送）
+
+- `HEAD` `cb995e3` → `cf7db16`；14 个文件 +273 / −2；`git status` clean。
+- `Changed`：三包 6 个文件；`generate-registry.mjs` +9；`build.mjs` +3；`learningUnits.ts` +49（unit-05 整块）；
+  `i18n/{zh,en}.ts` 各 +2；`tests/content-query.mjs` +5/−1；`src/core/content/registry.ts`（生成器产物，随接线重生成）。
+- `Bundle`：主 chunk `index-*.js` 422149 B → **426002 B**（gzip 128971 → **129789 B**，+818）；CSS 未变。
+- `Regression`：e2e **171/171**；UI 棘轮 `13 / 11 / 11 / 0` **纹丝未动**；`provider === 'unknown'` 全库 0 个。
+
+**唯一的「不是绿」：`gate:lint` 输出 UNKNOWN。** 它报
+「oxlint 起不来，测量失败：EBUSY —— 本机起不动第二个 node 进程」，
+但 oxlint 本体是好的（经门自己给的分流法实证，不是绕过）：
+
+```
+node_modules/oxlint/bin/oxlint --format=json  →  diagnostics [] , 218 files
+npm run lint  →  Found 0 warnings and 0 errors. 218 files
+```
+
+判定：**本机环境限制（同时 spawn 第二个 node 被挡），不是仓库门禁失效**，CI 全新容器不复现。
+另外 `package.json` 里**没有叫 `oxlint` 的脚本**（`lint: oxlint`），`gate:lint` 的入口是
+`node scripts/gate-lint.mjs` 调 `lint`。下次收口遇到同现象，先跑 `npm run lint` 拿本体证据，
+不要因为「门是 UNKNOWN」就以为 lint 没跑。
+
 ### 4.5 遗留（本刀明确不动，登记在案）
 
 1. `provider:'unknown'` 无硬门禁 —— 本刀保证自己登记进 PROVIDER，不新增该缺口；门禁加不加归下一刀。
 2. `scripts/verify-learning-unit.mjs` 仍未接进 `package.json` / CI（要 preview 服务，属证据任务）。
 3. 首页「词数」把非词汇 items 也叫「词」的口径，超边界未动（理由见 §4.2）。
 4. `publishedAt` 退出码口径：契约类 `exit(2)` / 内容校验类 `exit(1)`（A2 的 F-2 是 2，既有口径保持不变）。
+5. **A2 / A3 两份落档文档的门序与词数口径有笔误，已在本刀（A3）实测证伪并就地改对**，
+   但 **A2 文档 `docs/content/A2-UNIT-ENV-CUT.md` 的对应段落没有回改**（A2 已 CLOSED 并推送）：
+   - §3.4 门序把 `content:validate` 写在 `content:generate-registry` 之前 → 会红 3 项「策略不一致」。
+   - §4.1 的「814（纯字母 token 824）」→ 824 这个数不存在，正确是 814（空白切分）/ 715（纯字母整词）。
+   下一刀若还要引用 A2 文档做门序，以本文件 §3.4 / §4.1 为准。
