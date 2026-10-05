@@ -167,7 +167,7 @@ perf 门已于 Wave 5 落地（`scripts/gate-perf.mjs`），按「脚本文件�
 |---|--------|----------|----------|-----------|
 | **INV-1** | **P1.7 冻结交付物零改动**（P1.8 提交必须 additive） | **闸门**：`npm run verify:p17-frozen`（`scripts/verify-p17-frozen.mjs`） | 冻结 HEAD 存在 + `merge-base --is-ancestor` + `git diff <P1.7_HEAD>..HEAD -- docs/audit-package/` 为空 + `verify-manifest-hashes` 逐字节 0 不符 | P18-0 |
 | INV-2 | UI 只经 Catalog / Query / Learning 访问数据 | **闸门**：`tests/ui-contract.mjs`（**已建 · 在 CI** `test:ui-contract`，棘轮只许降） | 静态扫描 + 基线比对 | P18-D |
-| INV-3 | 体积/配额预算**不得上调** | **闸门**：`gate:perf`（**已建 · 已裁定暂缓接入 CI** ⛔）+ `check:bundle`（**在 CI**）；缺口 = `--record-baseline` 无拒绝上调守卫 + 无 falsify | 预算表变更即 FAIL | 已有，P1.8 沿用 |
+| INV-3 | 体积/配额预算**不得上调** | **闸门**：`gate:perf`（**已建 · 已进 CI** · 落点 `gate-build` 紧跟 `check:bundle`）+ `check:bundle`（**在 CI**） | 预算表变更即 FAIL | 已有，P1.8 沿用 |
 | INV-4 | 媒体一律远程，库内出现二进制即 FAIL | `content:validate` **判据 22**（**已建 · 随 `content:validate` 在 CI**，`scripts/content/validate.mjs:172`） | 内容仓扫二进制/大文件，fail-closed（遍历/读取异常即 FAIL，不当 0） | P18-F |
 | INV-5 | 真实素材必须过来源/版权**硬门** | **闸门**：`gate:license`（**已建 · 在 CI** `gate:license`，复用 `license-policy.mjs`） | 缺必填/未知 SPDX/非商用 → 拒 | P18-B |
 | INV-6 | 类型契约唯一，禁止 per-type 散落文件 | **闸门**：`npm run gate:content-type-contract`（`scripts/gate-content-type-contract.mjs`，**已建 · 已进 CI**：`deploy.yml` 的 `gate-static` job；另有 `--falsify` 13 条注入） | `CONTENT_TYPE_REGISTRY` 覆盖性 + model 目录无散落 | **A3.1-③** |
@@ -192,9 +192,24 @@ perf 门已于 Wave 5 落地（`scripts/gate-perf.mjs`），按「脚本文件�
 >   「不依赖构建产物、最快报红」的意图）。接入前实跑复核：常规模式 16 条判据全绿、
 >   `--falsify` 13 条注入恰好判红且还原后复绿；脚本内无 `win32` / 绝对路径字面量，
 >   G 判据用进程内 `ts.createProgram` 不 spawn 子进程 ⇒ 无环境相关断言。
-> - **INV-3 仍暂缓接入 CI** —— 按裁定二**先补守卫再进**，不得跳步。三项解锁条件：
->   ① `--record-baseline` 加拒绝上调守卫；② 补至少一条 falsify；③ 刷新陈旧基线（观察项 O1）。
->   归属（解锁后）= `gate-build`，紧跟 `check:bundle`。
+> - **INV-3 已接入 CI** —— 落点 `npm run gate:perf`，排在 `gate-build` 的 `check:bundle`
+>   **之后**（本门只读 `dist/`，紧跟 `check:bundle` ⇒ 零额外 build）。**不新开 step/job、
+>   不改 `needs` 拓扑**，因此不产生第二次构建。接入裁定见
+>   `docs/content/INV3-CI-ADMISSION-CUT.md`。
+>   - **三项解锁条件已于 `1fa9947` 全部完成**：① `--record-baseline` 的逐字段棘轮守卫
+>     （拒绝上调，且拒绝路径零写入）；② `--falsify` 自证注入；③ 刷新陈旧基线（观察项 O1）。
+>     该 commit 的 CI run `37310265929` success。
+>   - **唯一增量约束 = 单个 words chunk ≤ 550000 B**（`words-chunk-raw-single`）。
+>     `check:bundle` 与 `gate:perf` 复用**同一张预算表**，但它的 `mainChunkBudgets()` 只取
+>     `main-chunk-raw` / `main-chunk-gzip` **两行** —— 实测
+>     `grep -E "words-chunk-raw-single|550000" scripts/check-bundle.mjs` **0 命中**。
+>     即：**去掉 `gate:perf` 这道 step，该约束在 CI 上完全无人看守**（不是「少一道冗余检查」，
+>     而是一道 CI 此前不存在的判据）。
+>   - **接入前取证**（本机实跑）：常规判定连跑 3 次全绿、耗时 6.2–6.6s（`gate-build` 的
+>     `timeout-minutes: 20` 余量充裕）；超预算与缺 `dist/` 两种故障态均 `exit 1`（fail-closed，
+>     产物缺失不视为通过）。
+>   - ⚠️ `gate:perf --falsify` **不进 CI** —— 它是故障注入演练（证明门能判红），属证据任务；
+>     常规模式进门已足够，自证能力本地跑 `npm run gate:perf -- --falsify` 复核。
 >
 > 本表状态列纪律不变：**不采信「文件在」** —— 存在 ≠ 能跑 ≠ 会被执行，
 > 每次改状态都要以实跑 + `deploy.yml` 里确有 `run: npm run …` 为准。

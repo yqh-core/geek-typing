@@ -144,6 +144,15 @@ jobs:
       # 三态判定，UNKNOWN 视为不通过。
       - name: 体积门禁（check:bundle）
         run: npm run check:bundle
+      # 体积/配额预算门禁（INV-3）—— 与上面的 check:bundle 判同一张预算表的**不同子集**。
+      # check:bundle 只取 main-chunk-raw / main-chunk-gzip 两行；gate:perf 额外判
+      # **单个 words chunk ≤ 550000 B**（words-chunk-raw-single）。
+      # 去掉本 step ⇒ 该约束在 CI 上完全无人看守（实测 check-bundle 对其 0 命中）。
+      # 本门只读 dist/，紧跟 check:bundle ⇒ 零额外 build、不新开 job。
+      # 判据清单与阈值 = scripts/gate-perf.mjs 预算表（单一事实源，此处不重述数字）。
+      # 接入裁定见 docs/content/INV3-CI-ADMISSION-CUT.md。
+      - name: 体积/配额预算门禁（gate:perf · INV-3）
+        run: npm run gate:perf
       - name: 安装 Chromium
         run: npx playwright@1.49.1 install chromium --with-deps
       # 场景 态1/1.5/2/3/4/4b（判据清单 = tests/offline-audit.mjs，此处不重述计数）。
