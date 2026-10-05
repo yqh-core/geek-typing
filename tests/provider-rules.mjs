@@ -214,7 +214,9 @@ section('E · 真实仓库基线（只读扫描，绝不写盘）')
   ok('E-1 真实 content/ 有 27 个带 manifest.json 的包', packages.length === 27, `packages=${packages.length}`)
   ok('E-2 全库 0 个 unknown / 缺失 provider', stats.distribution[PROVIDER_UNKNOWN] === undefined, `distribution=${JSON.stringify(stats.distribution)}`)
 
-  const dist = { 'geek-typing original': 22, ecdict: 5 }
+  /* E-3 的 22 / 5 是**钉住的基线**（同 tests/content-query.mjs 的 BASELINE_ITEMS 口径）：
+   * 每加一套内容包都要按实测改这两个数 —— 这是刻意的：改它的人会顺便看一眼
+   * 新包的 provider 登记对不对，而不是让数字悄悄漂走。 */
   const actual = { 'geek-typing original': 0, ecdict: 0 }
   for (const [k, v] of Object.entries(stats.distribution)) {
     if (k in actual) actual[k] = v

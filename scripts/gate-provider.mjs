@@ -103,7 +103,10 @@ function main() {
   const { problems, stats, exitCode } = runGate({ root })
   printStats(stats)
 
-  if (problems.length === 0) {
+  /* 判定与退出码只认 runGate 给的 exitCode —— 它是判据逻辑的**唯一出口**。
+   * ⚠️ 不要再用 problems.length === 0 自己推一遍：那样「判据算 1、CLI 退 0」这类
+   *    分叉就没人看得见了（本刀 lint 棘轮先抓到的就是这个：解出 exitCode 却没用它）。 */
+  if (exitCode === 0) {
     console.log('  ✓ provider 覆盖完整：磁盘上的每个包都登记且 provider 可溯源，表内登记无孤儿')
     console.log(`  · 哨兵 provider = ${JSON.stringify(PROVIDER_ORIGINAL)}（自有内容，按设计豁免判据 C）`)
     console.log(`  · 兜底哨兵 = ${JSON.stringify(PROVIDER_UNKNOWN)}（build.mjs 的 ?? 兜底值，写盘时静默命中即由判据 A 拦）`)
