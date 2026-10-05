@@ -112,7 +112,8 @@ content/exercise/ielts-tech-03-exercise/{items.json,manifest.json}
 |------|--------|------|
 | `scripts/content/generate-registry.mjs` | `ORDER_IMPORT` 与 `ORDER_REGISTRY` 各加 `'ielts-tech-03-vocab'` | **只写包名**；两张表内容必须不同（追加同一项不会让它俩相等） |
 | `scripts/content/generate-registry.mjs` | `ORDER_NONVOCAB` 加 `'reading/ielts-tech-03-reading'`、`'exercise/ielts-tech-03-exercise'` | 形态是 **`type/dir`** |
-| `scripts/content/build.mjs` | `PROVIDER` 加 `'ielts-tech-03-vocab': PROVIDER_ORIGINAL` | 不登记会被写成 `provider:'unknown'` |
+| `scripts/content/provider-rules.mjs` | `PROVIDER` 加 `'ielts-tech-03-vocab': PROVIDER_ORIGINAL` | 不登记会被写成 `provider:'unknown'` |
+| ↑ 指针更新（provider 门那刀） | 本表**原写在 `scripts/content/build.mjs`**，现已搬到 `provider-rules.mjs` 并成为**全仓唯一实现**（build.mjs 只 import）。加包时改 `provider-rules.mjs`，去 build.mjs 找会找不到表 | 该缺口已由 `npm run verify:provider` 判据 A 硬拦，不再靠人记得 |
 | `src/data/learningUnits.ts` | 新增 `unit-05`（`bankId:'ielts-tech-03-vocab'`，`attached` 指向同单元 reading/exercise 且 `status:'listed'`） | id **必须是 unit-05**（unit-01/02/03/04 已占，不得复用） |
 | `src/i18n/{zh,en}.ts` | 新增 `unit.05.title` / `unit.05.summary` | 沿用既有键位（紧随 `unit.04.*`） |
 

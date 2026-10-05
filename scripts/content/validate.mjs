@@ -72,6 +72,10 @@ import os from 'node:os'
  * 而实际结果就是漂移：契约把 `ContentType` 扩到 14 时，两处 Node 白名单都停在 12。
  * 现在单一副本由 gate:content-type-contract 判据 H 对着契约上锁。 */
 import { CONTENT_TYPES, checksumPayload } from './license-policy.mjs'
+/* 自有内容哨兵**只从 provider-rules.mjs 取**（该文件 re-export license-policy.mjs 的 PROVIDER_ORIGINAL，
+ * 后者与 src/core/content/provenance.ts 同源）—— 本文件不再写第二份 'geek-typing original' 字面量。
+ * 这里只是把已有的 license 判据**换成常量引用**，语义与行为逐字不变。 */
+import { PROVIDER_ORIGINAL } from './provider-rules.mjs'
 /* relations 端点可达性**只从 relations.mjs 取**（P18-G0 裁定 §⑪-3）：本文件不得再有第二份实现。
  * 历史上这里是第三份（registry Map + normWords，只认 type === 'word'），与
  * gate-content-contract.mjs / ingest.mjs 的逐字复制互不同步。 */
@@ -351,7 +355,8 @@ async function main() {
       // provider === 'geek-typing original'（哨兵值见 src/core/content/provenance.ts，
       // 本脚本是 Node 无法 import TS，按字面量镜像，两处同步修改）。
       // provider 缺失时回退旧 origin 规则 —— 兼容未补 provider 的历史 manifest，不是放宽。
-      const isSelf = s.provider === 'geek-typing original'
+      // ⚠️ 哨兵走常量引用（provider-rules.mjs），**本处行为逐字不变**，只是不再硬写第二份字面量。
+      const isSelf = s.provider === PROVIDER_ORIGINAL
         || (s.provider === undefined && String(s.origin).includes('curated'))
       if (!lic.spdx && !isSelf) {
         fail(`外部来源 ${s.origin}（provider=${s.provider ?? '缺失'}）缺 license.spdx（未知协议内容不得入库）`)

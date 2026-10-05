@@ -31,6 +31,9 @@ import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { canonicalFile, canonicalize, sha256Canonical } from './canonical.mjs'
+/* PROVIDER 登记表 / PROVIDER_REPOSITORY 仓库地址表 / PROVIDER_UNKNOWN 兜底哨兵
+ * —— 全部只从 provider-rules.mjs 取（本文件不再持有任何一份字面量，见下方注释）。 */
+import { PROVIDER, PROVIDER_REPOSITORY, PROVIDER_UNKNOWN } from './provider-rules.mjs'
 
 const ROOT = path.resolve(process.cwd())
 const VOCAB_DIR = path.join(ROOT, 'content', 'vocabulary')
@@ -48,30 +51,14 @@ const SOURCE = {
 }
 const namespaceOf = (id) => `${SOURCE[id] ?? 'curated'}-${id}`
 
-/** 来源方 → provider（P1.7-Wave4 B-4 溯源字段）：写入 manifest.sources[].provider。
- *
- *  ⚠️ 'geek-typing original' 是自有内容哨兵值，与 src/core/content/provenance.ts 的
- *  PROVIDER_ORIGINAL 常量同源 —— 校验脚本（Node，无法 import TS）按该字面量判定
- *  「自有内容免 SPDX」，两处必须同步修改。
+/* 来源方 → provider（P1.7-Wave4 B-4 溯源字段）：写入 manifest.sources[].provider。
  *  ⚠️ 补 provider/repository 不参与 words 派生 checksum（checksum 只由 words.json 决定），
  *  故 contentChecksum / contentVersion / ContentId 均不变 —— 只是溯源信息更完整。
- *  ECDICT 仓库地址来自 docs/audit-package/08-exam/CET.md 的数据源记载，非臆测。 */
-const PROVIDER_ORIGINAL = 'geek-typing original'
-const PROVIDER = {
-  'ai-core': PROVIDER_ORIGINAL, 'cloud-native': PROVIDER_ORIGINAL, frontend: PROVIDER_ORIGINAL,
-  'ts-code': PROVIDER_ORIGINAL, 'go-code': PROVIDER_ORIGINAL,
-  /* A1-E：Unit 03 — Education 的正式词汇包（32 词，PM 内容侧补齐中文释义）。
-   * ⚠️ 这张表是**显式登记表**，不在表里的包会被写成 provider:'unknown'（溯源字段缺失）。
-   *    新增自研 vocabulary 包必须在这里登记，不要指望 `?? 'unknown'` 兜底。 */
-  'ielts-edu-01-vocab': PROVIDER_ORIGINAL,
-  'ielts-env-02-vocab': PROVIDER_ORIGINAL,
-  /* A3：Unit 05 — Technology & Innovation 的正式词汇包（30 词）。同 A1-E / A2 口径：
-   * 不在表里的包会被写成 provider:'unknown'（该缺口至今无硬门禁，故显式登记以免扩大）。 */
-  'ielts-tech-03-vocab': PROVIDER_ORIGINAL,
-  ielts: 'ecdict', kaoyan: 'ecdict', toefl: 'ecdict', cet4: 'ecdict', cet6: 'ecdict',
-}
-/** 外部来源方 → 仓库地址；自有内容省略 */
-const PROVIDER_REPOSITORY = { ecdict: 'https://github.com/skywind3000/ECDICT' }
+ *  ⚠️ PROVIDER / PROVIDER_REPOSITORY / PROVIDER_UNKNOWN 三个绑定**只能 import 一次**：
+ *  ESM 下重复 import 同一绑定名是 SyntaxError（`Identifier 'PROVIDER' has already been declared`），
+ *  而本文件是 npm 脚本入口 —— 语法错会让 content:build 整个起不来。
+ *  登记表搬去 provider-rules.mjs 之后，这里**不得**再留一份 PROVIDER 字面量：留两份 =
+ *  以后改一处漏一处，与 RELATION_TYPES 的三处 import 漂移同型。要改登记改 provider-rules.mjs 一处。 */
 
 /** manifest 结构版本（**不是内容版本**）。
  *  常量 SCHEMA_VERSION = 4 对应 V4.1-P0.5（schemaVersion/contentVersion 入 manifest）。
@@ -134,7 +121,10 @@ async function main() {
 
     /** 统一 checksum：内容指纹 = sha256(规范化序列化)，与文件排版无关（见文件头 ⑤(a)）。 */
     const checksum = sha256Canonical(words)
-    const provider = PROVIDER[id] ?? 'unknown'
+    /* ⚠️ 兜底**必须保留**（运行时降级：表没登记也要出产物，构建脚本崩了比写出 unknown 更糟），
+     * 但它会把「漏登记」降级成可观测的降级值 ⇒ 由 scripts/gate-provider.mjs 判据 A 在门禁层硬拦。
+     * 两者是同一枚硬币的正反面：兜底保构建，门保溯源 —— 删兜底治不了本问题，只把故障挪到更远的地方爆。 */
+    const provider = PROVIDER[id] ?? PROVIDER_UNKNOWN
     const repository = PROVIDER_REPOSITORY[provider]
     const sources = migrateSources(m, id).map((s) => ({
       ...s,

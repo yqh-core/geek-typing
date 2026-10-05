@@ -45,6 +45,21 @@ jobs:
       # 实测不依赖 dist。
       - name: 内容门禁（content:validate）
         run: npm run content:validate
+      # Provider 覆盖硬门（本刀补的静默失败缺口）：PROVIDER 登记表唯一实现在
+      # scripts/content/provider-rules.mjs（build.mjs 不再持表，只 import）。
+      # 三条判据：A 漏登记/落盘缺失（provider 不得为 unknown 等）、B 孤儿登记（表里的 key 磁盘上必须存在）、
+      # C 外部来源须能在 PROVIDER_REPOSITORY 查到仓库地址（哨兵自有内容豁免）。
+      # 防的是「新内容包落盘但忘了登记 ⇒ build 的 ?? 'unknown' 兜底静默写成 unknown，全仓无门拦」。
+      # 与已登记不变量的关系：邻近 INV-5（来源/版权硬门）但**不是同一条** —— INV-5 管 license.spdx，
+      # 本门管「provider 字段有没有被登记 / 登记得对不对」。**尚未登记为 INV-N**（登记表只有 INV-1..INV-6，
+      # 不擅自扩表）；要立为正式不变量需单独裁定。
+      # 必须排在 content:validate **之后**：content:validate 读 src/core/content/registry.ts，
+      # 而 registry.ts 由 content:generate-registry 生成，新包刚落盘时 validate 会先判「policy=lazy
+      # 但 registry.ts 找不到 localId」共 3 项 —— 新包接入的顺序是 generate-registry → validate。
+      # 自带 --falsify（S1/S2/S3 三条注入 + 判绿对照组）：本地跑 `npm run verify:provider:falsify`
+      # 可复核这道门确实会判红，CI 只跑常规模式（故障注入属证据任务，不进 CI）。
+      - name: Provider 覆盖门禁（gate:provider · 溯源登记）
+        run: npm run verify:provider
       # P18-C′ 注册表生成一致性门：registry.ts 由 scripts/content/generate-registry.mjs 生成，
       # 本门比对「content/ 实际包 ↔ 生成结果 ↔ 磁盘 registry.ts」三者的 localId / policy /
       # ?runtime / 双顺序，有漂移即 EXIT=1。只读 content/ 与 registry.ts，不触碰 dist。

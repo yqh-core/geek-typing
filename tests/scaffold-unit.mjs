@@ -37,11 +37,11 @@ const ROOT = join(HERE, '..')
 const SC = join(ROOT, 'scripts', 'content', 'scaffold-unit.mjs')
 const CONTENT = join(ROOT, 'content')
 const GEN_REG = join(ROOT, 'scripts', 'content', 'generate-registry.mjs')
-const BUILD = join(ROOT, 'scripts', 'content', 'build.mjs')
+const PROVIDER_RULES = join(ROOT, 'scripts', 'content', 'provider-rules.mjs')
 // 待办文案里点了这两个文件的名（E-3/E-4），先确认它们还在原处、结构没被搬走，
 // 否则「提示你改 generate-registry.mjs」会指向一个不存在或已重命名的目标。
 const genRegSrc = readFileSync(GEN_REG, 'utf8')
-const buildSrc = readFileSync(BUILD, 'utf8')
+const providerRulesSrc = readFileSync(PROVIDER_RULES, 'utf8')
 
 const scSrc = readFileSync(SC, 'utf8')
 
@@ -330,7 +330,9 @@ section('E · 静态契约')
   ok('E-3 不自动改 generate-registry.mjs', !/writeFileSync\(\s*GEN_REG/.test(scSrc))
   ok('E-4 不自动改 build.mjs', !/writeFileSync\(\s*BUILD/.test(scSrc))
   ok('E-6 待办指向的 generate-registry.mjs 确实有双顺序表', /ORDER_REGISTRY/.test(genRegSrc) && /ORDER_IMPORT/.test(genRegSrc))
-  ok('E-7 待办指向的 build.mjs 确实有 PROVIDER 登记表', /const PROVIDER = \{/.test(buildSrc))
+  // 表已从 build.mjs 搬到 provider-rules.mjs（本刀的单一实现改造）：指针与断言一起跟着走，
+  // 否则这条会去一个搬空了的文件里找表 —— 断言就会假红，或更糟：假绿（指针失效没人发现）。
+  ok('E-7 待办指向的 provider-rules.mjs 确实有 PROVIDER 登记表', /const PROVIDER = \{/.test(providerRulesSrc))
   ok('E-5 --check 只校验不写盘（写盘前有 process.exit）', /if \(CHECK\)[\s\S]*?process\.exit\(bad === 0 \? 0 : 1\)/.test(scSrc))
 }
 

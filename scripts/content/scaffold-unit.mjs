@@ -4,7 +4,8 @@
  * A1-E 交付 Unit-03 时，除了内容本身，还有 **4 处手工代码改动**：
  *   1. scripts/content/generate-registry.mjs 的 ORDER_IMPORT
  *   2. 同上文件的 ORDER_REGISTRY（两张表**内容必须不同**）
- *   3. scripts/content/build.mjs 的 PROVIDER（不登记会被写成 provider:'unknown'）
+ *   3. scripts/content/provider-rules.mjs 的 PROVIDER（不登记会被写成 provider:'unknown'，
+ *      且旧版这里指 build.mjs —— 表已搬到 provider-rules.mjs，指针得跟着走，否则提示指向空处）
  *   4. src/data/learningUnits.ts 新增单元 + src/i18n/{zh,en}.ts 新增文案键
  * 只加一两个单元时手工没问题；要「产品化内容包扩展」时，这四处就是每次必踩的坑。
  * 本脚本负责 1–3 中能自动化的部分（内容包落盘 + checksum + 顺序表 + PROVIDER），
@@ -28,7 +29,9 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
 const CONTENT = join(ROOT, 'content')
 const GEN_REG = join(HERE, 'generate-registry.mjs')
-const BUILD = join(HERE, 'build.mjs')
+/** PROVIDER 登记表现在住在 provider-rules.mjs（build.mjs 不再持表，见该文件的单一实现注释）。
+ *  ⚠️ 待办打印必须指向这里：指针指向 build.mjs 会让人在已经搬空的文件里找表。 */
+const PROVIDER_RULES = join(HERE, 'provider-rules.mjs')
 
 /** 本地日历日，格式为 YYYY-MM-DD（d 缺省为当前时刻）。
  *  ⚠️ 必须走 getFullYear/getMonth/getDate 拼本地日，**不能**用 toISOString().slice(0,10)：
@@ -353,7 +356,8 @@ for (const p of out) {
  * 而 ORDER_* 是**契约**（目录有但表没收 = 漏注册，会被门判红）。
  * 这里精确打印要加什么，由人改一次；改完跑 content:generate-registry / content:build 即可。 */
 const genSrc = readFileSync(GEN_REG, 'utf8')
-const buildSrc = readFileSync(BUILD, 'utf8')
+// PROVIDER 表已搬到 provider-rules.mjs：待办的「表里有没有这一项」只能查它
+const providerRulesSrc = readFileSync(PROVIDER_RULES, 'utf8')
 const todo = []
 for (const p of out) {
   const { packageId: id, type } = JSON.parse(p.manifestText)
@@ -366,8 +370,8 @@ for (const p of out) {
       : `ORDER_NONVOCAB 加 ${needle}（import 段与注册表段共用这一张表，形态是 type/dir）`
     todo.push(`  · scripts/content/generate-registry.mjs：${where}`)
   }
-  if (type === 'vocabulary' && !buildSrc.includes(`'${id}': PROVIDER_ORIGINAL`)) {
-    todo.push(`  · scripts/content/build.mjs：PROVIDER 表加 '${id}': PROVIDER_ORIGINAL（不登记会被写成 provider:'unknown'，且没有任何门管这个）`)
+  if (type === 'vocabulary' && !providerRulesSrc.includes(`'${id}': PROVIDER_ORIGINAL`)) {
+    todo.push(`  · scripts/content/provider-rules.mjs：PROVIDER 表加 '${id}': PROVIDER_ORIGINAL（不登记会被写成 provider:'unknown'，由 gate:provider 判据 A 硬拦）`)
   }
 }
 todo.push('  · src/data/learningUnits.ts：新增单元（bankId = 词汇包 id，attached 指向 reading / exercise）')

@@ -98,7 +98,8 @@ content/exercise/ielts-env-02-exercise/{items.json,manifest.json}
 |------|--------|------|
 | `scripts/content/generate-registry.mjs` | `ORDER_IMPORT` 与 `ORDER_REGISTRY` 各加 `'ielts-env-02-vocab'` | **只写包名**；两张表内容必须不同（追加同一项不会让它俩相等） |
 | `scripts/content/generate-registry.mjs` | `ORDER_NONVOCAB` 加 `'reading/ielts-env-02-reading'`、`'exercise/ielts-env-02-exercise'` | 形态是 **`type/dir`** |
-| `scripts/content/build.mjs` | `PROVIDER` 加 `'ielts-env-02-vocab': PROVIDER_ORIGINAL` | 不登记会被写成 `provider:'unknown'` |
+| `scripts/content/provider-rules.mjs` | `PROVIDER` 加 `'ielts-env-02-vocab': PROVIDER_ORIGINAL` | 不登记会被写成 `provider:'unknown'` |
+| ↑ 指针更新（provider 门那刀） | 本表**原写在 `scripts/content/build.mjs`**，现已搬到 `provider-rules.mjs` 并成为**全仓唯一实现**（build.mjs 只 import） | 该缺口已由 `npm run verify:provider` 判据 A 硬拦 |
 | `src/data/learningUnits.ts` | 新增 `unit-04`（`bankId:'ielts-env-02-vocab'`，`attached` 指向同单元 reading/exercise 且 `status:'listed'`） | id **必须是 unit-04**（unit-03 已是 Education，不得复用） |
 | `src/i18n/{zh,en}.ts` | 新增 `unit.04.title` / `unit.04.summary` | 沿用既有键位（en.ts:292-293 同位置） |
 
