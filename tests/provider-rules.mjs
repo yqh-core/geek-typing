@@ -19,7 +19,7 @@
  *   F 静态 · PROVIDER 表唯一实现（build.mjs 不得留第二份）
  */
 
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -90,6 +90,29 @@ function makeRoot({ dirs, providers }) {
 
 /** 判据命中的码集合（去重 + 排序，便于精确对账） */
 const codesOf = (problems) => [...new Set(problems.map((p) => p.code))].sort()
+
+/**
+ * 从 package.json 的 scripts **派生**出全部 npm script 入口（F-8 的清单）。
+ *
+ * 派生而非手写：手写清单的失效方式是**静默**的 —— 新增一个 npm 脚本没人会记得
+ * 回去加一行，而漏掉的入口正好是「新增脚本第一次跑不起来」的那次。
+ * 2026-10-05 实测：手写 4 个 vs 实际 50 个入口（覆盖 8%）。
+ *
+ * @returns {string[]} 仓库相对、posix 分隔、已排序去重的入口路径（只含文件真实存在的）
+ */
+function npmScriptEntries() {
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
+  const found = new Set()
+  for (const cmd of Object.values(pkg.scripts ?? {})) {
+    // 形如 `node scripts/xxx.mjs` / `node --experimental-x scripts/xxx.mjs`
+    const matches = String(cmd).match(/node\s+(?:-[\w-]+\s+)*([\w./-]+\.mjs)/g) ?? []
+    for (const m of matches) {
+      const rel = m.replace(/^node\s+/, '').replace(/^-[\w-]+\s+/, '').split('\\').join('/')
+      if (existsSync(join(ROOT, rel))) found.add(rel)
+    }
+  }
+  return [...found].sort()
+}
 
 /* ═══════════════ A · 判据 A：漏登记 / provider 缺失 / unknown ═══════════════ */
 section('A · 判据 A（漏登记 / provider 缺失 / unknown）')
@@ -250,23 +273,24 @@ section('F · 静态契约（PROVIDER 表唯一实现，用读文件+正则，�
   // 只换引用、不动语义：validate.mjs 里不得再有第二份哨兵字面量
   ok('F-7 validate.mjs 哨兵走常量引用（无第二份字面量）', !stripComments(validateSrc).includes("'geek-typing original'"))
 
-  /* F-8 被改过的脚本**能不能被 Node 解析**。
+  /* F-8 每一个 **npm script 入口**都必须能被 Node 真解析。
    * ⚠️ 这条是被真实事故逼出来的：本刀把 PROVIDER 表从 build.mjs 搬走时，同一条
    *    import 被插了两遍，ESM 直接 SyntaxError（Identifier 'PROVIDER' has already been
    *    declared），`npm run content:build` 整个起不来 —— 而 F-1~F-7 全绿、单测 30/30 全绿，
    *    因为它们 import 的是 provider-rules.mjs，**从没加载过 build.mjs**。
    *    静态正则断言查不出重复声明 ⇒ 必须另加一道真解析（node --check）。
-   *    凡是被本刀改过的 npm 脚本入口，都要进这个列表。
+   *
+   * ⚠️⚠️ 清单**从 package.json 自动派生**，不手写。原版手写 4 个文件，A2 收口复核时
+   *    实测发现本刀一共改过 7 个 npm 入口（漏了 scaffold-unit.mjs / tests/e2e.mjs /
+   *    prod-catalog-check.mjs / tests/provider-rules.mjs / tests/scaffold-unit.mjs）——
+   *    也就是说「凡本刀改过的入口都要进这个列表」这条原则**我自己没落实**。
+   *    手写清单的失效方式是静默的：新增一个 npm 入口没人会记得回来加一行。
+   *    派生则天然覆盖全部，且新增脚本自动进门。
    *
    * 三态：真语法错 = FAIL；本机起不动第二个 node 进程（EBUSY，与 gate:lint 同一根因）
    * = UNKNOWN，**既不冒充 PASS 也不冒充 FAIL**，但必须在收尾汇总里喊出来 ——
    * 静默跳过 = 门看起来在跑、其实没跑，比红更坏。真跑得起来的地方是 CI（全新容器）。 */
-  const syntaxTargets = [
-    'scripts/content/build.mjs',
-    'scripts/content/validate.mjs',
-    'scripts/content/provider-rules.mjs',
-    'scripts/gate-provider.mjs',
-  ]
+  const syntaxTargets = npmScriptEntries()
   /** F-9 的已知坏文件用（放临时根，不碰仓库） */
   const TMP2 = mkdtempSync(join(tmpdir(), 'provider-syntax-'))
   /** @returns {{v: 'PASS'|'FAIL'|'UNKNOWN', why: string}} */
@@ -285,9 +309,14 @@ section('F · 静态契约（PROVIDER 表唯一实现，用读文件+正则，�
     else if (verdict === 'UNKNOWN') { console.log(`  ⚠️  ${name} — UNKNOWN：${detail}`); unknown++; unknowns.push(name) }
     else { console.log(`  ❌ ${name}${detail ? ' — ' + detail : ''}`); fail++; failures.push(name) }
   }
+  // 派生本身的有效性：清单不能是空的、也不能少于已知入口数 —— 否则「全绿」是因为什么都没查
+  ok('F-8a npm 入口清单自动派生非空（派生逻辑没坏）', syntaxTargets.length >= 20, `entries=${syntaxTargets.length}`)
+  for (const must of ['scripts/content/build.mjs', 'scripts/content/scaffold-unit.mjs', 'scripts/content/validate.mjs', 'tests/e2e.mjs']) {
+    ok(`F-8b 已知入口在派生清单里（${must}）`, syntaxTargets.includes(must))
+  }
   for (const rel of syntaxTargets) {
     const r = syntaxVerdict(join(ROOT, rel))
-    record(`F-8 ${rel} 可被 Node 解析（重复 import / 语法错会当场判红）`, r.v, r.v === 'FAIL' ? r.why : r.why)
+    record(`F-8 ${rel} 可被 Node 解析（重复 import / 语法错会当场判红）`, r.v, r.why)
   }
 
   /* F-9 元自检：先证明「`node --check` 抓得住重复 import」这件事本身不是空话。
