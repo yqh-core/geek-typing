@@ -1323,7 +1323,15 @@ async function run() {
   await lockLangZh(mctx)
   const mpage = await mctx.newPage()
   const mConsoleErrors = []
-  mpage.on('console', (m) => m.type() === 'error' && mConsoleErrors.push(m.text()))
+  /* 移动端上下文原先**只收 error、丢弃 warning**（对比主上下文 :214-215 是 error+warning 都收）。
+   * 后果：`src/main.tsx` 那句 `[warmBanks] SW 未接管页面：…` 降级 warn 在 CI 上永远进不了日志 ——
+   * 而它正是「预热降级」在产品侧唯一的可观测信号，探针判红时却看不到它，两边对不上账。
+   * 这里补收 warning（error 的收集口径与判据完全不变，不放宽任何断言）。 */
+  const mConsoleWarns = []
+  mpage.on('console', (m) => {
+    if (m.type() === 'error') mConsoleErrors.push(m.text())
+    if (m.type() === 'warning') mConsoleWarns.push(m.text())
+  })
   mpage.on('pageerror', (e) => mConsoleErrors.push(String(e)))
 
   await gotoPage(mpage)
@@ -1380,9 +1388,22 @@ async function run() {
       ? // 清单解析不到 ⇒ 期望包数无法确定 ⇒ 直接判红（与 check-bundle 判据 3/6 的 UNKNOWN 同口径：测不出来 ≠ 通过）
         Promise.resolve({ ok: false, hits: [], why: 'registry.ts 的 WARMUP_IDS 解析不到' })
       : mpage.evaluate(async (need) => {
-          // 诊断字段：失败时必须能区分「SW 没接管 / 缓存没建出来」这类**测不到**，
+          // 诊断字段：失败时必须能区分「SW 没接管 / 缓存没建出来 / 装到一半卡住」这类**测不到**，
           // 和「预热真没把 chunk 写进缓存」这类**测到没通过** —— 混成一句「超时」就又变回不可复核的红灯。
-          const diag = { sawCache: false, ctrl: false }
+          //
+          // ⚠️ 状态维度（本次新增，对应 sw.js 的 precache 超时修复）：
+          //   regState + entries + 已缓存 pathname 三者合起来能一眼看出「装到第几条卡住」：
+          //     - regState 里 installing 还在 ⇒ install 未结束（precache 卡在某一条）；
+          //     - active=activated 但 controller 仍 false ⇒ 装完了却没接管（claim 环节的问题）；
+          //     - entries=0 ⇒ 缓存根本没建出来；
+          //     - 已缓存的 pathname 清单 ⇒ 可直接与 sw.js 的 SHELL 清单比对，看缺哪一条。
+          //   只报「超时」的话，CI 上拿到红灯仍然不知道该去看 SW 的哪一环。
+          const regStateDump = async () => {
+            const reg = await navigator.serviceWorker.getRegistration()
+            if (!reg) return '(无 registration)'
+            return `installing=${reg.installing?.state ?? '-'} waiting=${reg.waiting?.state ?? '-'} active=${reg.active?.state ?? '-'}`
+          }
+          const diag = { sawCache: false, ctrl: false, regState: '(取不到)', entries: -1, cached: [] }
           for (let i = 0; i < 240; i++) {
             try {
               diag.ctrl = !!navigator.serviceWorker.controller
@@ -1391,14 +1412,32 @@ async function run() {
                 diag.sawCache = true
                 const cache = await caches.open('gt-shell-v3')
                 const urls = (await cache.keys()).map((r) => r.url)
+                diag.entries = urls.length
+                // 记下已入库的 pathname 末段（够看清是哪几条），失败时用于定位卡在哪一条
+                diag.cached = urls.map((u) => u.slice(u.lastIndexOf('/') + 1) || '/')
                 // V4-P0：大词库 chunk 从模块名(ielts-*.js)变为 ?raw JSON 命名(words-*.js)
                 const hits = urls.filter((u) => /\/assets\/words-.*\.js/.test(u))
-                if (hits.length >= need) return { ok: true, hits }
+                if (hits.length >= need) {
+                  diag.regState = await regStateDump() // 成功路径也留一份终态，便于对照
+                  return { ok: true, hits, diag }
+                }
               }
             } catch {
               /* SW 未就绪继续等 */
             }
             await new Promise((r) => setTimeout(r, 500))
+          }
+          // 超时了：补记 registration 终态 + 已入缓存条目（循环内可能整体被 catch 跳过）
+          try {
+            diag.regState = await regStateDump()
+            if (diag.sawCache) {
+              const cache = await caches.open('gt-shell-v3')
+              const urls = (await cache.keys()).map((r) => r.url)
+              diag.entries = urls.length
+              diag.cached = urls.map((u) => u.slice(u.lastIndexOf('/') + 1) || '/')
+            }
+          } catch {
+            /* 诊断信息取不到不影响主判据 */
           }
           return { ok: false, hits: [], diag, why: '轮询 120s 超时' }
         }, warmIds.length)
@@ -1536,9 +1575,40 @@ async function run() {
       warm.why,
       `${warm.hits.length} 个 words chunk：${warm.hits.map((u) => u.split('/').pop()).join(', ')}`,
       warm.diag ? `观测：SW 接管=${warm.diag.ctrl} / gt-shell-v3 出现过=${warm.diag.sawCache}` : '',
+      // 状态维度：让红灯能定位到 SW 的哪一环（装到第几条 / 装完了没接管 / 缓存没建出来）
+      warm.diag ? `registration：${warm.diag.regState}` : '',
+      warm.diag ? `缓存条目：${warm.diag.entries} 条 [${warm.diag.cached.join(', ')}]` : '',
     ]
       .filter(Boolean)
       .join(' — '),
+  )
+
+  /* 14.10 降级可观测性（条件式判据，**只在真的降级时才要求**）。
+   *
+   * 判据形状是「若 controller 从未出现 ⇒ 则必须有 warn」，不是「必须有 warn」：
+   *   - 正常接管路径下 main.tsx 不会打那句 warn（它只在 !controller 时打），
+   *     若写成「必须有 warn」，这条判据在健康路径上会恒红 —— 那是判据写错，不是产品有 bug。
+   *   - 降级路径下必须有 warn：这是「静默失效 = 下次还得重新取证」那条教训的机器化。
+   *     main.tsx 原先 `await navigator.serviceWorker.ready` 是裸 await —— install 挂住时
+   *     它永不 resolve ⇒ 后面那句 warn 永远打不出来 ⇒ 降级在日志里**完全不可见**。
+   *     改成有界等待（SW_READY_TIMEOUT_MS）后，worst case 是 20s + 15s 轮询后打出 warn。
+   *
+   * ⚠️ 为什么这里能收得到 warn：移动端上下文原先只收 error、丢弃 warning（见 :1326 附近注释），
+   * 那正是「降级信号在 CI 上永远进不了日志」的独立缺陷，本轮一并修掉（补收 warning）。
+   *
+   * 只收窄不放宽：判据仍然 fail-closed（降级且无 warn ⇒ 判红），
+   * 且不改动上面任何既有断言的严格性。 */
+  const warmDegradeWarns = mConsoleWarns.filter(
+    (w) => w.includes('[warmBanks] SW 未接管页面') || w.includes('[warmBanks] 预热未全覆盖'),
+  )
+  check(
+    '预热降级可观测：controller 从未出现 ⇒ 必须有 [warmBanks] 降级 warn',
+    swCtrl.ok || warmDegradeWarns.length > 0,
+    swCtrl.ok
+      ? `SW 已接管（${swCtrl.ms}ms）⇒ 正常路径不应出现降级 warn（实测 ${warmDegradeWarns.length} 条）`
+      : `controller 从未出现，必须能观察到降级 warn；实测 ${warmDegradeWarns.length} 条：${warmDegradeWarns
+          .slice(0, 2)
+          .join(' | ') || '（无 ⇒ main.tsx 的降级信号仍不可见，本判据判红）'}`,
   )
 
   await mctx.close()
@@ -1812,12 +1882,16 @@ async function run() {
   check('无 console / page 运行时错误', realErrors.length === 0, realErrors.slice(0, 2).join(' | '))
 
   /* ---------------- 用例数锁死（以前只有文档纪律，没有机器断言） ----------------
-   * 项目纪律「e2e 用例数锁死 171，不许增减一条」原先只活在文档陈述里：
-   * 代码里没有任何 ===171 的断言，加减一条 check() 让 CI 照样绿。
+   * 项目纪律「e2e 用例数锁死，不许增减一条」原先只活在文档陈述里：
+   * 代码里没有任何 === N 的断言，加减一条 check() 让 CI 照样绿。
    * 这里把纪律钉成机器判据：断言**实际执行到的 check 总数** == 期望值（不符 ⇒ exit 1）。
-   * 期望值 = `npm run test:e2e` 输出「共 N 项」的实测值（当前 171），不是拍脑袋抄来的。
-   * 想加/减用例 ⇒ 连同这个常量一起改，并在提交里说清为什么 —— 这是刻意的棘轮。 */
-  const E2E_CASES_EXPECTED = 171
+   * 期望值 = `npm run test:e2e` 输出「共 N 项」的实测值，不是拍脑袋抄来的。
+   * 想加/减用例 ⇒ 连同这个常量一起改，并在提交里说清为什么 —— 这是刻意的棘轮。
+   *
+   * 171 → 172：SW precache flaky 修复（CI run 37304973473 门禁③ 169/171）新增一条判据
+   * 「预热降级可观测：controller 从未出现 ⇒ 必须有 [warmBanks] 降级 warn」（14.10，条件式：
+   * 正常接管路径不要求，故不会恒红）。原 171 与文档/记忆里的口径同步 +1，无删除。 */
+  const E2E_CASES_EXPECTED = 172
   if (results.length !== E2E_CASES_EXPECTED) {
     console.error(
       `\n✗ e2e 用例数漂移：实际执行 ${results.length} 项，期望 ${E2E_CASES_EXPECTED} 项` +

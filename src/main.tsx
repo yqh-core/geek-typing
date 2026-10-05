@@ -58,6 +58,23 @@ if (import.meta.env.PROD) {
    * 不能像旧代码那样连一句日志都没有，让缺陷只能靠用户反馈发现。 */
   const SW_CONTROLLER_WAIT_POLLS = 150
 
+  /* `navigator.serviceWorker.ready` 的**有界**等待预算（毫秒）。
+   *
+   * 为什么要给这处加界（这是「自我保护信号」能否活下来的关键）：
+   *   `ready` 的语义是「存在一个 **activated** 的 registration」。而 activation 要求 install 先结束，
+   *   install 结束要求 precacheShell 的 Promise.all settle —— 只要 SW 侧有**一条** precache
+   *   fetch 既不 resolve 也不 reject（CI run 37304973473 就是这个形态），`ready` 就**永不 resolve**。
+   *   原写法 `await navigator.serviceWorker.ready` 是裸 await 一个可能永不 settle 的 promise：
+   *   它挂住 ⇒ 下面的接管轮询到不了 ⇒ 再下面的降级 warn 也到不了 ⇒
+   *   **产品侧唯一的那个降级信号，恰好在最需要它的场景下成了死代码**。
+   *
+   * 取 20s 的依据：必须**大于** SW 侧那条 precache 超时（PRECACHE_FETCH_TIMEOUT_MS = 8s）
+   * 加上 activate + claim 的开销，否则会把「SW 正在正常安装、只是慢」误判为降级；
+   * 同时它与下面的接管轮询预算是**两段独立预算**（20s + 15s），不是把 15s 拉长 ——
+   * 轮询预算 SW_CONTROLLER_WAIT_POLLS 保持 150 不变，本次不靠加时间解决任何问题。
+   * 超时后不抛错、不阻断预热：直接落到下面的降级分支，把那句 warn 说出来（见下）。 */
+  const SW_READY_TIMEOUT_MS = 20000
+
   const conn = (navigator as { connection?: { saveData?: boolean; effectiveType?: string } }).connection
   const slowNetwork = conn?.saveData === true || ['slow-2g', '2g', '3g'].includes(conn?.effectiveType ?? '')
   if (!slowNetwork) {
@@ -66,7 +83,13 @@ if (import.meta.env.PROD) {
       // 否则首访用户预热发生在控制前 → chunk 不入库 → 首次离线仍切不了大词库
       if ('serviceWorker' in navigator) {
         try {
-          await navigator.serviceWorker.ready
+          // 有界等待：ready 若在预算内不 settle（install 挂住），就放弃等待并走降级分支，
+          // 而不是把后面那句 warn 一起挂死。race 的两侧都不 reject，无需 finally 清理定时器
+          // 之外的资源；定时器到点自然结束，不会泄漏。
+          await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((resolve) => setTimeout(resolve, SW_READY_TIMEOUT_MS)),
+          ])
           for (let i = 0; i < SW_CONTROLLER_WAIT_POLLS && !navigator.serviceWorker.controller; i++) {
             await new Promise((r) => setTimeout(r, 100))
           }
