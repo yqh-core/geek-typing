@@ -293,6 +293,8 @@ export const zh: Record<string, string> = {
   'unit.03.summary': '读一篇学术短文 + 15 题 IELTS 题型练习',
   'unit.04.title': 'Unit-04 · IELTS 学术阅读 · Environment',
   'unit.04.summary': '读一篇城市热岛学术短文 + 15 题 IELTS 题型练习',
+  'unit.05.title': 'Unit-05 · IELTS 学术阅读 · Technology',
+  'unit.05.summary': '读一篇医学影像诊断验证的学术短文 + 15 题 IELTS 题型练习',
   'unit.section.reading': '阅读',
   /* 多单元切换（A1）：单元数 > 1 后，「当前单元」不再唯一，必须给用户显式切换入口。
    * `unit.switch` 是切换器的可访问名（aria-label），`unit.current` 标注当前选中项。 */

@@ -293,6 +293,8 @@ export const en: Record<string, string> = {
   'unit.03.summary': 'One academic passage + 15 IELTS-style questions',
   'unit.04.title': 'Unit-04 · IELTS Academic Reading · Environment',
   'unit.04.summary': 'One urban-heat-island academic passage + 15 IELTS-style questions',
+  'unit.05.title': 'Unit-05 · IELTS Academic Reading · Technology',
+  'unit.05.summary': 'One academic passage on the validation of AI-assisted medical imaging + 15 IELTS-style questions',
   'unit.section.reading': 'Reading',
   /* Multi-unit switching (A1): with more than one unit the "current unit" is no longer
    * unique, so the UI needs an explicit switcher. `unit.switch` is its accessible name

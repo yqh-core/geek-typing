@@ -58,6 +58,8 @@ const ORDER_IMPORT = [
   'ielts-edu-01-vocab',
   // A2：Unit 04 — Environment 的正式词汇包（30 词）
   'ielts-env-02-vocab',
+  // A3：Unit 05 — Technology & Innovation 的正式词汇包（30 词，AI 影像诊断验证与责任归属）
+  'ielts-tech-03-vocab',
 ]
 
 /** `packages` 数组的 vocabulary 注册序（实测自 registry.ts 注册表段；**与上面不同**）。 */
@@ -69,6 +71,9 @@ const ORDER_REGISTRY = [
   'ielts-edu-01-vocab',
   // A2：Unit 04 — Environment 的正式词汇包（30 词）
   'ielts-env-02-vocab',
+  // A3：Unit 05 — Technology & Innovation 的正式词汇包（30 词）。两张表**内容必须不同**，
+  // 追加同一项不会让它们相等（前 10 项顺序本就不同），门会逐项比对。
+  'ielts-tech-03-vocab',
 ]
 
 /** 非 vocabulary 包的顺序（import 段与注册表段**恰好相同**，故共用一张表）。 */
@@ -87,6 +92,10 @@ const ORDER_NONVOCAB = [
   // A2：IELTS Academic Unit 02 — Environment（正式内容包，非 demo 探针）
   'reading/ielts-env-02-reading',
   'exercise/ielts-env-02-exercise',
+  // A3：IELTS Academic Unit 03 — Technology & Innovation（正式内容包，非 demo 探针）。
+  // 形态是 `type/dir`（本表两项都用这种形态，与上面 A1-E / A2 一致）。
+  'reading/ielts-tech-03-reading',
+  'exercise/ielts-tech-03-exercise',
 ]
 
 /** 注册表首行注释里的包数说明（随 ORDER_REGISTRY + ORDER_NONVOCAB 变动，生成时同步算）。 */

@@ -65,6 +65,9 @@ const PROVIDER = {
    *    新增自研 vocabulary 包必须在这里登记，不要指望 `?? 'unknown'` 兜底。 */
   'ielts-edu-01-vocab': PROVIDER_ORIGINAL,
   'ielts-env-02-vocab': PROVIDER_ORIGINAL,
+  /* A3：Unit 05 — Technology & Innovation 的正式词汇包（30 词）。同 A1-E / A2 口径：
+   * 不在表里的包会被写成 provider:'unknown'（该缺口至今无硬门禁，故显式登记以免扩大）。 */
+  'ielts-tech-03-vocab': PROVIDER_ORIGINAL,
   ielts: 'ecdict', kaoyan: 'ecdict', toefl: 'ecdict', cet4: 'ecdict', cet6: 'ecdict',
 }
 /** 外部来源方 → 仓库地址；自有内容省略 */

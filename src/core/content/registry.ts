@@ -50,6 +50,7 @@ import tsCodeManifest from '../../../content/vocabulary/ts-code/manifest.json?ru
 import goCodeManifest from '../../../content/vocabulary/go-code/manifest.json?runtime'
 import ieltsEdu01VocabManifest from '../../../content/vocabulary/ielts-edu-01-vocab/manifest.json?runtime'
 import ieltsEnv02VocabManifest from '../../../content/vocabulary/ielts-env-02-vocab/manifest.json?runtime'
+import ieltsTech03VocabManifest from '../../../content/vocabulary/ielts-tech-03-vocab/manifest.json?runtime'
 
 /* ---------------- 非 vocabulary 试金石包（P1.7-Wave4 B-2） ----------------
  * manifest 静态 import（常驻主 chunk，单个 ~1.2 KiB，O(包数) 线性小步涨）；
@@ -69,6 +70,8 @@ import ieltsEdu01ReadingManifest from '../../../content/reading/ielts-edu-01-rea
 import ieltsEdu01ExerciseManifest from '../../../content/exercise/ielts-edu-01-exercise/manifest.json?runtime'
 import ieltsEnv02ReadingManifest from '../../../content/reading/ielts-env-02-reading/manifest.json?runtime'
 import ieltsEnv02ExerciseManifest from '../../../content/exercise/ielts-env-02-exercise/manifest.json?runtime'
+import ieltsTech03ReadingManifest from '../../../content/reading/ielts-tech-03-reading/manifest.json?runtime'
+import ieltsTech03ExerciseManifest from '../../../content/exercise/ielts-tech-03-exercise/manifest.json?runtime'
 
 /* ---------------- inline 小库词条（同步 parse）---------------- */
 import aiCoreWords from '../../../content/vocabulary/ai-core/words.json?raw'
@@ -98,6 +101,7 @@ const loadCloudNative = async () => parseWords((await import('../../../content/v
 const loadFrontend = async () => parseWords((await import('../../../content/vocabulary/frontend/words.json?raw')).default)
 const loadIeltsEdu01Vocab = async () => parseWords((await import('../../../content/vocabulary/ielts-edu-01-vocab/words.json?raw')).default)
 const loadIeltsEnv02Vocab = async () => parseWords((await import('../../../content/vocabulary/ielts-env-02-vocab/words.json?raw')).default)
+const loadIeltsTech03Vocab = async () => parseWords((await import('../../../content/vocabulary/ielts-tech-03-vocab/words.json?raw')).default)
 const loadDemoListening01 = async () => parseData((await import('../../../content/listening/demo-listening-01/items.json?raw')).default)
 const loadDemoAudio01 = async () => parseData((await import('../../../content/audio/demo-audio-01/items.json?raw')).default)
 const loadDemoReading01 = async () => parseData((await import('../../../content/reading/demo-reading-01/items.json?raw')).default)
@@ -110,8 +114,10 @@ const loadIeltsEdu01Reading = async () => parseData((await import('../../../cont
 const loadIeltsEdu01Exercise = async () => parseData((await import('../../../content/exercise/ielts-edu-01-exercise/items.json?raw')).default)
 const loadIeltsEnv02Reading = async () => parseData((await import('../../../content/reading/ielts-env-02-reading/items.json?raw')).default)
 const loadIeltsEnv02Exercise = async () => parseData((await import('../../../content/exercise/ielts-env-02-exercise/items.json?raw')).default)
+const loadIeltsTech03Reading = async () => parseData((await import('../../../content/reading/ielts-tech-03-reading/items.json?raw')).default)
+const loadIeltsTech03Exercise = async () => parseData((await import('../../../content/exercise/ielts-tech-03-exercise/items.json?raw')).default)
 
-/* ---------------- 注册表（12 vocabulary + 12 非 vocabulary = 24 包） ---------------- */
+/* ---------------- 注册表（13 vocabulary + 14 非 vocabulary = 27 包） ---------------- */
 const packages: ContentPackage[] = [
   { manifest: aiCoreManifest, localId: 'ai-core', words: parseWords(aiCoreWords) },
   { manifest: cloudNativeManifest, localId: 'cloud-native', load: loadCloudNative },
@@ -125,6 +131,7 @@ const packages: ContentPackage[] = [
   { manifest: goCodeManifest, localId: 'go-code', words: parseWords(goCodeWords) },
   { manifest: ieltsEdu01VocabManifest, localId: 'ielts-edu-01-vocab', load: loadIeltsEdu01Vocab },
   { manifest: ieltsEnv02VocabManifest, localId: 'ielts-env-02-vocab', load: loadIeltsEnv02Vocab },
+  { manifest: ieltsTech03VocabManifest, localId: 'ielts-tech-03-vocab', load: loadIeltsTech03Vocab },
   { manifest: demoListening01Manifest, localId: 'demo-listening-01', loadData: loadDemoListening01 },
   { manifest: demoAudio01Manifest, localId: 'demo-audio-01', loadData: loadDemoAudio01 },
   { manifest: demoReading01Manifest, localId: 'demo-reading-01', loadData: loadDemoReading01 },
@@ -137,6 +144,8 @@ const packages: ContentPackage[] = [
   { manifest: ieltsEdu01ExerciseManifest, localId: 'ielts-edu-01-exercise', loadData: loadIeltsEdu01Exercise },
   { manifest: ieltsEnv02ReadingManifest, localId: 'ielts-env-02-reading', loadData: loadIeltsEnv02Reading },
   { manifest: ieltsEnv02ExerciseManifest, localId: 'ielts-env-02-exercise', loadData: loadIeltsEnv02Exercise },
+  { manifest: ieltsTech03ReadingManifest, localId: 'ielts-tech-03-reading', loadData: loadIeltsTech03Reading },
+  { manifest: ieltsTech03ExerciseManifest, localId: 'ielts-tech-03-exercise', loadData: loadIeltsTech03Exercise },
 ]
 /** vocabulary 槽位（既有 API 口径：UI / 持久化 / 学习层只看词库包） */
 const vocabularyPackages = packages.filter((p) => p.manifest.type === 'vocabulary')

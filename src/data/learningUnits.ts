@@ -295,6 +295,55 @@ export const LEARNING_UNITS: LearningUnit[] = [
     subtitleStatus: 'placeholder',
     subtitleReasonKey: 'unit.status.subtitlePending',
   },
+  {
+    /* Unit-05 —— A3：IELTS Academic Unit 03「Technology & Innovation」。
+     * 切口是 **AI 辅助医学影像诊断的验证（validation）与责任归属（accountability）**。
+     *
+     * ⚠️ 与 unit-03 / unit-04 是**并列的第三套正式内容包**，不是任何一套的变体：
+     *   bankId 用自己的词汇包 ielts-tech-03-vocab（30 词，与前两套的 bankId 均不共用），
+     *   reading / exercise 也是同前缀的独立包（ielts-tech-03-reading / -exercise）。
+     *   这是**第一个跨题材**的正式内容包（Education / Environment 都是自然-社会描述型，
+     *   本套是术语密集、分层（模型层 / 数据层 / 制度层）的技术-医学文本），
+     *   用来暴露「内容假设写死在题材上」的脚手架隐患。接入路径与前两套同款。
+     *
+     * 词段规模 30 词同样是**内容事实**（PM 的 Unit 03 规格 20–40 词），不是凑门禁。
+     * 30 词的顺序**逐项同序取自检包磁盘 `words.json`**（不是按字母重排、也不是照抄 unit-04），
+     * 前 18 词（algorithm … accountability）恰好构成 Tier A，后 12 词为 Tier B。
+     *
+     * 挂载的两个包都是 status 'listed' —— 它们**有真实载荷**（8 段正文 804 词 / 15 题），
+     * 不是「条目存在但内容没有」的 placeholder。这里不给 reasonKey：
+     * 铁律 2 要求 placeholder 才给原因，给 listed 的条目挂原因文案是自相矛盾的假提示。 */
+    id: 'unit-05',
+    // 本单元自己的词汇包（30 词）；与 unit-01/02/03/04 的 bankId 不同源，属新增内容包。
+    bankId: 'ielts-tech-03-vocab',
+    titleKey: 'unit.05.title',
+    summaryKey: 'unit.05.summary',
+    words: [
+      'algorithm', 'annotation', 'audit', 'benchmark', 'bias', 'cohort',
+      'dataset', 'deployment', 'drift', 'generalisation', 'inference', 'latency',
+      'oversight', 'provenance', 'reproducibility', 'screening', 'validation', 'accountability',
+      'attribute', 'curate', 'curtail', 'displace', 'discriminate', 'embed',
+      'mitigate', 'obscure', 'replicate', 'skew', 'understate', 'corroborate',
+    ],
+    // `words` 的展示镜像（与 words 逐项一致）。理由见 LearningUnit.lexemes 的注释：
+    // UI 域里不出现属性名为 `words` 的词表句柄读。
+    lexemes: [
+      'algorithm', 'annotation', 'audit', 'benchmark', 'bias', 'cohort',
+      'dataset', 'deployment', 'drift', 'generalisation', 'inference', 'latency',
+      'oversight', 'provenance', 'reproducibility', 'screening', 'validation', 'accountability',
+      'attribute', 'curate', 'curtail', 'displace', 'discriminate', 'embed',
+      'mitigate', 'obscure', 'replicate', 'skew', 'understate', 'corroborate',
+    ],
+    wordCount: 30,
+    attached: [
+      // 阅读：8 段正文（804 词）已入库，可消费 ⇒ listed
+      { localId: 'ielts-tech-03-reading', status: 'listed' },
+      // 练习：15 题（10 mcq + 5 tfng，含 answer / explanation / skill）已入库，可作答 ⇒ listed
+      { localId: 'ielts-tech-03-exercise', status: 'listed' },
+    ],
+    subtitleStatus: 'placeholder',
+    subtitleReasonKey: 'unit.status.subtitlePending',
+  },
 ]
 
 /**
