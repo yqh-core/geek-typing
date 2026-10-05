@@ -74,7 +74,7 @@ export const PLANNED_BASELINE = {
 export const ABSOLUTE_BUDGET = {
   'main-chunk-raw': 450000,        // 计划 D-2 给定；相对旧 check-bundle 硬编码 430,080 B 抬升
   'main-chunk-gzip': 145000,       // B-2 八类试金石包 manifest 按设计静态入主 chunk（O(包数) 线性增长）；gzip 因 JSON 高度可重压缩仅微增，留 ~6.7KiB 余量；raw 450,000 不变
-  'words-chunk-raw-single': 1000, // FALSIFY-INJECTION 临时注入（可丢弃）
+  'words-chunk-raw-single': 550000, // 计划 D-2 给定（新增判据：旧 check-bundle 无单 words chunk 上限）
 }
 
 export const REASONS = {
