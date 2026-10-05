@@ -145,8 +145,12 @@ jobs:
     # 兜底超时（关键）：CI run 36308273299 曾因 16 处 networkidle 在最终环境上
     # 挂死 25 分钟且不会自动失败，只能人工 cancel——白白烧 runner 额度且看起来
     # 像「一直在跑」。已在 tests/e2e.mjs 改用 waitUntil:'load' + 显式超时修根因，
-    # 这里是第二层保险：20 分钟到点强制失败。本地实测 e2e 约 2.5 分钟。
-    timeout-minutes: 20
+    # 这里是第二层保险：到点强制失败。本地实测 e2e 约 2.5 分钟。
+    # 预算从 20 调到 30：新增 verify:learning-unit 这条真机脚本（自带 preview 自举
+    # + 完整 CDP 走查 V1/V2/V3/V5），本地实测约 1 分钟，CI 上加装 Chromium 依赖与
+    # 冷启动更慢，20 分钟在慢 runner 上余量太薄 —— 与其留一个会随机超时的预算，
+    # 不如给足余量让超时真的只承担「挂死兜底」这一个职责。
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -163,6 +167,16 @@ jobs:
       # 「npm run preview & + curl 探活」是冗余的）。
       - name: 端到端测试
         run: npm run test:e2e
+      # 学习单元真机验收（Stage 2 V1/V2/V3/V5）。必须排在「安装 Chromium」**之后**：
+      # 本脚本零 Playwright 依赖、自己找浏览器（tests/helpers/chrome.mjs，认
+      # PLAYWRIGHT_BROWSERS_PATH 下的 chromium），没装 Chromium 时它只会报「找不到浏览器」。
+      # `-- --serve` 是显式 opt-in：默认（不带）preview 必须由外部起好，否则脚本直接失败、
+      # 绝不自己偷起一个测错实例；CI 上没有外部 preview，所以这里显式要求它自起
+      # （端口 4175，与 e2e 的 4173 / offline 的 4174 隔离），跑完自动 stop。
+      - name: 学习单元真机验收（verify:learning-unit · V1/V2/V3/V5）
+        run: npm run verify:learning-unit -- --serve
+      # ⚠️ verify:learning-unit:falsify **不进 CI** —— 它做的是故障注入演练（证明门会判红），
+      #    属证据任务；常规模式进门已足够，自证能力本地跑 `npm run verify:learning-unit:falsify` 复核。
 
   # ── 部署：needs 三条闸，任一失败/取消/跳过都不部署 ─────────────────────────
   deploy:

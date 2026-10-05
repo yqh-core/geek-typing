@@ -9,6 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
     "test:e2e": "node tests/e2e.mjs",
+    "verify:learning-unit": "node scripts/verify-learning-unit.mjs",
+    "verify:learning-unit:falsify": "node scripts/verify-learning-unit.mjs --falsify",
     "test:content": "node tests/content-query.mjs",
     "test:queryword-lazy": "node tests/queryword-lazy.mjs",
     "lint:text": "node scripts/scan-mojibake.mjs",

@@ -18,35 +18,15 @@
  * 退出码：断言通过 0，否则 1（供 CI / 人工复跑判红）。
  */
 import { chromium } from 'playwright-core'
-import { existsSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
 import { catalogTotals } from './helpers/catalog-totals.mjs'
+// Chromium/Chrome 可执行文件的查找已抽成共享模块（tests/helpers/chrome.mjs）。
+// 本文件原来持有一份与 tests/e2e.mjs 逐字重复的副本；第三份（scripts/verify-learning-unit.mjs）
+// 是同一段逻辑的**更差**版本（无 CHROME_PATH 兜底、无 Linux 路径 ⇒ ubuntu CI 上必然找不到）。
+// ⚠️ 连带效应：本文件原有的 node:fs / node:path import 只服务于那份本地副本，已随之删除 ——
+//    留着就是 lint 棘轮上的一条新增 warning。
+import { findChrome } from './helpers/chrome.mjs'
 
 const BASE = process.env.E2E_BASE ?? 'https://geek-typing.pages.dev'
-
-function findChrome() {
-  if (process.env.CHROME_PATH) return process.env.CHROME_PATH
-  const candidates = [
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-  ]
-  const agents = join(process.env.USERPROFILE ?? '', '.agent-browser', 'browsers')
-  if (existsSync(agents)) {
-    for (const dir of readdirSync(agents)) {
-      const exe = join(agents, dir, 'chrome.exe')
-      if (existsSync(exe)) candidates.unshift(exe)
-    }
-  }
-  const pwRoot = process.env.PLAYWRIGHT_BROWSERS_PATH ?? join(process.env.HOME ?? '', '.cache', 'ms-playwright')
-  if (existsSync(pwRoot)) {
-    for (const dir of readdirSync(pwRoot)) {
-      if (!dir.startsWith('chromium')) continue
-      const exe = join(pwRoot, dir, 'chrome-linux', 'chrome')
-      if (existsSync(exe)) candidates.unshift(exe)
-    }
-  }
-  return candidates.find((p) => existsSync(p))
-}
 
 const exe = findChrome()
 if (!exe) {

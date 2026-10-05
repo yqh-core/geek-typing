@@ -8,8 +8,6 @@
  *   CHROME_PATH=<chrome.exe>                            # 手动指定浏览器
  */
 import { chromium } from 'playwright-core'
-import { existsSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
 import { ensurePreviewServer, stopPreview } from './preview-server.mjs'
 // 预热清单的解析实现与 check-bundle 判据 3/6 共用（scripts/content/warmup-ids.mjs）：
 // 事实源只有 registry.ts 一个，这里不再自己写一遍正则 —— 两套口径迟早漂移。
@@ -21,6 +19,14 @@ import { readWarmUpIds } from '../scripts/content/warmup-ids.mjs'
 // ⚠️ 连带效应：本文件原有的 HERE / REPO_ROOT（只为 catalogTotals 定位 content/）随之失去用途，
 //    连 dirname / fileURLToPath 一起删干净 —— 留着就是 lint 棘轮上的一条新增 warning。
 import { catalogTotals } from './helpers/catalog-totals.mjs'
+
+// Chromium/Chrome 可执行文件的查找已抽成共享模块（tests/helpers/chrome.mjs）。
+// 本文件原来持有一份逐字副本，另两份（prod-catalog-check.mjs / verify-learning-unit.mjs）
+// 各持一份**更差**的版本 —— 其中 verify-learning-unit 那份连 Linux 路径都没有，
+// 结构上在 ubuntu CI 上跑不起来。三份副本的失效方式都是静默的，故合并为单一实现。
+// ⚠️ 连带效应：本文件原有的 node:fs（existsSync/readdirSync）与 node:path（join）import
+//    只服务于那份本地副本，已随之上文删除 —— 留着就是 lint 棘轮上的一条新增 warning。
+import { findChrome } from './helpers/chrome.mjs'
 
 /* ── Home 内容目录汇总的期望值：**从 content/ 读，不写死** ──
  * 这里原来写死「18 词库 · 9388 词」。A1-E 新增 reading / exercise 两个正式包后变成
@@ -37,31 +43,6 @@ const IS_PROD = process.argv.includes('--prod')
 // 避免连跑时第一条命令的 preview 拆除窗口污染第二条（EVIDENCE-INDEX §9.4）。
 const LOCAL_PORT = 4173
 const BASE = process.env.E2E_BASE ?? (IS_PROD ? PROD_BASE : `http://127.0.0.1:${LOCAL_PORT}`)
-
-function findChrome() {
-  if (process.env.CHROME_PATH) return process.env.CHROME_PATH
-  const candidates = [
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-  ]
-  const agents = join(process.env.USERPROFILE ?? '', '.agent-browser', 'browsers')
-  if (existsSync(agents)) {
-    for (const dir of readdirSync(agents)) {
-      const exe = join(agents, dir, 'chrome.exe')
-      if (existsSync(exe)) candidates.unshift(exe)
-    }
-  }
-  // Playwright 下载的 Chromium（CI / Linux / macOS）
-  const pwRoot = process.env.PLAYWRIGHT_BROWSERS_PATH ?? join(process.env.HOME ?? '', '.cache', 'ms-playwright')
-  if (existsSync(pwRoot)) {
-    for (const dir of readdirSync(pwRoot)) {
-      if (!dir.startsWith('chromium')) continue
-      const exe = join(pwRoot, dir, 'chrome-linux', 'chrome')
-      if (existsSync(exe)) candidates.unshift(exe)
-    }
-  }
-  return candidates.find((p) => existsSync(p))
-}
 
 const results = []
 let failures = 0

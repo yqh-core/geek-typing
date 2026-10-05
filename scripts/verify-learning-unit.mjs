@@ -8,7 +8,10 @@
  *   V2  音频 / 字幕 / 练习三处都有**可见**「待接入」文案，且零 console error、零「点了没反应」
  *   V3  打字 → 背单词 → 复习 → 进度全链路走通，且进度**真的被记下来**（回读 localStorage）
  *
- * 用法：node scripts/verify-learning-unit.mjs [--base http://127.0.0.1:4173] [--keep-screens]
+ * 用法：
+ *   node scripts/verify-learning-unit.mjs [--base http://127.0.0.1:4173] [--keep-screens]
+ *   node scripts/verify-learning-unit.mjs --serve        # 显式让本脚本自起/复用一个 preview
+ *   node scripts/verify-learning-unit.mjs --falsify     # 负向验证：证明这道门确实会判红
  *
  * 设计纪律（沿用本仓既有审计脚本口径）：
  *   - Chrome 必须 --no-proxy-server，否则本机 https_proxy 会拦127.0.0.1 抓出一堆错误页。
@@ -16,9 +19,20 @@
  *   - 失败项不吞：任一 V 判红 ⇒ EXIT=1。
  */
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+// preview 自举（仅 --serve 时才真的起）：与 e2e / offline-audit 共用同一份所有权模型
+// （marker + 探活 + 端口被陌生人占用即报错），不自造第二套。相对路径注意 scripts/ → ../tests/。
+import { ensurePreviewServer, stopPreview } from '../tests/preview-server.mjs'
+// Chromium/Chrome 可执行文件的查找已抽成共享模块（tests/helpers/chrome.mjs）。
+// 本文件原来持有一份**最差**的副本：候选只写死 3 条 Windows 路径、用正斜杠的
+// `C:/Program Files/...`、既无 CHROME_PATH 兜底也无 Linux 路径，findChrome() 找不到时
+// 直接 `throw new Error('no chrome found')` ⇒ 在 ubuntu CI 上结构上必然跑不起来。
+// 现在与 e2e.mjs / prod-catalog-check.mjs 共用同一实现，语义也统一为
+// 「找不到返回 undefined，由调用方报错」。
+import { findChrome } from '../tests/helpers/chrome.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -27,7 +41,18 @@ const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name)
   return i >= 0 ? process.argv[i + 1] : dflt
 }
-const BASE = argOf('--base', 'http://127.0.0.1:4173')
+/* ── --serve：preview 自举的**显式 opt-in**，默认关 ──
+ * 立场不变（不要删）：preview 默认由外部起好；没起就直接失败，**不自己偷起一个**
+ * —— 偷起会让人在测错实例（比如另一个项目占了 4173）时拿到一份「看着全绿」的假证据。
+ * 需要一键自跑时显式加 --serve，此时走 tests/preview-server.mjs 的所有权模型
+ * （marker + 探活 + 端口占用即报错），并在结束时把自己起的那个 stop 掉。
+ *
+ * 端口隔离：e2e 用 4173、offline-audit 用 4174、本脚本 --serve 用 4175，三者互不抢。
+ * 若同时给了 --base，则以 --base 里的端口为准去 ensure（不写死）。 */
+const SERVE_PORT = 4175
+const SERVE = process.argv.includes('--serve')
+const FALSIFY = process.argv.includes('--falsify')
+const BASE = argOf('--base', SERVE ? `http://127.0.0.1:${SERVE_PORT}` : 'http://127.0.0.1:4173')
 const KEEP = process.argv.includes('--keep-screens')
 const OUT = join(ROOT, '_evidence', 'stage2-unit')
 
@@ -36,25 +61,35 @@ const OUT = join(ROOT, '_evidence', 'stage2-unit')
  * 会让它一上来就假红 —— 而红的是「数字过期」，不是「功能坏了」，最容易被误当成功能缺陷去改产品。
  * 现在期望值从 `src/data/learningUnits.ts` 静态派生：默认单元 = LEARNING_UNITS[0]，
  * 取它的 `wordCount`。加单元 / 改词段都不会再让这组判据过期。
- * ⚠️ 解析失败必须 FAIL，绝不退回「当作 100」—— 静默回落正是这类门禁的假绿源。 */
-function expectedWordCount() {
-  const src = readFileSync(join(ROOT, 'src', 'data', 'learningUnits.ts'), 'utf8')
+ * ⚠️ 解析失败必须 FAIL，绝不退回「当作 100」—— 静默回落正是这类门禁的假绿源。
+ *
+ * ⚠️ srcPath 是**可注入**的（默认参数保持原行为不变）：--falsify 需要指向一份
+ *    篡改过的副本，才能在**不碰真 src/** 的前提下证明这道门会判红。 */
+function expectedWordCount(srcPath = join(ROOT, 'src', 'data', 'learningUnits.ts')) {
+  const src = readFileSync(srcPath, 'utf8')
   const units = [...src.matchAll(/\n\s*id: '(unit-[^']+)',[\s\S]*?\n\s*wordCount: (\d+),/g)]
     .map((m) => ({ id: m[1], wordCount: Number(m[2]) }))
-  if (units.length === 0) throw new Error('learningUnits.ts 里解析不出任何单元（id + wordCount）—— 不回落到默认值')
+  if (units.length === 0) throw new Error(`${srcPath} 里解析不出任何单元（id + wordCount）—— 不回落到默认值`)
   return units[0]
 }
-const EXPECTED = expectedWordCount()
 
-const CHROME_CANDIDATES = [
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
-  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-]
-const findChrome = () => {
-  for (const p of CHROME_CANDIDATES) if (existsSync(p)) return p
-  throw new Error('no chrome found')
+/* ── --falsify：在临时根里造一份篡改过的数据层副本，让判据必然 FAIL ──
+ * ⚠️ 绝不碰真 src/、content/ 或任何已跟踪文件 —— 只写 mkdtemp 出来的临时目录。
+ * ⚠️ 必须**自证不是假红**：篡改后若解析出的期望词数与真实值相同（说明替换没生效、
+ *    副本没篡改成功），直接抛错退出，而不是跑出一份全绿报告冒充「门会判红」。 */
+const FALSIFY_TMP = FALSIFY ? mkdtempSync(join(tmpdir(), 'unit-falsify-')) : null
+/** 期望词数的数据源路径：正常模式 = 真 src/；--falsify = 临时篡改副本 */
+let expectedSrcPath = join(ROOT, 'src', 'data', 'learningUnits.ts')
+if (FALSIFY) {
+  const realSrc = readFileSync(expectedSrcPath, 'utf8')
+  // 只替换**第一个** wordCount（= LEARNING_UNITS[0]，也就是 expectedWordCount() 取的那个）
+  const tampered = realSrc.replace(/(\n\s*wordCount: )(\d+)(,)/, '$19999$3')
+  if (tampered === realSrc) throw new Error('篡改失败：learningUnits.ts 里没找到 wordCount —— 不跑假红验证')
+  expectedSrcPath = join(FALSIFY_TMP, 'learningUnits.ts')
+  writeFileSync(expectedSrcPath, tampered, 'utf8')
 }
+const EXPECTED = expectedWordCount(expectedSrcPath)
+const EXPECTED_REAL = FALSIFY ? expectedWordCount() : null
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -116,7 +151,18 @@ function check(vId, name, ok, detail) {
 
 async function main() {
   mkdirSync(OUT, { recursive: true })
+  // --falsify 的自证横幅：先说清「期望词数被换成了篡改副本里的 N」，让后面判红的原因肉眼可辨。
+  // 这一句是「假红自证」的核心 —— 没有它，一份全绿或一份判红都无从解释。
+  if (FALSIFY) {
+    console.log(
+      `\n🚫 [falsify] 期望词数改用**篡改副本**：${join(FALSIFY_TMP, 'learningUnits.ts')}\n` +
+        `   期望词数（篡改副本）= ${EXPECTED.wordCount}（${EXPECTED.id}）` +
+        ` ／ 真实数据层词数 = ${EXPECTED_REAL.wordCount} —— 下面 V1/V1-d 必然判红，这是预期结果。`,
+    )
+  }
   const chrome = findChrome()
+  // 与 e2e.mjs:218-219 一致的报错口径（共享 findChrome 找不到时返回 undefined，不抛错）
+  if (!chrome) throw new Error('找不到 Chromium，请设置 CHROME_PATH')
   const cdpPort = 9345
   const profile = join(ROOT, '.unit-chrome-profile')
 
@@ -142,6 +188,11 @@ async function main() {
       '--no-default-browser-check',
       '--no-proxy-server',
       '--disable-gpu',
+      // CI 专用参数：**仅在 CI 时加**，不污染本机行为。
+      //   --no-sandbox：GitHub Actions 的 ubuntu runner 上，容器内 Chrome 的沙箱起不来，
+      //     不加会直接以 "Running as root without --no-sandbox is not supported" 退出。
+    //   --disable-dev-shm-usage：CI 的 /dev/shm 只有 64MB，不加会随机崩（且崩得莫名其妙）。
+      ...(process.env.CI ? ['--no-sandbox', '--disable-dev-shm-usage'] : []),
       '--window-size=1440,1000',
       'about:blank',
     ],
@@ -300,6 +351,14 @@ const openUnitPanel = async () => {
     const panelTitle = await textOf('unit-title')
     const wordsCount = await textOf('unit-words-count')
     const wordCount = await s.eval(`document.querySelectorAll('[data-testid="unit-word"]').length`)
+    // --falsify 自证：把「期望（篡改副本）」与「页面实测」并排打出来，
+    // 让判红原因肉眼可辨 —— 而不是让人猜「到底是哪条判据、因为什么红了」。
+    if (FALSIFY) {
+      console.log(
+        `  🚫 [falsify] 期望词数（篡改副本）= ${EXPECTED.wordCount} ／ 页面实测词数 = ${wordCount}` +
+          ` ⇒ 不相等，下面 V1-a/V1-b/V1-d 判红是**预期**的（证明这道门确实会因数据不符而判红）`,
+      )
+    }
     check('V1-b', '单元展开视图渲染出标题', panelTitle.length > 0, `unit-title="${panelTitle}"`)
     check('V1-b', `词段计数显示 ${EXPECTED.wordCount}（源自数据层）`,
       wordsCount === String(EXPECTED.wordCount), `unit-words-count="${wordsCount}"`)
@@ -522,10 +581,58 @@ const openUnitPanel = async () => {
   for (const c of checks.filter((x) => !x.ok)) console.log(`  ❌ [${c.vId}] ${c.name} — ${c.detail}`)
   writeFileSync(join(OUT, 'verify-report.json'), JSON.stringify({ base: BASE, checks }, null, 2))
   console.log(`证据：${join(OUT, 'verify-report.json')}`)
-  process.exit(fail === 0 ? 0 : 1)
+  // --falsify 的收尾自证：判红必须**只**来自词数不符，而不是别的什么。
+  // 如果一条都没红，那这份「判红报告」就是假的（篡改没生效 / 判据根本没跑），必须显式说出来。
+  if (FALSIFY) {
+    const redByWordCount = checks.filter((c) => !c.ok && new RegExp(`${EXPECTED.wordCount}`).test(c.name))
+    console.log(
+      `🚫 [falsify] 判红条目共 ${checks.length - pass} 条，其中 ${redByWordCount.length} 条直接由` +
+        `「期望 ${EXPECTED.wordCount} ≠ 实测」触发：[${redByWordCount.map((c) => c.vId).join(', ') || '（无）'}]`,
+    )
+    console.log(
+      redByWordCount.length > 0
+        ? '🚫 [falsify] 结论：门**确实会判红**（不是假红）。'
+        : '🚫 [falsify] 结论：❌ 假红！没有任何判据因词数不符而红 —— 本次 falsify 无效。',
+    )
+  }
+  // 注意：这里**返回**退出码而不是就地 process.exit ——
+  // 就地退出的话，run() 的 finally（停掉自起的 preview / 清理 falsify 临时目录）根本不会跑，
+  // --serve 会在仓库里留下一个孤儿 vite preview 占着端口。
+  // 实际 process.exit 移到 run() 的 finally 之后，退出码语义与原来完全一致。
+  return fail === 0 ? 0 : 1
 }
 
-main().catch((e) => {
+/* ------------------------------------------------------------------ *
+ * 入口：--serve 时自举 preview，结束时把自己起的那个停掉
+ * ------------------------------------------------------------------ */
+async function run() {
+  /** @type {{ owned: boolean, child: object|null, port: number }|null} */
+  let selfStarted = null
+  let exitCode = 1
+  try {
+    if (SERVE) {
+      // 端口以 --base 为准（用户显式指定了就不写死），否则用本脚本专属的 4175
+      const port = Number(new URL(BASE).port || SERVE_PORT)
+      selfStarted = await ensurePreviewServer({ port })
+    }
+    exitCode = await main()
+  } finally {
+    // 只有**自己起的**才停：复用的 preview（owned=false）属于别人，杀了就是破坏现场
+    if (selfStarted?.owned) {
+      stopPreview(selfStarted)
+      console.log(`本次 preview 由 --serve 自起（127.0.0.1:${selfStarted.port}），已 stop。`)
+    } else if (selfStarted) {
+      console.log(`本次复用了已在跑的 preview（127.0.0.1:${selfStarted.port}），未 stop（非本次启动）。`)
+    }
+    if (FALSIFY_TMP) {
+      rmSync(FALSIFY_TMP, { recursive: true, force: true })
+      console.log(`falsify 临时目录已清理：${FALSIFY_TMP}`)
+    }
+  }
+  process.exit(exitCode)
+}
+
+run().catch((e) => {
   console.error('验收失败：', e.message)
   process.exit(1)
 })
