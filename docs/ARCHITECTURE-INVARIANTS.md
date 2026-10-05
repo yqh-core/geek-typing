@@ -171,7 +171,7 @@ perf 门已于 Wave 5 落地（`scripts/gate-perf.mjs`），按「脚本文件�
 | INV-4 | 媒体一律远程，库内出现二进制即 FAIL | `content:validate` **判据 22**（**已建 · 随 `content:validate` 在 CI**，`scripts/content/validate.mjs:172`） | 内容仓扫二进制/大文件，fail-closed（遍历/读取异常即 FAIL，不当 0） | P18-F |
 | INV-5 | 真实素材必须过来源/版权**硬门** | **闸门**：`gate:license`（**已建 · 在 CI** `gate:license`，复用 `license-policy.mjs`） | 缺必填/未知 SPDX/非商用 → 拒 | P18-B |
 | INV-6 | 类型契约唯一，禁止 per-type 散落文件 | **闸门**：`gate:content-type-contract`（**已建 · 未进 CI** ⚠️，另有 `--falsify`） | `CONTENT_TYPE_REGISTRY` 覆盖性 + model 目录无散落 | P18-A/E |
-| **INV-7** | **内容包 provider 溯源登记完整**：每个落盘 content package 必须有明确、合法、且与其来源一致的 provider；禁止 `undefined` / 空串 / `unknown`；外部 provider 必须能解析到登记仓库 | **闸门**：`npm run verify:provider`（`scripts/gate-provider.mjs` + `scripts/content/provider-rules.mjs`，**已建 · 在 CI**；`--falsify` 自带证伪） | 判据 A 漏登记/落盘缺失（provider 非 undefined/空串/`unknown`）· 判据 B 孤儿登记（表 key 磁盘上必须存在，双向失衡同判）· 判据 C 外部来源须在 `PROVIDER_REPOSITORY` 查到仓库（哨兵 `PROVIDER_ORIGINAL` 豁免） | **A2.1（2026-10-05 登记）** |
+| **INV-7** | **内容包 provider 溯源登记完整**：每个落盘 content package 必须有明确、合法、且与其来源一致的 provider；禁止 `undefined` / 空串 / `unknown`；外部 provider 必须能解析到登记仓库 | **闸门**：`npm run verify:provider`（`scripts/gate-provider.mjs` + `scripts/content/provider-rules.mjs`，**已建 · 在 CI**；`--falsify` 自带证伪） | 判据 A 漏登记/落盘缺失（provider 非 undefined/空串/`unknown`）· 判据 B 孤儿登记（表 key 磁盘上必须存在，双向失衡同判）· 判据 C 外部来源须在 `PROVIDER_REPOSITORY` 查到仓库（哨兵 `PROVIDER_ORIGINAL` 豁免） | **A3.1（2026-10-05 登记）** |
 
 > **状态列的实测依据（2026-10-05，A2 收口复核时统一核对）**：原表把 INV-2/4/5 标成
 > 「待建」，实测**三处都早已实装并在 CI 运行** —— 陈旧的是表，不是代码。已按
@@ -182,9 +182,9 @@ perf 门已于 Wave 5 落地（`scripts/gate-perf.mjs`），按「脚本文件�
 >
 > ⚠️ **本表新暴露的两个缺口（不在 CI 的门）**：`gate:perf`（INV-3）与
 > `gate:content-type-contract`（INV-6）脚本都存在，但**都不在 `deploy.yml` 的任何
-> 门禁里**。按 A2.1 纪律条款 ④「不在 CI 里的检查 = 迟早腐坏且无人发现」，
-> 这两条是**下一个同类腐坏点**，已登记为 A2.1 待办（见
-> `docs/content/A2-CLOSURE-AND-NEXT-CUT.md`）—— 需要单独裁定是否并入 A2.1 的
+> 门禁里**。按 A3.1 纪律条款 ④「不在 CI 里的检查 = 迟早腐坏且无人发现」，
+> 这两条是**下一个同类腐坏点**，已登记为 A3.1 待办（见
+> `docs/content/A2-CLOSURE-AND-NEXT-CUT.md`）—— 需要单独裁定是否并入 A3.1 的
 > N2，还是另开一刀；**本刀不擅自把它们塞进 CI**（进 CI 会改变门禁集合与耗时，
 > 属需裁定的范围变更）。
 >

@@ -7,6 +7,14 @@
 > → **本刀 A3（Technology & Innovation，30 词 + ~800 词阅读 + 15 题）**。
 > 本刀是 `content:scaffold-unit` 的**第三个真实用例**，也是第一个**换题材跨领域**的用例。
 
+> **状态：CLOSED（2026-10-05）** —— 收口条件为「拿到 CI 对 `gate:lint` 的权威证据」，
+> 已满足：`37258706788` / `37259990804` / `37279380552` 三个 run 门禁① 全 success，
+> 其中 `gate:lint` 连续三次 **`✅ PASS —— lint warnings 未超过基线`（当前 0 / 基线 0）**。
+> ⇒ 本机那次 UNKNOWN 判定为**环境问题**（EBUSY，本机起不动第二个 node 进程），
+> 按三态纪律保留原样记录在 §4.4（**不把 UNKNOWN 擦成 PASS**），另附 CI 权威判定。
+> 下一刀 = **A3.1 · Engineering Hardening**（不回头插 A2.1，见
+> `docs/content/A2-CLOSURE-AND-NEXT-CUT.md` §L4 的路线更正）。
+
 ---
 
 ## L1 · Product（产品方向）
@@ -170,7 +178,7 @@ content/exercise/ielts-tech-03-exercise/{items.json,manifest.json}
 | collocations | 18 | **18** ✅ |
 | 包数 | 27（vocabulary 13 + 非 vocab 14） | **27**（13 + 14）✅ |
 | 词数基准 | `BASELINE_ITEMS` 9408 → **实测增量**（必须是实测不是估算） | **9438** ✅（= 9408 + 30） |
-| 门禁 | 3.4 **全部绿**，oxlint 0，UI 棘轮（13 / 11 / 11 / 0）**未上调** | 16 门跑完 **14 绿**；`gate:lint` 本机 UNKNOWN（见 §4.4） |
+| 门禁 | 3.4 **全部绿**，oxlint 0，UI 棘轮（13 / 11 / 11 / 0）**未上调** | 16 门跑完 **14 绿**；`gate:lint` 本机 UNKNOWN（EBUSY 环境问题，**CI 上连续三次 PASS** —— 见 §4.4.1） |
 | 幂等 | 源能原样重现磁盘包（含 publish 日期） | `--check` **6/6** ✅（vocab 为「JSON 语义一致（排版不同）」，reading/exercise 逐字节一致） |
 | e2e | 171/171 | **171/171**，首页实测「27 词库 · 9486 词」✅ |
 | unit-05 数据 | words / lexemes 30 项逐项同序全等，且与磁盘 `words.json` 同序同内容 | ✅ 独立提取复核通过（不采信工程师转述） |
@@ -208,15 +216,16 @@ content/exercise/ielts-tech-03-exercise/{items.json,manifest.json}
 
 `HEAD` / `WORKTREE` / `Changed` / `Gates` / `Bundle` / `Regression` / `Boundary` / `Result`。
 
-### 4.4 本刀实跑结果（commit `cf7db16`，未推送）
+### 4.4 本刀实跑结果（commit `cf7db16`；已推送，后续收口见下）
 
 - `HEAD` `cb995e3` → `cf7db16`；14 个文件 +273 / −2；`git status` clean。
-- `Changed`：三包 6 个文件；`generate-registry.mjs` +9；`build.mjs` +3；`learningUnits.ts` +49（unit-05 整块）；
+- `Changed`：三包 6 个文件；`generate-registry.mjs` +9；`build.mjs` +3（**PROVIDER 登记**——
+  ⚠️ 该表此后已搬到 `provider-rules.mjs`，见 §3.3 指针更新行）；`learningUnits.ts` +49（unit-05 整块）；
   `i18n/{zh,en}.ts` 各 +2；`tests/content-query.mjs` +5/−1；`src/core/content/registry.ts`（生成器产物，随接线重生成）。
 - `Bundle`：主 chunk `index-*.js` 422149 B → **426002 B**（gzip 128971 → **129789 B**，+818）；CSS 未变。
 - `Regression`：e2e **171/171**；UI 棘轮 `13 / 11 / 11 / 0` **纹丝未动**；`provider === 'unknown'` 全库 0 个。
 
-**唯一的「不是绿」：`gate:lint` 输出 UNKNOWN。** 它报
+**本机唯一的「不是绿」：`gate:lint` 输出 UNKNOWN。** 它报
 「oxlint 起不来，测量失败：EBUSY —— 本机起不动第二个 node 进程」，
 但 oxlint 本体是好的（经门自己给的分流法实证，不是绕过）：
 
@@ -225,15 +234,38 @@ node_modules/oxlint/bin/oxlint --format=json  →  diagnostics [] , 218 files
 npm run lint  →  Found 0 warnings and 0 errors. 218 files
 ```
 
-判定：**本机环境限制（同时 spawn 第二个 node 被挡），不是仓库门禁失效**，CI 全新容器不复现。
+判定：**本机环境限制（同时 spawn 第二个 node 被挡），不是仓库门禁失效**。
 另外 `package.json` 里**没有叫 `oxlint` 的脚本**（`lint: oxlint`），`gate:lint` 的入口是
 `node scripts/gate-lint.mjs` 调 `lint`。下次收口遇到同现象，先跑 `npm run lint` 拿本体证据，
 不要因为「门是 UNKNOWN」就以为 lint 没跑。
 
+#### 4.4.1 CI 权威判定（收口依据，2026-10-05 补）
+
+A3 CLOSED 的唯一阻塞就是这一条：**本机 UNKNOWN 到底是环境问题还是门失效？**
+不靠推断，靠 CI 上那道门自己的输出：
+
+| run | 门禁① | `gate:lint` 在 CI 的输出 |
+|---|---|---|
+| `37258706788` | success | `✅ PASS —— lint warnings 未超过基线` |
+| `37259990804` | success | 同上 |
+| `37279380552` | success | 同上（`当前 0 条：{}` / `基线 0 条：{}`） |
+
+⇒ **本机 UNKNOWN = 环境问题（EBUSY），仓库门禁在能 spawn 的环境里连续三次 PASS。**
+A3 收口条件满足 ⇒ **A3 = CLOSED**。
+
+⚠️ 纪律提醒（这是本轮最容易被擦掉的一处）：**`oxlint actual result = PASS` 与
+`gate:lint = PASS` 是两个不同命题。** 本机能证明的只是前者（`npm run lint` 0 warning）；
+后者由 CI 证明。把本机 UNKNOWN 直接写成「lint PASS」就是擦掉三态门 —— 上面这段保留
+UNKNOWN 原文就是为此。
+
 ### 4.5 遗留（本刀明确不动，登记在案）
 
-1. `provider:'unknown'` 无硬门禁 —— 本刀保证自己登记进 PROVIDER，不新增该缺口；门禁加不加归下一刀。
-2. `scripts/verify-learning-unit.mjs` 仍未接进 `package.json` / CI（要 preview 服务，属证据任务）。
+1. ~~`provider:'unknown'` 无硬门禁~~ —— **该遗留已于本轮工程刀关闭**：
+   `scripts/content/provider-rules.mjs` + `npm run verify:provider`（判据 A/B/C + `--falsify` 4/4）
+   已建门并进 CI，且已登记为 **INV-7**（`docs/ARCHITECTURE-INVARIANTS.md`）。
+   本文档 §3.3 的 PROVIDER 指针亦已同步更新。**勿再按本条机械执行。**
+2. `scripts/verify-learning-unit.mjs` 仍未接进 `package.json` / CI（要 preview 服务，属证据任务）
+   —— 归下一刀 **A3.1 · Engineering Hardening** 的 N2（四段推进：真跑一次 → package.json → CI → 负向测试）。
 3. 首页「词数」把非词汇 items 也叫「词」的口径，超边界未动（理由见 §4.2）。
 4. `publishedAt` 退出码口径：契约类 `exit(2)` / 内容校验类 `exit(1)`（A2 的 F-2 是 2，既有口径保持不变）。
 5. **A2 / A3 两份落档文档的门序与词数口径有笔误，已在本刀（A3）实测证伪并就地改对**，
