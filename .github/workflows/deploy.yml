@@ -60,6 +60,13 @@ jobs:
       # 可复核这道门确实会判红，CI 只跑常规模式（故障注入属证据任务，不进 CI）。
       - name: Provider 覆盖门禁（gate:provider · 溯源登记）
         run: npm run verify:provider
+      # 配套单测（做故障注入 + 证明 F-8 真解析得动脚本入口）。
+      # ⚠️ **这道 step 不能省**：verify:provider 只 import provider-rules.mjs，
+      # 从不加载 build.mjs —— 本刀就出现过「门与单测全绿、而 `npm run content:build`
+      # 因重复 import 直接 SyntaxError 起不来」。只有本 step 会真去解析那些入口文件。
+      # 本机 EBUSY 时 F-8/F-9 会判 UNKNOWN（既不算过也不算红），由本 CI 兜底执行。
+      - name: Provider 规则测试（test:provider-rules · 含脚本入口真解析）
+        run: npm run test:provider-rules
       # P18-C′ 注册表生成一致性门：registry.ts 由 scripts/content/generate-registry.mjs 生成，
       # 本门比对「content/ 实际包 ↔ 生成结果 ↔ 磁盘 registry.ts」三者的 localId / policy /
       # ?runtime / 双顺序，有漂移即 EXIT=1。只读 content/ 与 registry.ts，不触碰 dist。

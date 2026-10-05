@@ -40,7 +40,9 @@ const ROOT = join(HERE, '..')
 
 let pass = 0
 let fail = 0
+let unknown = 0
 const failures = []
+const unknowns = []
 function ok(name, cond, detail = '') {
   if (cond) {
     console.log(`  ✅ ${name}${detail ? ' — ' + detail : ''}`)
@@ -252,23 +254,60 @@ section('F · 静态契约（PROVIDER 表唯一实现，用读文件+正则，�
    *    declared），`npm run content:build` 整个起不来 —— 而 F-1~F-7 全绿、单测 30/30 全绿，
    *    因为它们 import 的是 provider-rules.mjs，**从没加载过 build.mjs**。
    *    静态正则断言查不出重复声明 ⇒ 必须另加一道真解析（node --check）。
-   *    凡是被本刀改过的 npm 脚本入口，都要进这个列表。 */
-  for (const rel of ['scripts/content/build.mjs', 'scripts/content/validate.mjs', 'scripts/content/provider-rules.mjs', 'scripts/gate-provider.mjs']) {
-    let detail = ''
-    let pass2 = true
+   *    凡是被本刀改过的 npm 脚本入口，都要进这个列表。
+   *
+   * 三态：真语法错 = FAIL；本机起不动第二个 node 进程（EBUSY，与 gate:lint 同一根因）
+   * = UNKNOWN，**既不冒充 PASS 也不冒充 FAIL**，但必须在收尾汇总里喊出来 ——
+   * 静默跳过 = 门看起来在跑、其实没跑，比红更坏。真跑得起来的地方是 CI（全新容器）。 */
+  const syntaxTargets = [
+    'scripts/content/build.mjs',
+    'scripts/content/validate.mjs',
+    'scripts/content/provider-rules.mjs',
+    'scripts/gate-provider.mjs',
+  ]
+  /** F-9 的已知坏文件用（放临时根，不碰仓库） */
+  const TMP2 = mkdtempSync(join(tmpdir(), 'provider-syntax-'))
+  /** @returns {{v: 'PASS'|'FAIL'|'UNKNOWN', why: string}} */
+  const syntaxVerdict = (absPath) => {
     try {
-      execFileSync(process.execPath, ['--check', join(ROOT, rel)], { stdio: 'pipe' })
+      execFileSync(process.execPath, ['--check', absPath], { stdio: 'pipe' })
+      return { v: 'PASS', why: '' }
     } catch (e) {
-      pass2 = false
-      detail = String(e.stderr ?? e.message).split('\n').find((l) => l.includes('Error')) ?? String(e.message)
+      const msg = String(e.stderr ?? e.message)
+      if (/EBUSY|EPERM|ENOMEM|spawn/i.test(msg)) return { v: 'UNKNOWN', why: '本机起不动第二个 node 进程（EBUSY，同 gate:lint 根因）' }
+      return { v: 'FAIL', why: msg.split('\n').find((l) => l.includes('Error')) ?? msg.trim() }
     }
-    ok(`F-8 ${rel} 可被 Node 解析（重复 import / 语法错会当场判红）`, pass2, detail)
   }
+  const record = (name, verdict, detail) => {
+    if (verdict === 'PASS') { console.log(`  ✅ ${name}${detail ? ' — ' + detail : ''}`); pass++ }
+    else if (verdict === 'UNKNOWN') { console.log(`  ⚠️  ${name} — UNKNOWN：${detail}`); unknown++; unknowns.push(name) }
+    else { console.log(`  ❌ ${name}${detail ? ' — ' + detail : ''}`); fail++; failures.push(name) }
+  }
+  for (const rel of syntaxTargets) {
+    const r = syntaxVerdict(join(ROOT, rel))
+    record(`F-8 ${rel} 可被 Node 解析（重复 import / 语法错会当场判红）`, r.v, r.v === 'FAIL' ? r.why : r.why)
+  }
+
+  /* F-9 元自检：先证明「`node --check` 抓得住重复 import」这件事本身不是空话。
+   * 只测「好文件能过」的门 = 恒真门；这里造一个**已知坏**文件，期望它被抓。 */
+  const dup = join(TMP2, 'dup-import.mjs')
+  writeFileSync(dup, "import { a } from './x.mjs'\nimport { a } from './x.mjs'\n", 'utf8')
+  {
+    const { v, why } = syntaxVerdict(dup)
+    if (v === 'UNKNOWN') record('F-9 元自检：node --check 抓得住重复 import', 'UNKNOWN', `${why}（元自检跳过）`)
+    else record('F-9 元自检：node --check 抓得住重复 import', v === 'FAIL' ? 'PASS' : 'FAIL', v === 'FAIL' ? '坏文件如预期被判错（检测器有效）' : `坏文件竟然通过了（${why}）⇒ 检测器无效，F-8 是恒真门`)
+  }
+  rmSync(TMP2, { recursive: true, force: true })
 }
 
 /* ── 收尾 ── */
 console.log('\n────────────────────────────────────────────────────────────────────')
-console.log(`provider-rules 测试：${pass} 通过 / ${fail} 失败（共 ${pass + fail} 条）`)
+console.log(`provider-rules 测试：${pass} 通过 / ${fail} 失败${unknown > 0 ? ` / ${unknown} UNKNOWN` : ''}（共 ${pass + fail + unknown} 条）`)
+if (unknown > 0) {
+  console.warn(`⚠️  ${unknown} 条 UNKNOWN（本机 EBUSY，跑不动第二个 node 进程）：`)
+  for (const u of unknowns) console.warn(`  · ${u}`)
+  console.warn('   UNKNOWN 既不算通过也不算失败，但**它们这次确实没被验证** —— 由 CI（全新容器）兜底执行。')
+}
 if (fail > 0) {
   console.error('失败用例：')
   for (const f of failures) console.error(`  · ${f}`)

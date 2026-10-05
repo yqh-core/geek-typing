@@ -23,6 +23,7 @@
     "verify:p17-frozen": "node scripts/verify-p17-frozen.mjs",
     "verify:provider": "node scripts/gate-provider.mjs",
     "verify:provider:falsify": "node scripts/gate-provider.mjs --falsify",
+    "test:provider-rules": "node tests/provider-rules.mjs",
     "stress:review": "node scripts/stress-review.mjs",
     "icons": "node scripts/gen-icons.mjs",
     "content:validate": "node scripts/content/validate.mjs",
