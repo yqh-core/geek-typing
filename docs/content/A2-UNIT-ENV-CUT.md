@@ -107,12 +107,19 @@ content/exercise/ielts-env-02-exercise/{items.json,manifest.json}
 
 ### 3.4 门禁（只许降不许升，禁止上调任何棘轮）
 
-`content:validate` → `content:generate-registry`（写 registry.ts）→ `content:build`
+`content:generate-registry`（写 registry.ts）→ `content:validate` → `content:build`
 → `verify:registry` → `test:generate-registry` → `test:scaffold-unit`
 → `test:content` → `test:ui-contract` → `gate:license` → `gate:architecture`
 → `verify:manifests` → `verify:p17-frozen` → `npm run build` → `check:bundle` → `test:e2e`
 → oxlint（基线 0）。
 
+> ⚠️ ⚠️ **本段门序已于 A3（`cf7db16`）更正过一次 —— 原写法会让 `content:validate` 判红 3 项。**
+> `content:validate` 读的是 `src/core/content/registry.ts`，而 registry.ts 由
+> `content:generate-registry` 生成；新包刚落盘、registry 未重生成时，validate 会报
+> 「policy=lazy，但 registry.ts 中找不到 localId: 'ielts-env-02-*' 的注册项」。
+> A2 当时没实测到这条（顺序写反了），A3 落档才证伪。**以 A3 文档 `A3-UNIT-TECH-CUT.md` §3.4 的
+> 现序为准**，下一刀别再按本文件旧序跑。
+>
 > ⚠️ 序列里 `npm run build` **不能省**（本刀实测踩过）：`check:bundle` 与 `test:e2e`
 > 都读 `dist/`，`dist/` 陈旧时它们在加包后立刻假红，容易被误分诊成功能缺陷。
 >
@@ -132,7 +139,14 @@ content/exercise/ielts-env-02-exercise/{items.json,manifest.json}
 
 | 判据 | 要求 | 实测 | 来源 |
 |------|------|------|------|
-| 阅读正文词数 | **700–900**，不虚报 | **814**（纯字母 token 824）✅ | 对 `items.json` 的 `body` 实测 |
+| 阅读正文词数 | **700–900**，不虚报 | **814**（按空白切分）✅ | 对 `items.json` 的 `body` 实测 |
+
+> ℹ️ **本行原写作「814（纯字母 token 824）」，A3（`cf7db16`）复核后措辞改准、数字未变：**
+> 三个口径都是实测值 —— **814** = 按空白切分（含 `built-up,` 这类带标点 token）→ **对外主口径**；
+> **824** = `[A-Za-z]+` 字母串数；**715** = `^[A-Za-z]+$` 完全命中、不含标点与连字符的整词。
+> 原句把 824 标成「纯字母 token」是**命名不精确**（824 属于字母串口径，不是整词口径），
+> 数本身没编错；A3 复核时我曾误判它为笔误并想改掉，实测后已撤销该改法。
+> ⚠️ 复算方法见 A3 文档 §4.1（一整个正文给三个数，报数必带口径）。
 | 词汇数 | 30 | **30** ✅ | `words.json` 长度 |
 | 题目数 | 15，MCQ / TFNG / Vocab 三族齐备 | **15**（mcq 10 + tfng 5；Vocab in context 5 题）✅ | 磁盘真值 |
 | collocations | 18 | **18** ✅ | 磁盘真值 |
@@ -149,6 +163,9 @@ content/exercise/ielts-env-02-exercise/{items.json,manifest.json}
   与首页「内容目录汇总」用的是这个口径。
 - 差 **46** = 8 个非词汇类型的全部条目：
   audio 5 + collection 5 + exercise 7 + listening 6 + reading 8 + speaking 5 + topic 5 + writing 5。
+- ⚠️ **46 不是常量**：A3（`cf7db16`）后差值变 **48**，因为本单元新增的
+  `ielts-tech-03-reading` 1 条 + `ielts-tech-03-exercise` 1 条都进全类型统计、不进 vocabulary-only。
+  **每加一套「词汇 + 阅读 + 练习」三件套，差值 +2**。完整推导见 A3 文档 §4.2。
 - 这不是本刀引入的缺陷：`tests/e2e.mjs:22-26` 的注释已说明「`totalItems` 统计的是所有类型的
   条目，所以一篇 reading 篇章也计 1…… UI 文案把 items 一律叫「词」的老问题，本刀不改（超边界）」。
 - PM 定：**继续不改**首页口径；但本文件记下差值与拆分，下一轮要动这个口径时不必重新推导。
