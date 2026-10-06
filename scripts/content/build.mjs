@@ -67,8 +67,11 @@ const namespaceOf = (id) => `${SOURCE[id] ?? 'curated'}-${id}`
 const SCHEMA_VERSION = 4
 /** 构建工具版本：写入 manifest.build.toolVersion，用于追溯「这份 manifest 是哪版工具产出的」 */
 const TOOL_VERSION = 'content-build/1.1'
-const MIT = { spdx: 'MIT', name: 'MIT License', url: 'https://opensource.org/licenses/MIT', attributionRequired: false, commercialUse: true }
-const SELF = { name: 'Proprietary (self-curated)', attributionRequired: false, commercialUse: true }
+/** 许可常量：`redistributable` 是**必填**的显式声明（license-policy:decideLicense 第三维，
+ *  缺失即判红）—— 故两个常量都必须带它，否则本脚本产出的 manifest 过不了自己的许可门。 */
+const MIT = { spdx: 'MIT', name: 'MIT License', url: 'https://opensource.org/licenses/MIT', attributionRequired: false, commercialUse: true, redistributable: true }
+/** 自有内容默认**不可**再分发（保持原「专有」语义）；确需开源时由内容作者显式改 true。 */
+const SELF = { name: 'Proprietary (self-curated)', attributionRequired: false, commercialUse: true, redistributable: false }
 
 /** 版本三元组 field 集合：写 manifest 时先从副本里 delete 再按固定顺序展开，
  *  避免对象字面量重复键，也避免脚本版本字段散落在 base 里导致键序漂移。 */

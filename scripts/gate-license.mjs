@@ -25,6 +25,12 @@
  *   2c. 每条 `sources[]` 的 `checksum` 必须存在，且**等于载荷实体的完整 SHA-256**
  *      （冻结 Plan §4.1 `:160`；用 `license-policy.mjs` 的 `checksumPayload`，与 `content:validate`
  *       判据 6 共用同一个 helper —— 不许出现第三份哈希实现）
+ *   2d. 每条 `sources[]` 的 `license.redistributable` 必须**显式**声明为布尔（**fail-closed**：
+ *       缺失/非布尔 ⇒ 判红）。这是「公开分发声明」的第三维 —— 本门此前只校验了
+ *      `commercialUse`（能否商用）与 `attributionRequired`（是否必须署名）两维，
+ *      「可否再分发」只活在 license-policy.mjs 的注释里，是**已证实的假绿盲区**。
+ *      显式 `false` 合法（判据只强制表态，不强制为 true），故 14 个自有专有非词库包
+ *      以 `redistributable:false` 如实记录「不可再分发」，13 个 MIT 词库包为 `true`。
  *   3. 包级 `licenses` 表（若存在）逐条判定（同 2 的口径）
  *   4. 每个 asset 走 `checkManifestAssets` 的**全规则**（assetId 语法/归属 · checksum 形状 ·
  *      url 必须 https · 许可二选一与 licenseRef 解析 · provenance）
@@ -418,8 +424,10 @@ const FALSIFY_CONTENT = join(FALSIFY_DIR, 'content')
 /** 证伪基准包（选 topic 试金石：无资产、单来源、结构最小，便于精确注入） */
 const BASE_PKG = join('topic', 'demo-topic-01')
 
-/** 合法许可 / 合法资产构件（对照组与多数用例的"其余部分保持绿"基座） */
-const MIT = { name: 'MIT License', spdx: 'MIT', attributionRequired: false, commercialUse: true }
+/** 合法许可 / 合法资产构件（对照组与多数用例的"其余部分保持绿"基座）
+ *  ⚠️ `redistributable: true` 是**必填**的显式声明（license-policy 第三维，缺失即 rejected）
+ *     —— 本常量代表「一份合法许可」，故必须把三维度表态齐全，否则对照组会被自己的门禁判红。*/
+const MIT = { name: 'MIT License', spdx: 'MIT', attributionRequired: false, commercialUse: true, redistributable: true }
 /** 64 位小写 hex（checksum 形状合法） */
 const GOOD_CHECKSUM = `sha256:${'a1'.repeat(32)}`
 /** 外部来源方标识（非自有哨兵 ⇒ 许可真走判定矩阵，而不是被哨兵短路成 allowed） */
@@ -471,7 +479,7 @@ const CASES = [
     mutate: (m) => {
       const c = clone(m)
       c.sources[0].provider = EXTERNAL
-      c.sources[0].license = { name: 'ECDICT dataset', commercialUse: true, attributionRequired: true, attribution: '© ECDICT' }
+      c.sources[0].license = { name: 'ECDICT dataset', commercialUse: true, attributionRequired: true, attribution: '© ECDICT', redistributable: true }
       return c
     },
   },
@@ -483,7 +491,7 @@ const CASES = [
     mutate: (m) => {
       const c = clone(m)
       c.sources[0].provider = EXTERNAL
-      c.sources[0].license = { name: 'CC BY-NC 4.0', spdx: 'CC-BY-NC-4.0', commercialUse: true, attributionRequired: true, attribution: '© CC' }
+      c.sources[0].license = { name: 'CC BY-NC 4.0', spdx: 'CC-BY-NC-4.0', commercialUse: true, attributionRequired: true, attribution: '© CC', redistributable: false }
       return c
     },
   },
@@ -495,7 +503,7 @@ const CASES = [
     mutate: (m) => {
       const c = clone(m)
       c.sources[0].provider = EXTERNAL
-      c.sources[0].license = { name: 'CC BY-SA 4.0', spdx: 'CC-BY-SA-4.0', commercialUse: true, attributionRequired: true, attribution: '© CC' }
+      c.sources[0].license = { name: 'CC BY-SA 4.0', spdx: 'CC-BY-SA-4.0', commercialUse: true, attributionRequired: true, attribution: '© CC', redistributable: true }
       return c
     },
   },
@@ -581,7 +589,7 @@ const CASES = [
     mutate: (m) => {
       const c = clone(m)
       c.provenance = { provider: EXTERNAL }
-      c.licenses = { bad: { name: 'CC BY-NC 4.0', spdx: 'CC-BY-NC-4.0', commercialUse: true, attributionRequired: true, attribution: '© CC' } }
+      c.licenses = { bad: { name: 'CC BY-NC 4.0', spdx: 'CC-BY-NC-4.0', commercialUse: true, attributionRequired: true, attribution: '© CC', redistributable: false } }
       return c
     },
   },
@@ -616,7 +624,7 @@ const CASES = [
     mutate: (m) => {
       const c = clone(m)
       c.sources[0].provider = EXTERNAL
-      c.sources[0].license = { name: 'MIT License', spdx: 'MIT', commercialUse: true, attributionRequired: true }
+      c.sources[0].license = { name: 'MIT License', spdx: 'MIT', commercialUse: true, attributionRequired: true, redistributable: true }
       return c
     },
   },
@@ -628,7 +636,7 @@ const CASES = [
     mutate: (m) => {
       const c = clone(m)
       c.sources[0].provider = EXTERNAL
-      c.sources[0].license = { name: 'MIT License', spdx: 'MIT', commercialUse: true, attributionRequired: true, attribution: '© 2026 Acme Records' }
+      c.sources[0].license = { name: 'MIT License', spdx: 'MIT', commercialUse: true, attributionRequired: true, attribution: '© 2026 Acme Records', redistributable: true }
       return c
     },
   },
@@ -651,6 +659,56 @@ const CASES = [
     mutate: (m) => {
       const c = clone(m)
       c.sources[0].checksum = `sha256:${'00'.repeat(32)}`
+      return c
+    },
+  },
+  /* —— 公开分发声明第三维：license.redistributable（可否再分发）——
+   *此前该维度**只存在于 license-policy.mjs 的注释里**，无任何机器判据（假绿盲区）。 */
+  {
+    letter: 'S9',
+    name: 'source license 缺 redistributable（删掉该字段）',
+    why: '第三维 fail-closed：「可否再分发」必须**显式**声明。字段缺失 = UNKNOWN ≠ 允许'
+      + '（若判绿，「没写」就被当成「可以」—— 正是本条判据要消灭的假绿形态）',
+    expect: ['LICENSE_REJECTED'],
+    mutate: (m) => {
+      const c = clone(m)
+      delete c.sources[0].license.redistributable
+      return c
+    },
+  },
+  {
+    letter: 'S9b',
+    name: 'source license.redistributable 非布尔（字符串 "true" 而非 true）',
+    why: '第三维要求**布尔**类型：字符串 "false" 是 JS 假值的经典陷阱（typeof判true、比较判false），'
+      + '必须显式判红而不是含糊放过',
+    expect: ['LICENSE_REJECTED'],
+    mutate: (m) => {
+      const c = clone(m)
+      c.sources[0].license.redistributable = 'true'
+      return c
+    },
+  },
+  {
+    letter: 'S10',
+    name: '对照组：redistributable=false（显式声明「不可再分发」）→ 仍判绿',
+    why: '证明第三维不是恒红、且**不越界误伤**：判据只强制「必须表态」，不强制「必须为 true」——'
+      + '否则等于用门禁逼所有内容开源。显式 false 是合法且被如实记录的事实（自有专有内容即此档）',
+    expect: [],
+    mutate: (m) => {
+      const c = clone(m)
+      c.sources[0].license.redistributable = false
+      return c
+    },
+  },
+  {
+    letter: 'S11',
+    name: '对照组：redistributable=true（显式声明「可再分发」）→ 判绿',
+    why: '与 S10 成对：true / false **两档都必须能判绿**，证明判据校验的是「有无显式声明」'
+      + '而非「必须为 true」；本轮 13 个词库包即 true 档，构成机器可读的「可开源」白名单',
+    expect: [],
+    mutate: (m) => {
+      const c = clone(m)
+      c.sources[0].license.redistributable = true
       return c
     },
   },

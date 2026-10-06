@@ -15,11 +15,29 @@
  *  [0] 公开分发声明（冻结 Plan §4.1 门禁规则 `:157` / `:158`）—— **对自有内容同样适用**：
  *      · `license.commercialUse !== true`（**字段缺失也算「不 true」**）             → rejected（§4.1 :157）
  *      · `license.attributionRequired === true` 且 `license.attribution` 为空/仅空白 → rejected（§4.1 :158）
+ *      · `license.redistributable` **缺失 / 非布尔**                → rejected（公开分发声明第三维，见下）
  *      为什么排在自有哨兵**之前**：自有内容的「license 自主」只意味着**不强制要求 SPDX**；
  *      而这两条是「公开分发声明」（能不能再分发 / 必须署名），属**分发**层面的事实，
  *      与内容是否自家整理无关 —— 故对自有内容**同样生效**，不能被哨兵短路掉。
  *      边界：结构化 `license` 对象整体缺失时本段跳过（无法评估），交给 [2]（外部 ⇒ rejected）
  *      或 [1]（自有 ⇒ allowed）按既有口径处置。
+ *
+ * ── 为什么新增 `redistributable`（本文件此前的公开分发声明只有两维）──
+ *   本文件历史注释把「能不能再分发」与「是否必须署名」并列为**公开分发声明**的两条
+ *   （见上方 [0] 与 `gate-license.mjs` 头部），但实际落地的机器判据只覆盖了
+ *   `commercialUse`（能否商用，§4.1 :157）与 `attributionRequired`+`attribution`
+ *   （是否必须署名且给了文本，§4.1 :158）—— **「可否再分发」从未有任何机器断言**，
+ *   它只活在注释里。
+ *   ⇒ 门禁对「一份声明了 commercialUse:true 却禁止再分发」的内容**照样全绿**，
+ *      这正是本仓反复吃过的「门禁盲区 ⇒ 缺陷一路过 CI」同型病（假绿）。
+ *   故新增第三维 `redistributable: boolean`，**显式声明**该来源是否允许再分发：
+ *     · 字段**缺失**或**非布尔** ⇒ rejected（**fail-closed**：无声明 ≠ 允许再分发，
+ *       与「缺失即视为允许」的假绿形态正好相反；沿用本项目「UNKNOWN 视为不通过」纪律）。
+ *     · 显式 `false` ⇒ **合法且被如实记录**（内容确实不可再分发，如 Proprietary 自有内容）：
+ *       判据只强制「必须表态」，不强制「必须为 true」—— 否则等于用门禁逼所有内容开源。
+ *     · 显式 `true` ⇒ 允许再分发（本轮 13 个词库包即此档，构成机器可读的「可开源」白名单）。
+ *   字段语义与 `commercialUse` 正交：NC 协议常`commercialUse:false` 但**允许**非商业再分发，
+ *   两者不可互相推导，故必须各自显式声明。
  *  [1] 自有内容（provider 哨兵 PROVIDER_ORIGINAL） → allowed（license 自主：不强制要求 SPDX）
  *  [2] 结构化 license 缺失                        → rejected（无 license ⇒ 判红）
  *  [3] MIT / Apache*                              → allowed
@@ -132,9 +150,19 @@ export function decideLicense(source) {
   const lic = source?.license
   const structured = lic !== null && typeof lic === 'object' && !Array.isArray(lic)
 
-  // [0] 公开分发声明（冻结 Plan §4.1 :157 / :158）—— 对自有内容同样适用，故排在自由哨兵之前。
-  //     「自有内容 license 自主」只豁免 SPDX；能否再分发 / 是否必须署名是分发层面的事实。
+  // [0] 公开分发声明（冻结 Plan §4.1 :157 / :158 + 本轮新增第三维）—— 对自有内容同样适用，
+  //     故排在自有哨兵之前。「自有内容 license 自主」只豁免 SPDX；
+  //     能否商用 / 能否再分发 / 是否必须署名都是**分发层面**的事实。
   if (structured) {
+    // 第三维：可否再分发必须**显式**声明。缺失/非布尔 ⇒ 判红（fail-closed）：
+    // 「没写」是 UNKNOWN，不是「允许」—— 那正是本文件此前注释里承诺、却无机器判据的假绿形态。
+    if (typeof lic.redistributable !== 'boolean') {
+      return {
+        decision: 'rejected',
+        reason: `license.redistributable=${JSON.stringify(lic.redistributable)} 不是布尔值（字段缺失同样不算声明）`
+          + ' ⇒ rejected：可否再分发必须显式声明，UNKNOWN ≠ 允许（公开分发声明第三维）',
+      }
+    }
     if (lic.commercialUse !== true) {
       return {
         decision: 'rejected',

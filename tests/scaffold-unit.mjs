@@ -299,11 +299,22 @@ section('D · 真实仓库（Unit-01 幂等重现，只读）')
     const ei = JSON.parse(readFileSync(join(eDir, 'items.json'), 'utf8'))
 
     // 反向构造：源 = 磁盘现有内容（不含任何手写文案），再让脚手架渲染回来
+    // ⚠️ `license` 必须**逐类型**从磁盘 manifest 反推，不能省略：
+    //   本 unit 的 vocabulary 包已改标 MIT（可开源），而 reading / exercise 仍是
+    //   Proprietary（redistributable:false）—— 许可已是随内容而异的事实数据，
+    //   省略它会让脚手架回落到默认「专有」默认值、与磁盘现状漂移 ⇒ D-1/D-2 判红。
+    //   （这正是「反向源可重现」这条幂等判据的价值：许可口径一变就当场暴露。）
+    const licenseOf = (m) => ({ ...m.sources[0].license })
     const derived = {
       packagePrefix: 'ielts-edu-01',
       publishedAt: vm.contentPublishedAt,
       origin: vm.sources[0].origin,
       tags: vm.tags,
+      license: {
+        vocabulary: licenseOf(vm),
+        reading: licenseOf(rm),
+        exercise: licenseOf(em),
+      },
       vocabulary: { title: vm.title, description: vm.description, items: vw },
       reading: { title: rm.title, itemTitle: ri[0].title, description: rm.description, paragraphs: ri[0].paragraphs },
       exercise: {

@@ -56,6 +56,10 @@ const USAGE_TEXT = `用法：
   "packagePrefix": "ielts-edu-01",          // 三个包的前缀：<prefix>-vocab / -reading / -exercise
   "publishedAt": "2026-10-04",              // 内容发布日期（不得是未来日期）
   "origin": "original authored content …",  // 溯源说明，写进每条 source.origin
+  "license": {                // 可缺省；**按内容类型**分别指定，缺省 = 自有专有 + 不可再分发
+    "vocabulary": { "name": "MIT License", "spdx": "MIT", "url": "https://opensource.org/licenses/MIT",
+                    "commercialUse": true, "attributionRequired": false, "redistributable": true }
+  }
   "tags": ["ielts", "academic", "education"],   // 可选，进三个包 manifest.tags
   "vocabulary": {                           // 可缺省；也接受直接给数组（那就是 items）
     "title": "…", "description": "…",
@@ -118,6 +122,23 @@ if (publishedAt > localDay()) {
 const origin = src.origin ?? 'original authored content'
 const builtAt = `${publishedAt}T00:00:00.000Z`
 
+/* ── license：按内容类型分别取，默认「自有专有 + 不可再分发」──
+ * 为什么必须**分段**而不是整个 unit 一个值：本 unit 的 vocabulary 包已改标 MIT（可开源），
+ * 而同 unit 的 reading / exercise 仍是 Proprietary（不可再分发）。
+ * 脚手架若写死单一许可，产出的 manifest 就与仓库现状漂移 ⇒ D 组「反向源可重现」幂等判据判红
+ *   （实测：加 redistributable 后 D-1/D-2 由 72 PASS 掉到 70 PASS / 2 FAIL —— 真回归，已修）。
+ * 故许可随内容类型走：`src.license.<vocabulary|reading|exercise>`，缺省用 DEFAULT_LICENSE。
+ *
+ * `redistributable` 是**必填**显式声明（license-policy:decideLicense 第三维，缺失即判红），
+ * 故默认值也必须带上它，不能省。 */
+const DEFAULT_LICENSE = { name: 'Proprietary (self-curated)', commercialUse: true, attributionRequired: false, redistributable: false }
+/** 取某类型的许可：源里显式给了就用（逐字段合并，缺字段回落默认），否则整块用默认。 */
+const licenseFor = (type) => {
+  const override = src.license?.[type]
+  if (!override || typeof override !== 'object' || Array.isArray(override)) return { ...DEFAULT_LICENSE }
+  return { ...DEFAULT_LICENSE, ...override }
+}
+
 /* ── 校验（写盘前先把内容问题挡住，别让门禁去发现）── */
 const problems = []
 const has = (k) => src[k] !== undefined && src[k] !== null
@@ -169,12 +190,15 @@ if (problems.length) {
 }
 
 /* ── 渲染 ── */
-const sourceOf = () => ({
+/** 造一条 source：许可按**内容类型**取（见上方 licenseFor）——
+ *  vocabulary 可能已是 MIT（可开源），reading / exercise 仍为专有（不可再分发）。
+ *  `redistributable` 必填（license-policy:decideLicense 第三维，缺失即判红）⇒ 默认值也必须带。 */
+const sourceOf = (type) => ({
   checksum: null, // 占位，下面按包填入
   origin,
   provider: PROVIDER_ORIGINAL,
   importedAt: publishedAt,
-  license: { name: 'Proprietary (self-curated)', commercialUse: true, attributionRequired: false },
+  license: licenseFor(type),
 })
 
 /** 造一个包：payload 落盘 + manifest（checksum 走唯一实现）。返回 {dir, payloadPath, manifestPath, payload, manifest} */
@@ -183,7 +207,7 @@ function buildPackage(type, id, payload, title, description, icon, extraManifest
   const payloadName = type === 'vocabulary' ? 'words.json' : 'items.json'
   const checksum = checksumPayload(payload)
   const namespace = `curated-${id}`
-  const s = { ...sourceOf(), checksum }
+  const s = { ...sourceOf(type), checksum }
   const manifest = {
     schemaVersion: 4,
     packageId: id,
