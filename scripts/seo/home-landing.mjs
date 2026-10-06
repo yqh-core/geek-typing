@@ -43,7 +43,6 @@ import {
   LANDING_START_COMMENT,
   SECTIONS,
   SKIP_LINK_TEXT,
-  SITE_NAME,
 } from './home-landing.copy.mjs'
 
 /**
