@@ -227,3 +227,49 @@ perf 门已于 Wave 5 落地（`scripts/gate-perf.mjs`），按「脚本文件�
 > `docs/audit-package/_generated/evidence/`（**行为零变化**），P1.8 的 `P18*` 波写
 > `docs/p18/_generated/evidence/`。否则 P1.8 一跑证据就会写入冻结区，与 INV-1 自相矛盾。
 > 分流判定同时施加于 `scripts/evidence-run.mjs` 与 `scripts/evidence-verify.mjs`。
+
+---
+
+## 6. SEO 内容面门禁（Path C · Phase 1 收口登记）
+
+> **本节为纯追加登记**（2026-10-06）。Path C · Phase 1 裁定 **CLOSED / PASS**，
+> 裁定档见**`docs/content/SEO-CONTENT-SURFACE-PHASE1-CLOSE.md`**。
+
+### 新增门禁 `gate:seo-pages`（判据 12 → **13 条**）
+
+| 项 | 内容 |
+|---|---|
+| **机器落点** | `npm run gate:seo-pages`（`scripts/seo/gate-seo-pages.mjs`，**已建· 在 CI**） |
+| **CI 落点** | `gate-build` job，紧跟 **`gate:perf` 之后**（零额外 build：只读 `dist/**` 与 `public/404.html`） |
+| **判据数** | 12 → **13 条**（新增判据 13：canonical 与 sitemap `<loc>` 均不含 `.html`） |
+
+### 它补的是哪个盲区
+
+**三道既有产物门对 HTML 产物零覆盖。** `check:bundle` 判JS 体积预算、
+`gate:perf` 判 chunk 预算、`gate:content-type-contract` 判类型契约 ——
+**三者都不读HTML 产物**。静态 SEO 页是本项目**唯一的 HTML 产物面**，
+此前在 CI 上**完全无人看守**。
+
+`gate:seo-pages` 补的正是这一段：sitemap 条数、每页正文长度（模拟无 JS 爬虫）、
+canonical 唯一性与正确性、`<title>`/description 唯一性、404 页语义与 `noindex`、
+单页 raw 体积上限。
+
+### 与既有不变量的关系
+
+- **判据 10** 把 **INV-6（类型契约唯一）延伸到产物侧**（页面模板函数只有 1 个）——
+  是既有不变量的延伸，**不是**新立不变量；
+- **判据 5 + 判据 13 双保险**：canonical 期望值来自生成器导出的 `canonicalBankUrl()`
+  （`build-static-pages.mjs`），门禁 `import` **同一个函数**算期望值、
+  **门禁内不另写域名常量**；判据 13 则**完全不复用** URL 构造逻辑，
+  只做 `.html` 字面量断言 —— 即使未来 URL 构造逻辑出现**系统性错误**，
+  判据 13 依然能判红（本次 false-green 的修复即为此因）。
+
+### ⚠️ 边界声明（本节**未**触碰 INV-1..INV-7 任何一行）
+
+本刀**零代码改动**，**未改动 §5 表格中 INV-1..INV-7 的任何一行的状态**。
+上表仅登记「新增了一道不属于 INV-1..INV-7 的独立门禁」这一事实。
+
+**判据一致 ≠ 语义正确** —— 本刀同时登记了一条教训：
+canonical 的目标域名属于**外部事实**，必须单独核实（实测确认
+`digdevbox.com` 属另一独立站点，⛔ 不得进入本项目 canonical / sitemap）。
+详见裁定档 L3「域名锁定」。
