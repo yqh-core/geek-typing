@@ -23,6 +23,12 @@
  *      恰好 1 个，且多处枚举 `dist/assets`；输出目录用 `dist/pages/` 天然避开。
  *   ③ 输出目录不能是 `dist/assets/`（会污染 lazyChunks 语义与 chunk 计数）。
  *
+ * ⭐ **URL 规范化（本次修复的核心）**：
+ *   词库页的**规范 URL 不带 `.html`** —— 生产实测 `/pages/bank/ielts.html` 会 **308** 重定向到
+ *   `/pages/bank/ielts`，`.html` 不是最终规范地址。canonical / og:url / sitemap `<loc>` / 门禁判据 5
+ *   的期望值**四处必须全部来自 canonicalBankUrl() 这一个函数**；任何一处自己拼字符串都会分叉。
+ *   ⚠️ 但**页文件名仍带 `.html`**（CF Pages 需静态文件才能响应）—— 文件名与 URL 是两件事。
+ *
  * siteOrigin 的单一事实源（**不新造常量**）：
  *   依次读`index.html` 的 `<link rel="canonical">` → `public/sitemap.xml` 的首个 `<loc>`。
  *   两处本来就必须一致（docs/audit-package 8.2.3 已把「三处一致」列为既有事实），
@@ -67,7 +73,49 @@ export const WORDS_PER_PAGE = 300
 /** 站点名（与 index.html / manifest.webmanifest 一致，用于 title 后缀） */
 const SITE_NAME = 'Geek Typing'
 
+/**
+ * 页内链回 SPA 的地址。
+ *
+ * ⚠️ **刻意不是 canonicalBankUrl**：它指向的是 SPA 首页，不是本页自己，
+ *所以不适用「本页规范 URL」那套去后缀逻辑。用根相对 `/` 而非绝对地址，
+ *   是为了换域名/换 origin 时不必重跑生成器（少一个需要同步的常量）。
+ *
+ * 之所以仍然把它收进导出面（而不是继续当裸字面量写在模板里）：本次缺陷的教训是
+ *   「同一个 URL 在多处各写一遍 ⇒ 整齐地一起写错」。凡是会被搜索引擎读到的 href，
+ *   都必须有名有姓地暴露出来，门禁判据 13 才能对它断言「不含 .html」。
+ */
+export const APP_HOME_HREF = '/'
+
 /* ──────────────────────────纯逻辑（可注入 / 可测试） ────────────────────────── */
+
+/**
+ * ⭐ 词库页的**规范 URL**（canonical URL）—— 全站唯一事实源。
+ *
+ * ⛔ **不带 `.html` 后缀**，这是本函数存在的全部理由：
+ *   生产实测（geek-typing.pages.dev，Cloudflare Pages 托管层行为）：
+ *     /pages/bank/ielts.html → **308永久重定向** → /pages/bank/ielts → 200
+ *   也就是说 `.html` 地址**会 308**，它不是最终规范 URL；而 canonical 指向一个会重定向的地址，
+ *   等于告诉搜索引擎「权威版本是那个会被 308 的地址」⇒ 规范信号与真实索引地址不一致。
+ *   本地任何静态检查都发现不了这一点，因为 308 是**托管层**行为，不是产物属性。
+ *
+ *⚠️ **页文件名仍带 `.html`**（dist/pages/bank/<id>.html）：Cloudflare Pages 需要真实静态文件
+ *   才能响应；去掉文件名后缀会破坏部署。**文件名与 URL 是两件事** —— 本函数只管 URL 层面。
+ *
+ * 三处必须同源（本次缺陷的教训：`.html` 曾整齐地写在三个地方）：
+ *   ① `<link rel="canonical">`与 `og:url`（renderBankPage）
+ *   ② sitemap的 `<loc>`（main）
+ *   ③ 门禁判据 5 的期望值（gate-seo-pages import 本函数）
+ * 任何一处自己拼字符串都会再次分叉 ⇒ **只允许调用本函数**。
+ *
+ * @param {string} siteOrigin 站点绝对 origin（无尾斜杠，如 https://geek-typing.pages.dev）
+ * @param {string} packageId 包 id（来自 manifest.packageId）
+ * @returns {string} 规范 URL，如 https://geek-typing.pages.dev/pages/bank/ielts
+ */
+export function canonicalBankUrl(siteOrigin, packageId) {
+  const origin = String(siteOrigin ?? '').replace(/\/+$/, '')
+  const id = String(packageId ?? '').trim()
+  return `${origin}/pages/bank/${encodeURIComponent(id)}`
+}
 
 /**
  * HTML 转义。词条里实测出现 `'`、`&`、`<`（definition 字段来自 ECDICT 英文释义），
@@ -160,8 +208,9 @@ export function renderBankPage({ manifest, words, siteOrigin, wordsPerPage = WOR
   const all = Array.isArray(words) ? words : []
   const shown = selectWords(all, wordsPerPage)
   const total = all.length
-  const path = `/pages/bank/${encodeURIComponent(packageId)}.html`
-  const url = `${siteOrigin}${path}`
+  // ⭐ 规范 URL 来自唯一事实源（⛔ 不带 .html）—— 见 canonicalBankUrl 的注释。
+  const url = canonicalBankUrl(siteOrigin, packageId)
+  const homeUrl = APP_HOME_HREF
   const pageTitle = `${title} · ${SITE_NAME}`
   const truncated = shown.length < total
 
@@ -227,7 +276,7 @@ ${items}
         <h2>使用说明</h2>
         <p>以上词条与释义直接来自本词库的内容包（${escapeHtml(packageId)}），未做改写。
         本页是静态索引页，只列出词条与释义，不提供练习；完整词库、打字练习与复习调度请进入应用。</p>
-        <a class="cta" href="/">进入完整词库 →</a>
+        <a class="cta" href="${escapeHtml(homeUrl)}">进入完整词库 →</a>
 
         <footer>${escapeHtml(SITE_NAME)} · 词库包 ${escapeHtml(packageId)} · 本页为静态索引，完整内容承载在应用内</footer>
       </article>
@@ -344,11 +393,13 @@ export function main(opts = {}) {
     const { manifest, words } = bank
     const html = renderBankPage({ manifest, words, siteOrigin: origin, wordsPerPage: opts.wordsPerPage })
     // 页文件名 = packageId + .html。⛔ 绝不用 index.html（见头注②）。
+    // ⚠️ **文件名带 .html，URL 不带** —— 文件名是 CF Pages 的部署要求，URL 是规范地址（见 canonicalBankUrl）。
     const file = join(bankDir, `${manifest.packageId}.html`)
     writeFileSync(file, html, 'utf8')
     const shown = Math.min(Array.isArray(words) ? words.length : 0, opts.wordsPerPage ?? WORDS_PER_PAGE)
     totalWords += shown
-    entries.push({ loc: `${origin}/pages/bank/${encodeURIComponent(manifest.packageId)}.html`, changefreq: 'monthly', priority: '0.8' })
+    // ⭐ 与 canonical / 门禁判据 5 同源（⛔ 不带 .html）—— 三处曾各写一遍 .html，是本次缺陷的直接成因。
+    entries.push({ loc: canonicalBankUrl(origin, manifest.packageId), changefreq: 'monthly', priority: '0.8' })
   }
 
   const xml = buildSitemap(entries)

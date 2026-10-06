@@ -12,12 +12,12 @@
  *   本门把它们纳入门禁体系，且**fail-closed**（任一 FAIL ⇒ exit 1；读不到产物同样判红，
  *   绝不「文件不存在就跳过」）。
  *
- * 判据（12条，每条打印 PASS/FAIL + 实测值）：
+ * 判据（13条，每条打印 PASS/FAIL + 实测值）：
  *    1sitemap <url> 数 == 14（1 首页 + 13 词库页）
  *    2  13 个页面文件都存在                                13/13
  *    3  每页去标签正文长度 ≥ 500 字符                        13/13
  *    4  每页含 ≥3 组 word+translation 字面量（模拟无 JS 爬虫）  13/13
- *    5  每页 canonical 自指（URL == 本页 URL）               13/13
+ *    5  每页 canonical == 规范 URL（canonicalBankUrl，⛔ 不含 .html）  13/13
  *    6  <title> 每页唯一                        13 互不相同 + 与首页不同
  *    7  description 每页唯一                    13 互不相同 + 与首页不同
  *    8  public/404.html 存在 + 正文非空 + 含 404 语义
@@ -25,6 +25,13 @@
  *   10  页面模板函数只有 1 个（把 INV-6 延伸到产物侧）
  *   11  不产生任何多余的 index.html：dist/assets/index-*.js 恰好 1 个且 dist/pages 下无 index.html
  *   12  词条规模声明诚实：声明 N == 实际渲染条数 M，且 N ≤ 声明总数 T，且 T == 该包真实总词数
+ *   13  canonical 与 sitemap <loc> 均不含 .html（防「回退到会 308 的地址」）
+ *
+ * 关于判据 5 的历史（一次已定位并修复的 false-green）：
+ *   它曾只验「canonical 自指（== 本页文件名带 .html）」。但生产实测 `/pages/bank/x.html` 会
+ *   **308** 永久重定向到 `/pages/bank/x`，即 **.html 不是规范地址** ⇒自指却非规范，判据全绿而
+ *   canonical 指向一个会重定向的地址。**自指 ≠ 规范。** 现在期望值由生成器的 canonicalBankUrl()
+ *   给出（见build-static-pages.mjs），判据 13 再独立兜一道字面量断言。
  *
  * 退出码：0 = 全PASS；1 = 有 FAIL；2 = 脚本自身错误（产物缺失/输入不可解析，**绝不降级成 PASS**）。
  *
@@ -41,7 +48,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmdirSync, statSync, 
 import { createHash } from 'node:crypto'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { WORDS_PER_PAGE } from './build-static-pages.mjs'
+import { WORDS_PER_PAGE, canonicalBankUrl, readSiteOrigin } from './build-static-pages.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const DIST = join(ROOT, 'dist')
@@ -232,6 +239,10 @@ export function collectInputs(o = {}) {
     indexHtml: readOrNull(indexPath),
     notFoundHtml: readOrNull(notFoundPath),
     builderSrc: readOrNull(o.builderSrc ?? BUILDER_SRC),
+    // ⛔ 不在本文件另写域名常量：直接调用生成器的 readSiteOrigin()，
+    //   与生成器 main() 取siteOrigin 的来源**逐字节同一个函数**（index.html canonical → public/sitemap.xml 首loc）。
+    //   这里若自己判一次域名，就等于新增一个分叉点 —— 那正是本次缺陷的成因。
+    siteOrigin: o.siteOrigin !== undefined ? o.siteOrigin : readSiteOrigin(),
   }
 }
 
@@ -343,20 +354,35 @@ export function evaluate(inp) {
     )
   }
 
-  /* 判据 5 · canonical 自指 */
+  /* 判据 5 · canonical == 生成器算出的规范 URL（⛔ 不再是「自指」）*
+   *
+   * 为什么要升级（旧版是 false-green 门）：旧判据只验 `canonical.endsWith('/pages/bank/' + 本页文件名)`，
+   *   也就是「**自指**」。而 `.html` URL 恰好自指（文件名就是 ielts.html），于是全绿。
+   *   但生产实测 `.html` 会 **308** 永久重定向到无后缀地址 ⇒ **自指 ≠ 规范**：
+   *   自指只证明「页面指向自己」，不证明「自己就是最终规范地址」。
+   *   308 是**托管层**行为，本地静态检查原理上无法发现 ⇒ 期望值必须由规范 URL 的定义方给出。
+   * 现在期望值直接来自生成器的 canonicalBankUrl()（⛔ 不在本门重算一遍字符串），
+   *   门禁与生成器共用**同一个 URL 事实源**：生成器错，门禁跟着红；这正是本判据存在的意义。
+   */
   {
     const bad = []
     const seen = []
     for (const p of pages) {
       const c = extractCanonical(p.html)
+      const pkgId = p.file.replace(/\.html$/, '')
+      const expected = inp.siteOrigin ? canonicalBankUrl(inp.siteOrigin, pkgId) : null
       seen.push(`${p.file}→${c ?? '缺失'}`)
-      if (!c || !c.endsWith(`/pages/bank/${p.file}`)) bad.push(p.file)
+      if (!c) bad.push(`${p.file}: canonical 缺失`)
+      else if (!expected) bad.push(`${p.file}: 读不到 siteOrigin，无法计算规范 URL`)
+      else if (c !== expected) bad.push(`${p.file}: canonical=${c} ≠ 规范 URL ${expected}`)
     }
     add(
       5,
-      'canonical 自指',
+      'canonical == 规范 URL（去 .html，非仅自指）',
       bad.length === 0 && pages.length > 0,
-      bad.length === 0 ? `13/13 自指（示例 ${seen[0] ?? '—'}）` : `❌ ${bad.length} 页非自指：${bad.join(' ')}`,
+      bad.length === 0
+        ? `13/13 等于 canonicalBankUrl()（origin=${inp.siteOrigin ?? '—'}）；示例 ${seen[0] ?? '—'}`
+        : `❌ ${bad.length} 页 canonical 非规范 URL：${bad.join(' | ')}`,
     )
   }
 
@@ -498,6 +524,37 @@ export function evaluate(inp) {
       bad.length === 0
         ? `13/13 一致：${detail.slice(0, 3).join('，')}${detail.length > 3 ? ` …（共 ${detail.length} 包）` : ''}`
         : `❌ ${bad.length} 页不诚实：${bad.join(' | ')}`,
+    )
+  }
+
+  /* 判据 13 · canonical 与 sitemap <loc> 均不含 .html（防回退守卫）
+   *
+   * 判据 5 已经是「==规范 URL」，理论上``.html`` 会被它挡住；本条是**冗余但独立**的第二道：
+   *   -判据 5 依赖 canonicalBankUrl 正确。一旦那个函数被改回带 .html，判据 5 与生成器
+   *     会**整齐地一起绿**（同一个共谋函数）—— 这正是本次 false-green 的形态。
+   *     本条不复用任何 URL 构造逻辑，只做最朴素的字面量断言「产物里不许出现 .html」，
+   *     因而在「生成器与判据 5 同时被改错」时依然能判红。
+   *   - 覆盖面也不止 canonical：sitemap 的 14 条 <loc>（含首页那条）一并查。
+   */
+  {
+    const canonHits = []
+    for (const p of pages) {
+      const c = extractCanonical(p.html)
+      if (c && c.includes('.html')) canonHits.push(`${p.file}→${c}`)
+    }
+    const locs = String(inp.sitemapXml ?? '').match(/<loc>([^<]*)<\/loc>/g) ?? []
+    const locValues = locs.map((s) => s.replace(/^<loc>/, '').replace(/<\/loc>$/, ''))
+    const locHits = locValues.filter((v) => v.includes('.html'))
+    const bad = []
+    if (canonHits.length > 0) bad.push(`${canonHits.length} 页 canonical 含 .html：${canonHits.join(' | ')}`)
+    if (locHits.length > 0) bad.push(`${locHits.length} 条 <loc> 含 .html：${locHits.join(' | ')}`)
+    add(
+      13,
+      'sitemap 与 canonical 均不含 .html',
+      bad.length === 0 && pages.length > 0 && locValues.length > 0,
+      bad.length === 0
+        ? `13 页 canonical + ${locValues.length} 条 <loc> 全部无 .html（示例 ${locValues[1] ?? '—'}）`
+        : `❌ ${bad.join('；')}`,
     )
   }
 
@@ -796,6 +853,44 @@ function falsify() {
           )
         },
       },
+      {
+        no: 13,
+        what: '把 sitemap 里某条 <loc> 写回 `.html` 形式（会 308 的地址）',
+        expect: 'sitemap <loc> 出现 .html',
+        mutate() {
+          const p = join(TMP, 'sitemap.xml')
+          const xml = readFileSync(p, 'utf8')
+          // 只把**一条无后缀的词库页 loc** 加回 .html；首页 loc 与 <url> 条数都不动
+          // ⇒ 判据 1（14 条）保持绿，判据 5（只看页面 canonical）也不受影响，
+          //    于是能干净地单独归因到判据 13。
+          writeFileSync(p, xml.replace(/<loc>(\S*?)\/pages\/bank\/([^<]+)<\/loc>/, '<loc>$1/pages/bank/$2.html</loc>'), 'utf8')
+        },
+      },
+      {
+        no: 14,
+        what: '把某页 canonical 写回 `.html` 形式（自指但会 308 —— 本次 false-green 的原始形态）',
+        expect: 'canonical 与 sitemap 守卫同时判红（两道独立守卫共识，不是耦合）',
+        // ⚠️ 这条**刻意期望两条判据同时转红**，与前 12 条的「恰好一条」不同 —— 理由必须写下来，
+        //   否则看起来像注入不精准：
+        //     判据 5（== canonicalBankUrl 算出的规范 URL）与判据 13（字面量不许出现 .html）
+        //     是**两个互不复用逻辑的独立守卫**。把 canonical 改回 .html 这个缺陷本就该被两者同时抓住，
+        //     同时转红正是「双守卫都在岗」的证据，而不是判据彼此耦合（谁也不读谁的结论）。
+        //   这条守的是本次 false-green 的**原始形态**：旧判据 5 验「自指」时，`.html` canonical
+        //   恰好自指 ⇒ 全绿 ⇒ 本条在旧版打不红、在新版打红，正是修复有效性的直接证据。
+        expectReds: [5, 13],
+        mutate() {
+          const files = readdirSync(join(TMP, 'bank')).sort()
+          const p = join(TMP, 'bank', files[0])
+          writeFileSync(
+            p,
+            readFileSync(p, 'utf8').replace(
+              /(<link rel="canonical" href=")([^"]+)(")/,
+              (_m, a, url, b) => `${a}${url}.html${b}`,
+            ),
+            'utf8',
+          )
+        },
+      },
     ]
 
     for (const inj of injections) {
@@ -807,14 +902,17 @@ function falsify() {
         continue
       }
       const reds = redNos(r)
+      // 默认期望「恰好只红目标那一条」；注入可显式声明 expectReds（用于两条独立守卫
+      // 理应同时抓到同一缺陷的场景，见注入 14的注释）。
+      const want = inj.expectReds ?? [inj.no]
+      const wantKey = [...want].sort((a, b) => a - b).join('、')
+      const gotKey = [...reds].sort((a, b) => a - b).join('、')
       if (reds.length === 0) {
         fail.push(`注入判据 ${inj.no}（${inj.what}）后仍全绿—— 该判据恒真，没在守`)
-      } else if (!reds.includes(inj.no)) {
-        fail.push(`注入判据 ${inj.no}（${inj.what}）后转红的是 ${reds.join('、')}，不含 ${inj.no} —— 注入未落到目标判据`)
-      } else if (reds.length > 1) {
-        fail.push(`注入判据 ${inj.no}（${inj.what}）后判据 ${reds.join('、')} 同时转红，不止 ${inj.no} 一条 —— 注入不精准，无法归因`)
+      } else if (gotKey !== wantKey) {
+        fail.push(`注入判据 ${inj.no}（${inj.what}）后转红的是 ${gotKey || '无'}，期望 ${wantKey} —— 注入未落到目标判据`)
       } else {
-        console.log(`[gate-seo-pages] 注入判据 ${String(inj.no).padStart(2)}：${inj.what} ⇒ 仅第 ${inj.no} 条转红 ✅（${inj.expect}）`)
+        console.log(`[gate-seo-pages] 注入判据 ${String(inj.no).padStart(2)}：${inj.what} ⇒ ${wantKey} 转红 ✅（${inj.expect}）`)
       }
     }
   } finally {
@@ -840,7 +938,7 @@ function falsify() {
     for (const f of fail) console.error(`   · ${f}`)
     process.exit(1)
   }
-  console.log('\n[gate-seo-pages] ✅ 证伪自检通过：12 条判据逐条「注入即红、且恰好只红那一条」，还原后逐字节一致 + 复绿')
+  console.log('\n[gate-seo-pages] ✅ 证伪自检通过：14 条注入逐条「注入即红、且恰好红期望的那几条」，还原后逐字节一致 + 复绿')
   process.exit(0)
 }
 
