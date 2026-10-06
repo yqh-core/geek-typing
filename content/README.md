@@ -502,7 +502,9 @@ Raw → Normalize → Validate → Build → Index → Manifest → Content Regi
     `checksum === contentChecksum` 的条目（取最近一条），其 `version === contentVersion`、
     `1 ≤ revision ≤ contentRevision`（回滚场景：version 回到历史值，revision 只增不减）
 17. `build` 存在且 `toolVersion` 非空字符串、`builtAt` 可被 `Date.parse`、`sourceChecksum === contentChecksum`
-18. **manifest 体积**：单包 < **8 KiB**、全库 < **40 KiB**
+18. **manifest 体积（常驻字段口径）**：单包 < **8 KiB**、全库 < **64 KiB**
+    —— 只统计**最终常驻主 chunk** 的字段（`RUNTIME_MANIFEST_FIELDS` 经 `projectManifest()` 投影）；
+    `sources` / `contentHistory` / `build` 是构建期专用字段，已在构建期裁掉、不进主 chunk，**不计入**
 19. **inline 预算**：`offline.policy === 'inline'` 的包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB**
 20. **策略一致性**：manifest 的 `offline.policy` 必须与 `registry.ts` 实际加载方式一致 —— `words:` ↔ inline，`load:` ↔ lazy（**全库包数 100% 一致**）
 
@@ -616,7 +618,7 @@ Oxford 30000 词 → **1854 KiB（×13.4）**。
 
 | # | 断言 | 阈值 | 守护者 |
 |---|---|---|---|
-| 18 | manifest 体积：单包 < **8 KiB**，全库 < **40 KiB** | 8 / 40 KiB | `content:validate` 判据 18 |
+| 18 | manifest 体积（**常驻字段口径**）：单包 < **8 KiB**，全库 < **64 KiB**；`sources`/`contentHistory`/`build` 为构建期专用字段（已裁掉、不进主 chunk），不计入 | 8 / 64 KiB | `content:validate` 判据 18 |
 | 19 | inline 预算：inline 包 **Σ词 ≤ 1000** 且 **Σ words.json ≤ 64 KiB** | 1000 词 / 64 KiB | `content:validate` 判据 19 |
 | 20 | 策略一致性：`offline.policy` 与 `registry.ts` 实际加载方式一致（`words:` ↔ inline，`load:` ↔ lazy） | **全库包数 100% 一致** | `content:validate` 判据 20 |
 | 21 | 主 chunk 体积：raw ≤ **439.45 KiB**、gzip ≤ **141.60 KiB**（分层预算生效层 = `ABSOLUTE_BUDGET`，见 `scripts/gate-perf.mjs`） | 439.45 / 141.60 KiB | `check:bundle` 判据 1 |

@@ -35,8 +35,18 @@
  *     checksum === contentChecksum 的条目，且该条目 version === contentVersion、
  *     revision <= contentRevision（回滚场景：version 回到历史值，revision 只增不减）
  * 17. build 存在且 toolVersion 非空、builtAt 为合法时间、sourceChecksum === contentChecksum
- * 18. manifest 体积：单包 < 8 KiB 且全库 < 40 KiB（manifest 常驻主 chunk，必须永远「轻」；
- *     包数增长时只允许 O(包数) 线性小步涨，不允许随词数涨）
+ * 18. manifest 体积：**常驻字段口径** —— 单包 < 8 KiB 且全库 < 64 KiB。
+ *     ⚠️ 口径纪律（三条，缺一即会再次漂移）：
+ *       ① budget   = runtime-resident fields only —— 只统计**最终常驻主 chunk** 的字段
+ *          （= manifest-runtime.mjs 的 RUNTIME_MANIFEST_FIELDS 经 projectManifest() 投影后）；
+ *       ② excluded = build-time-only fields —— sources / contentHistory / build
+ *          （DROPPED_MANIFEST_FIELDS）在构建期已被投影裁掉、**根本不进主 chunk**，故不计入；
+ *       ③ hard limit = 64 KiB。
+ *     manifest 常驻主 chunk（registry 静态 import），是「包数」的函数而不是「词数」的函数。
+ *     词库从 43 词涨到 3000 词时 manifest 只该多几十字节；越过单包上限说明有人把词表/释义
+ *     之类的重数据塞进了**常驻**字段 —— 那会 1:1 推高首屏。
+ *     实测（2026-10-05 · 27 包）：常驻 18.07 KiB（均值 685 B/包）/ 磁盘原始 38.22 KiB
+ *     （均值 1,450 B/包）⇒ 64 KiB 余量 45.93 KiB。被裁字段占原始字节的 53%。
  * 19. inline 预算：有载荷且 policy=inline 的包 Σ stats.items ≤ 1000 且 Σ 载荷 ≤ 64 KiB
  *     （实测 inline 词 1:1 全额传导进主 chunk：kaoyan 改 inline ⇒ 主 chunk +471.92 KiB，
  *      与 words.json 471.70 KiB 比值 1:1.0005，故 inline 是首屏体积的直通车，必须限量；
@@ -54,14 +64,15 @@
  *     即二进制，专抓改扩展名伪装）。fail-closed：遍历/读取异常 ⇒ 判 FAIL，绝不当作 0。
  *
  * 用法：node scripts/content/validate.mjs [--root=<内容包目录>]   → 全绿 exit 0，任一 FAIL exit 1
- *       node scripts/content/validate.mjs --falsify              → 证伪自检（系统临时副本双注入，
- *           4 断言；exit 0=全过 / 1=断言失败 / 2=自身异常，同 gate-license.mjs 三态惯例）
+ *       node scripts/content/validate.mjs --falsify              → 证伪自检（系统临时副本注入；
+ *           两组：判据 22 二进制媒体 4 断言 + 判据 18 manifest 常驻口径 6 断言；
+ *           exit 0=全过 / 1=断言失败 / 2=自身异常，同 gate-license.mjs 三态惯例）
  *       node scripts/content/validate.mjs --help                 → usage（exit 0）；未知参数 exit 2
  *       `--root` 默认 `content/`，**仅**覆盖"内容包目录"（ROOT / registry / i18n 等一律不变），
  *       用于对隔离副本做证伪（后续 scripts/gate-license.mjs 复用同一开关）。
  */
 import { readdir, readFile } from 'node:fs/promises'
-import { existsSync, readdirSync, openSync, readSync, closeSync, mkdtempSync, cpSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, openSync, readSync, closeSync, mkdtempSync, cpSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 /* 内容指纹**只走 license-policy.mjs 的 checksumPayload**（它内部 = canonical.mjs 的 sha256Canonical）。
@@ -83,6 +94,13 @@ import { buildReachability, isReachable, isValidRelationType, relationEndpoints 
 /* 资产规则**只从 asset-rules.mjs 取**（P1.8 裁定 ③/④-7）：本文件不得内联任何资产规则逻辑。
  * 资产规则的第二份副本由 gate:content-type-contract 判据 H3 上锁，与 CONTENT_TYPES 的 H1/H2 同一手法。 */
 import { checkManifestAssets, checkPackageAssetDeclarations, checkLicenseDecision } from './asset-rules.mjs'
+/* 判据 18 的**常驻字段口径**只从 manifest-runtime.mjs 取（RUNTIME_MANIFEST_FIELDS / DROPPED_MANIFEST_FIELDS /
+ * projectManifest），本文件**不持有第二份字段列表**。
+ * ⛔ 为什么必须 import 复用而不是抄一份：判据 18 卡的是「谁进主 chunk」，而「谁进主 chunk」由构建期的
+ *   投影插件（scripts/vite-plugin-manifest-runtime.mjs）决定。两份真相同步漂移过一次就判错了口径 ——
+ *   本项目反复吃过「同一个真相同步两份」的亏（ContentType 白名单、relations、asset 规则各一次）。
+ *   现在白名单增删字段，判据 18 的口径自动跟随，不存在「记得改两处」这回事。 */
+import { RUNTIME_MANIFEST_FIELDS, DROPPED_MANIFEST_FIELDS, projectManifest } from './manifest-runtime.mjs'
 
 const ROOT = path.resolve(process.cwd())
 /** 内容包目录：默认 content/；`--root=<dir>` 可指向隔离副本（证伪用）。仅覆盖此项，其余路径不变。 */
@@ -100,7 +118,7 @@ const CONTENT_DIR = (() => {
  *    未知 flag 一律拒绝（同 gate-license.mjs parseArgs / evidence-run 事故教训），不猜测语义。—— */
 const HELP_TEXT = `用法：
   node scripts/content/validate.mjs [--root=<内容包目录>]   全绿 exit 0，任一 FAIL exit 1
-  node scripts/content/validate.mjs --falsify               证伪自检（系统临时副本双注入，4 断言；exit 0=全过 / 1=断言失败 / 2=自身异常）
+  node scripts/content/validate.mjs --falsify               证伪自检（系统临时副本注入，两组共 10 断言；exit 0=全过 / 1=断言失败 / 2=自身异常）
   node scripts/content/validate.mjs --help                  本帮助（exit 0）`
 {
   const args = process.argv.slice(2)
@@ -120,11 +138,42 @@ const REGISTRY_TS = path.join(ROOT, 'src', 'core', 'content', 'registry.ts')
 /** 载荷文件名：vocabulary 包固定 words.json；其余类型统一 items.json（可选） */
 const payloadNameOf = (type) => (type === 'vocabulary' ? 'words.json' : 'items.json')
 
-/* —— 第 18/19 项阈值：Package = manifest（永远轻、常驻）+ words（按需） —— */
-/** 单包 manifest 字节上限。实测最大 1.40 KiB（ts-code），8 KiB 是「永远轻」的硬边界 */
+/* —— 第 18/19/20 项阈值：Package = manifest（永远轻、常驻）+ words（按需） ——
+ *
+ * ⚠️⚠️ 第 18 项的口径纪律（yqh 裁定 · 2026-10-05）——**三条缺一即会再次口径漂移**：
+ *   ① budget   = runtime-resident fields only
+ *      预算只统计**最终常驻主 chunk** 的字段，即 RUNTIME_MANIFEST_FIELDS 经 projectManifest() 投影后的字节。
+ *      字段清单从 manifest-runtime.mjs import，本文件不持有副本（见 import 处注释）。
+ *   ② excluded = build-time-only fields（already stripped from main chunk）
+ *      DROPPED_MANIFEST_FIELDS = sources / contentHistory / build —— 构建期已被投影插件裁掉，
+ *      在 src/ 内零运行时读取，**根本不进主 chunk**，故不计入预算。
+ *      实测三者合计占全库原始字节的 53%（39,139 B 里 20,637 B）—— 旧口径把这部分也算进去，
+ *      等于为一笔**不花首屏成本**的字节收了 20.6 KiB 税。
+ *   ③ hard limit = 64 KiB（65,536 B）。本轮之后**不再放宽**：不为过门禁继续放宽预算。
+ *
+ *   ⚠️ 这三条写在这里的原因：旧注释写「阈值按 **40 包**规模预留」，而当时实际已是 **27 包**、
+ *     均值 1,450 B/包 —— 注释的世界观与增长现实脱节，余量被悄悄吃掉（1,821 B）却没人发现。
+ *     **阈值注释里的「包数世界观」必须与实测同步，否则它就是下一次口径漂移的源头。**
+ *     下面两行把「现在多少包 / 多少字节 / 均值 / 还能加多少包」与阈值同处一块，
+ *     就是为了让下一个改阈值的人一眼看到全貌，而不是照抄一个陈旧的预留目标。 */
+
+/** 单包 manifest **常驻字段**字节上限（口径①：projectManifest() 投影后的字节，非磁盘原始字节）。
+ *  实测最大 840 B（ielts-env-02-vocab）⇒ 8 KiB 是它的 9.8× 余量。
+ *  ⚠️ 8 KiB 在新口径下**仍然合适**，故本轮不动它，判断依据三条：
+ *    1. **绝对余量反而更大了**：旧口径实测最大 1,968 B（8 KiB = 4.2×），新口径实测最大 840 B（9.8×）
+ *       —— 换口径后这条门更松、不是更紧，说明 8 KiB 不存在「恰好卡在实测边缘」的隐患。
+ *    2. **它的职责没变**：抓的是「有人把词表/释义之类重数据塞进 manifest」。这类数据无论新旧口径
+ *       都落在常驻字段里，8 KiB 对「常驻字段被撑大」仍有 9.8× 的 catching 能力。
+ *    3. **降档会削弱它**：若按新实测均值 685 B 反推「留 5× 余量」把上限压到约 3.4 KiB，等于把阈值
+ *       钉死在当前内容形态上 —— 任何一段合法的长 description 都会把门打红，而门红原因与体积失控无关。
+ *       8 KiB 是「manifest 只装元数据」这条**语义边界**，不是当前实测值的函数。
+ *  ⇒ 结论：**保持 8 KiB 不变**，仅统计口径由「磁盘原始字节」改为「常驻字段字节」。 */
 const MANIFEST_MAX_BYTES = 8 * 1024
-/** 全库 manifest 字节总和上限。实测 10 包 13.08 KiB；阈值按 40 包规模预留 */
-const MANIFEST_TOTAL_MAX_BYTES = 40 * 1024
+/** 全库 manifest **常驻字段**字节总和上限（口径 ①②③）。
+ *  实测（2026-10-05 · **27 包**）：常驻 18,502 B = 18.07 KiB，均值 **685 B/包**
+ *  ⇒ 余量 65,536 − 18,502 = **47,034 B**；按均值可再加约 **68 包**（约 22 套三包单元）。
+ *  ⚠️ 旧的「阈值按 40 包规模预留」是**过期值**，已随本次口径修正一并作废（见上方口径纪律 ③）。 */
+const MANIFEST_TOTAL_MAX_BYTES = 64 * 1024
 /** inline 包词条数上限。实测 7 包 346 词 */
 const INLINE_MAX_ITEMS = 1000
 /** inline 包 words.json 字节上限。实测 7 包 36.17 KiB */
@@ -210,6 +259,33 @@ function checkBinaryMedia(dir) {
   }
 }
 
+/* ===== 18. manifest 体积判定内核（main() 与 --falsify 共用**同一条实现**）=====
+ * 口径 = **只统计常驻主 chunk 的字段**（projectManifest 投影后字节，口径①）。
+ * excluded = sources / contentHistory / build（构建期已裁、不进主 chunk，口径②）。
+ * hard limit = 64 KiB 全库 / 8 KiB 单包（口径③）。
+ * ⚠️ 抽成独立函数是判据 18 证伪自检的前提：证伪跑的不是"另一份逻辑"。
+ *   —— 若 main() 内联判定、falsify() 再抄一份，两份判定会各自漂移，证伪就证了个假的。 */
+function judgeManifestSize(entries) {
+  const runtimeTotal = entries.reduce((a, s) => a + s.runtimeBytes, 0)
+  const rawTotal = entries.reduce((a, s) => a + s.rawBytes, 0)
+  const excludedBytes = rawTotal - runtimeTotal
+  const biggest = entries.reduce((a, s) => (a === null || s.runtimeBytes > a.runtimeBytes ? s : a), null)
+  const over = entries.filter((s) => s.runtimeBytes >= MANIFEST_MAX_BYTES)
+  const dual = `常驻 ${runtimeTotal} B（${kib(runtimeTotal)} KiB，判定口径） / 磁盘原始 ${rawTotal} B（${kib(rawTotal)} KiB，仅对照）；差额 ${excludedBytes} B 来自构建期专用字段 ${DROPPED_MANIFEST_FIELDS.join('/')}（已在构建期裁掉、不进主 chunk，故不计预算）`
+  let verdict = 'PASS'
+  let message = null
+  if (over.length > 0) {
+    verdict = 'FAIL'
+    message = `manifest 单包常驻体积越界 ${over.length} 个（须 < ${MANIFEST_MAX_BYTES} B）：${over.map((s) => `${s.id} 常驻 ${s.runtimeBytes} B（${kib(s.runtimeBytes)} KiB）`).join('；')} ⇒ 常驻字段被撑大，1:1 进主 chunk。全库：${dual}`
+  } else if (runtimeTotal >= MANIFEST_TOTAL_MAX_BYTES) {
+    verdict = 'FAIL'
+    message = `manifest 全库常驻体积越界：${runtimeTotal} B（${kib(runtimeTotal)} KiB）≥ ${MANIFEST_TOTAL_MAX_BYTES} B（${MANIFEST_TOTAL_MAX_BYTES / 1024} KiB）⇒ 常驻字段 1:1 进主 chunk，总和膨胀直接推高首屏。全库：${dual}`
+  } else {
+    message = `manifest 体积（常驻口径 · 最大 ${kib(biggest.runtimeBytes)} KiB「${biggest.id}」，全库 ${kib(runtimeTotal)}/${MANIFEST_MAX_BYTES / 1024}·${MANIFEST_TOTAL_MAX_BYTES / 1024} KiB，余量 ${MANIFEST_TOTAL_MAX_BYTES - runtimeTotal} B）：${dual}；被裁字段清单 ${DROPPED_MANIFEST_FIELDS.length} 项、常驻字段清单 ${RUNTIME_MANIFEST_FIELDS.length} 项（均自 manifest-runtime.mjs 单一事实源 import）`
+  }
+  return { verdict, message, runtimeTotal, rawTotal, excludedBytes, biggest, over }
+}
+
 let fails = 0
 const fail = (msg) => { fails++; console.error(`  ✗ ${msg}`) }
 const ok = (msg) => console.log(`  ✓ ${msg}`)
@@ -288,8 +364,22 @@ async function main() {
       const dup = [] // 12(a) 包内重复 key（第 4 项判定后回显）
       const keyOf = (it) => (type === 'vocabulary' ? it?.word : it?.id ?? it?.word)
 
-      // 18. manifest 体积取样（UTF-8 文件字节数，不是 JSON.stringify 长度）
-      manifestSizes.push({ id, bytes: (await readFile(path.join(dir, 'manifest.json'))).length })
+      // 18. manifest 体积取样：**两个口径都取**（字节数，不是 JSON.stringify 长度）。
+      //     · rawBytes    = manifest.json 磁盘文件的 UTF-8 字节数（仅用于输出对照，不参与判定）
+      //     · runtimeBytes = projectManifest(manifest) 投影后的 UTF-8 字节数（**判定口径**，口径①）
+      //     两个口径都取，是因为判据 18 的输出必须同时给出两个数字 + 差额来源（见判据 18 区块）——
+      //     只打印一个数字，下一个人就无法判断门卡的是哪一笔字节。
+      //     ⚠️ 投影后用 JSON.stringify 而非文件字节：投影产物是**对象字面量**，文件字节还含
+      //     2 空格缩进与被裁字段；口径必须与「主 chunk 里实际存在什么」对齐。
+      {
+        const rawText = await readFile(path.join(dir, 'manifest.json'))
+        const runtimeText = JSON.stringify(projectManifest(manifest))
+        manifestSizes.push({
+          id,
+          rawBytes: rawText.length,
+          runtimeBytes: Buffer.byteLength(runtimeText, 'utf8'),
+        })
+      }
 
       // 19. inline 预算取样：只有 inline 包的载荷会 1:1 全额进主 chunk，lazy 包不占首屏
       const policy = manifest.offline?.policy
@@ -571,21 +661,14 @@ async function main() {
   if (crossDups.length > 0) fail(`跨包 duplicate ContentId ${crossDups.length} 处：${crossDups.slice(0, 5).join('；')}`)
   else ok(`跨包无 duplicate ContentId（全库 ${totalWords} 词扫描，namespace 唯一 ⇒ 兜底回归）`)
 
-  /* ===== 18. manifest 体积 =====
-   * manifest 常驻主 chunk（registry 静态 import），是「包数」的函数而不是「词数」的函数。
-   * 词库从 43 词涨到 3000 词时 manifest 只该多几十字节；越过 8 KiB 说明有人把词表/释义
-   * 之类的重数据塞进了 manifest —— 那会 1:1 推高首屏。 */
+  /* ===== 18. manifest 体积（常驻字段口径 · 见上方「口径纪律」注释）=====
+   * 判定内核 = judgeManifestSize()（与 --falsify 共用同一条实现，见该函数注释）。
+   * 输出**同时给出常驻总量与原始总量并说明差额来源** —— 让下一个人一眼看出口径，
+   * 不用去翻源码猜门卡的是哪一笔字节。 */
   {
-    const total = manifestSizes.reduce((a, s) => a + s.bytes, 0)
-    const biggest = manifestSizes.reduce((a, s) => (a === null || s.bytes > a.bytes ? s : a), null)
-    const over = manifestSizes.filter((s) => s.bytes >= MANIFEST_MAX_BYTES)
-    if (over.length > 0) {
-      fail(`manifest 单包体积越界 ${over.length} 个（须 < ${MANIFEST_MAX_BYTES} B）：${over.map((s) => `${s.id} ${s.bytes} B（${kib(s.bytes)} KiB）`).join('；')}`)
-    } else if (total >= MANIFEST_TOTAL_MAX_BYTES) {
-      fail(`manifest 全库体积越界：${total} B（${kib(total)} KiB）≥ ${MANIFEST_TOTAL_MAX_BYTES} B（${MANIFEST_TOTAL_MAX_BYTES / 1024} KiB）⇒ manifest 常驻主 chunk，总和膨胀直接推高首屏`)
-    } else {
-      ok(`manifest 体积（最大 ${kib(biggest.bytes)} KiB「${biggest.id}」，全库 ${kib(total)} KiB < ${MANIFEST_MAX_BYTES / 1024}/${MANIFEST_TOTAL_MAX_BYTES / 1024} KiB）`)
-    }
+    const r = judgeManifestSize(manifestSizes)
+    if (r.verdict === 'FAIL') fail(r.message)
+    else ok(r.message)
   }
 
   /* ===== 19. inline 预算 =====
@@ -707,14 +790,183 @@ function falsifyBinaryMedia() {
   console.log('──────────────────────────────────────────────────────')
   if (verdict === true) {
     console.log(`content:validate Falsification：✅ PASS —— 4/4 断言通过，隔离副本已清理，真 content/ 未被写入`)
-    process.exit(0)
+    return true
   }
   if (verdict === false) {
     console.error(`content:validate Falsification：❌ FAIL —— ${bad}/4 断言未过 ⇒ 本判据不可信`)
-    process.exit(1)
+    return false
   }
-  process.exit(2)
+  return null // 自身异常（fail-closed）
 }
 
-if (process.argv.slice(2).includes('--falsify')) falsifyBinaryMedia()
+/* ===== 判据 18 证伪自检：口径证明（不会失败的门等于没有门）=====
+ * 隔离副本 = os.tmpdir()/p18-manifest-falsify-*（系统临时目录，容器即弃；真 content/ 只读、绝不被写）。
+ * **双注入，方向相反，缺一不可**：
+ *   注入一：把某包的某个**常驻字段**（如 description）撑大 ⇒ **必须判红**
+ *      —— 证「门还咬得住常驻部分」（否则口径改完后门变成永不触发的空门）。
+ *   注入二：把某包的某个**被裁字段**（sources）撑到很大 ⇒ **必须仍然判绿**
+ *      —— 证「门真的只管常驻部分」。⛔ 这一注入若判红，**说明口径没改对**（那才是本判据要抓的失败）：
+ *      门若对构建期已裁掉的字段也记账，就等于继续为一笔不花首屏成本的字节收税，
+ *      口径漂移只是换了个阈值继续存在。
+ * 两条注入合起来才构成「口径正确」的证明：单看注入一，只能证明门没坏；
+ * 单看注入二，只能证明门变松了；**一起看才证明门恰好卡在常驻边界上**。
+ *
+ * ⚠️ 断言用**同一条实现**（judgeManifestSize + projectManifest），不另写一份判定 ——
+ *   否则证伪跑的是"另一份逻辑"，证出来的 PASS 不代表主流程的 PASS。
+ * ⚠️ 隔离纪律：注入前后真 content/ 的判定结果必须一致（断言 4），证明副本没污染真实内容。
+ *   还原用内存快照覆写（0 次删除），避开本机 safe-delete shim 的累计删除计数。 */
+function falsifyManifestSize() {
+  console.log('[content:validate] 判据 18 证伪自检 —— 证明体积门只卡「常驻字段」，不卡「构建期已裁字段」')
+  let tmp = null
+  let verdict = null // true=断言全过 / false=断言失败 / null=自身异常（fail-closed）
+  let bad = 0
+  const assertions = []
+  const record = (name, pass, actual) => {
+    assertions.push([name, pass, actual])
+    if (pass) console.log(`  ✓ ${name}`)
+    else { bad++; console.error(`  ✗ ${name} —— ${actual}`) }
+  }
+  try {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'p18-manifest-falsify-'))
+    cpSync(CONTENT_DIR, tmp, { recursive: true })
+    console.log(`  隔离副本：${tmp}（系统临时目录；真 content/ 只读、绝不被写）`)
+
+    /** 在副本里列出全部包的两个口径取样（与 main() 同口径：projectManifest 投影后的字节）。
+     *  ⚠️ 目录遍历形态必须与 main() 一致（content/<type>/<pkg>/manifest.json），
+     *   否则证伪跑的是另一个包集合 —— 那是"证伪了别的数据集"。 */
+    const sampleAll = (dir) => {
+      const out = []
+      for (const type of readdirSync(dir, { withFileTypes: true })) {
+        if (!type.isDirectory()) continue
+        const tp = path.join(dir, type.name)
+        for (const entry of readdirSync(tp, { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue
+          const mp = path.join(tp, entry.name, 'manifest.json')
+          if (!existsSync(mp)) continue
+          const obj = JSON.parse(readFileSync(mp, 'utf8'))
+          out.push({
+            id: entry.name,
+            rawBytes: readFileSync(mp).length,
+            runtimeBytes: Buffer.byteLength(JSON.stringify(projectManifest(obj)), 'utf8'),
+          })
+        }
+      }
+      return out
+    }
+
+    /** 取一个稳定的注入目标（副本里常驻体积最大的包）—— 不写死包名，避免某包被删后证伪失效。 */
+    const base = sampleAll(tmp)
+    const target = base.reduce((a, s) => (a === null || s.runtimeBytes > a.runtimeBytes ? s : a), null)
+    const targetDir = (() => {
+      for (const type of readdirSync(tmp, { withFileTypes: true })) {
+        if (!type.isDirectory()) continue
+        const tp = path.join(tmp, type.name)
+        for (const id of readdirSync(tp, { withFileTypes: true })) {
+          if (id.isDirectory() && id.name === target.id) return path.join(tp, id.name)
+        }
+      }
+      return null
+    })()
+    if (targetDir === null) throw new Error(`找不到注入目标包目录：${target.id}`)
+    const manifestPath = path.join(targetDir, 'manifest.json')
+    const pristine = readFileSync(manifestPath, 'utf8') // 内存快照：还原靠覆写，0 次删除
+    const restore = () => writeFileSync(manifestPath, pristine, 'utf8')
+    console.log(`  注入目标：${target.id}（真实常驻 ${target.runtimeBytes} B / 原始 ${target.rawBytes} B）\n`)
+
+    const baseVerdict = judgeManifestSize(base)
+
+    /* —— 注入一：撑大**常驻字段** description ⇒ 必须判红 —— */
+    {
+      const obj = JSON.parse(pristine)
+      obj.description = 'X'.repeat(MANIFEST_MAX_BYTES * 2) // 常驻字段，撑到远超单包上限
+      writeFileSync(manifestPath, JSON.stringify(obj), 'utf8')
+      const r = judgeManifestSize(sampleAll(tmp))
+      record(
+        `断言 1：撑大**常驻字段** description（${MANIFEST_MAX_BYTES * 2} B）⇒ 判红`,
+        r.verdict === 'FAIL',
+        `verdict=${r.verdict}`,
+      )
+      record(
+        `断言 2：判红原因是「单包常驻体积越界」且点名被注入的包`,
+        r.message.includes('单包常驻体积越界') && r.message.includes(target.id),
+        `message=${r.message.slice(0, 120)}`,
+      )
+      restore()
+    }
+
+    /* —— 注入二：撑大**被裁字段** sources ⇒ 必须仍然判绿（口径改对了的证明）—— */
+    {
+      const obj = JSON.parse(pristine)
+      // sources 是 DROPPED_MANIFEST_FIELDS 之一：构建期已被投影裁掉，不进主 chunk。
+      // ⚠️ 填充量取阈值的 **2 倍**（不是 1 倍）：断言 4 要证明「原始口径下这笔字节远超上限」，
+      //   若只填到刚好等于阈值，断言就变成「差几个字节算不算超标」的口径争议 ——
+      //   那种断言在阈值附近时会给出一个取决于填充量的**假绿/假红**，等于没证伪。
+      //   填 2 倍则无论阈值取 40 KiB 还是 64 KiB，原始口径都必然越界，判据唯一。
+      const pad = 'Y'.repeat(MANIFEST_TOTAL_MAX_BYTES * 2)
+      obj.sources = [{ ...(Array.isArray(obj.sources) ? obj.sources[0] : {}), origin: pad }]
+      writeFileSync(manifestPath, JSON.stringify(obj), 'utf8')
+      const r = judgeManifestSize(sampleAll(tmp))
+      const rawGrew = r.rawTotal - baseVerdict.rawTotal
+      const rtSame = r.runtimeTotal === baseVerdict.runtimeTotal
+      record(
+        `断言 3：撑大**被裁字段** sources（+${rawGrew} B 原始字节 = 全库上限的 ${(rawGrew / MANIFEST_TOTAL_MAX_BYTES).toFixed(2)}×）⇒ **仍然判绿**`,
+        r.verdict === 'PASS',
+        `verdict=${r.verdict}（⛔ 若为 FAIL 说明口径没改对：门仍在为构建期已裁字段记账）`,
+      )
+      record(
+        `断言 4：注入二下常驻总量**逐字节不变**（${baseVerdict.runtimeTotal} B ⇒ ${r.runtimeTotal} B），原始总量显著变大`,
+        rtSame && rawGrew > MANIFEST_TOTAL_MAX_BYTES,
+        `常驻 ${baseVerdict.runtimeTotal}→${r.runtimeTotal} B（不变=${rtSame}）/ 原始 +${rawGrew} B（须 > ${MANIFEST_TOTAL_MAX_BYTES}）`,
+      )
+      restore()
+    }
+
+    /* —— 对照组：还原后必须与基线逐字节一致，且真 content/ 未被写入 —— */
+    {
+      const after = judgeManifestSize(sampleAll(tmp))
+      const real = judgeManifestSize(sampleAll(CONTENT_DIR))
+      record(
+        '断言 5：还原后副本回到基线（常驻/原始总量与注入前逐字节一致）',
+        after.runtimeTotal === baseVerdict.runtimeTotal && after.rawTotal === baseVerdict.rawTotal,
+        `常驻 ${baseVerdict.runtimeTotal}→${after.runtimeTotal} B / 原始 ${baseVerdict.rawTotal}→${after.rawTotal} B`,
+      )
+      record(
+        '断言 6：真 content/ 判定不受注入影响（隔离副本未污染真实内容）',
+        real.runtimeTotal === baseVerdict.runtimeTotal && real.rawTotal === baseVerdict.rawTotal && real.verdict === baseVerdict.verdict,
+        `真 content/ 常驻 ${real.runtimeTotal} B / 原始 ${real.rawTotal} B / verdict=${real.verdict}（基线 ${baseVerdict.runtimeTotal} B / ${baseVerdict.rawTotal} B / ${baseVerdict.verdict}）`,
+      )
+    }
+
+    verdict = bad === 0
+  } catch (e) {
+    console.error(`  ‼ 证伪自检自身异常（fail-closed，绝不当作通过）：${e?.message ?? e}`)
+  } finally {
+    if (tmp !== null) {
+      try { rmSync(tmp, { recursive: true, force: true }) }
+      catch (e) { console.warn(`  ⚠ 隔离副本清理失败（系统临时目录，容器即弃，不影响判定）：${tmp} — ${e?.message ?? e}`) }
+    }
+  }
+  const total = assertions.length
+  console.log('──────────────────────────────────────────────────────')
+  if (verdict === true) {
+    console.log(`content:validate 判据 18 Falsification：✅ PASS —— ${total}/${total} 断言通过（常驻字段撑大⇒判红 / 被裁字段撑大⇒仍判绿），隔离副本已清理，真 content/ 未被写入`)
+    return true
+  }
+  if (verdict === false) {
+    console.error(`content:validate 判据 18 Falsification：❌ FAIL —— ${bad}/${total} 断言未过 ⇒ 判据 18 的常驻口径不可信`)
+    return false
+  }
+  return null
+}
+
+if (process.argv.slice(2).includes('--falsify')) {
+  // 两组证伪都跑（判据 22 二进制媒体 + 判据 18 manifest 常驻口径），任一失败即整体失败。
+  // ⚠️ 两个 falsify 函数都**返回**三态而不自己 process.exit —— 否则先跑的那个会把进程带走，
+  //   后跑的那组永远不执行（证伪覆盖率静默下降，而输出看起来一切正常）。
+  // 三态对齐 gate-license.mjs --falsify 惯例：0=全过 / 1=断言失败 / 2=自身异常。
+  const r22 = falsifyBinaryMedia()
+  const r18 = falsifyManifestSize()
+  if (r22 === null || r18 === null) process.exit(2)
+  process.exit(r22 && r18 ? 0 : 1)
+}
 else main().catch((e) => { console.error('[content:validate] 异常：', e.message); process.exit(1) })
