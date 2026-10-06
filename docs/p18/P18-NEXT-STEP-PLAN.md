@@ -30,7 +30,7 @@
 | # | 优先级 | 项 | 状态（ inheriting from P18） | 需拍板 | 工程可控 | 证据落点 |
 |---|---|---|---|---|---|---|
 | **N1** | **P0** | **判据 L1（`gate:lint`）未挂进 `verify-release-gate.mjs`** | 已登记，按计划写明「不进 P18 闭合 43 项」 | 否（一句话决定接 or 不接） | ✅ | `npm run release:gate` 的判据总数；`npm run gate:lint` 输出 |
-| **N2** | **P0** | **`warmBanks` 生产缺口**：SW 激活 >5s 时预热在「未接管」状态下 import ⇒ 静默失效；`Promise.allSettled` 吞错无日志 | P18 只登记、未改（§4.1） | 否 | ✅ | e2e 预热探针观察 + 生产构建真机首访日志 |
+| **N2** | ~~**P0**~~ | ~~**`warmBanks` 生产缺口**：SW 激活 >5s 时预热在「未接管」状态下 import ⇒ 静默失效；`Promise.allSettled` 吞错无日志~~ | ✅ **已修（`16bb11a`，2026-10-01）** —— 见 §6「Stage 0 落地结果」。⚠️ 本行原写「P18 只登记、未改」，**与 §6 矛盾且已过期**（同文件内两处曾给出相反状态）；P18 阶段当时只登记，Stage 0 已实修并加门禁 G4-3② W1/W2 | 否 | ✅ |
 | **N3** | **P0** | **9.1 R2 / `AssetManifest` 资产半波** | ⏸ `BLOCKED / WAITING EXTERNAL CREDENTIAL` | ✅ **是**（R2 凭据绑定） | ❌ | `DECISIONS-POST-P18.md` §9.1 前置条件已定稿，产物不存在即不许 PASS |
 | **N4** | ~~**P1**~~ | ~~D 步内容扩充的前置：主 chunk 瘦身 or 正式重订分层预算~~ | ❌ **已撤销（2026-10-03）** —— 唯一成立依据是评审期「余量只剩 4.9%」，该口径已被 `check:bundle` 实测替代；经 Stage 1 两轮实际瘦身后余量已回到充裕区间，Stage 1 🟢 CLOSED、Stage 2 🟡 已解冻（§11）。**不重订预算、不再为 N4 做额外瘦身** | —（已关闭） | — | 若将来内容扩充真让预算成为约束，**以当时 `check:bundle` 实测重新登记新问题，不复活 N4** |
 | **N5** | **P1** | **9.3 注册表自动化**（`import.meta.glob` 会把全量词库拖进主包） | 侦察结论已有，待裁定 | ✅ **是** | 部分 | `check-bundle` 判据 2/4/5 与 `validate.mjs` 判据 20 都是文本扫描 `registry.ts`，动了会一起动 |
