@@ -2,71 +2,145 @@
 
 **建立时间**：2026-10-06 ｜ **Day 0 = 2026-10-06**
 **Path C · Phase 1**：✅ **CLOSED / PASS**（台账修正**不构成**重开理由 —— yqh 2026-10-06 裁定）
-**代码基线**：`d35dade` ｜ **裁定档落档**：`ca4e5de`（CI `37407901262` success）
-**当前仓库 HEAD**：`84a5b82`（纯文档，CI `37411229860` success）—— 引用时**勿与代码基线混用**
+**代码基线**：`d35dade`（本轮**未改任何业务代码/ 判据 / 预算**）
+**GSC property 验证落档**：`b6d4b43`（CI `37439047422` success）
 **裁定档**：`docs/content/SEO-CONTENT-SURFACE-PHASE1-CLOSE.md`
 **域名**：`geek-typing.pages.dev`（⛔ 不是 `digdevbox.com` —— 那是另一个站）
 
 > **当前阶段**：技术闭环已 CLOSED ⇒ 进入**搜索引擎观察期**。
 > 实验链路：13 包 → 13 SEO pages → canonical/sitemap/404 → robots/Googlebot 抓取
-> → **GSC 提交（← 唯一外部阻塞）** → discovery → crawl → index → impressions → queries → clicks
+> → ✅ **GSC property 已验证 → ✅ sitemap 已提交** → discovery → crawl → index
+> → impressions → queries → clicks
 > **下一刀由真实 GSC 数据决定，不由工程优化决定。**
 >
 > **Day 0 = 2026-10-06** ｜ §四之二 本地侧基线**已冻结** ｜ §五之二 下一周期判定门槛**已在无数据状态下前置冻结**
-> ⛔ 剩**唯一**未完成项：**`geek-typing.pages.dev` 的 GSC property 账号归属**
-> （实测已存在 Domain property，但当前登录账号无权访问 —— 见 §一）
-> ⛔ **AI 不会代点「验证您的所有权」** —— 那是不可逆的资源归属变更，须由yqh 显式决定。
-> ✅ 通道本身已打通：归属一解决，**提交 sitemap + 4 个 URL Inspection 可由 AI 代做**（本机 Chrome CDP 已实测可用）。
+>
+> ✅ **§一·一 区间的阻塞已全部解除**（实测，见 §1.4）：
+> property已创建并**验证通过**、`sitemap.xml` 已提交、GSC 侧导航与索引报告页**已可直读**。
+> ⛔ 剩**唯一**未取回的数据：**4 个 URL 的三字段 Inspection**（`URL is on Google` /
+> `User-declared canonical` / `Google-selected canonical`）—— 原因是**技术阻塞而非权限阻塞**，
+> 已穷尽 7 类自动化方法仍未触发 GSC 的检查入口，详见 §1.5。
 
 ---
 
 ## 一、通道现状（必须先说清，否则会误以为「已核验」）
 
-### 1.1 ⭐ 2026-10-06 12:52 更新：前两轮「无凭据」结论**已被推翻并修正**
+### 1.4 ⭐ 2026-10-06 13:00–17:50 更新：property 已验证通过，sitemap 已提交
+
+>本节**取代** §1.2 / §1.3 的「归属阻塞」结论，但**保留**它们作为过程记录
+>（§1.2 的「您无权访问 ⇒ property 存在」推断已被对照实验推翻，见 §1.3）。
+
+**执行链路（全部实测完成）**：
+
+| 步骤 | 结果 |
+|---|---|
+| 选定 property 类型 | **URL-prefix `https://geek-typing.pages.dev/`**（`pages.dev` 非自有域名，**DNS TXT 验证不可行**，故 Domain property 排除） |
+| 创建 property | ✅ 成功（CDP 原子操作：一次算完坐标 → 真实键入 → 立即提交） |
+| 验证方式 | **HTML 文件验证**（方案 A，yqh 裁定） |
+| 验证文件 | `public/google43538eb9ff0885f7.html`（54 B）→ 提交 `b6d4b43` → CI `37439047422` success |
+| 生产实测 | 普通 UA 与 **Googlebot 均 200/ 54 B / `text/html`** / 含正确 token |
+| 点「验证」 | ✅ **property 验证通过**（完整 GSC 导航 + 「添加新的站点地图」页可访问） |
+| 提交 sitemap | ✅ **`https://geek-typing.pages.dev/sitemap.xml` 已提交成功**（GSC 弹窗「已成功提交站点地图」） |
+| GSC 侧可读页| 站点地图、网页索引编制、概述 —— **均已可直读** |
+
+**当前 GSC 侧实测状态（2026-10-06 17:45）**：
+
+| 项 | GSC 显示 |
+|---|---|
+| Property | URL-prefix `https://geek-typing.pages.dev/`（**已验证**） |
+| Sitemap | `/sitemap.xml` 已提交 |
+| Sitemap 状态 | 🔴 **「无法抓取」** ｜ 已提交网址数 **0** ｜ 上次读取时间 2026/10/6 |
+| 网页索引编制 | 🟡 **「正在处理数据，请过 1 天左右再来查看」** |
+| 概述 | 🟡 「正在处理数据」×4（数据/编制索引/体验/增强功能） |
+
+> 📌 **「无法抓取」+「正在处理数据」是新property 的正常初始态**，不是站点故障。
+> Google 提交后立即尝试抓取、失败则数天内持续重试；索引报告对新property 需1 天左右出首份数据。
+> ⇒ 按 §五之二 冻结门槛，此状态**属观察项，不触发任何工程动作**（§1.6 有本地侧反证）。
+
+### 1.5 ⛔ 未取回的数据：4 个 URL Inspection 三字段
+
+**已穷尽 7 类自动化方法，全部未能触发 GSC 的检查入口**（如实记录，避免下轮重复）：
+
+| # | 方法 | 结果 |
+|---|---|---|
+| 1 | `/inspect?resource_id=…&inspection_url=…` 直接导航 | ❌ 参数被忽略，重定向回「概述」 |
+| 2 | 点击导航栏「网址检查」（`A.Lhhaec`） | ❌ 无`href`（JS 驱动），派发/真实点击均无跳转 |
+| 3 | DOM `focus()` + `Input.insertText` 填入 + 真实点击「检查」 | ✅ 填入成功；❌ 但页面找不到独立「检查」按钮（`nbtn:0`） |
+| 4 | 键盘 Enter（4 种事件序列变体） | ❌ **监听器证实按键根本没到达页面**（`window.__keys === []`） |
+| 5 | 4 个候选路由（`/url-inspection` `/inspect-url` `/urlcheck`） | ❌ 全部 **404** |
+| 6 | 填入后找建议下拉并点击 | ❌ `listbox` 存在（2 个）但**均不可见、无内容**（虚拟滚动） |
+| 7 | 输入框右侧 4 个坐标点真实鼠标点击 | ❌ 全部落在 input 本身（输入框横跨整行 664px） |
+
+**根因（实测，非推测）**：GSC 搜索框是 **Material `role="combobox"`**（jsname `dSO9oc`），
+程序化 `keydown` **不被该组件接受**；而触发检查的按钮在 Closure 事件委托的更深层，
+无 DOM 形态、无 href、无独立文本节点。
+
+⇒ **这是技术阻塞，不是权限阻塞**（property 已验证通过，读取权限完全正常）。
+处置：**yqh 在 GSC 页面上手动执行 4 次检查**（每次粘贴一个 URL、按回车，约 30 秒/个），
+或由yqh 授权后在**可见窗口**中由我配合触发。
+
+### 1.6 「无法抓取」的本地侧反证（2026-10-06 17:20 实测）
+
+⛔ **不得**据GSC 的「无法抓取」推断站点侧故障。本地侧 6 项实测全部为绿：
+
+| 检验项 | 实测|
+|---|---|
+| `sitemap.xml` 结构 | ✅ `</urlset>` 正确闭合，`application/xml`，**14 个 `<loc>`** |
+| `http → https` | ✅ **301** → `https://geek-typing.pages.dev/sitemap.xml` |
+| HTTPS 200 | ✅ `content-encoding: br`，2178 B |
+| **sitemap.xml 20 次泛测（Googlebot UA）** | ✅ **20/20 成功**，p50 **220 ms**，max 970 ms |
+| 对照：`/pages/bank/kaoyan` 20 次泛测 | ✅ **20/20 成功**，p50 **249 ms** |
+| 三次成功响应体md5 | ✅ **完全一致** `87fad66785ccaa3a319759873ea70383` |
+
+**sitemap 声明的 14 个 URL 线上逐一实测（Googlebot UA）**：
+
+| 项 | 结果 |
+|---|---|
+| HTTP 200 | ✅ **14/14**（`cet6` 首次 AbortError，重试 5 次全200） |
+| `canonical` 自指且正确 | ✅ **14/14** |
+| 正文长度与 Day 0 冻结基线| ✅ **逐项吻合**（`kaoyan` 29106 / `toefl` 27886 / `frontend` 547 / 首页 21） |
+| `noindex` | 14 个URL **均无** |
+
+⚠️ **一条重要的测量层陷阱（O-SEO-10）**：`curl` 路径实测曾出现 **HTTP 000 与 10–45 s 超时**
+（sitemap.xml 3/6 次失败），而同路径下Node `fetch` **20/20 成功、p50 220 ms**。
+经对照实验确认：根因是**本机 curl 的网络路径**（Steam++ hosts 劫持 + Clash 系统代理），
+**不是站点、也不是 CF 对 Googlebot 的拦截**（三 UA × 三 URL × 6 次 = 18/18 全 200）。
+
+### 1.7 历史记录（已被§1.4 取代，保留供追溯）
+
+<details>
+<summary>§1.1–§1.3 原文（2026-10-06 12:52–13:05）</summary>
+
+#### 1.1 前两轮「无凭据」结论**已被推翻并修正**
 
 前两轮我只查了「API 凭据 / 连接器」，**漏了本机已登录的浏览器会话**。
-本机 Chrome 正在运行且**CDP 调试端口 9222 已开** → 我已通过它**读到你的实时 GSC 数据**。
-⛔ 此前「必须由你本人操作」的结论据此**作废**（下文§1.2 为实测结果）。
 
 | 通道 | 结论 |
 |---|---|
-| GSC API 凭据（service account / OAuth） | ⛔ 仍无（无 `gcloud`、无 `~/.credentials`） |
+| GSC API 凭据 | ⛔仍无（无 `gcloud`、无 `~/.credentials`） |
 | GSC 连接器 | ⛔ 市场无对应类目 |
-| **本机 Chrome + CDP 9222** | ✅ **可用，已实测读到实时 GSC**（浏览器已登录 `yqhgry@gmail.com`） |
+| **本机 Chrome + CDP 9222** | ✅ **可用，已实测读到实时 GSC** |
 
-### 1.2 GSC 实测结论（CDP 直读，2026-10-06 12:52–13:05）
+#### 1.2 GSC 实测结论（CDP 直读）
 
 | 项 | 实测结果 |
 |---|---|
 | 当前浏览器登录身份 | **`yqhgry@gmail.com`** |
 | 该账号当前打开的 property | **`sc-domain:digdevbox.com`**（另一个站，⛔ 不用于本项目） |
-| 该property 已提交 sitemap | 6 条，**全部属 digdevbox 子域**（draw/notes/play/ip/fangdai/digdevbox.com）；其中 `notes.digdevbox.com` 状态「无法抓取」 |
-| **`sc-domain:geek-typing.pages.dev`** | 🔴 **「您无权访问此资源」**（当前登录身份无权；资源：geek-typing.pages.dev） |
-| **URL-prefix `https://geek-typing.pages.dev/`** | 🔴 **「请选择资源」** ⇒ **该 property 不存在** |
-| `geek-typing` / `pages.dev` 在已读页面中的出现次数 | **0 / 0** |
+| **`sc-domain:geek-typing.pages.dev`** | 🔴 「您无权访问此资源」 |
+| **URL-prefix `https://geek-typing.pages.dev/`** | 🔴 「请选择资源」⇒ **该 property 不存在** |
 
-**判读（三条并列，缺一不可）**：
-1. **Domain property 已被创建过** —— GSC 只对「已存在但无权访问」的资源返回「无权访问」；
-   不存在的资源不会这么回。
-2. **但当前账号不是它的所有者** —— 所以**无法提交 sitemap、无法 URL Inspection**。
-3. **URL-prefix 变体不存在** —— 两条备选路径都不可用。
+#### 1.3 ⚠️ 已作废的推断（「无权访问 ⇒ property 存在」）
 
-⇒ **真正的阻塞点已从「操作步骤」变成「账号归属」**：
-不是「你还没做」，而是**这个 property 归属另一个 Google 账号**。
-⛔ 我**不会**去点「验证您的所有权」按钮：那是**改变资源归属**的动作，
-一旦执行会把property 从现有所有者转到你当前账号，**属不可逆的账号侧变更**，
-必须由你显式决定，不能由我代劳。
+我曾从上述措辞推断「Domain property 已存在但归属他人，必须换账号」。
+**该推断已被对照实验推翻**：用两个**绝不存在**的域名
+（`zzz-definitely-nonexistent-9x8y7z.pages.dev`、`totally-not-a-real-domain-abc123456.com`）
+查询，返回**完全相同的「您无权访问此资源」**措辞。
 
-### 1.3 你需要做的选择（三选一）
+⇒ GSC 对**任何未归你所有的property**（含从未建过的）统一返回该措辞。
+**「无权访问」≠「存在」**。两个账号下实测 Domain property 均为不存在 ⇒ 直接走 URL-prefix新建。
 
-| 方案 | 动作 | 适用 |
-|---|---|---|
-| **A（推荐）** | 用**拥有该 Domain property 的那个 Google 账号**登录，再让我直读 | 归属本就正确，无需任何变更 |
-| **B** | 你点页面上的「验证您的所有权」完成归属转移，**然后我继续直读** | 该property 本就该归你，只是历史落在别的账号 |
-| **C** | 放弃现有 Domain property，**新建 URL-prefix property** `https://geek-typing.pages.dev/` | 只需 DNS/HTTP 验证，不触碰现有归属 |
-
-> 📌 无论 A/B/C，**验证完成后我可以直接代你完成「提交 sitemap + 4 个 URL Inspection」**
-> ——通道已证明可用，不需要你再手动抄结果。
+</details>
 
 ---
 
@@ -413,6 +487,9 @@ C:/Users/Administrator/.workbuddy/binaries/node/versions/22.22.2-3/node.exe \
 | **O-SEO-07**（新） | `robots.txt` 用**相对路径** `Sitemap: /sitemap.xml`。Google 按 robots.txt 所在 host 解析，**实际可用**（实测正常放行），但官方规范用绝对 URL。一旦将来加CDN 子域或换主机，解析基准会变。属**可接受但非最佳实践**，登记观察 |
 | **O-SEO-08**（新） | **首页可见正文仅 21 字符**且**无 `meta description`**——`<body>` 仍是 SPA 空壳 `<div id="root">`。与 Phase 0 取证一致，**本刀未处理、不在 Path C 范围**（首页是 SPA，不属「静态索引页」）。⇒ **13 个词库页是当前唯一的可索引正文来源**，首页在 GSC 眼里近乎空壳。⛔ **不因此重开 Path C**、不改首页（那是 SPA 渲染，静态化属另一条独立议题，届时须单独立刀） |
 | **O-SEO-09**（新 · 观察期新增） | `Google-selected canonical` 偏离 `User-declared canonical`。**处置见 §五之二 门槛 A**：⛔ 不重开 Path C，先看是否同批 308 规范化未完成；**仅当持续多次巡检仍偏离才升级为独立刀**。单次偏离不作为「canonical 修复没做干净」的证据 |
+| **O-SEO-10**（新 · **测量层缺陷，优先级高于 O-SEO-04**） | 本机存在**两条网络路径**且失败模式截然不同：`curl` 路径实测 `sitemap.xml` **3/6 次 HTTP 000**、耗时 10–45 s；同URL 用 Node `fetch`（走系统代理）**20/20 成功、p50 220 ms**。经三 UA × 三 URL × 6 次对照（**18/18 全 200**）确认根因是**本机 curl 路径**（Steam++ hosts 劫持 + Clash 系统代理），**与站点、CF 对 Googlebot 的拦截无关**。⚠️ **一旦用 `curl` 测线上可达性，会把本机网络抖动误判为站点故障**（本轮差点据此判「sitemap 无法抓取 = 服务端问题」）。⇒ **所有线上探测一律用 Node `fetch`（已落`D:\work\_ops\` 可复跑脚本）**，`curl` 结果不得作为站点状态证据 |
+| **O-SEO-11**（新） | GSC 提交 sitemap 后**立即显示「无法抓取」、已提交网址数 0**（2026-10-06 17:45 实测，三次读取一致）。本地侧 6 项反证全部为绿（§1.6，含 20/20 泛测与 14/14 URL 实测）。⇒ 按 §五之二 门槛，**属新property 的正常初始态**，Google 会数天内重试。⛔ **不因此改任何代码或门禁**；仅当 7 天后仍为「无法抓取」才升级为独立排查项（届时先查 Cloudflare 侧，而非改页面） |
+| **O-SEO-12**（新 · 通道限制） | GSC「网址检查」**无法自动化**：搜索框是 Material `role="combobox"`，程序化 `keydown` **不被接受**（监听器实证按键未到达页面），且触发按钮在 Closure 事件委托深层，无 DOM 形态/无 href。7 类方法全部失败（清单见 §1.5）。⇒ **4 个 URL 的三字段须由 yqh 手动执行**。⚠️ 这是**技术阻塞不是权限阻塞** —— property 已验证通过，其他 GSC 页面均可直读 |
 
 ---
 
@@ -452,6 +529,23 @@ C:/Users/Administrator/.workbuddy/binaries/node/versions/22.22.2-3/node.exe \
 ⚠️ 注意本条与既有纪律的**边界差异**：这不是「门禁失效」，而是**调查不完整**。
 两者都会导出错误的「不可能」结论，但修法不同：前者补判据，后者**补枚举**。
 
+### 本轮（§1.4–§1.6）的一条工程纪律（第 12 条 · 测量层）
+
+> **「站点故障」和「我的探测路径有毛病」是两件事 —— 而后者会伪装成前者。**
+
+本轮实测到两条网络路径在同一 URL 上的失败率天差地别：`curl` 3/6 次 HTTP 000（10–45 s 超时），
+Node `fetch` 20/20成功（p50 220 ms）。若只看 `curl`，我会把**本机代理/hosts 劫持造成的抖动**
+写成「Cloudflare 对 Googlebot 拦截」或「sitemap 服务端不可用」，并据此去改本来正常的站点。
+
+⇒ **线上可达性结论必须先证明「探测工具本身可信」。** 最低要求：
+① 用**与被测对象无关的第二条路径**复测（不同客户端/不同协议栈）；
+② 报告里写明**用的是哪条路径**；
+③ 判定站点故障前，**先跑一遍已知健康的对照组**（本轮用的对照组是 `kaoyan` 页20/20 全绿）。
+若对照组也失败 ⇒ 故障在探测层，不在站点。
+
+这与 O-SEO-05（同型：混用口径）、O-SEO-04（同一观测三次复核后无法复现）是同一族的坑：
+**都是「数字/状态有了，但它测的不是你以为的那个东西」**。
+
 ---
 
 ## 八、SHA 引用（沿用双基线规则）
@@ -461,7 +555,11 @@ C:/Users/Administrator/.workbuddy/binaries/node/versions/22.22.2-3/node.exe \
 | **代码实现状态基线**（引用实现状态用这个） | `d35dade` | `37406244511` success |
 | Phase 1 最终裁定落档 | `ca4e5de` | `37407901262` success |
 | Day 0 本地侧基线落档 | `84a5b82` | `37411229860` success |
-| **观察期台账 HEAD**（§四之二/§五之二 冻结于此） | 见下方「本轮提交」 | 见下方 |
+| GSC property 验证文件落档 | `b6d4b43` | `37439047422` success |
+| **观察期台账 HEAD**（§1.4–§1.6 / O-SEO-10..12 冻结于此） | 见下方「本轮提交」 | 见下方 |
+
+> ⚠️ **双基线提醒**：本轮**未改任何业务代码/ 判据 / 预算** ⇒ 代码基线仍是 `d35dade`。
+> 落档 commit 会推进 HEAD，但**不改变代码基线**。引用「实现状态」时一律用 `d35dade`。
 | 前实现版（canonical 修复前） | `53bc8cd` | `37403078567` success |
 
 > ⚠️ **引用纪律**：讨论「SEO 闭环的实现状态」⇒ 引 `d35dade`；
