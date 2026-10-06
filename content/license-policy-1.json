@@ -1,9 +1,9 @@
 {
   "policyVersion": "license-policy-1",
-  "generatedAt": "2026-09-30T09:51:51.661Z",
+  "generatedAt": "2026-10-06T18:01:19.795Z",
   "summary": {
-    "total": 18,
-    "allowed": 18,
+    "total": 27,
+    "allowed": 27,
     "allowedAttribution": 0,
     "reviewRequired": 0,
     "rejected": 0
@@ -70,6 +70,57 @@
       "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
     },
     {
+      "type": "exercise",
+      "id": "content:exercise:curated-ielts-edu-01-exercise:ielts-edu-01-exercise",
+      "packageId": "ielts-edu-01-exercise",
+      "namespace": "curated-ielts-edu-01-exercise",
+      "sources": [
+        {
+          "origin": "original authored content (A1-P/04 Unit 01 — Education)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "exercise",
+      "id": "content:exercise:curated-ielts-env-02-exercise:ielts-env-02-exercise",
+      "packageId": "ielts-env-02-exercise",
+      "namespace": "curated-ielts-env-02-exercise",
+      "sources": [
+        {
+          "origin": "original authored content (A2 · IELTS Academic Unit 02 — Environment/Climate)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "exercise",
+      "id": "content:exercise:curated-ielts-tech-03-exercise:ielts-tech-03-exercise",
+      "packageId": "ielts-tech-03-exercise",
+      "namespace": "curated-ielts-tech-03-exercise",
+      "sources": [
+        {
+          "origin": "original authored content (A3 · IELTS Academic Unit 03 — Technology & Innovation)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
       "type": "listening",
       "id": "content:listening:demo-demo-listening-01:demo-listening-01",
       "packageId": "demo-listening-01",
@@ -94,6 +145,57 @@
       "sources": [
         {
           "origin": "curated in-repo (B-2 试金石)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "reading",
+      "id": "content:reading:curated-ielts-edu-01-reading:ielts-edu-01-reading",
+      "packageId": "ielts-edu-01-reading",
+      "namespace": "curated-ielts-edu-01-reading",
+      "sources": [
+        {
+          "origin": "original authored content (A1-P/04 Unit 01 — Education)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "reading",
+      "id": "content:reading:curated-ielts-env-02-reading:ielts-env-02-reading",
+      "packageId": "ielts-env-02-reading",
+      "namespace": "curated-ielts-env-02-reading",
+      "sources": [
+        {
+          "origin": "original authored content (A2 · IELTS Academic Unit 02 — Environment/Climate)",
+          "provider": "geek-typing original",
+          "spdx": null,
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "reading",
+      "id": "content:reading:curated-ielts-tech-03-reading:ielts-tech-03-reading",
+      "packageId": "ielts-tech-03-reading",
+      "namespace": "curated-ielts-tech-03-reading",
+      "sources": [
+        {
+          "origin": "original authored content (A3 · IELTS Academic Unit 03 — Technology & Innovation)",
           "provider": "geek-typing original",
           "spdx": null,
           "decision": "allowed",
@@ -146,7 +248,7 @@
         {
           "origin": "curated in-repo (2026 AI 核心词库)",
           "provider": "geek-typing original",
-          "spdx": null,
+          "spdx": "MIT",
           "decision": "allowed",
           "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
         }
@@ -197,7 +299,7 @@
         {
           "origin": "curated in-repo (云原生词库)",
           "provider": "geek-typing original",
-          "spdx": null,
+          "spdx": "MIT",
           "decision": "allowed",
           "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
         }
@@ -214,7 +316,7 @@
         {
           "origin": "curated in-repo (前端词库)",
           "provider": "geek-typing original",
-          "spdx": null,
+          "spdx": "MIT",
           "decision": "allowed",
           "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
         }
@@ -231,7 +333,7 @@
         {
           "origin": "curated in-repo (Go 代码词库)",
           "provider": "geek-typing original",
-          "spdx": null,
+          "spdx": "MIT",
           "decision": "allowed",
           "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
         }
@@ -255,6 +357,57 @@
       ],
       "decision": "allowed",
       "reason": "SPDX=MIT ⇒ allowed"
+    },
+    {
+      "type": "vocabulary",
+      "id": "content:vocabulary:curated-ielts-edu-01-vocab:ielts-edu-01-vocab",
+      "packageId": "ielts-edu-01-vocab",
+      "namespace": "curated-ielts-edu-01-vocab",
+      "sources": [
+        {
+          "origin": "original authored content (A1-P/04 Unit 01 — Education)",
+          "provider": "geek-typing original",
+          "spdx": "MIT",
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "vocabulary",
+      "id": "content:vocabulary:curated-ielts-env-02-vocab:ielts-env-02-vocab",
+      "packageId": "ielts-env-02-vocab",
+      "namespace": "curated-ielts-env-02-vocab",
+      "sources": [
+        {
+          "origin": "original authored content (A2 · IELTS Academic Unit 02 — Environment/Climate)",
+          "provider": "geek-typing original",
+          "spdx": "MIT",
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+    },
+    {
+      "type": "vocabulary",
+      "id": "content:vocabulary:curated-ielts-tech-03-vocab:ielts-tech-03-vocab",
+      "packageId": "ielts-tech-03-vocab",
+      "namespace": "curated-ielts-tech-03-vocab",
+      "sources": [
+        {
+          "origin": "original authored content (A3 · IELTS Academic Unit 03 — Technology & Innovation)",
+          "provider": "geek-typing original",
+          "spdx": "MIT",
+          "decision": "allowed",
+          "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
+        }
+      ],
+      "decision": "allowed",
+      "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
     },
     {
       "type": "vocabulary",
@@ -299,7 +452,7 @@
         {
           "origin": "curated in-repo (TS 代码词库)",
           "provider": "geek-typing original",
-          "spdx": null,
+          "spdx": "MIT",
           "decision": "allowed",
           "reason": "provider=geek-typing original ⇒ 自有内容，license 自主"
         }

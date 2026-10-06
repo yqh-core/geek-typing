@@ -19,11 +19,13 @@
  * ── 铁律 ──
  *   · checksum 一律走 license-policy.mjs 的 checksumPayload（唯一实现，禁止手搓）
  *   · --check 只校验不写盘，用于证明「现有包能被同一份源重现」（幂等 / 无漂移）
+ *   · **落盘形态一律走 canonical.mjs 的 canonicalFile()**（唯一实现，禁止 JSON.stringify 直写）
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { checksumPayload, PROVIDER_ORIGINAL } from './license-policy.mjs'
+import { canonicalFile } from './canonical.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
@@ -238,8 +240,29 @@ function buildPackage(type, id, payload, title, description, icon, extraManifest
     dir,
     payloadPath: join(dir, payloadName),
     manifestPath: join(dir, 'manifest.json'),
-    payloadText: JSON.stringify(payload),
-    manifestText: JSON.stringify(manifest),
+    /* ⚠️ **manifest 与 payload 的落盘形态不是同一套**，别图省事一起 canonicalFile：
+     *   · manifest → canonicalFile()（递归键序归一 + 尾随换行）。仓库里**每一个** manifest 都是这个形态
+     *     （实测 27/27：canonicalFile(JSON.parse(磁盘)) === 磁盘），因为 content:build 用它落盘。
+     *   · payload  → JSON.stringify(payload) + 尾随换行（**保留字面插入序，不排序键**）。
+     *     实测 reading/exercise 的 items.json **不是** canonical 形态：磁盘键序是
+     *     `id,title,body,paragraphs`（插入序），而 canonicalize 会排成 `body,id,paragraphs,title`。
+     *     载荷是**内容本体**，键序带阅读语义（先 id 再 title 再 body），不该被构建器重排。
+     *   · 两者都补尾随换行：canonical.mjs:88 明确写了这是 POSIX 文本文件惯例
+     *     （避免 diff 出现 "\ No newline at end of file"）。
+     *     ⚠️ 实测既有 items.json **缺**这个换行（末字节 `5d`），而 content:build 写的 words.json 有（`0a`）
+     *     —— 同一仓两套排版约定。补齐的理由不是「-disk 上就该这样」，而是 canonical.mjs 已把它写成
+     *     全仓文本文件约定，且 git diff 的 "\ No newline at end of file" 标记本身就会污染 review：
+     *     任何一次触碰该文件都会显示「最后一行被改」，而实际只差一个换行。
+     *
+     *   实测踩过的坑：本脚本原先对两者都直写 JSON.stringify（无换行、manifest 按插入序），
+     *   产出与仓库既有形态不一致 ⇒ 重跑一次就在 git 里留下一批「只有键序和换行不同」的脏改动，
+     *   而内容其实零变化 —— 那种形态让 review 无法区分真漂移与假漂移。
+     *   而 npm run content:build 只归一 content/vocabulary/（build.mjs:105-113 显式跳过其它类型），
+     *   所以 reading / exercise 的错形态不会被后续步骤自动修回来。
+     *   ⚠️ canonicalFile 与 checksum 同源（checksum 只对 canonicalize 结果算、不含尾随换行），
+     *   故改落盘形态**不会**改动任何 contentChecksum / sources[].checksum。 */
+    payloadText: `${JSON.stringify(payload)}\n`,
+    manifestText: canonicalFile(manifest),
     statsItems: payload.length,
   }
 }

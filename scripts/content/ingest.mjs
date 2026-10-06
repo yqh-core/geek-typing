@@ -203,9 +203,22 @@ async function main() {
   /* 幂等（对齐 build.mjs「仅在语义有差异时回写」）：generatedAt 是溯源时间戳，每次运行必然
    * 变化，故不参与语义比较 —— 否则产物（已入库、受版本控制）每次运行都会产生一次工作区漂移。
    * ⚠️ 只**排除**它参与判定，不从产物里删字段；落盘结构 / 键序 / 缩进 / 尾随换行一律不变。
-   * ⚠️ 两侧用同一方式构造 ⇒ 键序一致，可直接比字符串，不引入任何新的规范化依赖。 */
-  // `_generatedAt`：它每跑必变、刻意**不参与**语义比较（排除而不删字段），下划线 = 有意不用
-  const semanticsOf = ({ _generatedAt, ...rest }) => JSON.stringify(rest)
+   * ⚠️ 两侧用同一方式构造 ⇒ 键序一致，可直接比字符串，不引入任何新的规范化依赖。
+   *
+   * ⚠️ 排除的键名必须与产物里**实际使用的**一致 —— 产物写的是 `generatedAt`（见上方 artifact）。
+   *   原实现排除的是 `_generatedAt`，而产物里根本没有这个键 ⇒ 解构不出东西、`generatedAt` 从未被排除
+   *   ⇒ 每次比较都不相等 ⇒ 每次跑都重写文件。实测现象：连跑两次都打印「✓ License Policy Matrix 已落盘」，
+   *   `git status` 一直是 ` M content/license-policy-1.json`。注释与实现不符，且是**假幂等**：
+   *   门禁声称「语义未变就跳过写入」，实际永远走不到那条分支。
+   * ⚠️ 用**复制 + 删键**而不是解构排除：解构出的 `generatedAt` 恒为「有意不使用」，
+   *   oxlint 的 no-unused-vars 会判红（未用参数须以 `_` 开头）。写成 `_generatedAt` 固然能过 lint，
+   *   但那正是本次要修的那个错键名 —— 用「lint 通过」换回「语义排除失效」是本末倒置。
+   *   故此处显式复制后 delete：键名写在字符串里，既是唯一事实源，也不会与 lint 规则打架。 */
+  const semanticsOf = (obj) => {
+    const rest = { ...obj }
+    delete rest.generatedAt
+    return JSON.stringify(rest)
+  }
   let prev = null
   try { prev = JSON.parse(await readFile(OUT, 'utf8')) } catch { prev = null } // 不存在/不可解析 ⇒ 必须写
   if (prev !== null && typeof prev === 'object' && semanticsOf(prev) === semanticsOf(artifact)) {
