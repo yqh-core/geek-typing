@@ -11,6 +11,33 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# ══════════════════════════════════════════════════════════════════════════
+# 版本钉死策略（2026-10 复核，勿轻易放开）
+#
+# ① `runs-on: ubuntu-24.04` —— **故意不用 `ubuntu-latest`**。
+#    `ubuntu-latest` 是会漂移的别名：GitHub 已公告它将在 2026-10-19 起分批切到
+#    Ubuntu 26.04（内核 6.17 → 7.0、userspace 一起换）。漂移意味着「昨天绿的
+#    门禁今天可能因为 glibc/预编译二进制变化而红」，而本仓库 4 个 job 全是
+#    **fail-closed 门禁 + 唯一发布通道**（部署 job needs 三闸）⇒ 镜像一变，
+#    部署链路整条断掉，且断点在 runner 侧、排查成本极高。
+#    钉死 = 把「环境漂移」这个变量从 CI 里去掉，只在**明确决定**时改这一行。
+#    ⚠️ ubuntu-24.04 本身仍在支持期内（真正到期的是 ubuntu-22.04，2027-04-17），
+#    所以**本轮不需要为 Ubuntu 26 做迁移** —— 迁移应作为独立一刀，届时单独验证。
+#
+# ② `node-version: '22'` —— **故意不盲目升大版本**。
+#    门禁脚本重依赖 `node:fs` / `node:zlib` / TypeScript Compiler API
+#    （如 gate-content-type-contract 用进程内 `ts.createProgram`），
+#    升大版本可能改变内置模块行为与 `--experimental` 标志语义 ⇒ 门禁行为漂移。
+#    `'22'` 解析到「22.x 最新补丁」，与本机开发大版本一致（Node 22 维护期至
+#    2027-04-30，本次 2026-10 硬期限不受影响）。升版本须先跑本文件全部 run: 命令。
+#
+# ③ action 主版本已是 node24 runtime（checkout@v7 / setup-node@v7 / wrangler-action@v4）。
+#    「Node.js 20 is deprecated」说的是 **action 自己的 runtime**
+#    （action.yml 里的 `using: node20`），**不是** setup-node 的 node-version。
+#    两者是不同层的东西 —— 升 node-version 不能消掉那条警告，升 action 主版本才可以。
+#    Node 20 已于 2026-09-23 从 runner 移除；本文件三个 action 均为 node24，不受影响。
+# ══════════════════════════════════════════════════════════════════════════
+
 jobs:
   # ══════════════════════════════════════════════════════════════════════════
   # P0.7 收口第 9 项：质量门禁（原为人工本地跑，现进入 CI）
