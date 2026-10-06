@@ -1,0 +1,38 @@
+sequenceDiagram
+    autonumber
+    participant U as 用户浏览器
+    participant SW as Service Worker<br/>(public/sw.js)
+    participant BS as build-static-pages.mjs<br/>(构建后处理)
+    participant COPY as home-landing.copy.mjs<br/>(文案唯一事实源)
+    participant HL as home-landing.mjs<br/>(纯逻辑 render/inject)
+    participant CT as content/vocabulary/*<br/>(词数事实源)
+    participant DIST as dist/index.html
+    participant R as React 19 createRoot
+    participant G as Googlebot / 爬虫
+
+    Note over BS,HL: ── 构建期（npm run build，排在 vite build 之后）──
+    BS->>COPY: readLandingCopy()
+    COPY-->>BS: 8 区块中文文案 + 9 个目标关键词 + FAQ
+    BS->>CT: 读 words.json 逐包真实长度
+    CT-->>BS: [{ai-core:43}, {ielts:3000}, ...]（现算，禁止写死）
+    BS->>HL: renderHomeLandingBlock({banks, origin, copy})
+    Note over HL: 函数名刻意不含 Page 子串<br/>⇒ gate-seo-pages 判据 10 数不到它<br/>H1 不自注入 <script>
+    HL-->>BS: 静态 HTML 块（含内联 <style>，作用域锁 #seo-home）
+    BS->>DIST: 读现有 dist/index.html（Vite 产物）
+    Note over BS,DIST: 硬约束：不覆盖 Vite 产物，只做字符串插入<br/>且必须逐字保留 <div id="root"></div><br/>（preview-server.mjs:116 依赖它判活）
+    BS->>HL: injectIntoIndexHtml(html, block)
+    HL-->>DIST: 落地块插到 #root 之前 → 写回
+    Note over DIST: index.html 2,007 B → 约 12–16 KB<br/>主 chunk raw/gzip 增量恰为 0 B
+
+    Note over U,G: ── 运行期（用户 / 爬虫访问 /）──
+    G->>U: GET /（不执行 JS）
+    U-->>G: 静态落地块正文（Hero/能力/词库/差异/FAQ/CTA）<br/>✅ Google 可见正文 0 → 800+ 字符
+    Note over G: 关键词落在服务端 HTML 里，<br/>不依赖 JS 执行
+
+    U->>SW: 导航请求 /
+    SW-->>U: 网络优先；未命中回落 precache 的 /index.html<br/>（落地块随 index.html 一并预缓存 ⇒ 离线可见）
+    U->>R: main.tsx → createRoot(#root).render()
+    R->>R: clearContainerSparingly(#root)
+    Note over R: 只清 #root 的子节点<br/>【E3 实测】#root 内静态块 insideExists:false<br/>#root 外静态块 outsideExists:true
+    R-->>U: 渲染 Header / 页签 / HomePanel（个性化动态层）
+    Note over U: 最终 DOM = 静态落地块（营销/SEO）<br/> + React 应用（今日打卡/推荐）<br/> 两层文案零重叠，无重复正文

@@ -1,0 +1,126 @@
+classDiagram
+    direction LR
+
+    class CopyModule {
+        <<module·文案唯一事实源>>
+        +readLandingCopy() LandingCopy
+        +TARGET_KEYWORDS : string[]
+    }
+
+    class LandingCopy {
+        <<data>>
+        +hero : {title, sub, ctas}
+        +why : Section[3]
+        +banks : BankCard[]
+        +diff : {title, rows[], positioning}
+        +voice : Testimonial[3]
+        +faq : FaqItem[]
+        +cta : {title, sub}
+    }
+
+    class BankCard {
+        <<data>>
+        +packageId : string
+        +label : string
+        +keyword : string
+    }
+
+    class LandingRenderer {
+        <<module·纯逻辑·import 无副作用>>
+        +renderHomeLandingBlock(input) string
+        +injectIntoIndexHtml(html, block) string
+        +LANDING_ID : string
+        +ROOT_ID : string
+    }
+
+    class LandingInput {
+        <<data>>
+        +copy : LandingCopy
+        +banks : BankRow[]
+        +siteOrigin : string
+    }
+
+    class BankRow {
+        <<data·现算禁止写死>>
+        +packageId : string
+        +title : string
+        +wordCount : number
+        +url : string
+    }
+
+    class ContentDir {
+        <<外部事实源>>
+        +readdirSync(vocabulary) string[]
+        +readFileSync(words.json) WordItem[]
+    }
+
+    class BuildStaticPages {
+        <<module·CLI·现有>>
+        +readSiteOrigin() string
+        +escapeHtml(v) string
+        +canonicalBankUrl(origin, id) string
+        +collectBanks() Bank[]
+        +main() Stats
+    }
+
+    class ViteBuild {
+        <<外部·构建产物>>
+        +index.html : 2007 B
+        +assets/index-*.js : 426052 B raw / 130283 B gzip
+    }
+
+    class DistIndexHtml {
+        <<产物·约 12–16 KB>>
+        +seo-home block : 位于 #root 之前
+        +div#root : 逐字保留·React 挂载点
+        +script module src : 逐字保留
+    }
+
+    class App {
+        <<React 19>>
+        +render() void
+    }
+
+    class CreateRoot {
+        <<react-dom/client>>
+        +clearContainerSparingly(node) void
+    }
+
+    class GateHomeLanding {
+        <<新增门禁·三态>>
+        +gate() void
+        +falsify() void
+        +H1..H9 : Check[]
+    }
+
+    class GateSeoPages {
+        <<既有门禁·不受影响>>
+        +judge1..13 : Check[]
+    }
+
+    class CheckBundle {
+        <<既有门禁·不受影响>>
+        +main() void
+        +mainChunkBudgets() Budget
+    }
+
+    CopyModule --> LandingCopy : 持有
+    LandingCopy --> BankCard : 含
+    BuildStaticPages ..> CopyModule : main() 读取文案
+    BuildStaticPages ..> LandingRenderer : main() 调用注入
+    BuildStaticPages --> ContentDir : collectBanks 读词数
+    ContentDir --> BankRow : 产出
+    LandingRenderer ..> LandingInput : 接收
+    LandingInput --> BankRow : 含
+    LandingInput --> LandingCopy : 含
+    ViteBuild --> DistIndexHtml : vite build 产出
+    BuildStaticPages --> DistIndexHtml : 就地插入·不覆盖
+    DistIndexHtml --> App : #root 挂载点
+    App --> CreateRoot : 内部使用
+    CreateRoot ..> DistIndexHtml : 只清 #root 子节点·落地块存活
+    GateHomeLanding ..> DistIndexHtml : H1 判位置在 #root 外
+    GateHomeLanding ..> CopyModule : H3 派生关键词期望值
+    GateHomeLanding ..> ContentDir : H5 核对词数诚实
+    GateSeoPages ..> DistIndexHtml : 判据 6/7 比对 title/description
+    GateSeoPages ..> BuildStaticPages : 判据 10 数模板函数·数不到落地块
+    CheckBundle ..> ViteBuild : 只读 dist/assets·增量 0 B

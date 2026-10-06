@@ -1,4 +1,8 @@
 User-agent: *
 Allow: /
 
-Sitemap: /sitemap.xml
+# F1 · Sitemap 必须是**完全限定 URL**（含协议与主机）。
+# 依据：Google 官方 sitemap 规范要求 `Sitemap:` 后面跟绝对 URL；
+# 相对路径（旧的 `/sitemap.xml`）会被 Google **静默忽略** —— 不报错、不提示，
+# 只是这个文件从来没被读到过。实测线上就是这个相对路径。
+Sitemap: https://geek-typing.pages.dev/sitemap.xml

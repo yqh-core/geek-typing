@@ -144,6 +144,35 @@ check(
   ['gzip', 'br'].includes(rHome.headers()['content-encoding'] ?? ''),
   `content-encoding=${rHome.headers()['content-encoding'] ?? '(无)'}`,
 )
+
+// A3b 首页落地块（#seo-home）—— 为什么生产侧要单独断言：
+//   本轮 P0 的根因是「13 个词库页全站零入站链接，Google 从未抓取」。
+//   本地 gate-home-landing 只证明**产物**对；线上这条证明**部署出去的东西**也对
+//   （CF Pages 可能改写 HTML、压缩可能改变字节形态，静态检查原理上覆盖不到）。
+//   顺带证明 prod-smoke 的 localFingerprints() 仍能从被注入过的 index.html 解析出 bundle 名
+//   —— 落地块插在 <head> 之前，若它含 `/assets/index-*.js` 形态的字面量就会污染那个解析。
+const landingStart = homeBody.indexOf('<!-- seo-home:start -->')
+const landingEnd = homeBody.indexOf('<!-- seo-home:end -->')
+const landingHtml =
+  landingStart !== -1 && landingEnd !== -1 && landingEnd > landingStart
+    ? homeBody.slice(landingStart, landingEnd)
+    : ''
+check(
+  'A3b: / 响应体含首页落地块 #seo-home',
+  landingStart !== -1 && landingEnd !== -1 && landingHtml.includes('id="seo-home"'),
+  `标记 start=${landingStart} end=${landingEnd}；块长=${landingHtml.length} B`,
+)
+check(
+  'A3b: 落地块内零 <script 且含 13 个词库真链接',
+  (landingHtml.match(/<script/gi) || []).length === 0 &&
+    (landingHtml.match(/\/pages\/bank\/[a-z0-9-]+/gi) || []).length === 13,
+  `<script>=${(landingHtml.match(/<script/gi) || []).length}；/pages/bank/ 链接=${(landingHtml.match(/\/pages\/bank\/[a-z0-9-]+/gi) || []).length}`,
+)
+check(
+  'A3b: 落地块注入后 localFingerprints() 仍能解析出 bundle（未被落地块污染）',
+  !!bundle && homeBody.includes(bundle) && !landingHtml.includes('/assets/index-'),
+  `bundle=${bundle ?? '(无)'}；落地块内是否含 /assets/index-=${landingHtml.includes('/assets/index-')}`,
+)
 await rHome.dispose()
 
 // A4 bundle 压缩 + 强缓存

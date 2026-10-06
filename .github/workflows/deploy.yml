@@ -173,6 +173,18 @@ jobs:
       # 判据清单 = scripts/seo/gate-seo-pages.mjs 文件头（**单一事实源，此处不重述 12 条的编号与阈值**）。
       - name: SEO 静态页门禁（gate:seo-pages · sitemap/正文/canonical/404）
         run: npm run gate:seo-pages
+      # 首页落地页门禁（gate:home-landing）—— 为什么紧跟 gate:seo-pages：
+      #   ① 同一个 job、同一次 build 的dist/，零额外构建成本；
+      #   ② 它补的是 gate-seo-pages 至今仍有的**入站链接盲区**（判据 14 已反向覆盖，
+      #      本门再从落地块侧独立复核一遍：位置/正文/关键词/零 script/词数诚实/内链/体积/移动端）。
+      #   两道门互不共谋判定逻辑：落地块若被挪进 #root（React 会清掉它），
+      #   gate-seo-pages 的判据 14抓不到（它只看 dist/index.html 的静态字节），
+      #   而本门的判据 1 会立刻判红。⛔ 不改 needs 拓扑、不动 timeout-minutes。
+      # ⚠️ `gate:home-landing:falsify` **不进 CI** —— 与既有 gate:perf / gate:seo-pages 的
+      #   约定一致：故障注入演练属证据任务，不是每次构建的门。
+      # 判据清单 = scripts/seo/gate-home-landing.mjs 文件头（单一事实源，此处不重述 10 条编号）。
+      - name: 首页落地页门禁（gate:home-landing · 内链/正文/零script/词数诚实）
+        run: npm run gate:home-landing
       - name: 安装 Chromium
         run: npx playwright@1.49.1 install chromium --with-deps
       # 场景 态1/1.5/2/3/4/4b（判据清单 = tests/offline-audit.mjs，此处不重述计数）。

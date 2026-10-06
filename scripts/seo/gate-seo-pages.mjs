@@ -558,6 +558,60 @@ export function evaluate(inp) {
     )
   }
 
+  /* 判据 14 · 反向内链覆盖（⭐ 本轮新增 —— 补「孤岛页」这个盲区）
+   *
+   * 为什么必须补这条（它是本轮 P0 的直接起因）：
+   *   13 条判据里**没有任何一条检查入站链接** —— 判据 5/13 查的是 bank 页自己的 canonical，
+   *   判据 12 查的是页面内的计数声明。**出站**链接（bank → 首页）被检查了，
+   *   而**入站**链接（首页 → bank）从来没人查。
+   *   ⇒ 实测出的后果就是：13 个词库页成了彻底的孤岛页（全站零入站链接），
+   *   Google 因此从未抓取过它们（GSC：三个 bank 页全部「尚未收录 · Google 无法识别此网址」），
+   *   而**全部门禁一路全绿**。孤岛不是「运气不好没被发现」，是**没人看这个指标**。
+   *   本条断言方向与既有判据相反：**从 dist/index.html 反查每个 bank 页是否被链到**。
+   *
+   * 为什么要求「零缺失零多余」而不是「≥10 个」：
+   *   「≥10」允许 3 个包继续当孤岛 —— 而孤岛正是本轮要消灭的东西。
+   *   期望集合取自 **dist/pages/bank/*.html 的真实文件清单**（不是写死 13），
+   *   所以新增词汇包一旦没被首页链到，本条立刻判红 ⇒ 新包不可能静默变孤岛。
+   */
+  {
+    // 反向：从首页 HTML 里抽出全部指向 /pages/bank/ 的 href
+    const indexHtml = inp.indexHtml ?? ''
+    const hrefs = (indexHtml.match(/href="([^"]*)"/g) || []).map((s) =>
+      s.slice('href="'.length, -1),
+    )
+    const bankHrefs = hrefs.filter((h) => h.includes('/pages/bank/'))
+    // 每个 bank 页应被链到的规范 URL（期望值来自 canonicalBankUrl —— 与判据 5 同源）
+    const expected = new Map()
+    for (const p of pages) {
+      const pkgId = p.file.replace(/\.html$/, '')
+      expected.set(pkgId, inp.siteOrigin ? canonicalBankUrl(inp.siteOrigin, pkgId) : null)
+    }
+    const linked = new Set()
+    for (const h of bankHrefs) {
+      const m = h.match(/\/pages\/bank\/([^/?#]+)/)
+      if (m) linked.add(decodeURIComponent(m[1]))
+    }
+    const orphan = [...expected.keys()].filter((pkgId) => !linked.has(pkgId))
+    const unknown = [...linked].filter((pkgId) => !expected.has(pkgId))
+    // ⛔ 站内 href 一律不含 .html（.html 会 308 ⇒ 不是规范地址；与判据 13 同一纪律的覆盖面扩展）
+    const withHtml = bankHrefs.filter((h) => h.includes('.html'))
+
+    const bad = []
+    if (indexHtml === '') bad.push('dist/index.html 不可读')
+    if (orphan.length > 0) bad.push(`❌ ${orphan.length} 个词库页零入站链接（孤岛页）：${orphan.join(' ')}`)
+    if (unknown.length > 0) bad.push(`首页链到了不存在的包：${unknown.join(' ')}`)
+    if (withHtml.length > 0) bad.push(`${withHtml.length} 条 bank href 含 .html：${withHtml.slice(0, 3).join(' ')}`)
+    add(
+      14,
+      '反向内链覆盖（首页 → 13 个词库页，零孤岛）',
+      bad.length === 0 && pages.length > 0 && expected.size > 0,
+      bad.length === 0
+        ? `首页含 ${bankHrefs.length} 条 /pages/bank/ 链接，恰好覆盖 ${expected.size}/${expected.size} 个词库页：零孤岛、零多余、零 .html`
+        : `❌ ${bad.join('；')}`,
+    )
+  }
+
   return { rows, fatal: null }
 }
 
@@ -716,7 +770,15 @@ function falsify() {
       {
         no: 2,
         what: '删掉 1 个页面文件（13 → 12）',
-        expect: '页面文件数不足 13',
+        expect: '页面文件数不足 13，且反向内链覆盖同时报「首页链到了不存在的包」',
+        // ⚠️ 本条**期望两条判据同时转红**，理由必须写下来（否则看起来像注入不精准）：
+        //   删掉 dist/pages/bank/ai-core.html 之后，**首页那条指向 ai-core 的入站链接就成了悬空链接**
+        //   —— 而悬空内链是货真价实的缺陷（爬虫点过去是 404）。于是两个**互不复用逻辑**的
+        //   独立守卫同时抓到它：判据 2（页面文件齐备性）与判据 14（反向内链覆盖，
+        //   它把「首页链到但产物不存在」判为多余链接）。
+        //   同时转红正是「双守卫都在岗」的证据，不是判据彼此耦合（谁也不读谁的结论）。
+        //   这与注入 14（canonical 改回 .html ⇒ 判据 5+13 同时红）是**完全同型**的情形。
+        expectReds: [2, 14],
         mutate() {
           const files = readdirSync(join(TMP, 'bank')).sort()
           unlinkSync(join(TMP, 'bank', files[0]))
@@ -891,6 +953,24 @@ function falsify() {
           )
         },
       },
+      {
+        no: 15,
+        what: '把首页里指向 3 个词库页的入站链接删掉（重建「孤岛页」这个缺陷）',
+        expect: '反向内链覆盖出现 3 个零入站链接的孤岛页',
+        // ⛔ 这条守的是**本轮 P0 修复的原始缺陷形态**：孤岛页之所以能一路过 CI，
+        //   就是因为前 13 条判据没有任何一条看**入站**链接（只看 bank 页自身的 canonical/sitemap）。
+        //   把首页对 3 个包的内链删掉后，判据 1–13 全部与该缺陷无关 ⇒ 只有判据 14 转红。
+        //   这正是「盲区已被补上」的直接证据，也是本条注入存在的全部意义。
+        expectReds: [14],
+        mutate() {
+          const p = join(TMP, 'index.html')
+          let html = readFileSync(p, 'utf8')
+          for (const id of ['ts-code', 'toefl', 'kaoyan']) {
+            html = html.replace(new RegExp(`<a class="gh-card" href="[^"]*${id}">[\\s\\S]*?<\\/a>`), '')
+          }
+          writeFileSync(p, html, 'utf8')
+        },
+      },
     ]
 
     for (const inj of injections) {
@@ -938,7 +1018,7 @@ function falsify() {
     for (const f of fail) console.error(`   · ${f}`)
     process.exit(1)
   }
-  console.log('\n[gate-seo-pages] ✅ 证伪自检通过：14 条注入逐条「注入即红、且恰好红期望的那几条」，还原后逐字节一致 + 复绿')
+  console.log('\n[gate-seo-pages] ✅ 证伪自检通过：15 条注入逐条「注入即红、且恰好红期望的那几条」，还原后逐字节一致 + 复绿')
   process.exit(0)
 }
 

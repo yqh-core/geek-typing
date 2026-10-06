@@ -46,6 +46,8 @@
     "gate:perf:falsify": "node scripts/gate-perf.mjs --falsify",
     "gate:seo-pages": "node scripts/seo/gate-seo-pages.mjs",
     "gate:seo-pages:falsify": "node scripts/seo/gate-seo-pages.mjs --falsify",
+    "gate:home-landing": "node scripts/seo/gate-home-landing.mjs",
+    "gate:home-landing:falsify": "node scripts/seo/gate-home-landing.mjs --falsify",
     "bench:content": "node scripts/bench-content.mjs",
     "bench:boot": "node scripts/bench-boot.mjs",
     "audit:learning": "node scripts/learning-consistency.mjs",

@@ -41,9 +41,11 @@
  * 见文件末尾）—— 这样 gate-seo-pages.mjs 可以 import 纯逻辑做判据计算与故障注入，
  * 而不会在 import 副作用里改产物。
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { injectIntoIndexHtml, renderHomeLandingBlock } from './home-landing.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const VOCAB_DIR = join(ROOT, 'content', 'vocabulary')
@@ -290,18 +292,27 @@ ${items}
  * 生成 sitemap XML。
  * 首页 priority 1.0，词库页 0.8；changefreq 首页 weekly（沿用既有 public/sitemap.xml 的值）、
  * 词库页 monthly（内容随包版本变更，不按天变）。
- * @param {Array<{loc:string, changefreq?:string, priority?:string}>} entries
+ *
+ * ⭐ **F2 · `<lastmod>`**：本条改动的原因是 sitemap 的 14 条 `<loc>` **全部缺 `<lastmod>`**，
+ *   而 sitemap 协议里 `<lastmod>` 是搜索引擎判断「这个 URL 的内容有没有变过」的主要信号 ——
+ *   缺它就等于告诉 Google「这批页面从建站至今一次都没动过」，直接削弱变更通知能力。
+ *   **值取各页面文件的 mtime**（写盘时刻 ⇒ 真实反映本次构建产物的新鲜度），⛔ 不写死字符串。
+ *
+ * @param {Array<{loc:string, changefreq?:string, priority?:string, lastmod?:string}>} entries
  * @returns {string} XML 文本
  */
 export function buildSitemap(entries) {
   const body = entries
-    .map(
-      (e) => `  <url>
-    <loc>${escapeHtml(e.loc)}</loc>
+    .map((e) => {
+      //⏎ 缺 lastmod 时不输出该标签（而不是编一个假日期）—— 与「不许编造数字」同源纪律。
+      const lastmod = String(e.lastmod ?? '').trim()
+      const lastmodLine = lastmod ? `\n    <lastmod>${escapeHtml(lastmod)}</lastmod>` : ''
+      return `  <url>
+    <loc>${escapeHtml(e.loc)}</loc>${lastmodLine}
     <changefreq>${escapeHtml(e.changefreq ?? 'monthly')}</changefreq>
     <priority>${escapeHtml(e.priority ?? '0.8')}</priority>
-  </url>`,
-    )
+  </url>`
+    })
     .join('\n')
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -323,10 +334,30 @@ export function readSiteOrigin() {
   }
   const sm = join(ROOT, 'public', 'sitemap.xml')
   if (existsSync(sm)) {
-    const m = readFileSync(sm, 'utf8').match(/<loc>([^<]+)<\/loc>/)
+    const m = readFileSync(sm, 'utf8').match(/<loc>([^<]*)<\/loc>/)
     if (m) return new URL(m[1]).origin
   }
   return null
+}
+
+/**
+ * 文件 mtime → sitemap `<lastmod>`（W3C Datetime，UTC，秒精度）。
+ *
+ * 为什么用 mtime 而不是「manifest 里的构建时间戳」：mtime 是**产物文件本身的最后写入时刻**，
+ * 也就是「搜索引擎下次抓取时该看到的内容有多新」的真值；manifest 里的时间戳可能来自
+ * 内容包入库时刻，与本次产物是否真的重写过无关。
+ * ⛔ 不写死字符串 —— 写死的 `<lastmod>` 等于对 Google 撒谎「这页从某年起就没变过」。
+ *
+ * @param {string} filePath 产物文件路径
+ * @returns {string} 形如 2026-01-01T00:00:00+00:00；文件不存在返回空串（调用方据此省略该标签）
+ */
+export function fileLastmod(filePath) {
+  try {
+    if (!existsSync(filePath)) return ''
+    return statSync(filePath).mtime.toISOString().replace(/\.\d{3}Z$/, '+00:00')
+  } catch {
+    return ''
+  }
 }
 
 /**
@@ -365,14 +396,15 @@ export function collectBanks(vocabDir = VOCAB_DIR) {
 /* ──────────────────────────────── CLI 段 ──────────────────────────────── */
 
 /**
- * 写盘：生成 13 个静态页 + 重写 dist/sitemap.xml。
+ * 写盘：生成 13 个静态页 + 重写 dist/sitemap.xml + 注入首页落地块。
  * @param {object} [opts] 注入点（falsify / 测试用；真跑全默认）
- * @returns {{pages:number, totalWords:number, sitemapUrls:number, origin:string}}
+ * @returns {{pages:number, totalWords:number, sitemapUrls:number, origin:string, landing:{injected:boolean,bytes:number,bankLinks:number}}}
  */
 export function main(opts = {}) {
   const dist = opts.dist ?? DIST
   const bankDir = opts.bankDir ?? join(dist, 'pages', 'bank')
   const sitemapPath = opts.sitemapPath ?? join(dist, 'sitemap.xml')
+  const indexPath = opts.indexPath ?? join(dist, 'index.html')
   const origin = opts.siteOrigin ?? readSiteOrigin()
   if (!origin) {
     console.error('[seo-pages] 读不到 siteOrigin（index.html canonical 与 public/sitemap.xml 都不可解析）：拒绝生成')
@@ -388,7 +420,11 @@ export function main(opts = {}) {
   mkdirSync(bankDir, { recursive: true })
 
   let totalWords = 0
-  const entries = [{ loc: `${origin}/`, changefreq: 'weekly', priority: '1.0' }]
+  // ⭐ F2：首页 <lastmod> 取 index.html 的 mtime（⛔ 不写死字符串）。
+  //   注意本entry 在落地块注入**之前**构造，而注入会在末尾覆写 index.html。
+  const entries = [
+    { loc: `${origin}/`, changefreq: 'weekly', priority: '1.0', lastmod: fileLastmod(indexPath) },
+  ]
   for (const bank of banks) {
     const { manifest, words } = bank
     const html = renderBankPage({ manifest, words, siteOrigin: origin, wordsPerPage: opts.wordsPerPage })
@@ -399,7 +435,13 @@ export function main(opts = {}) {
     const shown = Math.min(Array.isArray(words) ? words.length : 0, opts.wordsPerPage ?? WORDS_PER_PAGE)
     totalWords += shown
     // ⭐ 与 canonical / 门禁判据 5 同源（⛔ 不带 .html）—— 三处曾各写一遍 .html，是本次缺陷的直接成因。
-    entries.push({ loc: canonicalBankUrl(origin, manifest.packageId), changefreq: 'monthly', priority: '0.8' })
+    entries.push({
+      loc: canonicalBankUrl(origin, manifest.packageId),
+      changefreq: 'monthly',
+      priority: '0.8',
+      // ⭐ F2：该页产物文件的真实 mtime（⛔ 不写死字符串）
+      lastmod: fileLastmod(file),
+    })
   }
 
   const xml = buildSitemap(entries)
@@ -409,10 +451,49 @@ export function main(opts = {}) {
   const pubSitemap = join(ROOT, 'public', 'sitemap.xml')
   writeFileSync(pubSitemap, xml, 'utf8')
 
-  const stats = { pages: banks.length, totalWords, sitemapUrls: entries.length, origin }
+  /*
+   * ── 首页落地块注入（本轮 P0：让13 个孤岛词库页第一次有入站链接）────────
+   *
+   * 实测前提（不要再重测）：13 个 bank 页是**彻底的孤岛页 —— 全站零入站链接**，
+   *   Google 因此从未抓取过它们：
+   *     · dist/index.html含 `pages/bank` 0 次、含 `<a href` 0 个
+   *     · dist/assets/index-*.js 含 `pages/bank` 0 次
+   *     · 13 个 bank 页各自的出链各 1 条，**只有 href="/"**（链回首页）
+   *   GSC 印证：首页已收录；三个 bank 页全部「尚未收录 · Google 无法识别此网址」。
+   *
+   * 两条不可让步的性质：
+   *   ① 词库卡片必须是**真 `<a href>`**（不是纯文字展示）—— 纯文字对本问题零收益；
+   *   ② 块必须落在 `#root` **之外** —— React 19 createRoot 会清空 #root 内子节点（真机实测）。
+   *
+   * 排在 sitemap 之后：注入会覆写 dist/index.html，而 entries 里首页的 lastmod 已取过。
+   */
+  let landing = { injected: false, bytes: 0, bankLinks: 0 }
+  if (opts.injectLanding !== false && existsSync(indexPath)) {
+    // 词数一律**现算**（⛔ 不写死 —— 项目历史上写死的两处已腐坏成 18/9388）
+    const bankRows = banks.map((b) => ({
+      packageId: String(b.manifest?.packageId ?? '').trim(),
+      title: String(b.manifest?.title ?? '').trim(),
+      wordCount: Array.isArray(b.words) ? b.words.length : 0,
+    }))
+    const allWords = banks.reduce((sum, b) => sum + (Array.isArray(b.words) ? b.words.length : 0), 0)
+    const block = renderHomeLandingBlock({ bankRows, origin, totalWords: allWords })
+    writeFileSync(indexPath, injectIntoIndexHtml(readFileSync(indexPath, 'utf8'), block), 'utf8')
+    landing = {
+      injected: true,
+      bytes: Buffer.byteLength(block, 'utf8'),
+      bankLinks: (block.match(/class="gh-card" href="/g) || []).length,
+    }
+  }
+
+  const stats = { pages: banks.length, totalWords, sitemapUrls: entries.length, origin, landing }
   console.log(`[seo-pages] 已生成 ${stats.pages} 个静态页→ ${bankDir.replace(ROOT, '.')}`)
   console.log(`[seo-pages]   词条渲染合计 ${stats.totalWords} 条（单页上限 ${opts.wordsPerPage ?? WORDS_PER_PAGE}）`)
-  console.log(`[seo-pages]   sitemap ${stats.sitemapUrls} 条 → ${sitemapPath.replace(ROOT, '.')} + public/sitemap.xml（同步）`)
+  console.log(`[seo-pages]   sitemap ${stats.sitemapUrls} 条 → ${sitemapPath.replace(ROOT, '.')} + public/sitemap.xml（同步，含 <lastmod>）`)
+  if (landing.injected) {
+    console.log(
+      `[seo-pages]   首页落地块已注入 → ${indexPath.replace(ROOT, '.')}（${landing.bytes} B，${landing.bankLinks} 个词库真链接）`,
+    )
+  }
   return stats
 }
 

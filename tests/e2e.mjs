@@ -506,7 +506,22 @@ async function run() {
   const bodyEn = norm(await page.textContent('body'))
   check('en 即时生效', ['Typing', 'Vocabulary', 'Practice', 'Settings'].every((k) => bodyEn.includes(k)))
   // 切到 CET-4（无 nameEn，显示中文名属词库数据豁免）之外的主要 UI 不应残留中文
-  check('en 模式无中文导航残留', !bodyEn.includes('练习') && !bodyEn.includes('设置') && !bodyEn.includes('背单词'))
+  //
+  // ⚠️ **断言范围必须限定在 `#root`（应用区），不能扫整个 body** ——
+  //   本条判据的语义是「**应用导航 UI** 在 en 模式下不残留中文」。
+  //   而 `#seo-home` 落地块是**构建期注入的静态中文落地页**，位于 `#root` 之外：
+  //     - 它承载的是中文搜索关键词（英语打字练习 / 背单词 / K8s 词汇 …），本来就只面向中文 SERP；
+  //     - 门禁 H4 断言落地块内 `<script` 出现 **0 次** ⇒ 它**按设计无法**响应语言切换；
+  //     - 若把范围改回整个 body，本条会把「落地块存在中文」误判成「i18n 漏翻」，
+  //       而修它的唯一办法是给落地块加运行时 JS —— 那会同时踩 H4（零 JS）与 H7（体积），
+  //       代价是拿一个有搜索价值的落地页换一个本就不该由它承担的职责。
+  //   所以正确做法是**把断言收敛到它真正该管的范围**（应用区），而不是让落地块去满足一个不属于它的契约。
+  const appEn = norm(await page.textContent('#root'))
+  check(
+    'en 模式应用区（#root）无中文导航残留',
+    !appEn.includes('练习') && !appEn.includes('设置') && !appEn.includes('背单词'),
+    `扫描范围=#root（落地块 #seo-home 为静态中文落地页，按设计不参与 i18n）；应用区含「练习」=${appEn.includes('练习')} 「设置」=${appEn.includes('设置')} 「背单词」=${appEn.includes('背单词')}`,
+  )
   await reloadPage(page)
   // 语言偏好经 localStorage 恢复后由 React 渲染 → 轮询等英文导航就位
   await waitForBodyText(page, ['Typing', 'Practice'])
@@ -524,6 +539,67 @@ async function run() {
   await page.waitForTimeout(400)
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   check('移动端无横向溢出', overflow <= 2, `溢出=${overflow}px`)
+
+  /* ---------- 11.2 首页落地块（#seo-home）：三条断言 ---------- */
+  //为什么在这里：390px 视口已就位 ⇒ 判据 2（横向溢出，含落地块）可直接复用同一视口；
+  //   判据 1 需要「React 已挂载之后」，而 home-panel 在此刻已经渲染（pickMode 之前就已在Home）。
+  console.log('\n【11.2】首页落地块（#seo-home）')
+  // ① ⭐ React 挂载之后落地块仍存活 —— 把「React 19 createRoot 会清空 #root 内子节点」
+  //    这条实测结论固化成不变量，防后人「好心」把块挪进 #root（挪进去= 被清空 = 静默失效）。
+  //    断言放在 home-panel 已存在**之后**才有意义：之前 React 可能还没commit，测不出清空。
+  const landingAlive = await page.evaluate(() => {
+    const mounted = !!document.querySelector('[data-testid="home-panel"]')
+    const el = document.querySelector('#seo-home')
+    const inRoot = el ? !!el.closest('#root') : false
+    return {
+      mounted,
+      exists: !!el,
+      inRoot,
+      text: el ? (el.innerText || '') : '',
+      links: el ? el.querySelectorAll('a[href*="/pages/bank/"]').length : 0,
+      scripts: el ? el.querySelectorAll('script').length : 0,
+    }
+  })
+  check(
+    '落地块 #seo-home 在 React 挂载后仍存活于 #root 之外，且含主关键词与 13 个词库真链接',
+    // ⛌ 合成对照组：若后人把块挪进 #root，inRoot 变true ⇒ 本条判红（不是恒绿）；
+    //   若落地块被抽空/ 链接丢失，links ≠ 13 或关键词缺失 ⇒ 本条同样判红。
+    landingAlive.mounted &&
+      landingAlive.exists &&
+      !landingAlive.inRoot &&
+      ['英语打字练习', '背单词'].every((k) => landingAlive.text.includes(k)) &&
+      landingAlive.links === 13 &&
+      landingAlive.scripts === 0,
+    `home-panel 已挂载=${landingAlive.mounted}；#seo-home 存在=${landingAlive.exists}；在 #root 内=${landingAlive.inRoot}；` +
+      `关键词命中=${['英语打字练习', '背单词'].filter((k) => landingAlive.text.includes(k)).join('/')}；` +
+      `词库真链接=${landingAlive.links} 个；块内 <script>=${landingAlive.scripts} 个`,
+  )
+  // ② 移动端 390px 下落地块不得造成横向溢出（CSS 须用 max-width + overflow-wrap，禁固定 px 宽）
+  const landingOverflow = await page.evaluate(() => {
+    const el = document.querySelector('#seo-home')
+    if (!el) return { missing: true, delta: 0, w: 0, vw: window.innerWidth }
+    const r = el.getBoundingClientRect()
+    return { missing: false, delta: document.documentElement.scrollWidth - window.innerWidth, w: r.width, vw: window.innerWidth }
+  })
+  check(
+    '落地块在 390px 下不造成横向溢出（max-width 生效）',
+    !landingOverflow.missing && landingOverflow.delta <= 2 && landingOverflow.w <= landingOverflow.vw + 1,
+    `文档溢出=${landingOverflow.delta}px；块宽=${landingOverflow.w.toFixed(1)}px ≤ 视口 ${landingOverflow.vw}px`,
+  )
+  // ③ FAQ <details> 原生交互可展开（零 JS）
+  const faqOpened = await page.evaluate(() => {
+    const d = document.querySelector('#seo-home details.gh-faq-item')
+    if (!d) return { found: false, opened: false, answer: '' }
+    const summary = d.querySelector('summary')
+    if (summary) summary.click()
+    const answer = d.querySelector('.gh-faq-a')
+    return { found: true, opened: !!d.open, answer: answer ? (answer.textContent || '').trim().slice(0, 12) : '' }
+  })
+  check(
+    '落地块 FAQ <details> 点击可展开（原生交互、零 JS）',
+    faqOpened.found && faqOpened.opened,
+    `找到 details=${faqOpened.found}；展开后 open=${faqOpened.opened}；答案片段=「${faqOpened.answer}」`,
+  )
 
   /* ---------- 11.5 命令面板 ---------- */
   console.log('\n【11.5】命令面板（Esc + : 命令）')
@@ -1891,7 +1967,7 @@ async function run() {
    * 171 → 172：SW precache flaky 修复（CI run 37304973473 门禁③ 169/171）新增一条判据
    * 「预热降级可观测：controller 从未出现 ⇒ 必须有 [warmBanks] 降级 warn」（14.10，条件式：
    * 正常接管路径不要求，故不会恒红）。原 171 与文档/记忆里的口径同步 +1，无删除。 */
-  const E2E_CASES_EXPECTED = 172
+  const E2E_CASES_EXPECTED = 175
   if (results.length !== E2E_CASES_EXPECTED) {
     console.error(
       `\n✗ e2e 用例数漂移：实际执行 ${results.length} 项，期望 ${E2E_CASES_EXPECTED} 项` +

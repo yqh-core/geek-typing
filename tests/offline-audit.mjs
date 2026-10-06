@@ -360,9 +360,47 @@ try {
     poisoned.length === 0,
     poisoned.length > 0 ? `毒条目：${poisoned.map((e) => e.url).join(', ')}` : `${probe.entries.length} 条全部干净`,
   )
-  const hasIndex = probe.entries.some((e) => e.pathname === '/index.html' || e.pathname === '/')
-  check('态4: /index.html 或 / 已缓存', hasIndex)
-  probe.entries.forEach((e) => console.log(`    · [${e.status}] redirected=${e.redirected} ${e.pathname} (${e.contentType})`))
+const hasIndex = probe.entries.some((e) => e.pathname === '/index.html' || e.pathname === '/')
+check('态4: /index.html 或 / 已缓存', hasIndex)
+probe.entries.forEach((e) => console.log(`    · [${e.status}] redirected=${e.redirected} ${e.pathname} (${e.contentType})`))
+
+/* ---------- 态4c 离线缓存里的落地块标记 ----------
+ * 为什么必须单独断言：SW 的 SHELL 预缓存了 /index.html，落地块随它一起进缓存 ⇒
+ *   **断网首次访问也能看到完整落地页**（改造前断网只能看到空壳 #root）。
+ *   但「条目存在」（上面的态4）只证明 pathname 在，**不证明内容里有落地块**——
+ *   一份被缓存的旧版/空壳 index.html 同样能让态4 全绿。
+ *   这条把「离线也能读到落地页正文」从推断变成实测。
+ */
+let offlineLanding = { probed: false, hasBlock: false, links: 0, scripts: 0 }
+try {
+  offlineLanding = await page.evaluate(async (cacheName) => {
+    const out = { probed: true, hasBlock: false, links: 0, scripts: 0 }
+    const names = await caches.keys()
+    if (!names.includes(cacheName)) return out
+    const cache = await caches.open(cacheName)
+    // 精确匹配 SW 预缓存的键；'/index.html' 与 '/' 两个键都试（prod-smoke A1 实测 /index.html 会 308）
+    let res = await cache.match('/index.html')
+    if (!res) res = await cache.match('/')
+    if (!res) return out
+    const html = await res.clone().text()
+    const s = html.indexOf('<!-- seo-home:start -->')
+    const e = html.indexOf('<!-- seo-home:end -->')
+    if (s !== -1 && e !== -1 && e > s) {
+      const block = html.slice(s, e)
+      out.hasBlock = block.includes('id="seo-home"')
+      out.links = (block.match(/\/pages\/bank\/[a-z0-9-]+/gi) || []).length
+      out.scripts = (block.match(/<script/gi) || []).length
+    }
+    return out
+  }, CACHE_NAME)
+} catch (e) {
+  check('态4c: 离线落地块探针执行', false, String(e).split('\n')[0])
+}
+check(
+  '态4c: 离线缓存的 /index.html 仍含落地块（断网也能读正文与内链）',
+  offlineLanding.probed && offlineLanding.hasBlock && offlineLanding.links === 13 && offlineLanding.scripts === 0,
+  `探针执行=${offlineLanding.probed}；含 #seo-home=${offlineLanding.hasBlock}；词库链接=${offlineLanding.links}；块内 <script>=${offlineLanding.scripts}`,
+)
 
   /* ---------- 态4b MIME 投毒探针（BUG-002 回归，主动注入） ---------- */
   // 为什么必须「主动注入」而不是被动检查缓存：
