@@ -15,11 +15,13 @@
 >
 > **Day 0 = 2026-10-06** ｜ §四之二 本地侧基线**已冻结** ｜ §五之二 下一周期判定门槛**已在无数据状态下前置冻结**
 >
-> ✅ **§一·一 区间的阻塞已全部解除**（实测，见 §1.4）：
-> property已创建并**验证通过**、`sitemap.xml` 已提交、GSC 侧导航与索引报告页**已可直读**。
-> ⛔ 剩**唯一**未取回的数据：**4 个 URL 的三字段 Inspection**（`URL is on Google` /
-> `User-declared canonical` / `Google-selected canonical`）—— 原因是**技术阻塞而非权限阻塞**，
-> 已穷尽 7 类自动化方法仍未触发 GSC 的检查入口，详见 §1.5。
+> ✅ **§一 全部完成**（实测，见 §1.4 / §1.5）：
+> property 已验证、`sitemap.xml` 已提交、**4 个 URL 的三字段全部取回**（4/4）。
+>
+> 📌 **Day 0 双向对表已在 §1.5 落定**：
+> 首页**已收录**；`kaoyan`/`frontend`/`toefl` **「Google 无法识别此网址」**（从未抓取，与 sitemap「无法抓取」同根因）。
+> 按 §五之二 门槛：**canonical 未偏离（无偏离空间）→ 索引状态属「未发现」档 → 不构成内容质量判决**。
+> ⛔ 因此**不触发任何工程动作**，唯一待办是等 Google 读取 sitemap。
 
 ---
 
@@ -57,27 +59,82 @@
 > Google 提交后立即尝试抓取、失败则数天内持续重试；索引报告对新property 需1 天左右出首份数据。
 > ⇒ 按 §五之二 冻结门槛，此状态**属观察项，不触发任何工程动作**（§1.6 有本地侧反证）。
 
-### 1.5 ⛔ 未取回的数据：4 个 URL Inspection 三字段
+### 1.5 ✅ 已取回：4 个 URL Inspection 三字段（2026-10-06 19:28 实测，4/4）
 
-**已穷尽 7 类自动化方法，全部未能触发 GSC 的检查入口**（如实记录，避免下轮重复）：
+**方法**：CDP 自动化。`D:\work\_ops\gsc-inspect.cjs`（批量）+ `gsc-lib.cjs`（持久会话库）。
+
+| URL | `URL is on Google` | 用户声明 canonical | Google 选择 canonical | indexing state |
+|---|---|---|---|---|
+| `/` | ✅ **网址已收录到 Google** | （GSC 未单列，见注1） | （GSC 未单列，见注 1） | **网页已编入索引** |
+| `/pages/bank/kaoyan` | ❌ 尚未收录到 Google | **不适用** | **不适用** | **Google 无法识别此网址** |
+| `/pages/bank/frontend` | ❌ 尚未收录到 Google | **不适用** | **不适用** | **Google 无法识别此网址** |
+| `/pages/bank/toefl` | ❌ 尚未收录到 Google | **不适用** | **不适用** | **Google 无法识别此网址** |
+
+> **注 1（canonical 字段的口径，不可误读）**：GSC 的「用户声明规范网址 / Google 选择规范网址」
+> **只在 URL 已被抓取时才展开**。首页显示的是「增强功能和体验：HTTPS ✅」，
+> 三个 bank 页则「上次抓取时间 / 当时所用的用户代理 / 是否允许抓取 = **不适用**」。
+> ⇒ **「不适用」= Google 从未抓取过该 URL**，**不是**「canonical 不一致」，
+> 更**不是**「canonical 修复没做干净」。
+
+**三个 bank 页的次级字段全部「不适用」+「未检测到任何引荐站点地图」+「未检测到任何引荐来源网页」**
+⇒ 判定为 **Discovered 之前状态（Google 尚不知道这些 URL 存在）**，
+**不是** `Discovered - currently not indexed`，更不是 `Crawled - currently not indexed`。
+按 §五之二 门槛 B：这一档**不构成内容质量判决**，因为 Google 还没看过内容。
+
+**⚠️ 与 sitemap 状态互相印证**：三个 bank 页「未检测到任何引荐站点地图」，
+与 §1.4 的 sitemap「**无法抓取**」、已提交网址数 **0** 完全一致 ——
+**同一根因（sitemap 尚未被 Google 读取），不是两个独立问题**。
+
+#### 1.5.1 前7 类方法为何全部失败（保留，避免下轮重复）
 
 | # | 方法 | 结果 |
 |---|---|---|
 | 1 | `/inspect?resource_id=…&inspection_url=…` 直接导航 | ❌ 参数被忽略，重定向回「概述」 |
-| 2 | 点击导航栏「网址检查」（`A.Lhhaec`） | ❌ 无`href`（JS 驱动），派发/真实点击均无跳转 |
-| 3 | DOM `focus()` + `Input.insertText` 填入 + 真实点击「检查」 | ✅ 填入成功；❌ 但页面找不到独立「检查」按钮（`nbtn:0`） |
-| 4 | 键盘 Enter（4 种事件序列变体） | ❌ **监听器证实按键根本没到达页面**（`window.__keys === []`） |
+| 2 | 点击导航栏「网址检查」（`A.Lhhaec`） | ❌ 无 `href`（JS 驱动），派发/真实点击均无跳转 |
+| 3 | DOM `focus()` + `Input.insertText` 填入 + 真实点击「检查」 | ✅ 填入成功；❌ 找不到独立「检查」按钮（`nbtn:0`） |
+| 4 | 键盘 Enter（4 种事件序列变体） | ❌ 监听器证实按键未到达页面（`window.__keys === []`） |
 | 5 | 4 个候选路由（`/url-inspection` `/inspect-url` `/urlcheck`） | ❌ 全部 **404** |
-| 6 | 填入后找建议下拉并点击 | ❌ `listbox` 存在（2 个）但**均不可见、无内容**（虚拟滚动） |
-| 7 | 输入框右侧 4 个坐标点真实鼠标点击 | ❌ 全部落在 input 本身（输入框横跨整行 664px） |
+| 6 | 填入后找建议下拉并点击 | ❌ 只查 `[role=option]`/`li` ⇒ 0 个（**当时结论错误**，见下） |
+| 7 | 输入框右侧 4 个坐标点真实鼠标点击 | ❌ 全部落在 input 本身 |
 
-**根因（实测，非推测）**：GSC 搜索框是 **Material `role="combobox"`**（jsname `dSO9oc`），
-程序化 `keydown` **不被该组件接受**；而触发检查的按钮在 Closure 事件委托的更深层，
-无 DOM 形态、无 href、无独立文本节点。
+**真实根因（2026-10-06 19:2x 独立复现后修正，⚠️ 此前两轮结论都错）**：
 
-⇒ **这是技术阻塞，不是权限阻塞**（property 已验证通过，读取权限完全正常）。
-处置：**yqh 在 GSC 页面上手动执行 4 次检查**（每次粘贴一个 URL、按回车，约 30 秒/个），
-或由yqh 授权后在**可见窗口**中由我配合触发。
+我曾判定「Material combobox 拒绝程序化按键」，子 agent 判定「`visibilityState:"hidden"`
+冻结输入管道」。**两个结论都被对照实验推翻**：
+
+| 假设 | 实测 |
+|---|---|
+| `visibilityState` 被冻结 | ❌ 全程 `visible`、`hasFocus()=true`，**从未冻结** |
+| `scrollIntoView` 改变了点击位置 | ❌ 前后坐标完全一致（`[434,9,664,46]`） |
+| 真实鼠标事件无法投递 | ❌ 加上持久会话后 `mousedown` 计数 **1**（此前 0） |
+
+⇒ **真实根因是 CDP 会话的实现方式**：我旧脚本的 `cdp()` **每次调用都
+`new WebSocket` 后立即 `close()`** ⇒ 连接反复新建/断开，页面侧输入管道来不及就绪。
+改用**单条持久 WebSocket**（`gsc-lib.cjs` 的 `Sess` 类）后，**同一套点击+ Enter 逻辑一次即通**。
+
+⚠️ 附带更正：第 6 项「无下拉」也是错的 —— combobox 上 `aria-expanded="true"`、
+`aria-controls="nngdp5"`，**下拉确实打开了**，只是我当时只查 `[role=option]` 而漏了它。
+
+#### 1.5.2 GSC 内部 RPC（实测抓到的真实结构，非推测）
+
+| 项 | 实测值 |
+|---|---|
+| 端点 | **`/_/SearchConsoleAggReportUi/data/batchexecute`**（⚠️ 不是 `/_/ScConsoleUi/…`） |
+| 会话参数 | `f.sid=<数字>`、`bl=boq_searchconsoleserver_20261005.04_p0`、`at=<token>` |
+| 结果页路由 | `/search-console/inspect?resource_id=…&id=<19字符 base64ish>` |
+
+| rpcid | 作用（实测推断，依据是各次 body 内容） |
+|---|---|
+| `RVtklb` | 输入框建议下拉（body 含明文 URL） |
+| `MrNfbc` | **URL → id 令牌**转换 |
+| `yol87d,DETOSe,HZPzjb,C4lTm,zUbeBb,oUNqRb,ueowNe,OFNzWe,czrWJf` | **检查结果主体（9 个并行）** |
+| `pPDvCb` | `["70","<siteUrl>"]`，站点级配置 |
+
+⛔ **「URL Inspection 无深链路由」的证据**：Chrome History 里 `inspect` 路由出现 **0 次**
+⇒ 它是**纯前端 overlay**，靠 batchexecute 取数据 ⇒ 方法 1/5 必然失败。
+
+⚠️ **填值有随机性**：同一 URL 偶发 `填入值: EMPTY`（本轮 5 次里出现 1 次）
+⇒ **批量跑必须逐个复核结果**，不能只看脚本是否报错。
 
 ### 1.6 「无法抓取」的本地侧反证（2026-10-06 17:20 实测）
 
@@ -489,7 +546,14 @@ C:/Users/Administrator/.workbuddy/binaries/node/versions/22.22.2-3/node.exe \
 | **O-SEO-09**（新 · 观察期新增） | `Google-selected canonical` 偏离 `User-declared canonical`。**处置见 §五之二 门槛 A**：⛔ 不重开 Path C，先看是否同批 308 规范化未完成；**仅当持续多次巡检仍偏离才升级为独立刀**。单次偏离不作为「canonical 修复没做干净」的证据 |
 | **O-SEO-10**（新 · **测量层缺陷，优先级高于 O-SEO-04**） | 本机存在**两条网络路径**且失败模式截然不同：`curl` 路径实测 `sitemap.xml` **3/6 次 HTTP 000**、耗时 10–45 s；同URL 用 Node `fetch`（走系统代理）**20/20 成功、p50 220 ms**。经三 UA × 三 URL × 6 次对照（**18/18 全 200**）确认根因是**本机 curl 路径**（Steam++ hosts 劫持 + Clash 系统代理），**与站点、CF 对 Googlebot 的拦截无关**。⚠️ **一旦用 `curl` 测线上可达性，会把本机网络抖动误判为站点故障**（本轮差点据此判「sitemap 无法抓取 = 服务端问题」）。⇒ **所有线上探测一律用 Node `fetch`（已落`D:\work\_ops\` 可复跑脚本）**，`curl` 结果不得作为站点状态证据 |
 | **O-SEO-11**（新） | GSC 提交 sitemap 后**立即显示「无法抓取」、已提交网址数 0**（2026-10-06 17:45 实测，三次读取一致）。本地侧 6 项反证全部为绿（§1.6，含 20/20 泛测与 14/14 URL 实测）。⇒ 按 §五之二 门槛，**属新property 的正常初始态**，Google 会数天内重试。⛔ **不因此改任何代码或门禁**；仅当 7 天后仍为「无法抓取」才升级为独立排查项（届时先查 Cloudflare 侧，而非改页面） |
-| **O-SEO-12**（新 · 通道限制） | GSC「网址检查」**无法自动化**：搜索框是 Material `role="combobox"`，程序化 `keydown` **不被接受**（监听器实证按键未到达页面），且触发按钮在 Closure 事件委托深层，无 DOM 形态/无 href。7 类方法全部失败（清单见 §1.5）。⇒ **4 个 URL 的三字段须由 yqh 手动执行**。⚠️ 这是**技术阻塞不是权限阻塞** —— property 已验证通过，其他 GSC 页面均可直读 |
+| **O-SEO-12**（**已关闭 ·原「通道限制」**） |~~GSC「网址检查」无法自动化~~⇒ **2026-10-06 19:28 已解决并取回全部 4 个 URL 三字段**。真实根因**不是**「Material combobox 拒按键」、**也不是**「`visibilityState` 冻结输入管道」（两个假设均被对照实验推翻），而是**CDP 会话实现缺陷**：`cdp()` 每次调用都 `new WebSocket` 后立即 `close()`，连接反复新建/断开导致输入管道来不及就绪（`mousedown` 计数 0）。改用**单条持久 WebSocket**（`D:\work\_ops\gsc-lib.cjs`）后，同一套点击 + Enter 逻辑**一次即通**。⚠️ 保留原7 类失败方法清单（§1.5.1）避免下轮重复踩 |
+
+## 六之二、新增：Day 0 Google 侧实测结论（2026-10-06 19:28）
+
+| # | 观察项 | 内容 |
+|---|---|---|
+| **O-SEO-13**（新） | **首页已收录、13 个词库页全部未被抓取**。首页 `URL is on Google` = **已收录**（增强功能 HTTPS ✅）；`kaoyan` / `frontend` / `toefl` 三页 = **「Google 无法识别此网址」**，且「上次抓取时间/用户代理/允许抓取」全部**不适用** ⇒ **Google 从未抓取过这些 URL**。这与 O-SEO-11（sitemap「无法抓取」、网址数 0）**是同一根因**，不是两个独立问题。⛔ **按 §五之二 门槛 B，此状态不构成内容质量判决** —— Google 还没看过内容，无从判「低质量」。⛔ **不因此改页面、不灌水、不扩内容**。处置：等 Google 读取 sitemap（数天）；若 7 天后仍「无法抓取」，届时先查 Cloudflare 侧（O-SEO-11） |
+| **O-SEO-14**（新 · 测量层） | **CDP 会话的实现方式会伪装成「页面拒绝自动化」**。症状：`mousedown` 计数 0、`keydown` 监听器空数组、`activeElement` 恒为 `BODY` —— 看起来像「组件拒绝合成事件 / 窗口未聚焦」，实则是**连接被反复新建断开**。⇒ **凡用 CDP 做交互，必须用单条持久 WebSocket**（事件流与输入投递都依赖连接稳定）。⚠️ 本项目为此付出两次错误归因（我与子 agent 各一次），见 §1.5.1 |
 
 ---
 
