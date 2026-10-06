@@ -296,7 +296,17 @@ ${items}
  * ⭐ **F2 · `<lastmod>`**：本条改动的原因是 sitemap 的 14 条 `<loc>` **全部缺 `<lastmod>`**，
  *   而 sitemap 协议里 `<lastmod>` 是搜索引擎判断「这个 URL 的内容有没有变过」的主要信号 ——
  *   缺它就等于告诉 Google「这批页面从建站至今一次都没动过」，直接削弱变更通知能力。
- *   **值取各页面文件的 mtime**（写盘时刻 ⇒ 真实反映本次构建产物的新鲜度），⛔ 不写死字符串。
+ *   **值取各 URL 的「内容源」文件 mtime**（见 sourceLastmod），⛔ 不写死字符串。
+ *
+ * ⛔⛔ **v2 修正（语义回归修复）——`<lastmod>` 必须取「内容源」，绝不能取「产物」**：
+ *   v1 传的是**产物路径**（`dist/index.html`、`dist/pages/bank/<pkgId>.html`），
+ *   而产物每次 build 都会被重新写盘 ⇒ `<lastmod>` 恒等于「本次构建时刻」。实测后果：
+ *   只改一句无关文案触发 rebuild，14 条时间戳**整体平移**（`13:24:39 → 13:46:02`），
+ *   而这期间词库内容一个字符都没变—— 等于对 Google 谎报「14 个页面此刻全部刚刚变更」。
+ *   Google 官方口径是「页面**内容**最后一次修改时间」，不是「站点最后一次部署时间」；
+ *   反复声称内容变更却不影响排名，会被读作低质量变更信号，反而削弱 sitemap 作用。
+ *   ⇒ 现在改为：词库页取 `content/vocabulary/<pkgId>/{words,manifest}.json` 的较新者，
+ *     首页取**仓库根 `index.html` 源模板**（⛔ 绝不是 `dist/index.html`，那是产物，会重现同一 bug）。
  *
  * @param {Array<{loc:string, changefreq?:string, priority?:string, lastmod?:string}>} entries
  * @returns {string} XML 文本
@@ -341,15 +351,15 @@ export function readSiteOrigin() {
 }
 
 /**
- * 文件 mtime → sitemap `<lastmod>`（W3C Datetime，UTC，秒精度）。
+ * 单个文件的 mtime → sitemap `<lastmod>`（W3C Datetime，UTC，秒精度）。
  *
- * 为什么用 mtime 而不是「manifest 里的构建时间戳」：mtime 是**产物文件本身的最后写入时刻**，
- * 也就是「搜索引擎下次抓取时该看到的内容有多新」的真值；manifest 里的时间戳可能来自
- * 内容包入库时刻，与本次产物是否真的重写过无关。
- * ⛔ 不写死字符串 —— 写死的 `<lastmod>` 等于对 Google 撒谎「这页从某年起就没变过」。
+ * ⛔ **只允许传「内容源」路径，绝不允许传产物路径**。
+ *   产物（`dist/**`）每次 build 都会重新写盘 ⇒ 传产物等于把「本次构建时刻」当成内容变更时刻，
+ *   使 `<lastmod>` 退化成「站点最后部署时间」，与 Google 口径（页面**内容**最后修改时间）冲突。
+ *   正确用法见 sourceLastmod()。
  *
- * @param {string} filePath 产物文件路径
- * @returns {string} 形如 2026-01-01T00:00:00+00:00；文件不存在返回空串（调用方据此省略该标签）
+ * @param {string} filePath **内容源**文件路径
+ * @returns {string} 形如 2026-01-01T00:00:00+00:00；文件不存在/不可stat 返回空串（调用方据此省略该标签）
  */
 export function fileLastmod(filePath) {
   try {
@@ -361,8 +371,38 @@ export function fileLastmod(filePath) {
 }
 
 /**
+ * 一组内容源文件 → sitemap `<lastmod>`（取**较新者**）。
+ *
+ * 为什么取较新者而不是某一个：某个URL 的「内容」由多个源文件共同决定
+ * （词库页 = words.json + manifest.json）。只取其中一个会漏掉另一个的变更 ⇒ 又变成谎报（往少了说）。
+ * 取较新者 =「这批源文件里最后一次被改动的时间」，与「该URL 内容最后一次修改时间」同义。
+ *
+ * ⛔ 不写死字符串 —— 写死的 `<lastmod>` 等于对 Google 撒谎「这页从某年起就没变过」。
+ * ⛔ 全部源文件都拿不到 mtime 时返回空串，由 buildSitemap **省略该标签**而不是编假日期。
+ *
+ * @param {Array<string>} sourcePaths 该 URL 对应的**内容源**文件路径列表
+ * @returns {string} W3C Datetime 字符串，或空串（无可用 mtime）
+ */
+export function sourceLastmod(sourcePaths) {
+  let newestMs = Number.NEGATIVE_INFINITY
+  for (const p of sourcePaths ?? []) {
+    try {
+      if (!existsSync(p)) continue
+      const ms = statSync(p).mtimeMs
+      if (Number.isFinite(ms) && ms > newestMs) newestMs = ms
+    } catch {
+      // 单个源不可stat 不影响其余源；全不可用时自然落到下面的空串分支。
+    }
+  }
+  if (!Number.isFinite(newestMs)) return ''
+  return new Date(newestMs).toISOString().replace(/\.\d{3}Z$/, '+00:00')
+}
+
+/**
  * 扫描 content/vocabulary/*，挑出所有 type==='vocabulary' 的包（读盘部分，纯函数边界清晰）。
- * @returns {Array<{dirName:string, manifest:object, words:Array<object>}>} 按目录名排序（确定性）
+ *
+ * 每项带 `sourceFiles`（该包的内容源文件，供 `<lastmod>` 取值）—— 见sourceLastmod。
+ * @returns {Array<{dirName:string, manifest:object, words:Array<object>, sourceFiles:string[]}>} 按目录名排序（确定性）
  */
 export function collectBanks(vocabDir = VOCAB_DIR) {
   if (!existsSync(vocabDir)) return []
@@ -388,7 +428,9 @@ export function collectBanks(vocabDir = VOCAB_DIR) {
         continue
       }
     }
-    out.push({ dirName, manifest, words })
+    // ⭐ 该包的内容源 = manifest.json + words.json（⛔ 不含任何 dist/ 产物，见 sourceLastmod 注）。
+    //   words.json 可能不存在（允许空包），但仍列进去：sourceLastmod 会跳过不存在的项。
+    out.push({ dirName, manifest, words, sourceFiles: [manifestPath, wordsPath] })
   }
   return out
 }
@@ -405,6 +447,13 @@ export function main(opts = {}) {
   const bankDir = opts.bankDir ?? join(dist, 'pages', 'bank')
   const sitemapPath = opts.sitemapPath ?? join(dist, 'sitemap.xml')
   const indexPath = opts.indexPath ?? join(dist, 'index.html')
+  /**
+   * 首页**内容源** =仓库根 `index.html`（Vite 读它做入口的那份**源码模板**）。
+   * ⛔⛔ 不是 `indexPath`（= `dist/index.html`，**产物**）：产物每次 build 重写盘，
+   *拿它的 mtime 会让首页 `<lastmod>` 恒等于「本次构建时刻」，把「内容变更信号」退化成
+   * 「部署时刻信号」—— 这正是本次要修的缺陷本身。
+   */
+  const indexSourcePath = opts.indexSourcePath ?? join(ROOT, 'index.html')
   const origin = opts.siteOrigin ?? readSiteOrigin()
   if (!origin) {
     console.error('[seo-pages] 读不到 siteOrigin（index.html canonical 与 public/sitemap.xml 都不可解析）：拒绝生成')
@@ -420,10 +469,10 @@ export function main(opts = {}) {
   mkdirSync(bankDir, { recursive: true })
 
   let totalWords = 0
-  // ⭐ F2：首页 <lastmod> 取 index.html 的 mtime（⛔ 不写死字符串）。
-  //   注意本entry 在落地块注入**之前**构造，而注入会在末尾覆写 index.html。
+  // ⭐ F2 · v2：首页 <lastmod> 取**内容源**（仓库根 index.html）的 mtime（⛔ 不写死字符串、⛔ 不取 dist/ 产物）。
+  //   注意本 entry 在落地块注入**之前**构造，而注入会在末尾覆写 index.html —— 那也是不能取产物 mtime 的另一个理由。
   const entries = [
-    { loc: `${origin}/`, changefreq: 'weekly', priority: '1.0', lastmod: fileLastmod(indexPath) },
+    { loc: `${origin}/`, changefreq: 'weekly', priority: '1.0', lastmod: fileLastmod(indexSourcePath) },
   ]
   for (const bank of banks) {
     const { manifest, words } = bank
@@ -439,8 +488,9 @@ export function main(opts = {}) {
       loc: canonicalBankUrl(origin, manifest.packageId),
       changefreq: 'monthly',
       priority: '0.8',
-      // ⭐ F2：该页产物文件的真实 mtime（⛔ 不写死字符串）
-      lastmod: fileLastmod(file),
+      // ⭐ F2 · v2：该页**内容源**（words.json + manifest.json，取较新者）的真实 mtime。
+      //   ⛔ 不再取 `file`（产物）—— 产物每次 build 重写盘，会让 14 条时间戳整体平移。
+      lastmod: sourceLastmod(bank.sourceFiles),
     })
   }
 
