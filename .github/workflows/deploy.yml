@@ -153,6 +153,26 @@ jobs:
       # 接入裁定见 docs/content/INV3-CI-ADMISSION-CUT.md。
       - name: 体积/配额预算门禁（gate:perf · INV-3）
         run: npm run gate:perf
+      # SEO 静态页门禁（gate:seo-pages）—— 为什么放在 gate-build 这个 job：
+      #   ① `dist/` 已在本 job 的「类型检查 & 构建」里产出（build = tsc -b && vite build &&
+      #      build:seo-pages），本门只读 dist/** 与 public/404.html ⇒ **零额外 build、不新开 job、
+      #      不改 needs 拓扑、不动 timeout-minutes**。放到 gate-static 会读不到 dist/。
+      # 它补的是哪个盲区（为什么必须新写这道门，而不是「顺手让 check:bundle 顺便看一眼」）：
+      #   本仓三道产物门对 HTML 产物**零覆盖** —— gate-perf 只读 dist/assets、check-bundle 只读
+      #   dist/assets、prod-smoke 只读 dist/index.html。⇒ dist/pages/** 与 dist/sitemap.xml
+      #   这批 SEO 产物在 CI 上无人看守：sitemap 悄悄退回 1 条、静态页被清空、canonical 指错、
+      #   title 撞车、软 404 复现，全都不会让任何一道门变红。本门把这12 条判据接进 fail-closed 体系。
+      # 与 soft-404 / 404.html 的关系：
+      #   实测线上任意不存在路径都返回 **200 + 与首页同构**（soft-404），本门判据 8 守
+      #   `public/404.html` 必须存在、正文非空、含明确 404 语义、且带 `robots noindex`
+      #   —— 即「404 页必须真的以 404 语义呈现，且不得被索引」，否则 soft-404 会被搜索引擎
+      #   当成正常页面收录，反而比原来更糟。产物缺失在本门是 fatal（exit 2），不静默放行。
+      # ⚠️ `gate:seo-pages:falsify` **不进 CI** —— 与 gate:perf / verify:learning-unit 的既有约定一致：
+      #   故障注入演练属证据任务（证明门能判红），不是每次构建的门。注入代码在真产物之外做、
+      #   不可能自己变红；本地跑 `npm run gate:seo-pages:falsify` 可复核。
+      # 判据清单 = scripts/seo/gate-seo-pages.mjs 文件头（**单一事实源，此处不重述 12 条的编号与阈值**）。
+      - name: SEO 静态页门禁（gate:seo-pages · sitemap/正文/canonical/404）
+        run: npm run gate:seo-pages
       - name: 安装 Chromium
         run: npx playwright@1.49.1 install chromium --with-deps
       # 场景 态1/1.5/2/3/4/4b（判据清单 = tests/offline-audit.mjs，此处不重述计数）。

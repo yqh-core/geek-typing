@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/seo/build-static-pages.mjs",
+    "build:seo-pages": "node scripts/seo/build-static-pages.mjs",
     "lint": "oxlint",
     "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
     "test:e2e": "node tests/e2e.mjs",
@@ -43,6 +44,8 @@
     "check:bundle": "node scripts/check-bundle.mjs",
     "gate:perf": "node scripts/gate-perf.mjs",
     "gate:perf:falsify": "node scripts/gate-perf.mjs --falsify",
+    "gate:seo-pages": "node scripts/seo/gate-seo-pages.mjs",
+    "gate:seo-pages:falsify": "node scripts/seo/gate-seo-pages.mjs --falsify",
     "bench:content": "node scripts/bench-content.mjs",
     "bench:boot": "node scripts/bench-boot.mjs",
     "audit:learning": "node scripts/learning-consistency.mjs",
