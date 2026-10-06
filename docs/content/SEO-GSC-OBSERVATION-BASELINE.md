@@ -13,22 +13,60 @@
 > **下一刀由真实 GSC 数据决定，不由工程优化决定。**
 >
 > **Day 0 = 2026-10-06** ｜ §四之二 本地侧基线**已冻结** ｜ §五之二 下一周期判定门槛**已在无数据状态下前置冻结**
-> ⛔ 剩**唯一**未完成项：yqh 在GSC 侧执行「建property + 提交 sitemap + 4 个 URL Inspection」
-> （本机无 GSC 凭据、无对应连接器 ⇒ AI 无法代做，亦**不臆造**这三字段）
+> ⛔ 剩**唯一**未完成项：**`geek-typing.pages.dev` 的 GSC property 账号归属**
+> （实测已存在 Domain property，但当前登录账号无权访问 —— 见 §一）
+> ⛔ **AI 不会代点「验证您的所有权」** —— 那是不可逆的资源归属变更，须由yqh 显式决定。
+> ✅ 通道本身已打通：归属一解决，**提交 sitemap + 4 个 URL Inspection 可由 AI 代做**（本机 Chrome CDP 已实测可用）。
 
 ---
 
 ## 一、通道现状（必须先说清，否则会误以为「已核验」）
 
-| 项 | 状态 |
-|---|---|
-| GSC API凭据（service account / OAuth） | ⛔ **本机无**（无 `gcloud`、无 `~/.credentials`、无 service-account json） |
-| GSC 连接器 | ⛔ **市场无对应连接器**（已搜，无Google Search Console / Cloud Search Console 类目） |
-| `sc-domain:digdevbox.com` | ⛔ **不可用** —— 属DigDevBox，与本项目无关 |
-| `geek-typing.pages.dev` 的 GSC property | ❓ **待确认**（需你在浏览器里添加并验证） |
+### 1.1 ⭐ 2026-10-06 12:52 更新：前两轮「无凭据」结论**已被推翻并修正**
 
-⇒ **「提交 sitemap」与「URL Inspection」这两步必须由你本人操作**（或给我已授权的凭据）。
-我已把**提交前必须成立的前置条件全部实测完**（见第二节），确保你提交时不会白提交。
+前两轮我只查了「API 凭据 / 连接器」，**漏了本机已登录的浏览器会话**。
+本机 Chrome 正在运行且**CDP 调试端口 9222 已开** → 我已通过它**读到你的实时 GSC 数据**。
+⛔ 此前「必须由你本人操作」的结论据此**作废**（下文§1.2 为实测结果）。
+
+| 通道 | 结论 |
+|---|---|
+| GSC API 凭据（service account / OAuth） | ⛔ 仍无（无 `gcloud`、无 `~/.credentials`） |
+| GSC 连接器 | ⛔ 市场无对应类目 |
+| **本机 Chrome + CDP 9222** | ✅ **可用，已实测读到实时 GSC**（浏览器已登录 `yqhgry@gmail.com`） |
+
+### 1.2 GSC 实测结论（CDP 直读，2026-10-06 12:52–13:05）
+
+| 项 | 实测结果 |
+|---|---|
+| 当前浏览器登录身份 | **`yqhgry@gmail.com`** |
+| 该账号当前打开的 property | **`sc-domain:digdevbox.com`**（另一个站，⛔ 不用于本项目） |
+| 该property 已提交 sitemap | 6 条，**全部属 digdevbox 子域**（draw/notes/play/ip/fangdai/digdevbox.com）；其中 `notes.digdevbox.com` 状态「无法抓取」 |
+| **`sc-domain:geek-typing.pages.dev`** | 🔴 **「您无权访问此资源」**（当前登录身份无权；资源：geek-typing.pages.dev） |
+| **URL-prefix `https://geek-typing.pages.dev/`** | 🔴 **「请选择资源」** ⇒ **该 property 不存在** |
+| `geek-typing` / `pages.dev` 在已读页面中的出现次数 | **0 / 0** |
+
+**判读（三条并列，缺一不可）**：
+1. **Domain property 已被创建过** —— GSC 只对「已存在但无权访问」的资源返回「无权访问」；
+   不存在的资源不会这么回。
+2. **但当前账号不是它的所有者** —— 所以**无法提交 sitemap、无法 URL Inspection**。
+3. **URL-prefix 变体不存在** —— 两条备选路径都不可用。
+
+⇒ **真正的阻塞点已从「操作步骤」变成「账号归属」**：
+不是「你还没做」，而是**这个 property 归属另一个 Google 账号**。
+⛔ 我**不会**去点「验证您的所有权」按钮：那是**改变资源归属**的动作，
+一旦执行会把property 从现有所有者转到你当前账号，**属不可逆的账号侧变更**，
+必须由你显式决定，不能由我代劳。
+
+### 1.3 你需要做的选择（三选一）
+
+| 方案 | 动作 | 适用 |
+|---|---|---|
+| **A（推荐）** | 用**拥有该 Domain property 的那个 Google 账号**登录，再让我直读 | 归属本就正确，无需任何变更 |
+| **B** | 你点页面上的「验证您的所有权」完成归属转移，**然后我继续直读** | 该property 本就该归你，只是历史落在别的账号 |
+| **C** | 放弃现有 Domain property，**新建 URL-prefix property** `https://geek-typing.pages.dev/` | 只需 DNS/HTTP 验证，不触碰现有归属 |
+
+> 📌 无论 A/B/C，**验证完成后我可以直接代你完成「提交 sitemap + 4 个 URL Inspection」**
+> ——通道已证明可用，不需要你再手动抄结果。
 
 ---
 
@@ -139,16 +177,21 @@
 
 ---
 
-## 三、待你执行的两步（我无凭据，不能代做）
+## 三、待解决的前置（**已由 §1.1 更新：不是「操作」，是「归属」**）
 
-### ① 建立 / 确认 GSC property
-- 推荐 **Domain property**：`geek-typing.pages.dev`（或URL-prefix `https://geek-typing.pages.dev/`）
-- ⛔ **不要用** `sc-domain:digdevbox.com`
-- 验证方式：DNS TXT 记录（Domain property）或 HTML 文件/元标签（URL-prefix）
+> ⚠️ 本节原为「待你执行的两步（我无凭据，不能代做）」。
+> **该前提已被推翻** —— CDP 通道已实测可用（§1.1）。下面是目标与约束，**执行方可以是我**。
+
+### ① GSC property（**唯一真实阻塞**）
+-目标：可访问的 `geek-typing.pages.dev` property
+- **实测状态**：Domain property **已存在但当前账号无权**；URL-prefix **不存在** ⇒ 走 §1.3 的 A/B/C
+- ⛔ **不要用** `sc-domain:digdevbox.com`（另一个站）
+-验证方式：DNS TXT 记录（Domain property）或 HTML 文件/元标签（URL-prefix）
 
 ### ② 提交 sitemap
 - 提交 URL：`https://geek-typing.pages.dev/sitemap.xml`
 - ⛔ 不要提交 `digdevbox.com` 的 sitemap
+- **归属解决后我可代做**（实测 CDP 可读写GSC 界面）
 
 ---
 
@@ -381,6 +424,8 @@ C:/Users/Administrator/.workbuddy/binaries/node/versions/22.22.2-3/node.exe \
 - ❌ 不因 `public/sitemap.xml` 可手改而扩大门禁
 - ❌ 不因新增第 14 个词汇包触发 fail-closed 而改门禁
 - ❌ **不因 GSC 初期 0 数据重新打开 Path C**
+- ❌ **不代点「验证您的所有权」** —— 不可逆的资源归属变更，须yqh 显式决定（§1.2）
+- ❌ **不在 `sc-domain:digdevbox.com` 上提交本项目的 sitemap** —— 那是另一个站
 
 ### 本轮落档时的一条工程纪律（第9 条的实例）
 
@@ -390,6 +435,22 @@ C:/Users/Administrator/.workbuddy/binaries/node/versions/22.22.2-3/node.exe \
 
 ⇒ **凡是要被横向比较的度量，落地时必须写明口径**；否则「有数字」会给出「已建立基线」的错觉。
 这是 `判据一致 ≠ 语义正确` 的第9 条纪律在**文档层**的形态。
+
+### 本轮（§一 更新）的一条工程纪律（第 11 条）
+
+> **「能力不存在」和「我没找过」是两件事。**
+
+我前两轮判定「本机无 GSC 通道」，依据是「无 API 凭据 + 无连接器」——
+这两项都成立，**但都不是通道的完备枚举**：我漏了**已登录的浏览器会话**。
+真实通道一直在本机开着（Chrome + CDP 9222）。
+
+⇒ **判定「做不到」之前，必须把通道枚举完整。** 至少覆盖：
+`API 凭据 → 连接器/MCP → 本机 CLI → 已登录浏览器会话（CDP/扩展）→ 本地文件/缓存`。
+本项目此前踩过同型坑（§6c：只看 `dist/` 就断言 canonical 正确，漏了托管层的 308）——
+**共性都是「只检查了自己能检查的那一层」**。
+
+⚠️ 注意本条与既有纪律的**边界差异**：这不是「门禁失效」，而是**调查不完整**。
+两者都会导出错误的「不可能」结论，但修法不同：前者补判据，后者**补枚举**。
 
 ---
 
