@@ -1,7 +1,17 @@
 # geek-typing · 首页落地页静态化 + 产品页完善（增量架构方案）
 
 > 状态：**设计稿（本轮不写实现）**
-> 仓库：`D:\work\geek-typing`　生产：`https://geek-typing.pages.dev`（Cloudflare Pages，Git 集成）
+> 仓库：`D:\work\geek-typing`　生产：`https://geek-typing.pages.dev`（Cloudflare Pages，**Wrangler Direct Upload**，非 Git 集成）
+>
+> ⚠️ **2026-10-06 22:50 纠正**：本文件初稿此处写的是「Cloudflare Pages，**Git 集成**」—— **与实际不符**。
+> 实测 `.github/workflows/deploy.yml:319-324` 用 `cloudflare/wrangler-action@v4` +
+> `command: pages deploy dist --project-name=geek-typing --commit-dirty=true` +
+> `secrets.CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` ⇒ **发布由 CI 的 deploy job 直接上传 `dist/`**，
+> 与 `docs/audit-package/13-acceptance/PRODUCTION_CHECKLIST.md:264-265` 的记载一致（那份是对的，本文件是错的）。
+>
+> **这个纠正不是措辞问题，它改变影响面判断**：Git 集成下「push 即自动构建，CI node 版本只影响测试」；
+> Direct Upload 下 **CI 构建的 `dist/` 就是发布产物本身** ⇒ CI 的 Node 版本、
+> 构建链任何一步的成败**直接决定生产环境内容**。
 > 技术栈：React 19.2 + TypeScript ~6.0 + Vite 8.3 + Tailwind 3.4
 > 本文中所有体积数字均为**本机实测**（`zlib.gzipSync(..., {level:9})`，与 `check-bundle.mjs` 同口径），非估算。
 
