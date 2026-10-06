@@ -62,17 +62,26 @@
  *     本判据关掉**文件层缺口** —— 防「manifest 声明远程、实体却塞进仓库」的声明 ⟷ 实体脱钩绕过。
  *     双通道（裁定 ⑩-3）：① 扩展名白名单 .json/.md/.txt；② NUL 字节嗅探（前 8192 B 含 0x00
  *     即二进制，专抓改扩展名伪装）。fail-closed：遍历/读取异常 ⇒ 判 FAIL，绝不当作 0。
+ * 23. 词库包许可**降级棘轮**（P20 · 词库可开源）：vocabulary 包的 license.redistributable
+ *     必须为 true（当前 13/13）。⚠️ 它与第 7 项**方向相反**、不可互相替代：
+ *       第 7 项判「声明是否合法」（redistributable:false 是**合法**声明 ⇒ 第 7 项判绿）；
+ *       第 23 项判「声明相对现状有没有被悄悄降级」（棘轮，只许升不许降）。
+ *       没有第 23 项时，「拿缺 license 段的源跑一次 scaffold-unit」会把 13 个可开源词库
+ *       静默降级成 12 个，而**全仓无一门会红**。fail-closed：字段缺失/非布尔一律判红。
+ *       源侧的对应防线在 scaffold-unit.mjs 判据 23（缺段即拒跑），本条是**盘侧**兜底：
+ *       源在仓库外（不进 CI）时，本条是唯一能在 CI 里生效的那一层。
  *
  * 用法：node scripts/content/validate.mjs [--root=<内容包目录>]   → 全绿 exit 0，任一 FAIL exit 1
- *       node scripts/content/validate.mjs --falsify              → 证伪自检（系统临时副本注入；
- *           两组：判据 22 二进制媒体 4 断言 + 判据 18 manifest 常驻口径 6 断言；
+ *       node scripts/content/validate.mjs --falsify              → 证伪自检（隔离副本注入；
+ *           三组：判据 22 二进制媒体 4 断言 + 判据 18 manifest 常驻口径 6 断言
+ *           + 判据 23 词库许可降级棘轮 5 断言；
  *           exit 0=全过 / 1=断言失败 / 2=自身异常，同 gate-license.mjs 三态惯例）
  *       node scripts/content/validate.mjs --help                 → usage（exit 0）；未知参数 exit 2
  *       `--root` 默认 `content/`，**仅**覆盖"内容包目录"（ROOT / registry / i18n 等一律不变），
  *       用于对隔离副本做证伪（后续 scripts/gate-license.mjs 复用同一开关）。
  */
 import { readdir, readFile } from 'node:fs/promises'
-import { existsSync, readdirSync, readFileSync, openSync, readSync, closeSync, mkdtempSync, cpSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, openSync, readSync, closeSync, mkdtempSync, cpSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 /* 内容指纹**只走 license-policy.mjs 的 checksumPayload**（它内部 = canonical.mjs 的 sha256Canonical）。
@@ -118,7 +127,7 @@ const CONTENT_DIR = (() => {
  *    未知 flag 一律拒绝（同 gate-license.mjs parseArgs / evidence-run 事故教训），不猜测语义。—— */
 const HELP_TEXT = `用法：
   node scripts/content/validate.mjs [--root=<内容包目录>]   全绿 exit 0，任一 FAIL exit 1
-  node scripts/content/validate.mjs --falsify               证伪自检（系统临时副本注入，两组共 10 断言；exit 0=全过 / 1=断言失败 / 2=自身异常）
+  node scripts/content/validate.mjs --falsify               证伪自检（隔离副本注入，三组共 15 断言；exit 0=全过 / 1=断言失败 / 2=自身异常）
   node scripts/content/validate.mjs --help                  本帮助（exit 0）`
 {
   const args = process.argv.slice(2)
@@ -286,6 +295,48 @@ function judgeManifestSize(entries) {
   return { verdict, message, runtimeTotal, rawTotal, excludedBytes, biggest, over }
 }
 
+/* ===== 判据 23 · 词库包许可**降级棘轮**（P20：词库可开源）=====
+ * ⚠️ 为什么这条判据**不能省**（它治的是一个已经真实发生过的静默故障）：
+ *   `scaffold-unit.mjs:DEFAULT_LICENSE` 是 `redistributable: false`，而三套单元源的
+ *   `license` 段一度**整段缺失** ⇒ 任何人拿现成源跑一次脚手架，vocab 包就从
+ *   `MIT License | redistributable: true` 变成 `redistributable: false`，
+ *   **13 个可开源词库掉到 12 个，而没有任何门会红** ——
+ *   因为 `gate:license`（INV-5）判的是「声明了什么」（结构化 + SPDX + 决策矩阵），
+ *   `redistributable: false` 是一个**完全合法**的声明 ⇒ 合法地判绿。
+ *   这就是本项目反复吃过的那类病：**门只校验「现状合法」，不校验「不该悄悄变」**。
+ *
+ * 判据形态：**棘轮（只许升不许降）**。词库包当前 13/13 全部 `redistributable: true`，
+ *   任何 vocabulary 包出现 `redistributable !== true` ⇒ 判红，并点名是哪个包、哪个字段。
+ *   选「棘轮」而不是「逐字节等于 MIT」的原因：
+ *     · 未来若合法地把某个词库整体转专有，**必须同时改这条判据**（改代码 = 进review、留痕），
+ *       而不是靠「重跑一次脚手架」就静默生效 —— 那正是本次要治的病。
+ *     · 它对**非词库类型**（reading/exercise 合法为 false）完全不敏感，不会造假红。
+ *   ⚠️ fail-closed：读不到 license / 字段缺失 / 非布尔，一律判红（「没写」是 UNKNOWN，
+ *     不是「允许」，与 license-policy.mjs:159 同一口径）。
+ *
+ * 抽成独立函数供 main() 与 --falsify 共用同一条实现 —— 证伪跑的不是「另一份逻辑」。 */
+function judgeVocabLicenseRedistributable(entries) {
+  const bad = []
+  for (const e of entries) {
+    if (e.redistributable !== true) {
+      bad.push(`${e.id} license.redistributable=${JSON.stringify(e.redistributable ?? null)}`
+        + `（name=${JSON.stringify(e.name ?? null)}${e.spdx ? '' : '，spdx 缺失'}）`)
+    }
+  }
+  if (bad.length > 0) {
+    return {
+      verdict: 'FAIL',
+      message: `词库包许可降级 ${bad.length} 个（判据 23 棘轮：13 个可开源词库不得因重跑脚手架掉到 12 个）：${bad.join('；')}`
+        + ` ⇒ 「重跑一次 scaffold-unit」不是无害操作：缺 license 段会静默回落成 redistributable:false，`
+        + `而这样的声明在 gate:license 眼里完全合法。修法= 给源的对应段补显式 license（fail-closed）。`,
+    }
+  }
+  return {
+    verdict: 'PASS',
+    message: `词库包许可棘轮（${entries.length} 个 vocabulary 包全部 redistributable: true；判据 23 棘轮只拦降级，不拦合法升级）`,
+  }
+}
+
 let fails = 0
 const fail = (msg) => { fails++; console.error(`  ✗ ${msg}`) }
 const ok = (msg) => console.log(`  ✓ ${msg}`)
@@ -332,6 +383,7 @@ async function main() {
   const manifestSizes = [] // { id, bytes }
   const inlinePkgs = [] // { id, items, bytes }
   const policyList = [] // { id, policy }
+  const vocabLicenses = [] // 判据 23 · { id, redistributable, name, spdx }（只收 vocabulary 包）
 
   const seenIds = new Map()
   const seenNs = new Map()
@@ -384,6 +436,22 @@ async function main() {
       // 19. inline 预算取样：只有 inline 包的载荷会 1:1 全额进主 chunk，lazy 包不占首屏
       const policy = manifest.offline?.policy
       policyList.push({ id, policy })
+      // 判据 23 取样：**只收 vocabulary 包**（词库才是「可开源」这件事的载体；
+      // reading/exercise 合法为 redistributable:false，混进来会造出一堆假红）。
+      // 字段缺失刻意**照实记 undefined** 而不是补默认值 —— 判据要能区分
+      // 「显式 false（合法声明，但词库上就是降级）」与「压根没写（UNKNOWN）」。
+      if (type === 'vocabulary') {
+        const lic = (Array.isArray(manifest.sources) ? manifest.sources : [])
+          .map((s) => s?.license ?? {})
+        // 多来源时取**最严格**的一个（任一不可再分发即整包不可再分发），与 decidePackage 同向。
+        const worst = lic.reduce((a, l) => (a === null || l.redistributable !== true ? l : a), null)
+        vocabLicenses.push({
+          id,
+          redistributable: worst?.redistributable,
+          name: worst?.name,
+          spdx: worst?.spdx,
+        })
+      }
       if (policy === 'inline' && payload === null) {
         fail(`offline.policy=inline 但无 ${pName} 载荷：inline 语义是载荷静态进主 chunk，无载荷可进属语义矛盾`)
       } else if (policy === 'inline') {
@@ -739,6 +807,17 @@ async function main() {
     }
   }
 
+  /* ===== 23. 词库包许可降级棘轮（P20 · 词库可开源）=====
+   * 判定内核 = judgeVocabLicenseRedistributable()（与 --falsify 共用同一条实现）。
+   * 它守的是「**不该悄悄变**」，不是「现状合法」——
+   * gate:license（INV-5）判声明合法性，而 redistributable:false 是个合法声明，
+   * 所以「重跑一次脚手架把 13 个可开源词库降级成 12 个」在 INV-5 眼里全程绿灯。*/
+  {
+    const r = judgeVocabLicenseRedistributable(vocabLicenses)
+    if (r.verdict === 'FAIL') fail(r.message)
+    else ok(r.message)
+  }
+
   if (fails > 0) { console.error(`\n[content:validate] FAIL：${fails} 项`); process.exit(1) }
   console.log(`\n[content:validate] PASS：${totalPkgs} 包全部通过`)
 }
@@ -959,14 +1038,157 @@ function falsifyManifestSize() {
   return null
 }
 
+/* ===== 判据 23 证伪自检：三条分支各能判红/判绿 =========
+ * 隔离副本 = node_modules/.tmp/content-validate-falsify/（gitignore；真 content/ 全程只读）。
+ * ⚠️ 为什么用 node_modules/.tmp 而不是 os.tmpdir()：本机 safe-delete shim 按**累计删除数**计费、
+ *   超阈值 fail-closed；判据 22/18 那两组用 mkdtemp+rmSync 尚可，本组要反复覆写同一个文件，
+ *   覆写（writeFileSync）**不产生删除计数**，故整组零删除。
+ *
+ * **三条分支，缺一条就证不了伪**（这是本次要求的硬结构）：
+ *   分支① 注入降级：把某个 vocabulary 包的 license 改成 redistributable:false
+ *         ⇒ **必须判红**，且消息点名该包。证「门还咬得住降级」。
+ *   分支② 注入 UNKNOWN：把 redistributable **整键删掉**（不是改成 false）
+ *         ⇒ **必须判红**。证 fail-closed 真的生效 —— 这一条与分支① 方向相反，
+ *         只做① 的话，「字段缺失被当成 false 或当成 true」的 bug 都可能蒙混过关。
+ *   分支③ **对照组**：还原后源与磁盘逐字一致 ⇒ **必须判绿**。
+ *         证「它不是恒红门」。⛔ 这一条最容易被省略，而它才是可信度的锚：
+ *         一个只会判红的门和一个没有门，在只看「注入是否变红」时无法区分。
+ *   另加两条隔离断言（副本判定前后一致 / 真content/ 未被写入）。
+ *
+ * ⚠️ 断言用**同一条实现** judgeVocabLicenseRedistributable，不另写一份判定。 */
+function falsifyVocabLicense() {
+  console.log('[content:validate] 判据 23 证伪自检 —— 证明词库许可降级会判红、且「源与磁盘一致」判绿')
+  const FALSIFY_DIR = path.join(ROOT, 'node_modules', '.tmp', 'content-validate-falsify')
+  const FALSIFY_CONTENT = path.join(FALSIFY_DIR, 'content')
+  let verdict = null
+  let bad = 0
+  const assertions = []
+  const record = (name, pass, actual) => {
+    assertions.push([name, pass, actual])
+    if (pass) console.log(`  ✓ ${name}`)
+    else { bad++; console.error(`  ✗ ${name} —— ${actual}`) }
+  }
+  /** 判据 23 的取样口径，必须与 main() 完全一致（否则证伪跑的是另一个包集合）。 */
+  const sampleVocabLicenses = (dir) => {
+    const out = []
+    for (const type of readdirSync(dir, { withFileTypes: true })) {
+      if (!type.isDirectory()) continue
+      const tp = path.join(dir, type.name)
+      for (const entry of readdirSync(tp, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue
+        const mp = path.join(tp, entry.name, 'manifest.json')
+        if (!existsSync(mp)) continue
+        if (JSON.parse(readFileSync(mp, 'utf8')).type !== 'vocabulary') continue
+        const obj = JSON.parse(readFileSync(mp, 'utf8'))
+        const lic = (Array.isArray(obj.sources) ? obj.sources : []).map((s) => s?.license ?? {})
+        const worst = lic.reduce((a, l) => (a === null || l.redistributable !== true ? l : a), null)
+        out.push({ id: entry.name, redistributable: worst?.redistributable, name: worst?.name, spdx: worst?.spdx })
+      }
+    }
+    return out
+  }
+  try {
+    mkdirSync(FALSIFY_DIR, { recursive: true })
+    rmSync(FALSIFY_CONTENT, { recursive: true, force: true }) // 上轮残留，1 次删除（常量，非按文件计）
+    cpSync(CONTENT_DIR, FALSIFY_CONTENT, { recursive: true })
+    console.log(`  隔离副本：${FALSIFY_CONTENT}（node_modules/.tmp/，gitignore；真 content/ 只读、绝不被写）`)
+
+    // 取样：挑一个稳定的词库包（不写死包名，避免某包被删后证伪失效）
+    const base = sampleVocabLicenses(FALSIFY_CONTENT)
+    const targetId = base.find((b) => b.redistributable === true)?.id
+    if (targetId === undefined) throw new Error('副本里找不到 redistributable:true 的词库包，无法注入降级')
+    const targetDir = (() => {
+      for (const type of readdirSync(FALSIFY_CONTENT, { withFileTypes: true })) {
+        if (!type.isDirectory()) continue
+        const tp = path.join(FALSIFY_CONTENT, type.name)
+        for (const e of readdirSync(tp, { withFileTypes: true })) {
+          if (e.isDirectory() && e.name === targetId) return path.join(tp, e.name)
+        }
+      }
+      return null
+    })()
+    if (targetDir === null) throw new Error(`找不到注入目标包目录：${targetId}`)
+    const manifestPath = path.join(targetDir, 'manifest.json')
+    const pristine = readFileSync(manifestPath, 'utf8') // 内存快照：还原靠覆写，0 次删除
+    const restore = () => writeFileSync(manifestPath, pristine, 'utf8')
+    const baseVerdict = judgeVocabLicenseRedistributable(base)
+    console.log(`  注入目标：${targetId}（真实 ${JSON.stringify(base.find((b) => b.id === targetId).redistributable)}）\n`)
+
+    /* —— 分支①：注入降级（redistributable: true ⇒ false）⇒ 必须判红 —— */
+    {
+      const obj = JSON.parse(pristine)
+      obj.sources[0].license.redistributable = false
+      writeFileSync(manifestPath, JSON.stringify(obj), 'utf8')
+      const r = judgeVocabLicenseRedistributable(sampleVocabLicenses(FALSIFY_CONTENT))
+      record(
+        `断言 1：把 ${targetId} 降级成 redistributable:false ⇒ 判红`,
+        r.verdict === 'FAIL',
+        `verdict=${r.verdict}`,
+      )
+      record(
+        '断言 2：判红消息点名该包（不是「有包坏了」这种无法定位的说法）',
+        r.message.includes(targetId),
+        `message=${r.message.slice(0, 140)}`,
+      )
+      restore()
+    }
+
+    /* —— 分支②：注入 UNKNOWN（**整键删掉**）⇒ 仍必须判红（fail-closed）—— */
+    {
+      const obj = JSON.parse(pristine)
+      delete obj.sources[0].license.redistributable
+      writeFileSync(manifestPath, JSON.stringify(obj), 'utf8')
+      const r = judgeVocabLicenseRedistributable(sampleVocabLicenses(FALSIFY_CONTENT))
+      record(
+        `断言 3：把 ${targetId} 的 redistributable **整键删除**（UNKNOWN，非 false）⇒ 仍判红`,
+        r.verdict === 'FAIL',
+        `verdict=${r.verdict}（⛔ 若为 PASS 说明判据把「没写」当成了允许 —— 那正是本次要治的病）`,
+      )
+      restore()
+    }
+
+    /* —— 分支③：对照组。还原后源与磁盘逐字一致 ⇒ 必须判绿 —— */
+    {
+      const after = judgeVocabLicenseRedistributable(sampleVocabLicenses(FALSIFY_CONTENT))
+      const real = judgeVocabLicenseRedistributable(sampleVocabLicenses(CONTENT_DIR))
+      record(
+        '断言 4：**对照组** —— 还原后副本回到基线（源与磁盘完全一致 ⇒ 判绿）',
+        after.verdict === 'PASS' && after.message === baseVerdict.message,
+        `verdict=${after.verdict}（基线 ${baseVerdict.verdict}）`,
+      )
+      record(
+        '断言 5：真 content/ 判定与副本基线逐字一致（隔离副本未污染真实内容）',
+        real.verdict === baseVerdict.verdict && real.message === baseVerdict.message,
+        `真 content/ verdict=${real.verdict}；message 与基线${real.message === baseVerdict.message ? '一致' : '不一致'}`,
+      )
+    }
+
+    verdict = bad === 0
+  } catch (e) {
+    console.error(`  ‼ 证伪自检自身异常（fail-closed，绝不当作通过）：${e?.message ?? e}`)
+  }
+  const total = assertions.length
+  console.log('──────────────────────────────────────────────────────')
+  if (verdict === true) {
+    console.log(`content:validate 判据 23 Falsification：✅ PASS —— ${total}/${total} 断言通过（降级⇒判红 / UNKNOWN⇒判红 / 源与磁盘一致⇒判绿），真 content/ 未被写入`)
+    return true
+  }
+  if (verdict === false) {
+    console.error(`content:validate 判据 23 Falsification：❌ FAIL —— ${bad}/${total} 断言未过 ⇒ 判据 23 不可信`)
+    return false
+  }
+  return null
+}
+
 if (process.argv.slice(2).includes('--falsify')) {
-  // 两组证伪都跑（判据 22 二进制媒体 + 判据 18 manifest 常驻口径），任一失败即整体失败。
-  // ⚠️ 两个 falsify 函数都**返回**三态而不自己 process.exit —— 否则先跑的那个会把进程带走，
+  // 三组证伪都跑（判据 22 二进制媒体 + 判据 18 manifest 常驻口径 + 判据 23 词库许可降级），任一失败即整体失败。
+  // ⚠️ 多个 falsify 函数都**返回**三态而不自己 process.exit —— 否则先跑的那个会把进程带走，
   //   后跑的那组永远不执行（证伪覆盖率静默下降，而输出看起来一切正常）。
   // 三态对齐 gate-license.mjs --falsify 惯例：0=全过 / 1=断言失败 / 2=自身异常。
   const r22 = falsifyBinaryMedia()
   const r18 = falsifyManifestSize()
-  if (r22 === null || r18 === null) process.exit(2)
-  process.exit(r22 && r18 ? 0 : 1)
+  const r23 = falsifyVocabLicense()
+  if (r22 === null || r18 === null || r23 === null) process.exit(2)
+  process.exit(r22 && r18 && r23 ? 0 : 1)
 }
 else main().catch((e) => { console.error('[content:validate] 异常：', e.message); process.exit(1) })

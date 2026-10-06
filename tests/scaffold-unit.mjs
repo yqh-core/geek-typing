@@ -77,12 +77,20 @@ function run(args = []) {
   }
 }
 
-/** 最小合法源（2 词 / 1 段 / 1 题）—— 合成源，不依赖仓库现有内容。 */
+/** 最小合法源（2 词 / 1 段 / 1 题）—— 合成源，不依赖仓库现有内容。
+ *  ⚠️ `license` **必填**（判据 23，fail-closed）：合成源也必须逐段声明许可，
+ *     否则 A/B/C/F 全组都会被判红 —— 那不是「测出真回归」，是夹具自己过期了。
+ *     形态与仓库现状同口径：vocabulary 可再分发(MIT)，reading / exercise 不可再分发。 */
 const GOOD_SRC = () => ({
   packagePrefix: 'zz-test-01',
   publishedAt: '2026-01-01',
   origin: 'original authored content (test)',
   tags: ['test'],
+  license: {
+    vocabulary: { name: 'MIT License', spdx: 'MIT', url: 'https://opensource.org/licenses/MIT', commercialUse: true, attributionRequired: false, redistributable: true },
+    reading: { name: 'Proprietary (self-curated)', commercialUse: true, attributionRequired: false, redistributable: false },
+    exercise: { name: 'Proprietary (self-curated)', commercialUse: true, attributionRequired: false, redistributable: false },
+  },
   vocabulary: {
     title: 'ZZ Test 01 — Core Vocabulary',
     description: '合成测试词汇包',
@@ -376,6 +384,72 @@ section('F · 本地日历日判据（UTC 00:00–08:00 窗口也必须过）')
   const s2 = writeSrc('F_2', (s) => { s.publishedAt = tomorrow; return s })
   const r2 = checkAt(s2, fEmpty)
   ok('F-2 publishedAt = 本地明天 ⇒ FAIL 且报「未来日期」', r2.code !== 0 && /未来日期/.test(r2.out), `exit=${r2.code} publishedAt=${tomorrow}`)
+}
+
+/* ═══════════════ G · 源许可 fail-closed（判据 23 · 缺失 ≠ 默认允许）═══════════════ */
+section('G · 源许可 fail-closed（缺段必须当场判红，不许静默降级）')
+{
+  // 三条分支，缺一条就证不了伪：
+  //   ① 源**缺 license 段** ⇒ 判红（fail-closed；「缺失」≠ 默认允许）
+  //   ② 源的 license 与**磁盘现状不一致** ⇒ 判红（重跑会造成降级/变更要被发现）
+  //   ③ **对照组**：源与磁盘完全一致 ⇒ 判绿（证明不是恒红门）
+
+  // ① 缺段：整段拿掉
+  const noLicense = writeSrc('G_1', (s) => { delete s.license; return s })
+  const r1 = checkAt(noLicense, B_ROOT)
+  ok('G-1 源缺 license 段 ⇒ FAIL 且点名 license.vocabulary',
+    r1.code !== 0 && /license\.vocabulary/.test(r1.out), `exit=${r1.code}`)
+  ok('G-1b 判红理由写明「缺失 ≠ 默认允许」并点名 redistributable:false 的降级后果',
+    /缺失/.test(r1.out) && /默认允许/.test(r1.out) && /redistributable/.test(r1.out),
+    (r1.out.split('\n').find((l) => l.includes('缺失')) ?? '').trim())
+
+  // ① 只缺一段（给了 reading/exercise，没给 vocabulary）⇒ 仍判红，且只点名缺的那段
+  const partial = writeSrc('G_2', (s) => { delete s.license.vocabulary; return s })
+  const r2 = checkAt(partial, B_ROOT)
+  ok('G-2 源只缺 license.vocabulary（另两段齐备）⇒ FAIL 且只点名 vocabulary',
+    r2.code !== 0 && /license\.vocabulary/.test(r2.out) && !/license\.reading/.test(r2.out), `exit=${r2.code}`)
+
+  // ① 只声明 vocabulary 段的源**不必**声明另两段（否则是假红：没建的包不该被要求许可）
+  const vocabOnly = writeSrc('G_3', (s) => {
+    delete s.reading; delete s.exercise
+    s.license = { vocabulary: s.license.vocabulary }
+    return s
+  })
+  const vOnlyRoot = join(TMP, 'g-vocab-only')
+  const rv = scaffoldTo('G-3', vocabOnly, vOnlyRoot)
+  ok('G-3 只声明 vocabulary 的源不必给 reading/exercise 许可 ⇒ PASS（不造假红）',
+    rv.code === 0, `exit=${rv.code}`)
+
+  // ② 源与磁盘不一致：把 vocabulary 降级（MIT/true ⇒ 专有/false），即「重跑会造成降级」
+  const downgraded = writeSrc('G_4', (s) => {
+    s.license.vocabulary = { name: 'Proprietary (self-curated)', commercialUse: true, attributionRequired: false, redistributable: false }
+    return s
+  })
+  const r4 = checkAt(downgraded, B_ROOT)
+  ok('G-4 源把 vocabulary 降级为 redistributable:false ⇒ FAIL 且报出 license 漂移',
+    r4.code !== 0 && /license/.test(r4.out) && /不一致/.test(r4.out), `exit=${r4.code}`)
+
+  // ③ 对照组：源与磁盘完全一致 ⇒ 判绿（这条最容易被省，而它才是可信度的锚 ——
+  //   一个只会判红的门和一个没有门，在只看「注入是否变红」时无法区分）
+  const good = writeSrc('G_5', (s) => s)
+  const r5 = checkAt(good, B_ROOT)
+  ok('G-5 **对照组**：源与磁盘完全一致 ⇒ PASS（证明判据 23 不是恒红门）',
+    r5.code === 0 && (r5.out.match(/✓/g) ?? []).length === 6, `exit=${r5.code} ✓×${(r5.out.match(/✓/g) ?? []).length}`)
+
+  // ③ 对照组的必要前提：B_ROOT 里的包确实是 redistributable:true（否则 G-5 的绿是假绿）
+  const bLic = JSON.parse(readFileSync(join(B_ROOT, 'vocabulary', 'zz-test-01-vocab', 'manifest.json'), 'utf8'))
+  ok('G-6 对照组前提：B_ROOT 的 vocabulary 包确为 redistributable:true',
+    bLic.sources?.[0]?.license?.redistributable === true, `实得 ${JSON.stringify(bLic.sources?.[0]?.license?.redistributable)}`)
+
+  // 真实仓库侧：13 个词库必须全是 redistributable:true（判据 23 盘侧在 content:validate 跑，
+  //   这里只钉住「Unit-01 三包」这个最小切片，证明脚手架写出的包许可形态没漂）。
+  const realV = JSON.parse(readFileSync(join(CONTENT, 'vocabulary', 'ielts-edu-01-vocab', 'manifest.json'), 'utf8'))
+  const realR = JSON.parse(readFileSync(join(CONTENT, 'reading', 'ielts-edu-01-reading', 'manifest.json'), 'utf8'))
+  ok('G-7 真实 vocab 包 = MIT + redistributable:true（可开源）',
+    realV.sources?.[0]?.license?.redistributable === true && realV.sources?.[0]?.license?.spdx === 'MIT',
+    JSON.stringify(realV.sources?.[0]?.license))
+  ok('G-8 真实 reading 包 = 专有 + redistributable:false（按类型分段，非一刀切）',
+    realR.sources?.[0]?.license?.redistributable === false, JSON.stringify(realR.sources?.[0]?.license))
 }
 
 /* ═══════════════ 收尾：真实文件零改动 ═══════════════ */

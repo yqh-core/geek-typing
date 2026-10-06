@@ -15,6 +15,8 @@
  * ── 输入契约（PM 内容侧交付物）──
  *   node scripts/content/scaffold-unit.mjs --src=<unit-source.json> [--check] [--out-root=<dir>]
  * 源文件形状见 USAGE_TEXT。vocabulary / reading / exercise 三段都可缺省（缺哪段就不建哪个包）。
+ * ⚠️ 但**声明了哪段，就必须显式声明该段的 `license.<段>`**（判据 23 · fail-closed）——
+ *   「缺失」不等于「默认允许」，理由见下方 DEFAULT_LICENSE 处的注释。
  *
  * ── 铁律 ──
  *   · checksum 一律走 license-policy.mjs 的 checksumPayload（唯一实现，禁止手搓）
@@ -58,9 +60,14 @@ const USAGE_TEXT = `用法：
   "packagePrefix": "ielts-edu-01",          // 三个包的前缀：<prefix>-vocab / -reading / -exercise
   "publishedAt": "2026-10-04",              // 内容发布日期（不得是未来日期）
   "origin": "original authored content …",  // 溯源说明，写进每条 source.origin
-  "license": {                // 可缺省；**按内容类型**分别指定，缺省 = 自有专有 + 不可再分发
+  "license": {                // ⚠️ **必填**（判据 23）：声明了哪段内容，就必须显式声明该段的许可；
+                              //   **缺段不再回落默认值** —— 「缺失」≠ 默认允许（见下方 DEFAULT_LICENSE 注释）
     "vocabulary": { "name": "MIT License", "spdx": "MIT", "url": "https://opensource.org/licenses/MIT",
-                    "commercialUse": true, "attributionRequired": false, "redistributable": true }
+                    "commercialUse": true, "attributionRequired": false, "redistributable": true },
+    "reading":    { "name": "Proprietary (self-curated)",
+                    "commercialUse": true, "attributionRequired": false, "redistributable": false },
+    "exercise":   { "name": "Proprietary (self-curated)",
+                    "commercialUse": true, "attributionRequired": false, "redistributable": false }
   }
   "tags": ["ielts", "academic", "education"],   // 可选，进三个包 manifest.tags
   "vocabulary": {                           // 可缺省；也接受直接给数组（那就是 items）
@@ -124,17 +131,30 @@ if (publishedAt > localDay()) {
 const origin = src.origin ?? 'original authored content'
 const builtAt = `${publishedAt}T00:00:00.000Z`
 
-/* ── license：按内容类型分别取，默认「自有专有 + 不可再分发」──
+/* ── 判据 23 · 许可段 fail-closed（**缺失 ≠ 默认允许**）──
  * 为什么必须**分段**而不是整个 unit 一个值：本 unit 的 vocabulary 包已改标 MIT（可开源），
  * 而同 unit 的 reading / exercise 仍是 Proprietary（不可再分发）。
  * 脚手架若写死单一许可，产出的 manifest 就与仓库现状漂移 ⇒ D 组「反向源可重现」幂等判据判红
  *   （实测：加 redistributable 后 D-1/D-2 由 72 PASS 掉到 70 PASS / 2 FAIL —— 真回归，已修）。
- * 故许可随内容类型走：`src.license.<vocabulary|reading|exercise>`，缺省用 DEFAULT_LICENSE。
+ * 故许可随内容类型走：`src.license.<vocabulary|reading|exercise>`。
+ *
+ * ⛔ **为什么「缺段」必须判红、而不是回落 DEFAULT_LICENSE（本刀的核心）**：
+ *   旧实现在 `licenseFor` 里静默 `return { ...DEFAULT_LICENSE }`，而 DEFAULT_LICENSE 的
+ *   `redistributable: false`。后果是**静默降级**：
+ *     · 磁盘上三个 vocab 包是 `MIT License | redistributable = true`（13 个可开源词库）
+ *     · 任何人拿现成源跑一次 scaffold-unit，vocab 包就变成 `redistributable: false`
+ *     ·⇒ 13 个可开源词库掉到 12 个，而**没有任何门会红** ——
+ *       因为 `gate:license` 判的是「声明了什么」，不是「声明相对现状有没有被降级」。
+ *   这正是本项目反复吃过的那类病：**门只校验「现状合法」，不校验「不该悄悄变」**。
+ *   fail-closed 的口径与 license-policy.mjs:159 对 `redistributable` 的口径**逐字一致**
+ *   （「字段缺失同样不算声明」）—— 同一仓同一件事只有一种判法。
  *
  * `redistributable` 是**必填**显式声明（license-policy:decideLicense 第三维，缺失即判红），
- * 故默认值也必须带上它，不能省。 */
+ * 故合并默认值时也必须带上它，不能省。 */
 const DEFAULT_LICENSE = { name: 'Proprietary (self-curated)', commercialUse: true, attributionRequired: false, redistributable: false }
-/** 取某类型的许可：源里显式给了就用（逐字段合并，缺字段回落默认），否则整块用默认。 */
+/** 源里声明了内容段的类型集合（与下方 problems 校验同口径，缺哪段就不建哪个包）。 */
+const DECLARED_TYPES = ['vocabulary', 'reading', 'exercise'].filter((t) => src[t] !== undefined && src[t] !== null)
+/** 取某类型的许可：必须在源里显式声明（判据 23 已先挡住缺段情形，故这里不再有回落分支）。 */
 const licenseFor = (type) => {
   const override = src.license?.[type]
   if (!override || typeof override !== 'object' || Array.isArray(override)) return { ...DEFAULT_LICENSE }
@@ -184,6 +204,25 @@ if (has('exercise')) {
 }
 if (!has('vocabulary') && !has('reading') && !has('exercise')) {
   problems.push('vocabulary / reading / exercise 至少要有一段')
+}
+
+/* 判据 23 · 许可段 fail-closed —— 「源里声明了某段内容」⇒「源里必须显式声明该段的 license」。
+ *
+ * 刻意用 `DECLARED_TYPES`（源里实际声明了哪几段）而不是「三段全都必须给」：
+ *   只给 vocabulary 的源不必声明 reading/exercise 的许可（那两段根本不会建包），
+ *   硬要求三段全给会把「合法的小源」判红 —— 那是假红，比漏判更伤。
+ * 反过来，**声明了内容却没声明许可 ⇒ 一律判红**，不给「默认专有」留后门。
+ *
+ * ⚠️ 这一段挡在**写盘之前**（与 A 组同位置）：降级必须在源这一侧就被拦住，
+ *   而不是等落盘后再让下游门禁去发现 —— 落盘即既成事实。 */
+for (const type of DECLARED_TYPES) {
+  const seg = src.license?.[type]
+  if (!seg || typeof seg !== 'object' || Array.isArray(seg)) {
+    problems.push(
+      `license.${type} 缺段（本源声明了 ${type} 内容）—— 「缺失」≠ 默认允许：`
+      + `缺段会静默回落成 redistributable:false，把该包从可再分发降级为不可再分发，且无门会红`,
+    )
+  }
 }
 if (problems.length) {
   console.error('[scaffold-unit] 源校验失败：')
