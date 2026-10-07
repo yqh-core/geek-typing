@@ -10,6 +10,7 @@ import type { Analytics } from '../core/learning'
 import Dropdown from './Dropdown'
 import BankManager from './BankManager'
 import StatsPanel from './StatsPanel'
+import InstallButton from './InstallButton'
 import { useT, useLang } from '../i18n/hooks'
 
 interface HeaderProps {
@@ -308,6 +309,11 @@ export default function Header(props: HeaderProps) {
               </button>
             ))}
           </div>
+
+          {/* PWA 安装入口：永远渲染（不支持 beforeinstallprompt 时点击给手动说明），
+              已安装成standalone 时自动消失。放在命令面板入口之前 —— 两者都是「工具型」
+              图标按钮相邻，读起来是一组；⛔ 不放落地块（见 InstallButton 顶部注释）。 */}
+          <InstallButton theme={theme} />
 
           {/* 命令面板入口：移动端的主要唤起方式（桌面 Esc 更快，按钮保留统一入口） */}
           <button

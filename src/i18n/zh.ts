@@ -12,6 +12,15 @@ export const zh: Record<string, string> = {
   'nav.restart': '重新开始本轮',
   'nav.importBank': '导入词库…',
 
+  /* PWA 安装引导（install.* 键由 InstallButton / useInstallCapability 消费） */
+  'install.title': '装到桌面 / 添加到主屏幕',
+  'install.button': '装到桌面',
+  'install.close': '关闭',
+  'install.manualTitle': '手动添加到主屏幕',
+  'install.manualIos': '在 Safari 中点击底部的「分享」按钮，向下找到「添加到主屏幕」，即可把 Geek Typing 装到主屏，像原生 App 一样全屏打开。',
+  'install.manualAndroid': '点击浏览器右上角的菜单，选择「安装应用」或「添加到主屏幕」，即可把 Geek Typing 装到桌面。',
+  'install.manualDesktop': '在地址栏右侧点击安装图标，或打开浏览器菜单选择「安装 Geek Typing」，即可把它装成独立窗口应用。',
+
   /* 内容类型（P1.8-A · 类型维度文案；键由 content/types/registry.ts 引用，key 名不得手改） */
   'type.word.label': '词条',
   'type.word.unit': '词',

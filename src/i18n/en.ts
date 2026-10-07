@@ -11,6 +11,18 @@ export const en: Record<string, string> = {
   'nav.restart': 'Restart this round',
   'nav.importBank': 'Import banks…',
 
+  /* PWA install prompt (keys consumed by InstallButton / useInstallCapability) */
+  'install.title': 'Install to desktop / home screen',
+  'install.button': 'Install',
+  'install.close': 'Close',
+  'install.manualTitle': 'Add to home screen manually',
+  'install.manualIos':
+    'In Safari, tap the Share button, scroll down and pick "Add to Home Screen" — Geek Typing then opens full-screen like a native app.',
+  'install.manualAndroid':
+    'Open the browser menu and choose "Install app" or "Add to Home screen" to put Geek Typing on your device.',
+  'install.manualDesktop':
+    'Click the install icon next to the address bar, or pick "Install Geek Typing" in the browser menu, to run it as a standalone window.',
+
   /* Content types (P1.8-A · type-dimension copy; keys referenced by content/types/registry.ts) */
   'type.word.label': 'Word',
   'type.word.unit': 'words',

@@ -9,6 +9,7 @@ import type { PracticeModeId } from '../lib/modes'
 import { DEFAULT_BANK_ID } from '../data/wordBanks'
 import { sound } from '../lib/sound'
 import { settingsChannel } from '../core/persistence/channels'
+import { resolveDeepLinkBankId } from '../lib/deeplink'
 
 export function readStorage<T>(key: string, fallback: T): T {
   try {
@@ -31,7 +32,15 @@ export function writeStorage(key: string, value: unknown) {
 }
 
 export function useSettings() {
-  const [bankId, setBankId] = useState<string>(() => readStorage('gt.bank', DEFAULT_BANK_ID))
+  /* 首屏词库的取值优先级：`?bank=` 深链 > 本机偏好 `gt.bank` > 默认库。
+   *
+   * ⛔ 深链**只在初始化时读一次**（惰性初始值，且不进 state 的依赖），所以用户随后在
+   * UI 里换库不会被 URL 拽回去 —— 深链是「落地页参数」，不是双向绑定。
+   * ⛔ 未知 id 由 `resolveDeepLinkBankId` 判掉并返回 null ⇒ 这里等价于「没带参数」，
+   * 于是既不会白屏，也不会把垃圾 id 写进 `gt.bank`（见 deeplink.ts 顶部注释的两道闸分工）。 */
+  const [bankId, setBankId] = useState<string>(
+    () => resolveDeepLinkBankId() ?? readStorage('gt.bank', DEFAULT_BANK_ID),
+  )
   const [themeId, setThemeId] = useState<ThemeId>(() => readStorage('gt.theme', 'matrix'))
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => readStorage('gt.sound', true))
   const [soundTheme, setSoundTheme] = useState<SoundTheme>(() => readStorage('gt.soundTheme', 'mech'))
