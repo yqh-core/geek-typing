@@ -2,3 +2,18 @@
 *.png binary
 *.jpg binary
 *.svg binary
+
+# content-source/ = 单元脚手架的**源文件**（判据 ① 的守门对象），入库是为了让
+# 「源缺 license 段就拒跑」能在 PR 阶段就红（见 scripts/content/validate.mjs 判据 24）。
+#
+# ⛔ 必须 `-text`：这一组是**外来交付物**，必须**逐字节原样保存**，不许 git 替我们改写。
+#   仓库全局是 `* text=auto eol=lf`，而 unit-source-ielts-tech-03.json 实际带 CRLF
+#   （实测 578 个 CR，占 600 行的绝大多数）。实测（/tmp 干净克隆复现，两组对照）：
+#     · 无本行  ⇒ `git cat-file -p :content-source/…tech-03.json | wc -c` = 28725 B
+#                 （CR 被静默吞掉，比工作区的 29303 B 少 578 B ⇒ 入库即失真）
+#     · 有本行  ⇒ blob = 29303 B，与工作区**逐字节相同**
+#   为什么「少 578 个 CR」不只是洁癖：`--check` / 判据 24 都要对源做 SHA-256 与
+#   JSON 语义比对，一旦入库即被改写，本地验过的字节与 CI 拿到的字节就不是同一份，
+#   「源能还原磁盘现状」这句话就失去可复现的依据。
+#   ⚠️ 只对 content-source/ 关闭换行归一，**不扩到全仓** —— 其余文件仍要 eol=lf。
+content-source/** -text

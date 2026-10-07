@@ -18,6 +18,19 @@
  * ⚠️ 但**声明了哪段，就必须显式声明该段的 `license.<段>`**（判据 23 · fail-closed）——
  *   「缺失」不等于「默认允许」，理由见下方 DEFAULT_LICENSE 处的注释。
  *
+ * ── 源文件在哪（2026-10-07 起在仓库内）──
+ *   三套单元源已入库到 `content-source/unit-source-ielts-{edu-01,env-02,tech-03}.json`。
+ *   此前它们只存在于仓库外的 `D:/work/_ops/`，**CI 的任何 step 都不读那个目录** ——
+ *   于是判据 ①（源缺 license 段即拒跑）只在「有人手动跑本脚本」时才触发，
+ *   在 PR 阶段是**形同虚设**的（源侧的病，CI 看不见）。
+ *   入库后判据 ① 的等价检查已由 `content:validate` 的**判据 24**在 CI 里常驻执行
+ *   （读同一批 `content-source/*.json`，口径与本文件的 DECLARED_TYPES 逐字一致）；
+ *   本文件仍是「真正落盘/校验时」的最后一道闸，两层方向相同、职责不同。
+ *   ⚠️ `content-source/` **不是**内容包根：它不在 `content/` 下，故不会被
+ *   `content:validate` / `content:ingest` 当作包扫描（实测把同类目录放进 content/ 会判红）。
+ *   ⚠️ 该目录在 .gitattributes 里是 `-text`：源必须逐字节原样入库，不许 git 改写换行
+ *   （tech-03 实际带 CRLF；被归一后本地与 CI 拿到的就不是同一份字节）。
+ *
  * ── 铁律 ──
  *   · checksum 一律走 license-policy.mjs 的 checksumPayload（唯一实现，禁止手搓）
  *   · --check 只校验不写盘，用于证明「现有包能被同一份源重现」（幂等 / 无漂移）

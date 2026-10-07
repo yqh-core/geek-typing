@@ -69,7 +69,11 @@
  *       没有第 23 项时，「拿缺 license 段的源跑一次 scaffold-unit」会把 13 个可开源词库
  *       静默降级成 12 个，而**全仓无一门会红**。fail-closed：字段缺失/非布尔一律判红。
  *       源侧的对应防线在 scaffold-unit.mjs 判据 23（缺段即拒跑），本条是**盘侧**兜底：
- *       源在仓库外（不进 CI）时，本条是唯一能在 CI 里生效的那一层。
+ *       两者缺一不可（见下方判据 24 区块的「不是对方替代品」论证）。
+ * 24. 单元源许可段 fail-closed（判据 23 的**源侧**）：读仓库内 `content-source/*.json`，
+ *     「源里声明了某段内容」⇒「必须显式声明该段 license」，且 `redistributable` 必须是显式布尔。
+ *     ⚠️ 源已于 2026-10-07 入库（此前在仓库外 `_ops/`，CI 无任何 step 读它 ⇒ 判据 ① 形同虚设）。
+ *       fail-closed 三条：content-source/ 不存在 ⇒ 判红；空目录 ⇒ 判红；缺段 / 字段缺失 ⇒ 判红。
  *
  * 用法：node scripts/content/validate.mjs [--root=<内容包目录>]   → 全绿 exit 0，任一 FAIL exit 1
  *       node scripts/content/validate.mjs --falsify              → 证伪自检（隔离副本注入；
@@ -91,7 +95,7 @@ import os from 'node:os'
  * P1.8-A 之前这里是第二份手写镜像，注释写着"任一侧增删类型时两处同改"，
  * 而实际结果就是漂移：契约把 `ContentType` 扩到 14 时，两处 Node 白名单都停在 12。
  * 现在单一副本由 gate:content-type-contract 判据 H 对着契约上锁。 */
-import { CONTENT_TYPES, checksumPayload } from './license-policy.mjs'
+import { CONTENT_TYPES, checksumPayload, decideLicense } from './license-policy.mjs'
 /* 自有内容哨兵**只从 provider-rules.mjs 取**（该文件 re-export license-policy.mjs 的 PROVIDER_ORIGINAL，
  * 后者与 src/core/content/provenance.ts 同源）—— 本文件不再写第二份 'geek-typing original' 字面量。
  * 这里只是把已有的 license 判据**换成常量引用**，语义与行为逐字不变。 */
@@ -335,6 +339,115 @@ function judgeVocabLicenseRedistributable(entries) {
     verdict: 'PASS',
     message: `词库包许可棘轮（${entries.length} 个 vocabulary 包全部 redistributable: true；判据 23 棘轮只拦降级，不拦合法升级）`,
   }
+}
+
+/* ===== 判据 24 · 单元源许可段 fail-closed（判据 23 的**源侧**，现在真的在 CI 里）=====
+ * ⚠️ 为什么判据 23 单独存在时，本条是**覆盖不到的**（这是 04a5937 之后的真实状态）：
+ *   判据 23 守的是**盘侧**（包 manifest 上的 license 字段）。它拦得住「已经落盘的降级」，
+ *   拦不住「源本身缺 license 段」—— 后者只在有人手动跑 `content:scaffold-unit` 时才暴露，
+ *   而 CI 的任何 step 都不读 `_ops/`，于是**判据 ①（源侧 fail-closed）在 CI 里形同虚设**。
+ *   本条把源纳入仓库（`content-source/`）后，那条「源里声明了某段内容 ⇒ 必须显式声明该段 license」
+ *   才第一次变成 PR 阶段就会红的东西。
+ *
+ * 与判据 23 的关系：**同一条规则的两个观测点，缺一不可**，且都不是对方的替代品。
+ *   · 判据 23（盘）：包 manifest 的 license.redistributable 不得被降级（棘轮）。
+ *   · 判据 24（源）：源文件对**每个已声明内容段**都必须显式声明 license（缺段即红）。
+ *   只有 24 没有 23：源合规但盘上已被手改降级 ⇒ 漏。
+ *   只有 23 没有 24：盘是对的，但「下一次跑脚手架就会降级」这个**定时炸弹**没人看见 ⇒ 漏。
+ *
+ * ⛔ **fail-closed 的三条口径**（都来自 license-policy.mjs 的既有约定，本条不自创）：
+ *   ① `content-source/` 目录不存在 ⇒ 判红（不是「没有源就跳过」）——
+ *      「源没入库」正是本条要治的病，把它判绿等于把病当药。
+ *   ② 源里声明了某段内容却没给该段 license ⇒ 判红（沿用判据 ① 在 scaffold-unit.mjs 的口径：
+ *      按**实际声明了哪几段**逐段要求，不要求「三段全给」，否则只给 vocabulary 的合法小源被假红）。
+ *   ③ license 段的 `redistributable` 缺失/非布尔 ⇒ 判红（与 license-policy.mjs:159 逐字同口径：
+ *      「没写」是 UNKNOWN，不是允许）。
+ *
+ * 校验规则本身**不重造**：结构化 license 的合法性判定走 license-policy.mjs 的 decideLicense（唯一实现），
+ * 本判据只做「段是否缺失 + 该段能否被 decideLicense 接受」这两件事，避免第二份规则副本漂移。 */
+
+/** 源里可声明的内容段类型（与 scaffold-unit.mjs 的 DECLARED_TYPES 同口径，同一份事实）。 */
+const UNIT_SOURCE_TYPES = ['vocabulary', 'reading', 'exercise']
+
+/**
+ * 判定单个源文件的许可段声明。返回 problems[]（空数组 = 判绿）。
+ * 抽成独立纯函数：main() 与 --falsify 共用同一条实现，证伪跑的不是「另一份逻辑」。
+ */
+export function judgeUnitSourceLicense(src, fileName = '(source)') {
+  const problems = []
+  if (src === null || typeof src !== 'object' || Array.isArray(src)) {
+    return [`${fileName}: 顶层不是 JSON 对象（无法判定许可段）`]
+  }
+  // 实际声明了哪几段内容（缺哪段就不建哪个包 ⇒ 只对已声明的段要求许可）
+  const declared = UNIT_SOURCE_TYPES.filter((t) => src[t] !== undefined && src[t] !== null)
+  if (declared.length === 0) {
+    problems.push(`${fileName}: vocabulary / reading / exercise 一段都没声明 —— 这不是一个可用的单元源`)
+  }
+  if (src.license !== undefined && src.license !== null && (typeof src.license !== 'object' || Array.isArray(src.license))) {
+    problems.push(`${fileName}: license 段必须是对象（实得 ${Array.isArray(src.license) ? 'array' : typeof src.license}）`)
+    return problems
+  }
+  for (const type of declared) {
+    const seg = src.license?.[type]
+    // ① 缺段即红 —— 与 scaffold-unit.mjs 判据 ① 逐字同口径
+    if (!seg || typeof seg !== 'object' || Array.isArray(seg)) {
+      problems.push(
+        `${fileName}: license.${type} 缺段（本源声明了 ${type} 内容）—— 「缺失」≠ 默认允许：`
+        + `缺段会让 scaffold-unit 静默回落成 redistributable:false，把该包从可再分发降级为不可再分发`,
+      )
+      continue
+    }
+    // ② 第三维必须显式且为布尔（字段缺失同样不算声明）—— 与 license-policy.mjs:159 同口径
+    if (typeof seg.redistributable !== 'boolean') {
+      problems.push(
+        `${fileName}: license.${type}.redistributable=${JSON.stringify(seg.redistributable ?? null)} 不是布尔值`
+        + `（字段缺失同样不算声明）—— UNKNOWN ≠ 允许`,
+      )
+    }
+    // ③ 合法性判定交给唯一实现 decideLicense（不自建 SPDX 矩阵）
+    const decision = decideLicense({ provider: PROVIDER_ORIGINAL, license: seg })
+    if (decision.decision === 'rejected') {
+      problems.push(`${fileName}: license.${type} 被 license-policy 判定 rejected（${decision.reason}）`)
+    }
+  }
+  return problems
+}
+
+/**
+ * 扫描 content-source/ 下全部源并汇总。返回 { total, problems, files }。
+ * ⚠️ 目录不存在 ⇒ 判红（fail-closed ①）：「源没入库」本身就是本判据要治的病。
+ */
+export function checkUnitSources(dir = path.join(ROOT, 'content-source')) {
+  const problems = []
+  if (!existsSync(dir)) {
+    return {
+      total: 0,
+      files: [],
+      problems: [
+        `content-source/ 不存在（${dir}）—— 单元源必须入库：判据 ①（源缺 license 段即拒跑）`
+        + `只有源在仓库里才能在 PR 阶段判红；源在仓库外时 CI 无任何 step 会读它，判据 ① 形同虚设`,
+      ],
+    }
+  }
+  const files = readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith('.json'))
+    .map((e) => e.name)
+    .sort()
+  if (files.length === 0) {
+    return { total: 0, files, problems: [`content-source/ 下没有任何 .json 源文件（${dir}）—— 空目录同样判红（fail-closed：没有源可校验 ≠ 校验通过）`] }
+  }
+  for (const name of files) {
+    const abs = path.join(dir, name)
+    let obj
+    try {
+      obj = JSON.parse(readFileSync(abs, 'utf8'))
+    } catch (e) {
+      problems.push(`${name}: 不可解析为 JSON（${e.message}）`)
+      continue
+    }
+    problems.push(...judgeUnitSourceLicense(obj, name))
+  }
+  return { total: files.length, files, problems }
 }
 
 let fails = 0
@@ -818,6 +931,20 @@ async function main() {
     else ok(r.message)
   }
 
+  /* ===== 24. 单元源许可段 fail-closed（判据 23 的源侧 · 让判据 ① 真正在 CI 生效）===== */
+  {
+    const r = checkUnitSources()
+    if (r.problems.length > 0) {
+      fail(`单元源许可声明不合规 ${r.problems.length} 项（判据 24 · fail-closed：源缺 license 段即红）：`
+        + r.problems.join('；')
+        + ` ⇒ 「缺失」≠ 默认允许：这些源一旦被拿去跑 content:scaffold-unit，`
+        + `对应包会静默降级成 redistributable:false（13 个可开源词库掉到 12 个），`
+        + `而这样的声明在 gate:license 眼里完全合法。修法= 给源的对应段补显式 license。`)
+    } else {
+      ok(`单元源许可段 fail-closed（${r.total} 个源：${r.files.join(', ')} —— 每个源对每段已声明内容都显式声明了 license，且 redistributable 为显式布尔；判据 24 与盘侧判据 23 方向相反、缺一不可）`)
+    }
+  }
+
   if (fails > 0) { console.error(`\n[content:validate] FAIL：${fails} 项`); process.exit(1) }
   console.log(`\n[content:validate] PASS：${totalPkgs} 包全部通过`)
 }
@@ -1180,6 +1307,107 @@ function falsifyVocabLicense() {
   return null
 }
 
+/* ===== 判据 24 证伪自检：证明「源缺 license 段 ⇒ 判红」且「合规源 ⇒ 判绿」=====
+ * ⚠️ 为什么必须有这一组：判据 24 是**新加的门**，而本项目的核心教训是
+ *   「不会失败的门等于没有门」。只跑常规模式（3 个源都合规 ⇒ 全绿）**无法区分**
+ *   「判据真的在咬」与「判据根本��触发 / 恒绿」—— 两者输出的 PASS 一模一样。
+ *
+ * 隔离副本放 node_modules/.tmp/（gitignore；真 content-source/ 与 content/ 只读、绝不被写）。
+ * 注入方式是**覆写**（writeFileSync）而非删除 ⇒ 零删除计数，不触发 safe-delete shim。
+ * 三条分支：① 删 license 段 ⇒ 判红；② 删 redistributable 键 ⇒ 判红（fail-closed 的第二重）；
+ *          ③ 对照组（不注入的干净副本）⇒ 判绿。 */
+function falsifyUnitSourceLicense() {
+  console.log('[content:validate] 判据 24 证伪自检 —— 证明「源缺 license 段」会判红、且合规源判绿')
+  const FALSIFY_DIR = path.join(ROOT, 'node_modules', '.tmp', 'content-source-falsify')
+  const REAL = path.join(ROOT, 'content-source')
+  let verdict = null
+  let bad = 0
+  const assertions = []
+  const record = (name, pass, actual) => {
+    assertions.push([name, pass, actual])
+    if (pass) console.log(`  ✓ ${name}`)
+    else { bad++; console.error(`  ✗ ${name} —— ${actual}`) }
+  }
+  try {
+    rmSync(FALSIFY_DIR, { recursive: true, force: true }) // 1 次删除（常量目录，非按文件计）
+    mkdirSync(FALSIFY_DIR, { recursive: true })
+    cpSync(REAL, FALSIFY_DIR, { recursive: true })
+    const names = readdirSync(FALSIFY_DIR).filter((n) => n.endsWith('.json')).sort()
+    if (names.length === 0) throw new Error('content-source/ 下没有 .json 源文件，无法注入')
+    const target = names[0]
+    const targetPath = path.join(FALSIFY_DIR, target)
+    const pristine = readFileSync(targetPath, 'utf8') // 内存快照：还原靠覆写，0 次删除
+    const restore = () => writeFileSync(targetPath, pristine, 'utf8')
+
+    // —— 分支③先跑（对照组）：未注入的干净副本必须判绿 ——
+    const base = checkUnitSources(FALSIFY_DIR)
+    record(
+      '断言 1：**对照组** —— 未注入的干净副本 3 个源全部合规 ⇒ 判绿（证「它不是恒红门」）',
+      base.problems.length === 0 && base.total === names.length,
+      `problems=${base.problems.length}（${base.problems.slice(0, 2).join(';')}）total=${base.total}`,
+    )
+
+    // —— 分支①：删掉 license 段 ⇒ 必须判红 ——
+    {
+      const obj = JSON.parse(pristine)
+      delete obj.license
+      writeFileSync(targetPath, JSON.stringify(obj), 'utf8')
+      const r = checkUnitSources(FALSIFY_DIR)
+      record(
+        `断言 2：把 ${target} 的**整个 license 段删掉** ⇒ 判红`,
+        r.problems.length > 0,
+        `problems=${r.problems.length}（若为 0 说明判据 24 根本不会因缺段变红）`,
+      )
+      record(
+        '断言 3：判红消息点名该源文件与缺失的段（不是「有源坏了」这种无法定位的说法）',
+        r.problems.some((p) => p.includes(target) && p.includes('license.')),
+        `首条=${r.problems[0]?.slice(0, 120) ?? '(无)'}`,
+      )
+      restore()
+    }
+
+    // —— 分支②：只删 redistributable 键（license 段还在）⇒ 仍必须判红（fail-closed）——
+    {
+      const obj = JSON.parse(pristine)
+      delete obj.license.vocabulary.redistributable
+      writeFileSync(targetPath, JSON.stringify(obj), 'utf8')
+      const r = checkUnitSources(FALSIFY_DIR)
+      record(
+        `断言 4：把 ${target} 的 license.vocabulary.redistributable **整键删除**（UNKNOWN，非 false）⇒ 仍判红`,
+        r.problems.length > 0,
+        `problems=${r.problems.length}（⛔ 若为 0 说明判据把「没写」当成了允许 —— 那正是要治的病）`,
+      )
+      restore()
+    }
+
+    // —— 隔离断言：真 content-source/ 未被写入，且判绿对照可复现 ——
+    {
+      const real = checkUnitSources(REAL)
+      const after = checkUnitSources(FALSIFY_DIR)
+      record(
+        '断言 5：真 content-source/ 判定与副本基线逐字一致（隔离副本未污染真实源文件）',
+        real.problems.length === 0 && after.problems.length === 0 && real.total === base.total,
+        `真源 problems=${real.problems.length} total=${real.total}`,
+      )
+    }
+
+    verdict = bad === 0
+  } catch (e) {
+    console.error(`  ‼ 证伪自检自身异常（fail-closed，绝不当作通过）：${e?.message ?? e}`)
+  }
+  const total = assertions.length
+  console.log('──────────────────────────────────────────────────────')
+  if (verdict === true) {
+    console.log(`content:validate 判据 24 Falsification：✅ PASS —— ${total}/${total} 断言通过（缺段⇒判红 / UNKNOWN⇒判红 / 合规源⇒判绿），真 content-source/ 未被写入`)
+    return true
+  }
+  if (verdict === false) {
+    console.error(`content:validate 判据 24 Falsification：❌ FAIL —— ${bad}/${total} 断言未过 ⇒ 判据 24 不可信`)
+    return false
+  }
+  return null
+}
+
 if (process.argv.slice(2).includes('--falsify')) {
   // 三组证伪都跑（判据 22 二进制媒体 + 判据 18 manifest 常驻口径 + 判据 23 词库许可降级），任一失败即整体失败。
   // ⚠️ 多个 falsify 函数都**返回**三态而不自己 process.exit —— 否则先跑的那个会把进程带走，
@@ -1188,7 +1416,8 @@ if (process.argv.slice(2).includes('--falsify')) {
   const r22 = falsifyBinaryMedia()
   const r18 = falsifyManifestSize()
   const r23 = falsifyVocabLicense()
-  if (r22 === null || r18 === null || r23 === null) process.exit(2)
-  process.exit(r22 && r18 && r23 ? 0 : 1)
+  const r24 = falsifyUnitSourceLicense()
+  if (r22 === null || r18 === null || r23 === null || r24 === null) process.exit(2)
+  process.exit(r22 && r18 && r23 && r24 ? 0 : 1)
 }
 else main().catch((e) => { console.error('[content:validate] 异常：', e.message); process.exit(1) })

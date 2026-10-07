@@ -1,0 +1,319 @@
+{
+  "packagePrefix": "ielts-env-02",
+  "publishedAt": "2026-10-04",
+  "origin": "original authored content (A2 · IELTS Academic Unit 02 — Environment/Climate)",
+  "tags": ["ielts", "academic", "environment"],
+  "license": {
+    "vocabulary": {
+      "attributionRequired": false,
+      "commercialUse": true,
+      "name": "MIT License",
+      "redistributable": true,
+      "spdx": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    },
+    "reading": {
+      "attributionRequired": false,
+      "commercialUse": true,
+      "name": "Proprietary (self-curated)",
+      "redistributable": false
+    },
+    "exercise": {
+      "attributionRequired": false,
+      "commercialUse": true,
+      "name": "Proprietary (self-curated)",
+      "redistributable": false
+    }
+  },
+  "vocabulary": {
+    "title": "IELTS Academic Unit 02 — Environment: Core Vocabulary",
+    "description": "IELTS Academic Unit 02（Environment/Climate）核心词汇 30 词：Tier A 18 + Tier B 12。中文释义与英文 definition 由 PM 内容侧补齐；音标按现有契约可选，本轮未提供。",
+    "items": [
+      { "word": "albedo", "translation": "反照率；反射率", "definition": "the proportion of solar radiation reflected by a surface" },
+      { "word": "anthropogenic", "translation": "人为的；人类活动造成的", "definition": "produced by human activity rather than by natural processes" },
+      { "word": "canopy", "translation": "树冠层；顶盖", "definition": "the layer of leaves and branches formed by the crowns of trees" },
+      { "word": "evapotranspiration", "translation": "蒸散（作用）", "definition": "the combined loss of water from the soil and from plants by evaporation and transpiration" },
+      { "word": "impermeable", "translation": "不透水的；不透气的", "definition": "allowing no liquid or gas to pass through" },
+      { "word": "mitigation", "translation": "缓解；减轻", "definition": "the reduction of the severity or harmful effect of something" },
+      { "word": "vulnerability", "translation": "脆弱性；易受害性", "definition": "the extent to which a system or person is likely to be harmed by a hazard" },
+      { "word": "susceptibility", "translation": "易感性；敏感性", "definition": "the likelihood of being influenced or affected adversely" },
+      { "word": "threshold", "translation": "阈值；临界点", "definition": "the level at which a response or change begins to occur" },
+      { "word": "ambient", "translation": "周围环境的；大气的", "definition": "the temperature, pressure or light of the surrounding environment" },
+      { "word": "exposure", "translation": "暴露；接触", "definition": "the condition of being subjected to something, especially adverse conditions" },
+      { "word": "urbanization", "translation": "城市化", "definition": "the process by which rural areas become part of a city" },
+      { "word": "emission", "translation": "排放（物）", "definition": "the release of something, especially gas or heat, into the atmosphere" },
+      { "word": "density", "translation": "密度；稠密", "definition": "the number of people or objects in a given area or volume" },
+      { "word": "inequality", "translation": "不平等；差异", "definition": "the unequal distribution of resources or opportunities" },
+      { "word": "ventilation", "translation": "通风；换气", "definition": "the replacement of stale air with fresh air in a space" },
+      { "word": "suburban", "translation": "郊区的；城郊的", "definition": "relating to the areas on the outskirts of a city" },
+      { "word": "reservoir", "translation": "水库；蓄积层", "definition": "a large quantity of something that is stored and can be drawn on" },
+
+      { "word": "exceed", "translation": "超过；超出", "definition": "to go above or beyond a limit or amount" },
+      { "word": "pronounced", "translation": "显著的；明显的", "definition": "very marked or taking a strongly defined form" },
+      { "word": "release", "translation": "释放；排放", "definition": "to set something free or allow it to be emitted" },
+      { "word": "accumulate", "translation": "累积；积聚", "definition": "to gather over a period of time until there is a large amount" },
+      { "word": "compound", "translation": "使加重；使恶化", "definition": "to make a problem or situation worse" },
+      { "word": "allocate", "translation": "分配；拨给", "definition": "to give a share of something to a person or purpose" },
+      { "word": "infrastructure", "translation": "基础设施", "definition": "the basic structures and facilities of a place or activity" },
+      { "word": "fragment", "translation": "碎裂；割裂", "definition": "to break or be broken into small separate parts" },
+      { "word": "mature", "translation": "成熟；长成", "definition": "to become fully developed or reach maturity" },
+      { "word": "excursion", "translation": "偏离；波动幅度", "definition": "a departure from a normal or established course or level" },
+      { "word": "regulatory", "translation": "监管的；法规的", "definition": "relating to the enforcement of rules and regulations" },
+      { "word": "moderate", "translation": "缓和；适度调节", "definition": "to make something less extreme or severe" }
+    ]
+  },
+  "reading": {
+    "title": "IELTS Academic Unit 02 — Environment: Reading",
+    "itemTitle": "The Urban Heat Island and Who Bears the Heat",
+    "description": "原创 IELTS-style 学术阅读篇章（8 段，约 820 词，主题：城市热岛效应的机制、健康影响与治理）。",
+    "paragraphs": [
+      "An urban heat island describes a situation in which the air temperature of a city, or of a district within a city, is measurably higher than that of the surrounding rural area. The phenomenon is not new, but its magnitude has grown as cities have expanded and as the global mean temperature has risen. Research conducted in temperate and tropical cities alike indicates that nighttime temperatures within dense urban cores can exceed those of outlying neighbourhoods by several degrees even when both share the same latitude, altitude and weather system. Such comparisons form the basic evidence base of the field, and they are usually made on still, clear nights, when the contrast is at its most pronounced.",
+
+      "Measured intensities vary considerably between places. In subtropical megacities the surface temperature of built-up terrain has been recorded fifteen degrees above that of adjoining vegetated land on extreme summer afternoons, although surface contrasts matter less for human comfort than the air that people actually breathe. A growing network of low-cost sensors indicates that the typical nighttime urban excess is closer to two or three degrees, rising above eight during heat waves. The excess is not evenly distributed. Industrial zones, arterial roads and dense housing blocks record the highest readings, while parks and riverine corridors remain close to the rural baseline.",
+
+      "Three physical mechanisms account for most of the observed warmth. First, the materials that pave cities, including asphalt, concrete and dark roofing, have low albedo, so they absorb a large share of incoming solar radiation and release it slowly after dark. Second, vegetation is scarce, and trees and soils cool their surroundings through evapotranspiration, a process that impermeable surfaces cannot perform at all. Third, the geometry of streets and buildings traps outgoing long-wave radiation and slows the wind, so heat given off by one surface readily returns to another. Rural terrain, with its short grass and unobstructed sky, experiences none of these effects at once.",
+
+      "Anthropogenic heat adds a fourth and independent contribution. Vehicles, industrial processes, air-conditioning compressors and dense human activity discharge waste heat directly into the street canyon, and the discharge is greatest exactly where population density is greatest. After sunset, when solar input ceases, this fraction becomes dominant and the city stays warm long after the rural ground has cooled. Models that remove anthropogenic heat but leave the geometry unchanged still report a substantial nighttime excess. Built form alone is therefore sufficient to produce an island, yet human activity clearly amplifies one that would otherwise be milder.",
+
+      "The consequences follow from the distribution of heat rather than from the city-wide average. Exposure is not random with respect to income. Households in old housing stock without air conditioning, informal settlements with little canopy, and neighbourhoods sited beside heavy traffic or industrial plants receive the largest dose. Evening cooling matters particularly: when concrete gives back its stored heat, residents of compact districts cannot open their windows or sleep, and heat stress accumulates across consecutive days. Hospitals in warm cities record a dependable rise in admissions for cardiovascular and respiratory difficulty during the first nights above a local threshold.",
+
+      "Vulnerability also varies with age and with pre-existing illness. Older residents, young children and people with chronic conditions are least able to regulate body temperature or to leave an unsuitable dwelling, and they are over-represented precisely in the districts with the weakest canopy cover. Population mobility compounds the difficulty, since workers who commute into the core during the hottest hours are exposed there although they sleep elsewhere. Plans that assume a uniform city temperature mis-allocate assistance, because the people most at risk are concentrated in the smallest and hottest parts of the metropolitan area.",
+
+      "Policy has converged on three interventions. Extending tree canopy, with species chosen for tolerance of heat and drought, lowers air temperature and reduces the cooling load of nearby buildings. Raising the albedo of roofing and paving through lighter surfaces, reflective coatings or permeable materials reduces the heat stored by day and returned by night. Developing cool centres where residents can retreat during extreme events, together with green corridors along water, addresses the remainder. Cheap in relation to large engineering works, the three interact: canopy performs poorly without water, and reflective surfaces lose much of their benefit once dust and mildew settle upon them.",
+
+      "Governance determines how quickly any of them takes effect. Tree planting needs decades to reach canopy maturity, whereas heat waves arrive within a single season, so short-term provision of cooling space must accompany long-term greening. Fragmented land ownership, competing infrastructure budgets and the slow turnover of the urban fabric all postpone intervention, and the districts with the least existing canopy are usually least able to fund new planting. The most effective programmes therefore combine a regulatory floor, expressed as minimum canopy cover and maximum impermeable surface in new development, with targeted public investment in the places that have fallen furthest behind."
+    ]
+  },
+  "exercise": {
+    "title": "IELTS Academic Unit 02 — Environment: Practice",
+    "itemTitle": "The Urban Heat Island — Practice Set",
+    "description": "Multiple Choice ×5、True/False/Not Given ×5、Vocabulary in Context ×5，含答案与解析。",
+    "questions": [
+      {
+        "id": "q01",
+        "type": "mcq",
+        "prompt": "What is the main point of the passage?",
+        "options": [
+          { "key": "A", "text": "Cities are warmer than rural areas because the global mean temperature is rising rapidly." },
+          { "key": "B", "text": "The urban heat island is a measurable local effect produced by built surfaces and human activity, and its costs fall unevenly on residents." },
+          { "key": "C", "text": "Planting trees and lightening surfaces will solve the heat problem within a single season." },
+          { "key": "D", "text": "Heat waves are mainly caused by the expansion of suburban housing estates." }
+        ],
+        "answer": "B",
+        "explanation": "The passage moves from defining and measuring the island, through its physical mechanisms, to who is exposed and what governance can do. It neither attributes the effect solely to global warming (A), nor promises a seasonal fix (C, which the final paragraph explicitly denies).",
+        "skill": "Main idea"
+      },
+      {
+        "id": "q02",
+        "type": "mcq",
+        "prompt": "According to the passage, when is the urban excess at its most pronounced?",
+        "options": [
+          { "key": "A", "text": "On still, clear summer nights in the urban core." },
+          { "key": "B", "text": "On extreme summer afternoons in subtropical megacities." },
+          { "key": "C", "text": "During daytime in rural areas with tall grass." },
+          { "key": "D", "text": "Immediately after heavy rainfall in industrial zones." }
+        ],
+        "answer": "A",
+        "explanation": "Paragraph 1 states that comparisons are usually made on still, clear nights, when the contrast is at its most pronounced. B is a different measurement (surface temperature in subtropical megacities) and the passage notes that surface contrasts matter less for comfort than air temperature.",
+        "skill": "Detailed information"
+      },
+      {
+        "id": "q03",
+        "type": "mcq",
+        "prompt": "Which of the following is NOT identified in the passage as a cause of the urban heat island?",
+        "options": [
+          { "key": "A", "text": "Low albedo of paving and roofing materials." },
+          { "key": "B", "text": "Absence of evapotranspiration over impermeable surfaces." },
+          { "key": "C", "text": "The trapping of long-wave radiation between buildings and streets." },
+          { "key": "D", "text": "The combustion of fossil fuels in distant power stations." }
+        ],
+        "answer": "D",
+        "explanation": "Paragraph 3 lists low albedo, lack of evapotranspiration and the trapping of long-wave radiation as the three physical mechanisms. Distant power stations are not mentioned; the anthropogenic heat named in paragraph 4 is discharged locally into the street canyon.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q04",
+        "type": "mcq",
+        "prompt": "What do models that remove anthropogenic heat but keep the city geometry unchanged show?",
+        "options": [
+          { "key": "A", "text": "The heat island disappears entirely, proving human activity is the only cause." },
+          { "key": "B", "text": "A substantial nighttime excess remains, so built form alone can produce the island." },
+          { "key": "C", "text": "Temperatures in the core fall below the rural baseline." },
+          { "key": "D", "text": "Daytime surface temperatures rise even further." }
+        ],
+        "answer": "B",
+        "explanation": "Paragraph 4: the models 'still report a substantial nighttime excess', and the author concludes that built form alone is sufficient to produce an island while human activity amplifies it.",
+        "skill": "Reasoning"
+      },
+      {
+        "id": "q05",
+        "type": "mcq",
+        "prompt": "Why does the author say that plans assuming a uniform city temperature mis-allocate assistance?",
+        "options": [
+          { "key": "A", "text": "Because the hottest districts are also the smallest and hold the most concentrated people at risk." },
+          { "key": "B", "text": "Because rural areas need almost no assistance during heat waves." },
+          { "key": "C", "text": "Because hospitals cannot record admissions reliably." },
+          { "key": "D", "text": "Because most residents move out of the core in summer." }
+        ],
+        "answer": "A",
+        "explanation": "Paragraph 6 gives the reason directly: people most at risk are concentrated in 'the smallest and hottest parts of the metropolitan area'. B and C are unsupported; D reverses the commuting pattern described.",
+        "skill": "Inference"
+      },
+      {
+        "id": "q06",
+        "type": "tfng",
+        "prompt": "Nighttime temperatures inside dense urban cores can exceed those of outlying neighbourhoods by several degrees under identical weather conditions.",
+        "options": [
+          { "key": "TRUE", "text": "TRUE" },
+          { "key": "FALSE", "text": "FALSE" },
+          { "key": "NOT GIVEN", "text": "NOT GIVEN" }
+        ],
+        "answer": "TRUE",
+        "explanation": "Paragraph 1 states exactly this: the excess appears 'even when both share the same latitude, altitude and weather system'.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q07",
+        "type": "tfng",
+        "prompt": "Surface temperature differences between urban and rural terrain are the most reliable guide to the heat that residents actually experience.",
+        "options": [
+          { "key": "TRUE", "text": "TRUE" },
+          { "key": "FALSE", "text": "FALSE" },
+          { "key": "NOT GIVEN", "text": "NOT GIVEN" }
+        ],
+        "answer": "FALSE",
+        "explanation": "Paragraph 2 says surface contrasts 'matter less for human comfort than the air that people actually breathe', so the claim reverses the passage's ordering. TRUE/FALSE is given because the passage explicitly addresses the point.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q08",
+        "type": "tfng",
+        "prompt": "Giving off anthropogenic heat is the only cause of the urban heat island.",
+        "options": [
+          { "key": "TRUE", "text": "TRUE" },
+          { "key": "FALSE", "text": "FALSE" },
+          { "key": "NOT GIVEN", "text": "NOT GIVEN" }
+        ],
+        "answer": "FALSE",
+        "explanation": "Paragraphs 3 and 4 establish three physical mechanisms plus anthropogenic heat as a fourth, independent contribution; models without anthropogenic heat still show an excess. The passage addresses the point directly, so it is ruled false rather than unstated.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q09",
+        "type": "tfng",
+        "prompt": "People without air conditioning in older housing and with little nearby tree cover take in the largest share of excess heat.",
+        "options": [
+          { "key": "TRUE", "text": "TRUE" },
+          { "key": "FALSE", "text": "FALSE" },
+          { "key": "NOT GIVEN", "text": "NOT GIVEN" }
+        ],
+        "answer": "TRUE",
+        "explanation": "Paragraph 5 names old housing stock without air conditioning, informal settlements with little canopy and neighbourhoods beside traffic or industry as receiving 'the largest dose'.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q10",
+        "type": "tfng",
+        "prompt": "A newly planted street tree provides its full cooling effect within the first summer.",
+        "options": [
+          { "key": "TRUE", "text": "TRUE" },
+          { "key": "FALSE", "text": "FALSE" },
+          { "key": "NOT GIVEN", "text": "NOT GIVEN" }
+        ],
+        "answer": "FALSE",
+        "explanation": "The final paragraph says tree planting 'needs decades to reach canopy maturity, whereas heat waves arrive within a single season'. Ruled false because the passage addresses the timescale directly.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q11",
+        "type": "mcq",
+        "prompt": "In paragraph 3, \"albedo\" most nearly means",
+        "options": [
+          { "key": "A", "text": "the ability of a surface to store water for later release" },
+          { "key": "B", "text": "the proportion of incoming solar radiation a surface reflects" },
+          { "key": "C", "text": "the rate at which a material releases stored heat at night" },
+          { "key": "D", "text": "the depth of soil available to plant roots" }
+        ],
+        "answer": "B",
+        "explanation": "The passage explains the term by its consequence: materials with low albedo 'absorb a large share of incoming solar radiation', so a low albedo means a small reflected proportion (B).",
+        "skill": "Vocabulary in context"
+      },
+      {
+        "id": "q12",
+        "type": "mcq",
+        "prompt": "In paragraph 3, \"evapotranspiration\" refers to",
+        "options": [
+          { "key": "A", "text": "the slow oxidation of organic matter in soil" },
+          { "key": "B", "text": "the combined evaporation of water from soil and its transpiration through plants" },
+          { "key": "C", "text": "the condensation of vapour on building surfaces at night" },
+          { "key": "D", "text": "the circulation of air between streets and rooftops" }
+        ],
+        "answer": "B",
+        "explanation": "Paragraph 3 glosses the term directly as 'a process that impermeable surfaces cannot perform', following the mention of trees and soils cooling their surroundings. B is the standard definition.",
+        "skill": "Vocabulary in context"
+      },
+      {
+        "id": "q13",
+        "type": "mcq",
+        "prompt": "In paragraph 3, \"impermeable\" is used to describe surfaces that",
+        "options": [
+          { "key": "A", "text": "allow no liquid or gas to pass through" },
+          { "key": "B", "text": "absorb large quantities of heat quickly" },
+          { "key": "C", "text": "reflect most incoming radiation" },
+          { "key": "D", "text": "drain water towards underground reservoirs" }
+        ],
+        "answer": "A",
+        "explanation": "In context the word contrasts with soil and vegetation, which cool through evaporation; the intended meaning is that paved surfaces cannot pass water or air through, hence cannot support evapotranspiration.",
+        "skill": "Vocabulary in context"
+      },
+      {
+        "id": "q14",
+        "type": "mcq",
+        "prompt": "In paragraph 6, how is \"compounds\" most likely to be read?",
+        "options": [
+          { "key": "A", "text": "To make a difficulty worse or more severe" },
+          { "key": "B", "text": "To add the numbers of two quantities together" },
+          { "key": "C", "text": "To break a substance into smaller chemical units" },
+          { "key": "D", "text": "To agree with a proposal at a meeting" }
+        ],
+        "answer": "A",
+        "explanation": "The sentence is 'Population mobility compounds the difficulty', followed by the reason (commuters are exposed in the core). None of the other readings fits a difficulty as the object; only making it worse does.",
+        "skill": "Vocabulary in context"
+      },
+      {
+        "id": "q15",
+        "type": "mcq",
+        "prompt": "In the final paragraph, \"regulatory floor\" refers to",
+        "options": [
+          { "key": "A", "text": "the lowest temperature below which no further action is required" },
+          { "key": "B", "text": "a mandatory minimum standard written into rules for new development" },
+          { "key": "C", "text": "the price floor set for land in the suburban housing market" },
+          { "key": "D", "text": "the minimum level of funding the city must reserve each year" }
+        ],
+        "answer": "B",
+        "explanation": "The parenthetical gloss explains it as 'minimum canopy cover and maximum impermeable surface in new development', i.e. a binding standard in regulation, not a temperature or a price limit.",
+        "skill": "Vocabulary in context"
+      }
+    ],
+    "collocations": [
+      "urban heat island",
+      "surface temperature",
+      "heat wave",
+      "low albedo",
+      "impermeable surface",
+      "green canopy",
+      "tree canopy",
+      "cooling load",
+      "green corridor",
+      "reflective coating",
+      "permeable material",
+      "air temperature",
+      "canopy cover",
+      "population density",
+      "public investment",
+      "regulatory floor",
+      "infrastructure budget",
+      "vulnerable group"
+    ]
+  }
+}

@@ -1,0 +1,609 @@
+{
+  "packagePrefix": "ielts-edu-01",
+  "publishedAt": "2026-10-04",
+  "origin": "original authored content (A1-P/04 Unit 01 — Education)",
+  "tags": [
+    "ielts",
+    "academic",
+    "education"
+  ],
+  "license": {
+    "vocabulary": {
+      "attributionRequired": false,
+      "commercialUse": true,
+      "name": "MIT License",
+      "redistributable": true,
+      "spdx": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    },
+    "reading": {
+      "attributionRequired": false,
+      "commercialUse": true,
+      "name": "Proprietary (self-curated)",
+      "redistributable": false
+    },
+    "exercise": {
+      "attributionRequired": false,
+      "commercialUse": true,
+      "name": "Proprietary (self-curated)",
+      "redistributable": false
+    }
+  },
+  "vocabulary": {
+    "title": "IELTS Academic Unit 01 — Education: Core Vocabulary",
+    "description": "IELTS Academic Unit 01（Education）核心词汇 32 词：Tier A 19 + Tier B 13。中文释义由 PM 内容侧补齐（A1-P/05）；音标按现有契约可选，本轮未提供。",
+    "items": [
+      {
+        "word": "academic",
+        "translation": "学术的；学业的",
+        "definition": "related to education or study"
+      },
+      {
+        "word": "assessment",
+        "translation": "评估；评价",
+        "definition": "the process of judging learning or performance"
+      },
+      {
+        "word": "institution",
+        "translation": "机构；院校",
+        "definition": "an established organisation, especially a university or similar body"
+      },
+      {
+        "word": "qualification",
+        "translation": "资格；资历；学历",
+        "definition": "an official achievement showing that someone has completed a course or reached a standard"
+      },
+      {
+        "word": "vocational",
+        "translation": "职业的；职业教育的",
+        "definition": "related to skills or training for a particular occupation"
+      },
+      {
+        "word": "participation",
+        "translation": "参与；参加",
+        "definition": "the act of taking part in something"
+      },
+      {
+        "word": "outcome",
+        "translation": "结果；成果",
+        "definition": "a result produced by an activity or process"
+      },
+      {
+        "word": "graduate",
+        "translation": "毕业生；毕业",
+        "definition": "a person who has completed a degree or course"
+      },
+      {
+        "word": "flexibility",
+        "translation": "灵活性",
+        "definition": "the ability to adapt to different circumstances"
+      },
+      {
+        "word": "motivation",
+        "translation": "动机；动力",
+        "definition": "the reason or desire that causes someone to act"
+      },
+      {
+        "word": "instruction",
+        "translation": "指导；教学",
+        "definition": "teaching or information about how to do something"
+      },
+      {
+        "word": "evaluate",
+        "translation": "评估；评价",
+        "definition": "to judge the quality, value or effectiveness of something"
+      },
+      {
+        "word": "continuous",
+        "translation": "持续的；连续的",
+        "definition": "continuing over a period rather than happening once"
+      },
+      {
+        "word": "practical",
+        "translation": "实际的；实用的",
+        "definition": "concerned with real actions or useful application"
+      },
+      {
+        "word": "responsibility",
+        "translation": "责任；职责",
+        "definition": "a duty or obligation to deal with something"
+      },
+      {
+        "word": "conventional",
+        "translation": "传统的；惯例的",
+        "definition": "based on established or traditional practice"
+      },
+      {
+        "word": "expanded",
+        "translation": "扩大的；扩展的",
+        "definition": "became larger or more extensive"
+      },
+      {
+        "word": "alternative",
+        "translation": "替代的；另一种选择",
+        "definition": "different from the usual choice"
+      },
+      {
+        "word": "effectively",
+        "translation": "有效地",
+        "definition": "in a way that produces the intended result"
+      },
+      {
+        "word": "transfer",
+        "translation": "转移；转学；转让",
+        "definition": "move knowledge or information from one context to another"
+      },
+      {
+        "word": "circumstance",
+        "translation": "情况；环境",
+        "definition": "a condition or situation affecting something"
+      },
+      {
+        "word": "proportion",
+        "translation": "比例；部分",
+        "definition": "a part or share of a whole"
+      },
+      {
+        "word": "route",
+        "translation": "路线；途径",
+        "definition": "a way of achieving something"
+      },
+      {
+        "word": "demonstrate",
+        "translation": "证明；展示",
+        "definition": "show clearly that something is true or has been achieved"
+      },
+      {
+        "word": "accumulation",
+        "translation": "积累；累积",
+        "definition": "the gradual collection of something"
+      },
+      {
+        "word": "resource",
+        "translation": "资源",
+        "definition": "a source of useful information, material or support"
+      },
+      {
+        "word": "reveal",
+        "translation": "揭示；显示",
+        "definition": "make something previously unknown or hidden known"
+      },
+      {
+        "word": "sufficient",
+        "translation": "足够的；充足的",
+        "definition": "enough for a particular purpose"
+      },
+      {
+        "word": "increasingly",
+        "translation": "日益；越来越多地",
+        "definition": "more and more over time"
+      },
+      {
+        "word": "relevant",
+        "translation": "相关的；切题的",
+        "definition": "directly connected with the matter being considered"
+      },
+      {
+        "word": "established",
+        "translation": "已确立的；公认的",
+        "definition": "accepted or recognised over a period of time"
+      },
+      {
+        "word": "approach",
+        "translation": "方法；途径",
+        "definition": "a particular method or way of dealing with something"
+      }
+    ]
+  },
+  "reading": {
+    "title": "IELTS Academic Unit 01 — Education: Reading",
+    "itemTitle": "The Changing Role of Education",
+    "description": "原创 IELTS-style 学术阅读篇章（7 段），配 15 题练习。",
+    "paragraphs": [
+      "Education has traditionally been associated with the transfer of knowledge from teachers to students. In a conventional classroom, teachers explain concepts, students take notes, and examinations are used to measure what students have learned. Although this model remains common, the role of education has gradually expanded. Modern education is increasingly expected to prepare learners not only to remember information but also to use knowledge effectively in changing circumstances.",
+      "One important change concerns access to education. In many societies, higher education was once available mainly to a relatively small proportion of the population. Universities were often regarded as institutions for students who had achieved particularly strong academic results. Today, participation in higher education has expanded, and a wider range of learners seek university qualifications. At the same time, vocational education and professional training provide alternative routes for people who want to develop specific practical skills.",
+      "This expansion has created new questions about the purpose of education. A qualification can demonstrate that a person has completed a particular programme, but employers and other organisations may also expect graduates to communicate effectively, solve problems and work independently. Consequently, educational institutions increasingly consider learning outcomes that go beyond the simple accumulation of information.",
+      "Another major development is the use of digital technology. Online courses, recorded lectures and digital resources can give learners access to educational materials without requiring them to be physically present on a university campus. This flexibility can be particularly useful for people who work, live far from educational institutions or have other responsibilities. However, digital learning does not automatically produce better educational outcomes. Learners still need appropriate resources, clear instruction and sufficient motivation to participate effectively.",
+      "Assessment is also changing. Traditional examinations remain important, but educators increasingly use different forms of assessment to understand how students are progressing. Projects, presentations, practical tasks and continuous assessment can provide information that a single examination may not reveal. These approaches can evaluate not only what learners know but also how they apply their knowledge.",
+      "Another increasingly important idea is lifelong learning. Changes in technology and employment mean that knowledge and professional skills may need to be updated repeatedly. A qualification obtained early in a person’s career may not provide all the knowledge required decades later. Lifelong learning therefore treats education as an ongoing process rather than something that ends when a person leaves school or university.",
+      "The changing role of education does not mean that traditional teaching methods have become irrelevant. Teachers remain important because they provide guidance, explain difficult concepts and help learners evaluate information. Technology can support these activities, but it does not remove the need for effective teaching. The future of education is therefore likely to involve a combination of established educational practices and new approaches that give learners greater access, flexibility and responsibility."
+    ]
+  },
+  "exercise": {
+    "title": "IELTS Academic Unit 01 — Education: Practice",
+    "itemTitle": "IELTS Academic Unit 01 — Education: Practice Set",
+    "description": "Multiple Choice ×5、True/False/Not Given ×5、Vocabulary in Context ×5，含答案与解析。",
+    "questions": [
+      {
+        "id": "q01",
+        "type": "mcq",
+        "prompt": "What is the main idea of the passage?",
+        "options": [
+          {
+            "key": "A",
+            "text": "Universities should replace traditional examinations with digital learning."
+          },
+          {
+            "key": "B",
+            "text": "Education is changing from a mainly knowledge-transfer model towards a broader and more flexible role."
+          },
+          {
+            "key": "C",
+            "text": "Online education is more effective than classroom education."
+          },
+          {
+            "key": "D",
+            "text": "Vocational education is becoming more important than university education."
+          }
+        ],
+        "answer": "B",
+        "explanation": "The passage discusses several changes in education, including access, skills, technology, assessment and lifelong learning. It does not argue that one particular method should replace all others.",
+        "skill": "Main idea"
+      },
+      {
+        "id": "q02",
+        "type": "mcq",
+        "prompt": "According to paragraph 2, what has happened to participation in higher education?",
+        "options": [
+          {
+            "key": "A",
+            "text": "It has become restricted to students with exceptional academic results."
+          },
+          {
+            "key": "B",
+            "text": "It has remained approximately unchanged."
+          },
+          {
+            "key": "C",
+            "text": "It has expanded to include a wider range of learners."
+          },
+          {
+            "key": "D",
+            "text": "It has been replaced by vocational training."
+          }
+        ],
+        "answer": "C",
+        "explanation": "The passage states that participation in higher education has expanded and that a wider range of learners now seek university qualifications.",
+        "skill": "Specific information"
+      },
+      {
+        "id": "q03",
+        "type": "mcq",
+        "prompt": "Why does the passage say that a qualification may not be enough for employers?",
+        "options": [
+          {
+            "key": "A",
+            "text": "Qualifications are becoming less expensive."
+          },
+          {
+            "key": "B",
+            "text": "Employers may also require communication, problem-solving and independent-working skills."
+          },
+          {
+            "key": "C",
+            "text": "Universities no longer teach practical subjects."
+          },
+          {
+            "key": "D",
+            "text": "Employers prefer vocational qualifications in every situation."
+          }
+        ],
+        "answer": "B",
+        "explanation": "Paragraph 3 states that organisations may expect graduates to communicate, solve problems and work independently in addition to holding a qualification.",
+        "skill": "Specific information"
+      },
+      {
+        "id": "q04",
+        "type": "mcq",
+        "prompt": "What limitation of digital learning is mentioned?",
+        "options": [
+          {
+            "key": "A",
+            "text": "Digital resources are unavailable to most learners."
+          },
+          {
+            "key": "B",
+            "text": "Universities cannot provide digital courses."
+          },
+          {
+            "key": "C",
+            "text": "Digital technology alone does not guarantee better learning outcomes."
+          },
+          {
+            "key": "D",
+            "text": "Online courses are only useful for university students."
+          }
+        ],
+        "answer": "C",
+        "explanation": "The passage explicitly states that digital learning does not automatically produce better educational outcomes.",
+        "skill": "Detail / inference"
+      },
+      {
+        "id": "q05",
+        "type": "mcq",
+        "prompt": "What does the final paragraph suggest about the future of education?",
+        "options": [
+          {
+            "key": "A",
+            "text": "Traditional teaching will disappear."
+          },
+          {
+            "key": "B",
+            "text": "Technology will replace teachers."
+          },
+          {
+            "key": "C",
+            "text": "Education will probably combine established practices with newer approaches."
+          },
+          {
+            "key": "D",
+            "text": "Students will become entirely responsible for their own education."
+          }
+        ],
+        "answer": "C",
+        "explanation": "The final paragraph argues for a combination of established educational practices and new approaches.",
+        "skill": "Writer's conclusion"
+      },
+      {
+        "id": "q06",
+        "type": "tfng",
+        "prompt": "Higher education was historically available to a relatively small proportion of the population.",
+        "options": [
+          {
+            "key": "TRUE",
+            "text": "TRUE"
+          },
+          {
+            "key": "FALSE",
+            "text": "FALSE"
+          },
+          {
+            "key": "NOT GIVEN",
+            "text": "NOT GIVEN"
+          }
+        ],
+        "answer": "TRUE",
+        "explanation": "Paragraph 2 explicitly states this.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q07",
+        "type": "tfng",
+        "prompt": "Most employers consider university qualifications more important than practical skills.",
+        "options": [
+          {
+            "key": "TRUE",
+            "text": "TRUE"
+          },
+          {
+            "key": "FALSE",
+            "text": "FALSE"
+          },
+          {
+            "key": "NOT GIVEN",
+            "text": "NOT GIVEN"
+          }
+        ],
+        "answer": "NOT GIVEN",
+        "explanation": "The passage says employers may expect graduates to communicate, solve problems and work independently, but it does not compare the relative importance of qualifications and practical skills.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q08",
+        "type": "tfng",
+        "prompt": "Digital learning automatically produces better educational outcomes.",
+        "options": [
+          {
+            "key": "TRUE",
+            "text": "TRUE"
+          },
+          {
+            "key": "FALSE",
+            "text": "FALSE"
+          },
+          {
+            "key": "NOT GIVEN",
+            "text": "NOT GIVEN"
+          }
+        ],
+        "answer": "FALSE",
+        "explanation": "The passage explicitly states that digital learning does not automatically produce better educational outcomes.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q09",
+        "type": "tfng",
+        "prompt": "Projects and presentations can provide information that a single examination may not reveal.",
+        "options": [
+          {
+            "key": "TRUE",
+            "text": "TRUE"
+          },
+          {
+            "key": "FALSE",
+            "text": "FALSE"
+          },
+          {
+            "key": "NOT GIVEN",
+            "text": "NOT GIVEN"
+          }
+        ],
+        "answer": "TRUE",
+        "explanation": "This is stated directly in paragraph 5.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q10",
+        "type": "tfng",
+        "prompt": "The passage claims that lifelong learning should become compulsory for all workers.",
+        "options": [
+          {
+            "key": "TRUE",
+            "text": "TRUE"
+          },
+          {
+            "key": "FALSE",
+            "text": "FALSE"
+          },
+          {
+            "key": "NOT GIVEN",
+            "text": "NOT GIVEN"
+          }
+        ],
+        "answer": "NOT GIVEN",
+        "explanation": "The passage explains why lifelong learning is increasingly important but does not state that it should be compulsory.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q11",
+        "type": "mcq",
+        "prompt": "In paragraph 1, what does “conventional” most nearly mean?",
+        "options": [
+          {
+            "key": "A",
+            "text": "experimental"
+          },
+          {
+            "key": "B",
+            "text": "traditional"
+          },
+          {
+            "key": "C",
+            "text": "expensive"
+          },
+          {
+            "key": "D",
+            "text": "digital"
+          }
+        ],
+        "answer": "B",
+        "explanation": "“Conventional classroom” refers to the established or traditional classroom model described immediately afterwards.",
+        "skill": "Vocabulary in context"
+      },
+      {
+        "id": "q12",
+        "type": "mcq",
+        "prompt": "In paragraph 3, what does “accumulation” most nearly mean?",
+        "options": [
+          {
+            "key": "A",
+            "text": "collection"
+          },
+          {
+            "key": "B",
+            "text": "removal"
+          },
+          {
+            "key": "C",
+            "text": "exchange"
+          },
+          {
+            "key": "D",
+            "text": "measurement"
+          }
+        ],
+        "answer": "A",
+        "explanation": "“Accumulation of information” means gradually collecting information.",
+        "skill": "Vocabulary in context"
+      },
+      {
+        "id": "q13",
+        "type": "mcq",
+        "prompt": "In paragraph 4, what does “flexibility” refer to?",
+        "options": [
+          {
+            "key": "A",
+            "text": "The ability to change a university's curriculum every year"
+          },
+          {
+            "key": "B",
+            "text": "The ability to study without any instruction"
+          },
+          {
+            "key": "C",
+            "text": "The ability to fit learning around different circumstances"
+          },
+          {
+            "key": "D",
+            "text": "The ability to avoid assessment"
+          }
+        ],
+        "answer": "C",
+        "explanation": "The paragraph connects flexibility with people who work, live far away or have other responsibilities.",
+        "skill": "Vocabulary in context"
+      },
+      {
+        "id": "q14",
+        "type": "mcq",
+        "prompt": "In paragraph 5, what does “reveal” most nearly mean?",
+        "options": [
+          {
+            "key": "A",
+            "text": "hide"
+          },
+          {
+            "key": "B",
+            "text": "show"
+          },
+          {
+            "key": "C",
+            "text": "replace"
+          },
+          {
+            "key": "D",
+            "text": "prevent"
+          }
+        ],
+        "answer": "B",
+        "explanation": "An examination may fail to “reveal” certain information, meaning it may fail to show it.",
+        "skill": "Vocabulary in context"
+      },
+      {
+        "id": "q15",
+        "type": "mcq",
+        "prompt": "In the final paragraph, what does “established educational practices” most nearly refer to?",
+        "options": [
+          {
+            "key": "A",
+            "text": "Completely new teaching technologies"
+          },
+          {
+            "key": "B",
+            "text": "Methods that have already been accepted and used in education"
+          },
+          {
+            "key": "C",
+            "text": "Informal learning outside educational institutions"
+          },
+          {
+            "key": "D",
+            "text": "Online-only teaching"
+          }
+        ],
+        "answer": "B",
+        "explanation": "“Established” means already accepted or recognised; the phrase contrasts established practices with newer approaches.",
+        "skill": "Vocabulary in context"
+      }
+    ],
+    "collocations": [
+      "higher education",
+      "academic results",
+      "university qualification",
+      "vocational education",
+      "practical skills",
+      "learning outcomes",
+      "educational institution",
+      "digital resources",
+      "online course",
+      "clear instruction",
+      "educational assessment",
+      "continuous assessment",
+      "professional skills",
+      "lifelong learning",
+      "traditional teaching methods",
+      "educational practice",
+      "effective teaching",
+      "changing circumstances"
+    ]
+  }
+}

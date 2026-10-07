@@ -1,0 +1,600 @@
+{
+  "packagePrefix": "ielts-tech-03",
+  "publishedAt": "2026-10-05",
+  "origin": "original authored content (A3 · IELTS Academic Unit 03 — Technology & Innovation)",
+  "tags": [
+    "ielts",
+    "academic",
+    "technology"
+  ],
+  "license": {
+    "vocabulary": {
+      "attributionRequired": false,
+      "commercialUse": true,
+      "name": "MIT License",
+      "redistributable": true,
+      "spdx": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    },
+    "reading": {
+      "attributionRequired": false,
+      "commercialUse": true,
+      "name": "Proprietary (self-curated)",
+      "redistributable": false
+    },
+    "exercise": {
+      "attributionRequired": false,
+      "commercialUse": true,
+      "name": "Proprietary (self-curated)",
+      "redistributable": false
+    }
+  },
+  "vocabulary": {
+    "title": "IELTS Academic Unit 03 — Technology: Vocabulary",
+    "description": "30 academic terms for technology, machine learning and the validation of clinical systems (Tier A 18 / Tier B 12).",
+    "items": [
+      {
+        "word": "algorithm",
+        "translation": "算法",
+        "definition": "the step-by-step procedure a computer follows to solve a problem or produce a result"
+      },
+      {
+        "word": "annotation",
+        "translation": "标注",
+        "definition": "the practice of attaching labels or notes to data such as images"
+      },
+      {
+        "word": "audit",
+        "translation": "审查；审计",
+        "definition": "an official examination of a system's records, processes or outputs"
+      },
+      {
+        "word": "benchmark",
+        "translation": "基准；参照标准",
+        "definition": "a standard test against which a system's performance is measured"
+      },
+      {
+        "word": "bias",
+        "translation": "偏差；偏斜",
+        "definition": "a systematic tendency in results that favours one group, site or outcome"
+      },
+      {
+        "word": "cohort",
+        "translation": "队列；一组对象",
+        "definition": "a group of people or samples studied together over a defined period"
+      },
+      {
+        "word": "dataset",
+        "translation": "数据集",
+        "definition": "a structured collection of records used to train, test or evaluate a model"
+      },
+      {
+        "word": "deployment",
+        "translation": "部署",
+        "definition": "the act of putting a model or system into regular operational use"
+      },
+      {
+        "word": "drift",
+        "translation": "漂移（性能衰减）",
+        "definition": "the gradual decline of a model's accuracy as its inputs or context change over time"
+      },
+      {
+        "word": "generalisation",
+        "translation": "泛化能力",
+        "definition": "the ability of a model to perform well on data it has not seen during training"
+      },
+      {
+        "word": "inference",
+        "translation": "推理",
+        "definition": "the phase in which a trained model receives inputs and produces an output"
+      },
+      {
+        "word": "latency",
+        "translation": "延迟",
+        "definition": "the time between an input arriving and a usable output being returned"
+      },
+      {
+        "word": "oversight",
+        "translation": "监管；监督",
+        "definition": "the formal supervision of an activity by an external body or authority"
+      },
+      {
+        "word": "provenance",
+        "translation": "溯源；来源记录",
+        "definition": "a recorded account of where data or a result came from and how it was produced"
+      },
+      {
+        "word": "reproducibility",
+        "translation": "可复现性",
+        "definition": "the property that an independent group can repeat a result from the same records"
+      },
+      {
+        "word": "screening",
+        "translation": "筛查",
+        "definition": "a test applied to a large group in order to identify the likely cases"
+      },
+      {
+        "word": "validation",
+        "translation": "验证",
+        "definition": "the process of confirming that a system works as intended for its stated purpose"
+      },
+      {
+        "word": "accountability",
+        "translation": "问责；责任归属",
+        "definition": "the obligation of an actor to answer for a decision, act or outcome"
+      },
+      {
+        "word": "attribute",
+        "translation": "把……归因于",
+        "definition": "to regard something as caused or produced by a particular factor"
+      },
+      {
+        "word": "curate",
+        "translation": "整理；精选",
+        "definition": "to select and arrange data with care before it is used"
+      },
+      {
+        "word": "curtail",
+        "translation": "削减；限制",
+        "definition": "to reduce the extent, scope or duration of something"
+      },
+      {
+        "word": "displace",
+        "translation": "取代；替换",
+        "definition": "to replace a person, process or system with another"
+      },
+      {
+        "word": "discriminate",
+        "translation": "区分；区别对待",
+        "definition": "to treat different cases differently on the evidence available"
+      },
+      {
+        "word": "embed",
+        "translation": "嵌入",
+        "definition": "to place something firmly within an existing structure or workflow"
+      },
+      {
+        "word": "mitigate",
+        "translation": "缓解；减轻",
+        "definition": "to make something bad less severe or less likely to happen"
+      },
+      {
+        "word": "obscure",
+        "translation": "使模糊；掩盖",
+        "definition": "to make something difficult to see, understand or detect"
+      },
+      {
+        "word": "replicate",
+        "translation": "复现（实验结果）",
+        "definition": "to repeat an experiment and obtain the same result independently"
+      },
+      {
+        "word": "skew",
+        "translation": "使偏斜；使失真",
+        "definition": "to influence a result so that it is unrepresentative of the population"
+      },
+      {
+        "word": "understate",
+        "translation": "低估；轻描淡写",
+        "definition": "to describe something as less important or smaller than it really is"
+      },
+      {
+        "word": "corroborate",
+        "translation": "佐证；相互印证",
+        "definition": "to confirm a finding with additional or independent evidence"
+      }
+    ]
+  },
+  "reading": {
+    "title": "IELTS Academic Unit 03 — Technology: Reading",
+    "itemTitle": "When the Algorithm Reads the Scan",
+    "description": "Eight paragraphs on the validation, regulation and accountability of AI systems used to interpret medical images.",
+    "paragraphs": [
+      "Deep-learning systems now identify abnormalities in medical images with an accuracy that rivals, and in several tasks exceeds, that of junior clinicians. Yet comparatively few have reached routine hospital use. The gap between reported performance and deployed performance is not mysterious: it follows from how such systems are validated, and from the fact that a model which performs well in an experiment is not automatically a device which performs well at the bedside. Grounding a claim in a single retrospective test has become a habit that the clinical setting cannot reward. Commercial interest is considerable, and the pressure to publish a flattering number is real.",
+      "Most published evaluations are retrospective. Records from existing hospital systems are annotated by experts, a model is trained and tested on the same collection, and the area under the receiver operating characteristic curve looks impressive. What such a design cannot show is how the system will behave on patients who arrive next week, in a different building, with scanners from another manufacturer. Because the same patient population and the same machines appear on both sides of the split, the result measures how well the system fits a particular cohort, not how robust it is.",
+      "The central technical question is generalisation, and its failure mode has a name: drift. Once a model is deployed in one centre, it decays slowly as referral patterns shift, as imaging protocols are revised, and as new equipment replaces the scanners on which it was trained. Reported accuracy may be quoted once and never revisited; unless a mechanism observes the live inputs, the decline is discovered only after a clinician notices that the character of a report has changed. Prospective validation, in which a system runs alongside normal care for a defined period and every disagreement is logged, costs more and is usually skipped. The institutions that own such a system rarely hold the instrumentation needed to detect it.",
+      "Bias introduces a second, quieter problem. Training collections over-represent some groups and under-represent others, generally because access to advanced imaging has never been equal. A model fitted to that mixture inherits the imbalance and may produce markedly different false positive rates across populations, presenting a screening tool that is unusually cautious, or unusually indiscriminate, for particular groups of patients. Aggregate benchmarks conceal the problem: an average conceals the tail, and a headline figure rarely travels down to the subgroup that is worst served.",
+      "Integration is a practical problem as much as a clinical one. A system that returns a verdict in seconds is of little use if it cannot be embedded in the workflow a radiologist already follows, if its output arrives in a format that the picture archiving system will not display, or if it interrupts the sequence of decisions through which a scan is normally read. Latency, interface and the established habits of the reading room together determine whether a genuinely useful model is ever used, and none of them appears in an accuracy table. A model that cannot be embedded is, in practice, a model that will be switched off within a year.",
+      "Reproducibility is uneven across the field. Papers frequently omit the annotation protocol, the exact exclusion rules or the version of the code that produced the numbers, so an independent group cannot reconstruct the experiment even when the underlying data can be requested. Provenance, which images, which labels, which adjudication, by whom, is what turns a result into evidence. Where such records are kept, the checks are cheap and fast; where they are absent, a published figure can be reproduced only by the authors who produced it, and the field loses the ability to learn from its own experiments.",
+      "Regulators have responded by treating these systems as medical devices subject to audit rather than as ordinary software releases. Approval requires a documented validation strategy, a defined intended use, and post-market surveillance that monitors drift and adverse events. Several frameworks now insist on a human in the loop: an algorithm may flag, rank or prioritise images, but a qualified reader must remain accountable for the report. The rule is easy to state and expensive to satisfy, since it obliges each hospital to record who saw what, and when.",
+      "The question that remains open is accountability. When a model returns a false negative and a patient is harmed, no honest account can say that the machine decided. Somebody trained the system, chose its intended use, procured the software and signed the report. Distributing responsibility across those actors is difficult, but the difficulty is not technical: it is a matter of allocating duty among developers, hospitals and clinicians. Until that allocation is written down, a sophisticated algorithm will continue to reach clinics faster than the accountability that ought to arrive with it. Regulators, insurers and hospitals each prefer the others to define the standard."
+    ]
+  },
+  "exercise": {
+    "title": "IELTS Academic Unit 03 — Technology: Practice",
+    "itemTitle": "When the Algorithm Reads the Scan — Practice Set",
+    "description": "Fifteen IELTS-style questions: ten multiple choice and five true / false / not given, including five vocabulary-in-context items.",
+    "questions": [
+      {
+        "id": "q01",
+        "type": "mcq",
+        "prompt": "What is the main argument the passage advances?",
+        "options": [
+          {
+            "key": "A",
+            "text": "Artificial intelligence will replace radiologists within a decade, provided that regulators relax their requirements."
+          },
+          {
+            "key": "B",
+            "text": "The weak take-up of medical imaging systems is mainly caused by the poor accuracy of the published evaluations."
+          },
+          {
+            "key": "C",
+            "text": "Reported performance differs from deployed performance because of how systems are validated, integrated and assigned responsibility, not merely because the algorithms are imperfect."
+          },
+          {
+            "key": "D",
+            "text": "Prospective validation is unnecessary, since retrospective tests already guarantee that a model will behave well in hospital."
+          }
+        ],
+        "answer": "C",
+        "explanation": "The passage moves from the reported-versus-deployed gap (paragraph 1), through validation, drift and bias, to workflow integration, provenance, regulation and finally accountability; it never blames the algorithms alone (rejected by B) and never proposes relaxing regulation (rejected by A) or dismissing prospective validation (rejected by D).",
+        "skill": "Main idea"
+      },
+      {
+        "id": "q02",
+        "type": "mcq",
+        "prompt": "According to paragraph 2, why does a retrospective design fail to show how the system will behave in future?",
+        "options": [
+          {
+            "key": "A",
+            "text": "Because experts who annotate medical records are not trained to identify the target abnormality."
+          },
+          {
+            "key": "B",
+            "text": "Because the patient population and the machines are present on both sides of the training and testing split, so the result measures fit to one cohort rather than robustness."
+          },
+          {
+            "key": "C",
+            "text": "Because the area under the receiver operating characteristic curve is mathematically biased towards small samples."
+          },
+          {
+            "key": "D",
+            "text": "Because patients who arrive the following week are by definition outside the hospital's records."
+          }
+        ],
+        "answer": "B",
+        "explanation": "Paragraph 2 gives the reason explicitly: the same patient population and the same machines appear on both sides of the split, so the figure measures how well the system fits that cohort. A is not stated (the passage says records are annotated by experts, without questioning their skill), and C and D invent technical or temporal restrictions.",
+        "skill": "Detailed information"
+      },
+      {
+        "id": "q03",
+        "type": "mcq",
+        "prompt": "In paragraph 3, what does \"drift\" most nearly mean?",
+        "options": [
+          {
+            "key": "A",
+            "text": "A sudden error introduced into the software during a routine update."
+          },
+          {
+            "key": "B",
+            "text": "The gradual loss of accuracy as the conditions of real use diverge from those of training."
+          },
+          {
+            "key": "C",
+            "text": "The movement of patients from one hospital department to another after a scan."
+          },
+          {
+            "key": "D",
+            "text": "The deliberate decision to withdraw a model from clinical service."
+          }
+        ],
+        "answer": "B",
+        "explanation": "The surrounding sentences define drift operationally: as referral patterns shift, protocols are revised and new equipment replaces the training scanners, the model decays. A describes a software bug, C describes patient flow, and D describes withdrawal.",
+        "skill": "Vocabulary in context"
+      },
+      {
+        "id": "q04",
+        "type": "mcq",
+        "prompt": "Paragraph 3 implies that prospective validation is avoided because it",
+        "options": [
+          {
+            "key": "A",
+            "text": "requires the involvement of clinicians who lack the authority to log disagreements"
+          },
+          {
+            "key": "B",
+            "text": "is more expensive and demands sustained running alongside ordinary clinical care"
+          },
+          {
+            "key": "C",
+            "text": "produces results that are systematically less favourable than retrospective ones"
+          },
+          {
+            "key": "D",
+            "text": "cannot be used to measure generalisation at all"
+          }
+        ],
+        "answer": "B",
+        "explanation": "The sentence states the mechanics directly: prospective validation runs the system alongside normal care for a defined period and logs every disagreement, and it costs more, so it is usually skipped. A, C and D add reasons the passage does not give.",
+        "skill": "Reasoning"
+      },
+      {
+        "id": "q05",
+        "type": "mcq",
+        "prompt": "What does \"the tail\" refer to in the comparison made in paragraph 4?",
+        "options": [
+          {
+            "key": "A",
+            "text": "The patients who are most likely to be referred for a second opinion"
+          },
+          {
+            "key": "B",
+            "text": "The small extreme cases at one end of a distribution, in this context the worst-performing subgroups"
+          },
+          {
+            "key": "C",
+            "text": "The final portion of the recording that the system reads last"
+          },
+          {
+            "key": "D",
+            "text": "The tail end of the period during which the study collected images"
+          }
+        ],
+        "answer": "B",
+        "explanation": "The figure being discussed is an aggregate average across populations, so the tail is the group at the far end of the distribution of results; the author's point is precisely that an average hides the worst-served subgroup. A, C and D take a literal tail meaning that does not fit the statistical comparison.",
+        "skill": "Vocabulary in context"
+      },
+      {
+        "id": "q06",
+        "type": "mcq",
+        "prompt": "Which of the following constraints on integration is NOT mentioned in paragraph 5?",
+        "options": [
+          {
+            "key": "A",
+            "text": "The output format may be one that the picture archiving system will not display."
+          },
+          {
+            "key": "B",
+            "text": "The system may interrupt the sequence of decisions through which a scan is normally read."
+          },
+          {
+            "key": "C",
+            "text": "The hardware on which the model runs may be too slow to install in the reading room."
+          },
+          {
+            "key": "D",
+            "text": "The model may not be embeddable in the workflow the radiologist already follows."
+          }
+        ],
+        "answer": "C",
+        "explanation": "Paragraph 5 lists three constraints: embedding in the existing workflow, the output format, and disruption of the reading sequence. Hardware speed is discussed in terms of latency and usefulness, but 'too slow to install' is not a listed obstacle, so C is the one not mentioned.",
+        "skill": "Detailed information"
+      },
+      {
+        "id": "q07",
+        "type": "mcq",
+        "prompt": "In paragraph 4, the word \"indiscriminate\" is used of a screening tool; it is closest in meaning to",
+        "options": [
+          {
+            "key": "A",
+            "text": "rejecting too few cases to be of any clinical value"
+          },
+          {
+            "key": "B",
+            "text": "being overly cautious and missing nearly every case"
+          },
+          {
+            "key": "C",
+            "text": "flagging cases without discrimination, so that many false positives result"
+          },
+          {
+            "key": "D",
+            "text": "lacking the confidence to record its output in the report"
+          }
+        ],
+        "answer": "C",
+        "explanation": "The author is describing divergent false positive rates across populations: a tool may flag almost everything (indiscriminate) or almost nothing (overly cautious). Since the sentence is framed around false positive rates, C matches; B describes the opposite pole, and A and D are unrelated.",
+        "skill": "Vocabulary in context"
+      },
+      {
+        "id": "q08",
+        "type": "mcq",
+        "prompt": "According to paragraph 6, why can an independent group still fail to reproduce a published result?",
+        "options": [
+          {
+            "key": "A",
+            "text": "Because the underlying data are always protected by patient confidentiality and can never be released."
+          },
+          {
+            "key": "B",
+            "text": "Because even when the data can be requested, the annotation protocol, exclusion rules and code version may be missing."
+          },
+          {
+            "key": "C",
+            "text": "Because the authors who produced the result refuse to answer questions from other researchers."
+          },
+          {
+            "key": "D",
+            "text": "Because reproducibility is defined by the authors and cannot be tested by anyone else."
+          }
+        ],
+        "answer": "B",
+        "explanation": "The passage says precisely this: papers omit the annotation protocol, the exclusion rules or the code version, 'so an independent group cannot reconstruct the experiment even when the underlying data can be requested'. A overstates the case, and C and D introduce facts not given.",
+        "skill": "Detailed information"
+      },
+      {
+        "id": "q09",
+        "type": "mcq",
+        "prompt": "What does \"adjudication\" refer to in the discussion of provenance in paragraph 6?",
+        "options": [
+          {
+            "key": "A",
+            "text": "The final decision of a court or official body about a disputed claim"
+          },
+          {
+            "key": "B",
+            "text": "The determination of the correct label for each image, and by whom that determination was made"
+          },
+          {
+            "key": "C",
+            "text": "The process of calibrating a scanner so that it produces comparable pixel values"
+          },
+          {
+            "key": "D",
+            "text": "The statistical test used to compare two competing models"
+          }
+        ],
+        "answer": "B",
+        "explanation": "The provenance list is 'which images, which labels, which adjudication, by whom', all elements of building a labelled dataset, so adjudication means the resolving of disputed labels and who resolved them. A is the everyday legal sense, which clashes with the dataset context; C and D are unrelated technical steps.",
+        "skill": "Vocabulary in context"
+      },
+      {
+        "id": "q10",
+        "type": "mcq",
+        "prompt": "In paragraph 7, the word \"modest\" is used of the technical requirement; it is closest in meaning to",
+        "options": [
+          {
+            "key": "A",
+            "text": "large and expensive to implement in full"
+          },
+          {
+            "key": "B",
+            "text": "slight or unremarkable in technical difficulty"
+          },
+          {
+            "key": "C",
+            "text": "genuinely difficult for software engineers to satisfy"
+          },
+          {
+            "key": "D",
+            "text": "deliberately kept secret by the regulator"
+          }
+        ],
+        "answer": "B",
+        "explanation": "The sentence sets a modest technical requirement against a substantial organisational one, and the next clause explains that the real burden falls on hospitals as recording duties, so modest means slight in technical terms rather than demanding (C) or costly (A).",
+        "skill": "Vocabulary in context"
+      },
+      {
+        "id": "q11",
+        "type": "tfng",
+        "prompt": "Retrospective evaluations are criticised in the passage because expert annotators frequently disagree about the labels they assign.",
+        "options": [
+          {
+            "key": "TRUE",
+            "text": "TRUE"
+          },
+          {
+            "key": "FALSE",
+            "text": "FALSE"
+          },
+          {
+            "key": "NOT GIVEN",
+            "text": "NOT GIVEN"
+          }
+        ],
+        "answer": "FALSE",
+        "explanation": "Paragraph 2 accepts that records are annotated by experts and locates the problem elsewhere: the same population and machines appear on both sides of the split. The passage addresses the point directly, so it is ruled false rather than unstated.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q12",
+        "type": "tfng",
+        "prompt": "A model can decay considerably after deployment for years without anyone noticing, if no mechanism observes its live inputs.",
+        "options": [
+          {
+            "key": "TRUE",
+            "text": "TRUE"
+          },
+          {
+            "key": "FALSE",
+            "text": "FALSE"
+          },
+          {
+            "key": "NOT GIVEN",
+            "text": "NOT GIVEN"
+          }
+        ],
+        "answer": "TRUE",
+        "explanation": "Paragraph 3 states that the decline is discovered only after a clinician notices a change in the character of reports, which presupposes that nobody detected the decay earlier through observation of live inputs.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q13",
+        "type": "tfng",
+        "prompt": "The passage says that requiring a human in the loop is a demanding technical task for developers.",
+        "options": [
+          {
+            "key": "TRUE",
+            "text": "TRUE"
+          },
+          {
+            "key": "FALSE",
+            "text": "FALSE"
+          },
+          {
+            "key": "NOT GIVEN",
+            "text": "NOT GIVEN"
+          }
+        ],
+        "answer": "FALSE",
+        "explanation": "Paragraph 7 calls it 'a modest technical requirement and a substantial organisational one', and the organisational burden falls on hospitals, not developers. The passage addresses the point, so the claim is false.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q14",
+        "type": "tfng",
+        "prompt": "The passage states that a reproducible result requires the underlying data to be published openly for use by all researchers.",
+        "options": [
+          {
+            "key": "TRUE",
+            "text": "TRUE"
+          },
+          {
+            "key": "FALSE",
+            "text": "FALSE"
+          },
+          {
+            "key": "NOT GIVEN",
+            "text": "NOT GIVEN"
+          }
+        ],
+        "answer": "NOT GIVEN",
+        "explanation": "Paragraph 6 argues that provenance records matter even where the data can merely be requested, and never claims that open publication of the data is a requirement. The point is unaddressed, so NOT GIVEN is the correct ruling.",
+        "skill": "Identifying information"
+      },
+      {
+        "id": "q15",
+        "type": "tfng",
+        "prompt": "The author argues that responsibility for harm caused by an algorithmic error cannot fairly be located in the algorithm itself.",
+        "options": [
+          {
+            "key": "TRUE",
+            "text": "TRUE"
+          },
+          {
+            "key": "FALSE",
+            "text": "FALSE"
+          },
+          {
+            "key": "NOT GIVEN",
+            "text": "NOT GIVEN"
+          }
+        ],
+        "answer": "TRUE",
+        "explanation": "The final paragraph says no honest account can say that the machine decided and lists the human actors who trained, procured and signed. The passage addresses the point directly and affirms it.",
+        "skill": "Identifying information"
+      }
+    ],
+    "collocations": [
+      "machine learning model",
+      "training data",
+      "test cohort",
+      "diagnostic accuracy",
+      "false positive rate",
+      "screening tool",
+      "clinical workflow",
+      "medical image",
+      "post-market surveillance",
+      "adverse event",
+      "human in the loop",
+      "intended use",
+      "annotation protocol",
+      "expert adjudication",
+      "cross-site validation",
+      "algorithm deployment",
+      "performance decay",
+      "accountability framework"
+    ]
+  }
+}
