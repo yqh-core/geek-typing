@@ -541,7 +541,7 @@ function falsify() {
       },
       {
         no: 2,
-        what: '把落地块抽薄到只剩词库卡片与关键词（正文 1953 →约 540 字符）',
+        what: '把落地块抽薄到只剩词库卡片与关键词（正文 2331 → 约 540 字符）',
         expect: '去标签正文 < 800 字符，而 H3/H5/H6 仍绿（证明只打红「太薄」这一条）',
         // ⚠️ **注入必须精准**：若把正文整段掏空，判据 3（关键词）与 5/6（词库卡片）
         //   会跟着转红 ⇒ 一次注入打红四条，无法归因到H2（与 gate-seo-pages 注入 3 同一类教训：
@@ -550,6 +550,15 @@ function falsify() {
         //   的卡片与条目，然后补一行含全部 9 个关键词的短句 ——
         //   于是判据 3（关键词在）与 5/6（13 张卡片与真链接在）保持绿，
         //   只有判据 2 的「去标签正文长度」掉到 800 以下。
+        //
+        // ⚠️⚠️ **本注入必须随落地块结构同步维护（它是一条「白名单式」的抽薄刀）**：
+        //   它只抽「它显式列出的那几类」prose，**新增的文案载体若不在名单里就会漏网**。
+        //   本轮新增了 gh-hero 的 `.gh-chips` 徽标与 gh-demo 的 `.gh-demo` 展示区
+        //   （示意图 figcaption + 要点清单 + SVG 内的 <text>），初版没把它们列进来 ⇒
+        //   抽薄后仍剩 1106 字符 > 800 ⇒ 判据 2 根本不红 ⇒ falsify 报「该判据恒真，没在守」。
+        //   ⛔ 这是**真实的证伪自检价值**：它证明「加区块」与「门的注入」必须同改，
+        //   否则门会在无人察觉的情况下失去对判据 2 的守护。
+        //   ⇒ 下方 ③b 就是为此存在；**再加任何文案载体，必须同步加一条删除**。
         mutate() {
           mutate((html) => {
             let out = html
@@ -561,6 +570,12 @@ function falsify() {
             out = out.replace(/<ul class="gh-cmp">[\s\S]*?<\/ul>/g, '')
             out = out.replace(/<p class="gh-fact">[\s\S]*?<\/p>/g, '')
             out = out.replace(/<details class="gh-faq-item">[\s\S]*?<\/details>/g, '')
+            // ③b 抽掉本轮新增的两个文案载体（⛔ 见上方「必须随结构同步维护」）：
+            //   · gh-chips：Hero 徽标条（4 条事实标签）
+            //   · gh-demo  ：整个展示区 —— 含 figcaption、要点清单，以及 **SVG 内的 <text>**
+            //     （extractVisibleText 会把 SVG 文字算进正文，所以必须整块删而不是只删 figcaption）
+            out = out.replace(/<ul class="gh-chips">[\s\S]*?<\/ul>/g, '')
+            out = out.replace(/<div class="gh-demo">[\s\S]*?<\/ul><\/div>/g, '')
             // ④ 补一行 9 个关键词，让判据 3 保持绿（证明这刀只砍长度）
             const kw = '英语打字练习 背单词 打字练习 程序员背单词 前端英语词汇 Go 词汇 云原生词汇 K8s 词汇 AI 大模型词汇'
             out = out.replace('<section class="gh-sec" id="gh-cta">', `<p class="gh-p">${kw}</p><section class="gh-sec" id="gh-cta">`)

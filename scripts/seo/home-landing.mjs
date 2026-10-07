@@ -136,6 +136,33 @@ export function renderHomeLandingBlock({ bankRows, origin, totalWords } = {}) {
 
     for (const p of sec.body ?? []) parts.push(`<p class="gh-p">${escapeHtml(fill(p))}</p>`)
 
+    // Hero 徽标条：可从代码验证的事实标签，⛔ 零数字（⛔ 不是「用户怎么说」，也不是战绩）
+    if (sec.chips) {
+      parts.push(
+        `<ul class="gh-chips">${sec.chips.map((c) => `<li class="gh-chip">${escapeHtml(c)}</li>`).join('')}</ul>`,
+      )
+    }
+
+    // gh-demo：产品界面示意图（**纯内联 SVG，零 <script>、零外部资源**）
+    //   ⚠️ figure.svg 是**受信任的静态常量**（来自 home-landing.copy.mjs，不是用户输入），
+    //   所以这里刻意不过 escapeHtml ——  escapeHtml 会把 `<rect>`/`<text>` 变成字面文本，示意图就没了。
+    //   门禁判据 4（<script 计数 = 0）与判据 9（无 data-testid）保证它带不进这两样东西。
+    if (sec.figure) {
+      parts.push(
+        `<div class="gh-demo"><figure class="gh-shot">${sec.figure.svg}` +
+          `<figcaption class="gh-shot-cap">${escapeHtml(sec.figure.caption)}</figcaption></figure>` +
+          (sec.key
+            ? `<ul class="gh-key">${sec.key
+                .map(
+                  (k) =>
+                    `<li class="gh-key-item"><span class="gh-key-k">${escapeHtml(k.k)}</span><span class="gh-key-v">${escapeHtml(k.v)}</span></li>`,
+                )
+                .join('')}</ul>`
+            : '') +
+          `</div>`,
+      )
+    }
+
     if (sec.cards) {
       parts.push(
         `<div class="gh-grid">${sec.cards.map((c) => `<div class="gh-card"><span class="gh-card-title">${escapeHtml(c.title)}</span><span class="gh-card-count">${escapeHtml(c.text)}</span></div>`).join('')}</div>`,
