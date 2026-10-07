@@ -27,8 +27,17 @@ Go / TypeScript 代码行、AI 大模型、前端、云原生等主题词库）�
 
 ## 截图
 
-暂无仓库内截图（体积与首屏权衡的取舍见下方「截图方案」一节）。
-应用真实界面可直接访问：<https://geek-typing.pages.dev>
+以下为应用真实界面截图，存于 `docs/audit-package/screenshots/a11y/`（P1.7 审计交付物，随仓库版本管理）。
+
+| 打字练习 | 背单词 |
+| --- | --- |
+| ![打字练习界面](docs/audit-package/screenshots/a11y/desktop-1280__typing.png) | ![背单词界面](docs/audit-package/screenshots/a11y/desktop-1280__memorize.png) |
+
+| 学习进度 | 复习调度 |
+| --- | --- |
+| ![学习进度界面](docs/audit-package/screenshots/a11y/desktop-1280__progress.png) | ![复习界面](docs/audit-package/screenshots/a11y/desktop-1280__review.png) |
+
+想直接体验：<https://geek-typing.pages.dev>（无需注册，断网也能用）
 
 ## 词库与内容许可
 
