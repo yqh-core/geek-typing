@@ -120,6 +120,47 @@ export function canonicalBankUrl(siteOrigin, packageId) {
 }
 
 /**
+ * 社交分享图（og:image）的**唯一事实源** —— 全站绝对地址。
+ *
+ * 指向仓库里**已存在**的 `public/icon-512.png`（512×512 PNG，实测 2698 B），
+ * 由 vite 从 public/ 原样拷进 dist/ ⇒ **不新增任何二进制资源**，
+ * 也**不引用站外 URL**（外链图在分享卡片里常被防盗链拦掉，且不可控）。
+ *
+ * ⚠️og:image 必须是**绝对 URL**（相对路径在多数平台无效），故这里显式拼 origin；
+ *   但 origin 的取法与 bank 页 URL 不同 —— 它不是某个包自己的地址，
+ *   所以**不该**套 canonicalBankUrl（那是「本页规范 URL」专用，见其注释）。
+ *   与 sitemap 首页那条 `${origin}/` 同一口径（见 main）。
+ *
+ * @param {string} siteOrigin 站点绝对 origin（无尾斜杠）
+ * @returns {string} 绝对图地址，如 https://geek-typing.pages.dev/icon-512.png
+ */
+export function siteIconUrl(siteOrigin) {
+  const origin = String(siteOrigin ?? '').replace(/\/+$/, '')
+  return `${origin}/icon-512.png`
+}
+
+/**
+ * ⭐ JSON-LD 的安全序列化。
+ *
+ * 为什么要单独一层：JSON-LD 落在 `<script type="application/ld+json">` 里，
+ *   HTML 解析器只认**字面量** `</script` 作为结束标签 —— 词条里一旦出现 `<` 或 `</`
+ *   就会提前闭合脚本块，把后续 JSON 变成裸文本（页面结构当场损坏）。
+ *   故把 `<` / `>` / `&` 转成 JSON 的等效 Unicode 转义（`\u003c` 等）：
+ *   `JSON.parse` 之后**语义完全相同**，但 HTML 层面不再有闭合标签序列。
+ *
+ * @param {unknown} value 任意可 JSON 化对象
+ * @returns {string} 可安全嵌进 `<script type="application/ld+json">` 的文本
+ */
+export function serializeJsonLd(value) {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
+}
+
+/**
  * HTML 转义。词条里实测出现 `'`、`&`、`<`（definition 字段来自 ECDICT 英文释义），
  * 不转义就会破坏 HTML 结构 ⇒ 所有动态位置必须过这里。
  *
@@ -194,6 +235,78 @@ export function renderWordItem(item) {
 }
 
 /**
+ * ⭐ 词库页 meta description 的**自适应后缀**（判据 7 的唯一拼接实现）。
+ *
+ * 为什么必须自适应（这是本次修复的实测起因）：
+ *   旧实现无条件拼「（本页展示前 N 词 / 完整 M 词，完整词库与应用内练习见 X）」。
+ *   但本项目 13 个包 `shown === total` **全部成立**（每包词数都 ≤ 300 单页上限），
+ *   于是每页 description 都有这么一句**零信息量**的废话：
+ *     · 读者从「前 50 词 / 完整 50 词」里得不到任何新信息（两个数字一样）；
+ *     · 它吃掉约 1/3 的长度预算，而 Google 约在 155 字符处截断 ——
+ *       后半句真正有信息量的部分（词库主题）反而更容易被截掉。
+ *   实测旧产物（dist/pages/bank/go-code.html）：
+ *     「…（大小写敏感）（本页展示前 50 词 / 完整 50 词，完整词库与应用内练习见 Geek Typing）」
+ *
+ * 自适应规则（⛔ 不写死「本项目全是完整展示」—— 哪天某个包超过 300 词，截断说明必须自动回来）：
+ *   · shown <  total（真被截断）⇒ 保留「展示前 N / 完整 M」—— 这时它**是**有用的信息；
+ *   · shown === total（全量展示）⇒ 换成有信息量的表述：明确说明「本页完整收录 N 词」。
+ *
+ * @param {string} description 该包manifest 的原始 description
+ * @param {number} shown 本页实际渲染条数
+ * @param {number} total 该包真实总条数
+ * @param {boolean} truncated shown < total
+ * @returns {string} 完整 meta description
+ */
+export function buildBankMetaDescription(description, shown, total, truncated) {
+  const base = String(description ?? '').trim()
+  return truncated
+    ? `${base}（本页展示前 ${shown} 词 / 完整 ${total} 词，完整词库与应用内练习见 ${SITE_NAME}）`
+    : `${base}（本页完整收录全部 ${total} 词，含中文释义，可在 ${SITE_NAME} 应用内打字练习与复习）`
+}
+
+/**
+ * 词库页 JSON-LD：`BreadcrumbList` + `ItemList`。
+ *
+ * ⛔ **绝不写 aggregateRating / review / rating** —— 本项目明令禁止编造用户评价与星级。
+ *   少一个 rich result 好过一个假的。
+ * ⛔ 所有 URL 取自 canonicalBankUrl()（⛔ 不在本文件另拼字符串），词条数取自
+ *   words.json 真实长度（⛔ 不写死），全部现算。
+ *
+ * ItemList 只列**本页真实展示**的词条（`shown`），不把未渲染的词谎报进列表。
+ *
+ * @param {object} input
+ * @param {{packageId?:string,title?:string}} input.manifest
+ * @param {Array<object>} input.shown 本页实际渲染的词条
+ * @param {string} input.siteOrigin
+ * @returns {object} JSON-LD 对象
+ */
+export function buildBankJsonLd({ manifest, shown, siteOrigin }) {
+  const packageId = String(manifest?.packageId ?? '').trim()
+  const title = String(manifest?.title ?? '').trim()
+  const url = canonicalBankUrl(siteOrigin, packageId)
+  const home = `${String(siteOrigin ?? '').replace(/\/+$/, '')}/`
+  const items = Array.isArray(shown) ? shown : []
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: SITE_NAME, item: home },
+          { '@type': 'ListItem', position: 2, name: `${title} 词库`, item: url },
+        ],
+      },
+      {
+        '@type': 'ItemList',
+        name: `${title} 词条列表`,
+        numberOfItems: items.length,
+        itemListElement: items.map((w, i) => ({ '@type': 'ListItem', position: i + 1, name: String(w?.word ?? '') })),
+      },
+    ],
+  }
+}
+
+/**
  * 从包 manifest + words 渲染整页 HTML（**全站唯一的词库页模板函数** —— 判据 10 守的就是它）。
  *
  * @param {object} input
@@ -215,12 +328,18 @@ export function renderBankPage({ manifest, words, siteOrigin, wordsPerPage = WOR
   const homeUrl = APP_HOME_HREF
   const pageTitle = `${title} · ${SITE_NAME}`
   const truncated = shown.length < total
+  // ⭐ 分享图来自唯一事实源（⛔ 不写死路径、不引外部 URL）
+  const imageUrl = siteIconUrl(siteOrigin)
 
-  // description 用该包 manifest 的真实 description；再补一句「展示 N / 完整 M」让每页唯一且内容相关。
+  // description 用该包 manifest 的真实 description；后缀按「是否真被截断」自适应（见 buildBankMetaDescription）。
   // ⛔ 不编造：只拼manifest 里真实存在的字段 + 可从 words.json 精确算出的计数。
-  const metaDescription = `${description}（本页展示前 ${shown.length} 词 / 完整 ${total} 词，完整词库与应用内练习见 ${SITE_NAME}）`
+  const metaDescription = buildBankMetaDescription(description, shown.length, total, truncated)
 
   const items = shown.map(renderWordItem).join('\n')
+  //⭐ JSON-LD 落在 <head> 里（⛔ 不是 <body>，也不是落地块内）——
+  //   gate-home-landing 判据 4 只对 `<!-- seo-home:start -->`…`end` 之间的切片数 <script>，
+  //   而本函数产出的是词库页（根本没有落地块），故无冲突。
+  const jsonLd = serializeJsonLd(buildBankJsonLd({ manifest, shown, siteOrigin }))
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -236,7 +355,15 @@ export function renderBankPage({ manifest, words, siteOrigin, wordsPerPage = WOR
     <meta property="og:description" content="${escapeHtml(metaDescription)}" />
     <meta property="og:url" content="${escapeHtml(url)}" />
     <meta property="og:locale" content="zh_CN" />
+    <meta property="og:image" content="${escapeHtml(imageUrl)}" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:alt" content="${escapeHtml(`${SITE_NAME}：${title} 词库`)}" />
     <meta name="twitter:card" content="summary" />
+    <script type="application/ld+json">
+${jsonLd}
+    </script>
     <style>
       :root { color-scheme: dark; }
       body { margin: 0; padding: 2rem 1.25rem 4rem; background: #0b1120; color: #e2e8f0;

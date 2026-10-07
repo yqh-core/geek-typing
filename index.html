@@ -33,9 +33,61 @@
     />
     <meta property="og:url" content="https://geek-typing.pages.dev/" />
     <meta property="og:locale" content="zh_CN" />
+    <meta property="og:image" content="https://geek-typing.pages.dev/icon-512.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:alt" content="Geek Typing · 英语打字练习与程序员背单词工具" />
     <meta name="twitter:card" content="summary" />
 
     <link rel="canonical" href="https://geek-typing.pages.dev/" />
+
+    <!--
+      结构化数据（JSON-LD）。
+      ⛔ 放在 <head> 里、且**在落地块标记注释切片之外**：
+        gate-home-landing 判据 4 要求落地块切片内 `<script` 计数为 0（爬虫无需执行 JS 即可读全部正文）。
+        JSON-LD 是 `type="application/ld+json"`（不可执行），但判据数的是字面量 `<script`，
+        所以**位置**必须落在落地块之外 —— 那是判据真正要的性质。
+      ⛔ 绝不加 aggregateRating / review / rating：本项目禁止编造用户评价与星级。
+      ⛔ **刻意不加 `potentialAction: SearchAction`**：实测全站**不存在任何检索功能**
+        （`grep` src/ 无 URLSearchParams / location.search 消费方，无搜索 UI；
+        `src/core/content/query/` 是内部查询层，不对外暴露 URL 参数入口）。
+        SearchAction 的语义是「本站在 ?q= 上提供站内检索」，指向一个不存在的端点
+        与aggregateRating 同属**对搜索引擎的虚假声明** —— 同一个纪律：少一个 rich result
+        好过一个假的。等真做了检索入口再补这一条。
+    -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "name": "Geek Typing",
+            "alternateName": "Geek Typing · 英语打字练习与程序员背单词工具",
+            "url": "https://geek-typing.pages.dev/",
+            "inLanguage": "zh-CN",
+            "description": "英语打字练习与背单词两合一的纯前端工具：13 个词库 9438 条词条，覆盖前端英语、Go、云原生、K8s、AI 大模型词汇与雅思托福考研四级六级。"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "name": "Geek Typing",
+            "url": "https://geek-typing.pages.dev/",
+            "applicationCategory": "EducationalApplication",
+            "operatingSystem": "Web (浏览器)",
+            "inLanguage": "zh-CN",
+            "description": "英语打字练习与背单词两合一：敲对变绿、机械键盘音效、默写与限时模式，纯前端无需注册，断网也能练。",
+            "featureList": [
+              "英语打字练习",
+              "背单词",
+              "机械键盘音效",
+              "默写模式",
+              "限时模式",
+              "纯前端无需注册"
+            ]
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
