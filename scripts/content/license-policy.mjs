@@ -78,6 +78,74 @@ export const CONTENT_TYPES = new Set([
 /** 载荷文件名：vocabulary 固定 words.json；其余类型统一 items.json（可选） */
 export const payloadNameOf = (type) => (type === 'vocabulary' ? 'words.json' : 'items.json')
 
+/* ===== 单元源「可声明内容段」的唯一事实源（单一副本 · 机器上锁）=====
+ *
+ * ## 这张表为什么住在 license-policy.mjs（而不是新开一个文件）
+ *
+ * 它与本文件已有的 `CONTENT_TYPES` 是**同一物种**：Node 侧「内容可以长成什么形状」的契约常量。
+ *   · `CONTENT_TYPES` = 包级类型白名单（13 项），由 `gate:content-type-contract` 判据 H1/H2 上锁；
+ *   · `UNIT_SOURCE_SEGMENTS` = 单元源里**可声明**的段类型（3 项），由 `content:validate` 判据 27 上锁。
+ * 两张表都必须是「Node 侧唯一副本 + 机器判据盯着」，放进同一个纯逻辑模块可以复用同一套上锁手法
+ * （H2 的形状就是「不许 validate.mjs 自建副本」，判据 27 是它的同构版）。
+ * ⛔ **不新开 `unit-source-types.mjs`**：那只会多一个「记得 import 它」的地方，
+ *   而本文件已经是 `validate.mjs` 与 `scaffold-unit.mjs` **双方都已经在 import** 的模块
+ *   （见两处顶部 import）—— 放这里 = 两处都已在的那条边上，零新增耦合。
+ * ⛔ **不放 `scaffold-unit.mjs`**：它是带 CLI 的脚本，顶层会在 import 时真的解析 argv / 写盘
+ *   （末段 `import.meta.url` 之后是 CLI 主体，import 本模块即触发）——
+ *   让门禁 import 它 = 把「测试/门禁绝不能 import 生成器」的坑重新引进 CI。
+ * ⛔ **不放 `validate.mjs`**：它是**判官**，事实不该住在判官里（判官只能引用，不能定义）。
+ *
+ * ## 为什么本表必须是「纯数据」
+ * `content:validate` 在 CI 里跑，`scaffold-unit` 在本机跑 —— 两边 import 的是**同一个进程内对象**。
+ * 本表只含字面量与纯函数：**不读文件、不写盘、不看 argv、不含 CLI**。
+ * 判据 27 的证伪注入会真的把本文件复制到隔离副本、删掉一段再 import，
+ * 若本文件有任何顶层副作用，那条证伪就会连真仓库一起污染。
+ *
+ * ## 字段口径（三者都是**契约**，改任一项都要想清楚下游）
+ *   · `type`      —— 段键，也是 `src.license.<type>` 的键（判据 24/脚手架判据 ① 按它逐段要求许可）。
+ *   · `dirSuffix` —— 产物包 id 的后缀：`<prefix><dirSuffix>`（vocabulary 是 `vocab` 而段名是
+ *                    `vocabulary`，**故意不同** —— 磁盘上就是 `ielts-edu-01-vocab`）。
+ *                    判据 26 的「哪些包应该有源」由本字段**派生**，不维护第二份清单。
+ *   · `icon`      —— 产物 manifest.icon；写死在前端图标注册表里，改名会让旧包判红。
+ * 载荷文件名**不在本表**：它已由本文件既有的 `payloadNameOf(type)` 统一决定（vocabulary→words.json，
+ * 其余→items.json），脚手架此前自己又写了一遍同款三元表达式 —— 现已改为调用 payloadNameOf，
+ * 消灭那处重复。 */
+export const UNIT_SOURCE_SEGMENTS = Object.freeze([
+  Object.freeze({ type: 'vocabulary', dirSuffix: 'vocab', icon: 'GraduationCap' }),
+  Object.freeze({ type: 'reading', dirSuffix: 'reading', icon: 'BookOpen' }),
+  Object.freeze({ type: 'exercise', dirSuffix: 'exercise', icon: 'Dumbbell' }),
+])
+
+/** 段类型名列表（派生，非第二份字面量）。判据 24 的「已声明段」与判据 27 的上锁都以它为准。 */
+export const UNIT_SOURCE_TYPES = Object.freeze(UNIT_SOURCE_SEGMENTS.map((s) => s.type))
+
+/** 取某段类型的完整描述；未知类型返回 null（**不抛** —— 判官要用它做 fail-closed 判定）。 */
+export const unitSourceSegment = (type) => UNIT_SOURCE_SEGMENTS.find((s) => s.type === type) ?? null
+
+/** 段类型 → 产物包 id 的后缀。未知类型抛错（这是**编程错误**，不是数据问题）。 */
+export function unitSourceDirSuffix(type) {
+  const seg = unitSourceSegment(type)
+  if (!seg) throw new Error(`未知的单元源内容段类型：${String(type)}（可声明段 = ${UNIT_SOURCE_TYPES.join(' / ')}）`)
+  return seg.dirSuffix
+}
+
+/** 产物包 id（= 包目录名 = manifest.packageId = ContentId 第 4 段），四处同源的唯一构造函数。 */
+export const unitPackageIdOf = (prefix, type) => `${prefix}-${unitSourceDirSuffix(type)}`
+
+/**
+ * 源里**实际声明**了哪几段内容（缺哪段就不建哪个包）。
+ * ⚠️ 这是判据 24（源侧 license 逐段要求）与脚手架判据 ①（缺段即拒跑）**共用的唯一实现** ——
+ *   此前两处各写一份 `['vocabulary','reading','exercise'].filter(t => src[t] != null)`，
+ *   靠注释互指维持同步：改一处忘另一处 ⇒ 两层口径分叉（判据 24 会假红或假绿）。
+ * @param {unknown} src 解析后的源对象
+ * @param {ReadonlyArray<{type: string}>} segments 段表（默认唯一副本；**仅证伪注入时**传变异副本）
+ * @returns {string[]} 已声明段类型（保持 UNIT_SOURCE_SEGMENTS 的声明顺序）
+ */
+export function declaredUnitSourceTypes(src, segments = UNIT_SOURCE_SEGMENTS) {
+  if (src === null || typeof src !== 'object' || Array.isArray(src)) return []
+  return segments.filter((s) => src[s.type] !== undefined && src[s.type] !== null).map((s) => s.type)
+}
+
 /** ContentId 端点解析：content:<type>:<namespace>:<localId> */
 export const CONTENT_ID_RE = /^content:([a-z]+):([a-z0-9-]+):(.+)$/
 

@@ -117,6 +117,16 @@ jobs:
       # 本步是 **--check（只读、零写盘）**：它证明「入库的源能还原出磁盘上现有的包」。
       # ⛔ 绝不改成不带 --check 的落盘模式 —— 那是脚手架的写入流程，不该、也不能进 CI。
       # 为什么不用新造一个工作流：这是既有 gate-static 闸里的一步，复用既有 npm 脚本。
+      #
+      # ⚠️ **本步与 `content:validate` 判据 25 是「同一事实的两个观测点」，不是两份实现**：
+      #   · 事实唯一：「入库的源能否还原磁盘上现有的包」；
+      #   · 本步 = 给人看的逐条 ✓/✗；判据 25 = 门禁内的机器判定；
+      #   · 实现只有一份 —— 两边都调 `scripts/content/unit-source-render.mjs` 的
+      #     `planUnitSource()` + `comparePackageToDisk()`（⛔ validate.mjs 绝不 import 本脚本：
+      #     它带 CLI，import 即触发 process.exit / 真写盘）。
+      #   ⇒ **本步被删掉也不会丢覆盖**（判据 25 已在门禁本体里）；反过来判据 25 也在，
+      #     所以这一步的价值是**可读的逐条输出**，不是「唯一的守门点」。
+      #     本轮刻意**不删**本步（⛔）：它是 review 时最直观的「源 ⇄ 盘」证据。
       - name: 单元源可还原磁盘现状（scaffold-unit --check · 判据 ① 源侧入 CI）
         run: |
           for f in content-source/unit-source-*.json; do

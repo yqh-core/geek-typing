@@ -35,6 +35,8 @@ import { checksumPayload } from '../scripts/content/license-policy.mjs'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
 const SC = join(ROOT, 'scripts', 'content', 'scaffold-unit.mjs')
+// 渲染/比对的唯一实现（纯模块）。E-1/E-2 的断言对象：checksum 与 canonicalFile 的调用点已随抽取搬到这里。
+const RENDER = join(ROOT, 'scripts', 'content', 'unit-source-render.mjs')
 const CONTENT = join(ROOT, 'content')
 const GEN_REG = join(ROOT, 'scripts', 'content', 'generate-registry.mjs')
 const PROVIDER_RULES = join(ROOT, 'scripts', 'content', 'provider-rules.mjs')
@@ -44,6 +46,7 @@ const genRegSrc = readFileSync(GEN_REG, 'utf8')
 const providerRulesSrc = readFileSync(PROVIDER_RULES, 'utf8')
 
 const scSrc = readFileSync(SC, 'utf8')
+const renderSrc = readFileSync(RENDER, 'utf8')
 
 let pass = 0
 let fail = 0
@@ -344,8 +347,19 @@ section('D · 真实仓库（Unit-01 幂等重现，只读）')
 /* ═══════════════ E · 静态断言 ═══════════════ */
 section('E · 静态契约')
 {
-  ok('E-1 不手搓 checksum（无 createHash）', !/createHash/.test(scSrc))
-  ok('E-2 checksum 走唯一实现 checksumPayload', /import\s*\{[^}]*checksumPayload[^}]*\}\s*from\s*'\.\/license-policy\.mjs'/.test(scSrc))
+  ok('E-1 不手搓 checksum（无 createHash）', !/createHash/.test(scSrc) && !/createHash/.test(renderSrc))
+  // ⚠️ E-2 的**断言对象在 2026-10-07 随渲染抽取而搬家**（不变的是纪律本身）。
+  //   背景：`content:validate` 判据 25 要做「源 ↔ 磁盘一致性」却绝不能 import scaffold-unit.mjs
+  //   （带 CLI 的脚本，import 即 process.exit / 真写盘 —— 本仓明令禁止「门禁 import 生成器」），
+  //   故渲染与比对被抽到 `unit-source-render.mjs`（纯函数），脚手架与门禁共用同一实现。
+  //   于是「谁 import checksumPayload」从 scaffold-unit.mjs 移到了 unit-source-render.mjs。
+  //   ⛔ 这里**不能**把断言改弱（例如只保留「无 createHash」或删掉这条）——
+  //     那会让「手搓 checksum」重新可行且无人发现，正是本仓反复吃过的假绿形态。
+  //   故断言同时覆盖两侧：渲染实现必须从唯一实现 import，脚手架本体不得再自建副本。
+  ok('E-2 checksum 走唯一实现 checksumPayload（渲染实现 unit-source-render.mjs 从 license-policy.mjs import；脚手架本体不自建副本）',
+    /import\s*\{[^}]*checksumPayload[^}]*\}\s*from\s*'\.\/license-policy\.mjs'/.test(renderSrc)
+    && !/from\s*['"]\.\/license-policy\.mjs['"]/.test(scSrc.replace(/[\s\S]*?unit-source-render\.mjs'/, ''))
+    && !/createHash/.test(scSrc))
   ok('E-3 不自动改 generate-registry.mjs', !/writeFileSync\(\s*GEN_REG/.test(scSrc))
   ok('E-4 不自动改 build.mjs', !/writeFileSync\(\s*BUILD/.test(scSrc))
   ok('E-6 待办指向的 generate-registry.mjs 确实有双顺序表', /ORDER_REGISTRY/.test(genRegSrc) && /ORDER_IMPORT/.test(genRegSrc))

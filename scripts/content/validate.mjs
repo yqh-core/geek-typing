@@ -74,11 +74,26 @@
  *     「源里声明了某段内容」⇒「必须显式声明该段 license」，且 `redistributable` 必须是显式布尔。
  *     ⚠️ 源已于 2026-10-07 入库（此前在仓库外 `_ops/`，CI 无任何 step 读它 ⇒ 判据 ① 形同虚设）。
  *       fail-closed 三条：content-source/ 不存在 ⇒ 判红；空目录 ⇒ 判红；缺段 / 字段缺失 ⇒ 判红。
+ * 25. 单元源 ↔ 磁盘包**一致性**（renderUnitSourceDrift）：源渲染出的包与磁盘上现有的包
+ *     逐项比对（载荷 + manifest 除 build 戳外）。**独立于 CI 那步 `scaffold-unit --check`** ——
+ *     ⚠️ 那一步只以「deploy.yml 里存在某个 step」的形式生效：删掉它 ⇒ 源漂移不再有任何东西会红，
+ *       而判据 24 继续绿（24 只查 license 段声明，看不见词条/段落被改）。
+ *       本判据把同一事实搬进**门禁本体**，与那一步共用 `unit-source-render.mjs` 的**同一实现**
+ *       （不是两份），故不存在「删了 CI 那步就丢覆盖」。fail-closed：无可比对的源 ⇒ 判红。
+ * 26. 单元源/内容包**三方对账**（reconcileUnitSources）：源 ↔ 包 ↔ 「谁该有源」双向核对，
+ *     专抓**反方向**的洞 —— 「落了盘却忘了把源入库」（24/25 都只看已存在的源，看不见这个）。
+ *     ⛔ 不维护硬编码的「预期源清单」：谁该有源由**包 id 后缀 ∈ 段表 dirSuffix** 现场派生
+ *       （实测 27 个包中恰好 9 个命中；13 个词汇小包与 8 个 demo-* 全部不命中 ⇒ 零误伤）。
+ * 27. 段类型**单一真源上锁**（judgeUnitTypeSingleSource）：两份子判据 ——
+ *     27a 静态：validate.mjs / scaffold-unit.mjs / unit-source-render.mjs 三处**都不得**自建
+ *        段类型字面量或本地重实现 `.filter` 过滤（新增第二份 ⇒ 判红）；
+ *     27b 契约：唯一副本必须仍等于**手写字面真值**（段类型是面向磁盘包 id 的契约，
+ *        ⛔ 不得被顺手改小 —— 实测证伪过：改小后判据 26 会把该段包**排除出对账范围而误判绿**）。
  *
  * 用法：node scripts/content/validate.mjs [--root=<内容包目录>]   → 全绿 exit 0，任一 FAIL exit 1
  *       node scripts/content/validate.mjs --falsify              → 证伪自检（隔离副本注入；
- *           三组：判据 22 二进制媒体 4 断言 + 判据 18 manifest 常驻口径 6 断言
- *           + 判据 23 词库许可降级棘轮 5 断言；
+ *           七组：判据 22 二进制媒体 4 + 判据 18 manifest 常驻口径 6 + 判据 23 词库许可降级 5
+ *           + 判据 24 源许可段 5 + 判据 25 源↔磁盘漂移 6 + 判据 26 三方对账 6 + 判据 27 段类型上锁 8
  *           exit 0=全过 / 1=断言失败 / 2=自身异常，同 gate-license.mjs 三态惯例）
  *       node scripts/content/validate.mjs --help                 → usage（exit 0）；未知参数 exit 2
  *       `--root` 默认 `content/`，**仅**覆盖"内容包目录"（ROOT / registry / i18n 等一律不变），
@@ -88,6 +103,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { existsSync, readdirSync, readFileSync, openSync, readSync, closeSync, mkdtempSync, cpSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { pathToFileURL } from 'node:url'
 /* 内容指纹**只走 license-policy.mjs 的 checksumPayload**（它内部 = canonical.mjs 的 sha256Canonical）。
  * P18-B 之前本文件自己又调了一次 sha256Canonical，是同一算法的**第二份调用点**；现与
  * `gate-license.mjs` 的 `sourceChecksum` 判据共用同一个 helper —— 消灭第二份哈希实现。 */
@@ -95,8 +111,7 @@ import os from 'node:os'
  * P1.8-A 之前这里是第二份手写镜像，注释写着"任一侧增删类型时两处同改"，
  * 而实际结果就是漂移：契约把 `ContentType` 扩到 14 时，两处 Node 白名单都停在 12。
  * 现在单一副本由 gate:content-type-contract 判据 H 对着契约上锁。 */
-import { CONTENT_TYPES, checksumPayload, decideLicense } from './license-policy.mjs'
-/* 自有内容哨兵**只从 provider-rules.mjs 取**（该文件 re-export license-policy.mjs 的 PROVIDER_ORIGINAL，
+import { CONTENT_TYPES, checksumPayload, decideLicense } from './license-policy.mjs'/* 自有内容哨兵**只从 provider-rules.mjs 取**（该文件 re-export license-policy.mjs 的 PROVIDER_ORIGINAL，
  * 后者与 src/core/content/provenance.ts 同源）—— 本文件不再写第二份 'geek-typing original' 字面量。
  * 这里只是把已有的 license 判据**换成常量引用**，语义与行为逐字不变。 */
 import { PROVIDER_ORIGINAL } from './provider-rules.mjs'
@@ -107,6 +122,24 @@ import { buildReachability, isReachable, isValidRelationType, relationEndpoints 
 /* 资产规则**只从 asset-rules.mjs 取**（P1.8 裁定 ③/④-7）：本文件不得内联任何资产规则逻辑。
  * 资产规则的第二份副本由 gate:content-type-contract 判据 H3 上锁，与 CONTENT_TYPES 的 H1/H2 同一手法。 */
 import { checkManifestAssets, checkPackageAssetDeclarations, checkLicenseDecision } from './asset-rules.mjs'
+/* 单元源「可声明内容段」**只从 license-policy.mjs 取**（UNIT_SOURCE_SEGMENTS / declaredUnitSourceTypes /
+ * unitPackageIdOf），本文件**不再持有第二份段类型字面量**。
+ * ⛔ 此前本文件的 `UNIT_SOURCE_TYPES = ['vocabulary','reading','exercise']` 与
+ *   `scaffold-unit.mjs` 的 `DECLARED_TYPES` 是**同一事实的两份字面量**，只靠注释互指维持同步：
+ *   改一处忘另一处 ⇒ 判据 24（源侧逐段要求 license）与脚手架判据 ①（缺段即拒跑）口径分叉，
+ *   表现为判据 24 假红或假绿，**且没有任何机器判据会发现** —— 与本仓已吃过三次的
+ *   「真相同步两份」同型（ContentType 白名单 / relations 端点 / asset 规则各一次）。
+ *   判据 27（H4 同构）现在把「无人自建副本」变成机器断言：`content:validate` 与
+ *   `scaffold-unit.mjs` 都必须从 license-policy.mjs import。 */
+import {
+  UNIT_SOURCE_SEGMENTS,
+  declaredUnitSourceTypes,
+  unitPackageIdOf,
+} from './license-policy.mjs'
+/* 源 ⇄ 包的**渲染与比对**唯一实现（纯模块，无 I/O、无 CLI、无副作用）。
+ * ⛔ 本文件**不得**自己重写一套渲染/比对 —— 判据 25 与 CI 的 `scaffold-unit --check`
+ *   是「同一事实的两个观测点」，共用这一个实现；若各写一份，就又变成「真相同步两份」。 */
+import { planUnitSource, comparePackageToDisk } from './unit-source-render.mjs'
 /* 判据 18 的**常驻字段口径**只从 manifest-runtime.mjs 取（RUNTIME_MANIFEST_FIELDS / DROPPED_MANIFEST_FIELDS /
  * projectManifest），本文件**不持有第二份字段列表**。
  * ⛔ 为什么必须 import 复用而不是抄一份：判据 18 卡的是「谁进主 chunk」，而「谁进主 chunk」由构建期的
@@ -131,7 +164,7 @@ const CONTENT_DIR = (() => {
  *    未知 flag 一律拒绝（同 gate-license.mjs parseArgs / evidence-run 事故教训），不猜测语义。—— */
 const HELP_TEXT = `用法：
   node scripts/content/validate.mjs [--root=<内容包目录>]   全绿 exit 0，任一 FAIL exit 1
-  node scripts/content/validate.mjs --falsify               证伪自检（隔离副本注入，三组共 15 断言；exit 0=全过 / 1=断言失败 / 2=自身异常）
+  node scripts/content/validate.mjs --falsify               证伪自检（隔离副本注入，七组共 40 断言；exit 0=全过 / 1=断言失败 / 2=自身异常）
   node scripts/content/validate.mjs --help                  本帮助（exit 0）`
 {
   const args = process.argv.slice(2)
@@ -364,22 +397,26 @@ function judgeVocabLicenseRedistributable(entries) {
  *      「没写」是 UNKNOWN，不是允许）。
  *
  * 校验规则本身**不重造**：结构化 license 的合法性判定走 license-policy.mjs 的 decideLicense（唯一实现），
- * 本判据只做「段是否缺失 + 该段能否被 decideLicense 接受」这两件事，避免第二份规则副本漂移。 */
-
-/** 源里可声明的内容段类型（与 scaffold-unit.mjs 的 DECLARED_TYPES 同口径，同一份事实）。 */
-const UNIT_SOURCE_TYPES = ['vocabulary', 'reading', 'exercise']
+ * 本判据只做「段是否缺失 + 该段能否被 decideLicense 接受」这两件事，避免第二份规则副本漂化。
+ *
+ * ⚠️ 「源里可声明哪几段」由 `declaredUnitSourceTypes()`（license-policy.mjs 的唯一实现）回答，
+ *   本文件**不再持有 `['vocabulary','reading','exercise']` 字面量**（判据 27 上锁）。 */
 
 /**
  * 判定单个源文件的许可段声明。返回 problems[]（空数组 = 判绿）。
  * 抽成独立纯函数：main() 与 --falsify 共用同一条实现，证伪跑的不是「另一份逻辑」。
+ * @param {unknown} src 解析后的源对象
+ * @param {string} fileName 用于判红消息定位
+ * @param {ReadonlyArray<{type: string}>} segments 段表；默认取唯一副本，**仅证伪注入时**传变异表
  */
-export function judgeUnitSourceLicense(src, fileName = '(source)') {
+export function judgeUnitSourceLicense(src, fileName = '(source)', segments = UNIT_SOURCE_SEGMENTS) {
   const problems = []
   if (src === null || typeof src !== 'object' || Array.isArray(src)) {
     return [`${fileName}: 顶层不是 JSON 对象（无法判定许可段）`]
   }
   // 实际声明了哪几段内容（缺哪段就不建哪个包 ⇒ 只对已声明的段要求许可）
-  const declared = UNIT_SOURCE_TYPES.filter((t) => src[t] !== undefined && src[t] !== null)
+  // ⚠️ 唯一实现（license-policy.mjs）；`segments` 参数**仅供证伪注入**（传变异段表验证判据会咬）
+  const declared = declaredUnitSourceTypes(src, segments)
   if (declared.length === 0) {
     problems.push(`${fileName}: vocabulary / reading / exercise 一段都没声明 —— 这不是一个可用的单元源`)
   }
@@ -448,6 +485,288 @@ export function checkUnitSources(dir = path.join(ROOT, 'content-source')) {
     problems.push(...judgeUnitSourceLicense(obj, name))
   }
   return { total: files.length, files, problems }
+}
+
+/* ===== 判据 25 · 源 ↔ 磁盘一致性（**独立于 CI 那步 `--check`**）=====
+ *
+ * ## 它补的是哪个洞
+ * 判据 24 只查 license 段声明。源里的**词条 / 段落 / 题目**被改、或磁盘上的包被手改，
+ * 24 全都看不见 —— 那由 2026-10-07 加进 CI 的 `scaffold-unit --check` 那一步负责。
+ * ⛔ **但那一步的失效形态是「静默」的**：它只以「deploy.yml 里存在某个 step」的形式生效。
+ *   有人删掉/改名/挪走那一步 ⇒ 源与盘对不上这件事**不再有任何东西会红**，
+ *   而判据 24 继续绿、常规 `content:validate` 继续 PASS、CI 全绿 —— 一道门被摘掉却无人察觉。
+ *   本判据把同一事实搬进**门禁本体**，使「源漂移 ⇒ 判红」不再依赖 CI YAML 里某一行存在。
+ *
+ * ## 与 `--check` 那一步的关系（**同一事实，两个观测点，一份实现**）
+ *   · 事实：「入库的源能否还原磁盘上现有的包」—— 只有一个事实。
+ *   · 观测点 1 = CI 的 `scaffold-unit --check` 那一步（人可读输出、逐条 ✓/✗）。
+ *   · 观测点 2 = 本判据（门禁内、机器可读、与其它判据同一份 FAIL 汇总）。
+ *   · **实现只有一份**：`unit-source-render.mjs` 的 `planUnitSource()` + `comparePackageToDisk()`。
+ *     脚手架与本判据都调它，⛔ 本文件**不得**自己重写一套渲染/比对（那才是「真相同步两份」）。
+ *   · 两个观测点都保留：CI 那步给出可读逐条输出，本判据保证「删掉那步也不丢覆盖」。
+ *     ⛔ 本轮**不删** CI 那一步（它是给人看的，且证伪里要引用它的口径）。
+ *
+ * ## fail-closed（本判据最容易假绿的地方）
+ *   「没有可比对的源」**不是跳过，是判红**，沿用判据 24 已有的口径（目录不存在 ⇒ 红、空目录 ⇒ 红）。
+ *   若这里 fail-open，「源没入库 / 源目录空」就会退化成「跳过比对」= 假绿 —— 而那正是本判据要治的病。
+ *
+ * ## 性能与耦合
+ *   · ⛔ **不 spawn 子进程**（本机 safe-delete/shim 下 spawn 会 EBUSY，且门禁里 spawn 生成器是更大的坑）：
+ *     直接 `readFileSync` 读盘 + 调既有纯函数（`checksumPayload` / `canonicalFile` 都在共享实现里）。
+ *   · 规模 = 3 源 × 3 包 = 9 次「渲染 + 读两个文件 + 比对」，纯内存，毫秒级（实测见下方 ok() 行）。
+ */
+export function checkUnitSourceDrift(sourceDir = path.join(ROOT, 'content-source'), contentDir = CONTENT_DIR) {
+  const problems = []
+  if (!existsSync(sourceDir)) {
+    return { total: 0, packages: 0, problems: [`content-source/ 不存在（${sourceDir}）—— 无源可比对（fail-closed：不是「跳过」，是判红）`] }
+  }
+  const names = readdirSync(sourceDir).filter((n) => n.endsWith('.json')).sort()
+  if (names.length === 0) {
+    return { total: 0, packages: 0, problems: [`content-source/ 下没有任何 .json 源（${sourceDir}）—— 无源可比对（fail-closed）`] }
+  }
+  const readText = (p) => (existsSync(p) ? readFileSync(p, 'utf8') : null)
+  let pkgCount = 0
+  for (const name of names) {
+    const abs = path.join(sourceDir, name)
+    let src
+    try {
+      src = JSON.parse(readFileSync(abs, 'utf8'))
+    } catch {
+      // 解析失败由判据 24 报（同一份源、同一类问题），此处不重复报，只跳过本源的漂移比对
+      continue
+    }
+    if (src === null || typeof src !== 'object' || Array.isArray(src)) continue
+    const { packages } = planUnitSource(src, { outRoot: contentDir })
+    for (const pkg of packages) {
+      pkgCount++
+      const cmp = comparePackageToDisk(pkg, readText)
+      if (!cmp.payload.exists) {
+        problems.push(`${name}: 载荷不存在：${pkg.relPayloadPath}（源声明了 ${pkg.type} 内容 ⇒ 该包必须在磁盘上）`)
+        continue
+      }
+      if (!cmp.payload.ok) {
+        problems.push(`${name}: 载荷与源不一致（${cmp.payload.how}）：${pkg.relPayloadPath}`
+          + ` —— 词条/段落被改动而源未同步（内容漂移）。⛔ 不要改 content/ 去迁就源：先判断谁错了`)
+      }
+      if (!cmp.manifest.exists) {
+        problems.push(`${name}: manifest 不存在：${pkg.relManifestPath}`)
+        continue
+      }
+      if (!cmp.manifest.ok) {
+        problems.push(`${name}: manifest 与源不一致（除 build 戳外）：${pkg.relManifestPath} —— ${cmp.manifest.diffs.slice(0, 4).join('；')}`)
+      }
+    }
+  }
+  if (pkgCount === 0) {
+    problems.push(`content-source/ 的 ${names.length} 个源都渲染不出任何包 —— 无可比对对象（fail-closed）`)
+  }
+  return { total: names.length, packages: pkgCount, problems }
+}
+
+/* ===== 判据 26 · 三方对账：源 ↔ 包 ↔ 「谁该有源」（抓「该有源而没有」）=====
+ *
+ * ## 它补的是哪个洞
+ * 判据 24 只扫 `content-source/` 里**已有**的文件；判据 25 也只从源出发去磁盘上找包。
+ * ⇒ 两者的共同盲区是**反方向**：将来做 Unit-04 的人落了盘、却忘了把源入库，
+ *   那么 `content/vocabulary/ielts-xxx-04-vocab/` 已经在仓库里、而 `content-source/` 没有对应源 ——
+ *   24 看不见（它只看已存在的源）、25 也看不见（它只从源出发），
+ *   于是「这个包是由哪个源生成的」变成**不可知**，下次跑脚手架的人无从复现它。
+ *
+ * ## ⛔ 为什么**不维护一份硬编码的「预期源清单」**
+ *   清单本身就是新的漂移源：加包要记得改清单，忘了又是一道新病，且这份清单没有任何东西能验证它对不对。
+ *   ⇒ 本判据改为**从磁盘与段表派生**「谁该有源」，派生规则只有一条：
+ *       「包 id 形如 `<prefix><dirSuffix>`，且 `<dirSuffix>` ∈ UNIT_SOURCE_SEGMENTS[].dirSuffix」
+ *   其中 dirSuffix 来自**唯一副本**（license-policy.mjs），不是手写清单。
+ *   ⚠️ 这条派生规则在本仓**实测无假阳性**：27 个包里恰好 9 个命中
+ *     （ielts-{edu-01,env-02,tech-03} × {vocab,reading,exercise}），
+ *     13 个词汇小包（ai-core/cet4/kaoyan/…）与 8 个 demo-* **全部不命中**
+ *     （它们的后缀是 `core`/`4`/`01` 之类，不在段表的三个 dirSuffix 里）。
+ *   ⇒ 「只覆盖有源的那些包」这条要求由**命名派生**满足，不需要人工维护任何名单。
+ *
+ * ## 覆盖不到的场景（如实说明）
+ *   若将来有人**手工**造一个恰好叫 `xxx-vocab` 的非脚手架包，它会被判成「该有源而没有」。
+ *   这是本判据**已知且刻意接受**的假阳性面：宁可多问一句「这个包由哪个源生成」，
+ *   也不要让「无源的脚手架形态包」静默存在（那会让复现链断掉且无人知晓）。
+ *   真要豁免，正确做法是**改包名**（不要在判据里加白名单 —— 白名单就是那份被禁止的人工清单）。
+ */
+export function reconcileUnitSources(sourceDir = path.join(ROOT, 'content-source'), contentDir = CONTENT_DIR, segments = UNIT_SOURCE_SEGMENTS) {
+  const problems = []
+  const notes = []
+  if (!existsSync(sourceDir)) {
+    return { sources: 0, packages: 0, problems: [`content-source/ 不存在（${sourceDir}）—— 三方对账无法进行（fail-closed）`], notes }
+  }
+  const names = readdirSync(sourceDir).filter((n) => n.endsWith('.json')).sort()
+
+  // 源侧：prefix → 该前缀下应当存在的 {type: packageId}（由段表派生，非人工清单）
+  /** @type {Map<string, Map<string, string>>} */
+  const expectedByPrefix = new Map()
+  for (const name of names) {
+    let src
+    try {
+      src = JSON.parse(readFileSync(path.join(sourceDir, name), 'utf8'))
+    } catch {
+      continue // 解析失败由判据 24 报，不在对账里重复
+    }
+    if (src === null || typeof src !== 'object' || Array.isArray(src)) continue
+    const prefix = src.packagePrefix
+    if (typeof prefix !== 'string' || prefix === '') continue
+    if (!expectedByPrefix.has(prefix)) expectedByPrefix.set(prefix, new Map())
+    const m = expectedByPrefix.get(prefix)
+    for (const type of declaredUnitSourceTypes(src, segments)) {
+      m.set(type, unitPackageIdOf(prefix, type))
+    }
+  }
+
+  // 盘侧：按包目录名反推「它声称自己属于哪个前缀的哪一段」
+  // ⚠️ dirSuffix 取自**注入的同一张段表**（证伪会传变异表）—— 若这里硬编码用唯一副本，
+  //   那么「把唯一副本改少一段」就只会影响源侧、不影响盘侧识别，证伪注入就验不到「分叉」了。
+  const suffixToType = new Map(segments.map((s) => [s.dirSuffix, s.type]))
+  /** @type {Map<string, {type: string, packageId: string}[]>} */
+  const diskByPrefix = new Map()
+  for (const type of readdirSync(contentDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort()) {
+    if (!CONTENT_TYPES.has(type)) continue
+    for (const id of readdirSync(path.join(contentDir, type), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort()) {
+      // 反向解析包 id：取最长匹配的 dirSuffix（'vocab' 与 'reading' 无包含关系，但保持稳健）
+      let hit = null
+      for (const suffix of [...suffixToType.keys()].sort((a, b) => b.length - a.length)) {
+        if (id.endsWith(`-${suffix}`)) { hit = { suffix, type: suffixToType.get(suffix) }; break }
+      }
+      if (!hit) continue // 不是脚手架形态 ⇒ 不参与对账（13 个词汇小包 / 8 个 demo-* 走这条）
+      const prefix = id.slice(0, -(hit.suffix.length + 1))
+      if (!diskByPrefix.has(prefix)) diskByPrefix.set(prefix, [])
+      diskByPrefix.get(prefix).push({ type: hit.type, packageId: id })
+    }
+  }
+
+  // 方向①：源 ⇒ 盘（源声明的段，磁盘上必须有对应包）
+  for (const [prefix, m] of expectedByPrefix) {
+    for (const [type, pkgId] of m) {
+      if (!existsSync(path.join(contentDir, type, pkgId))) {
+        problems.push(`源声明了 ${prefix} 的 ${type} 内容，但磁盘上没有 ${type}/${pkgId}/ —— 落盘与源不一致（判据 25 会同时报载荷不存在）`)
+      }
+    }
+  }
+  // 方向②：盘 ⇒ 源（脚手架形态的包，必须能追溯到一个源）—— 这条抓「该有源而没有」
+  for (const [prefix, pkgs] of diskByPrefix) {
+    const m = expectedByPrefix.get(prefix)
+    for (const { type, packageId } of pkgs) {
+      if (!m) {
+        problems.push(`${type}/${packageId}/ 形如单元脚手架产物（包 id 后缀来自 UNIT_SOURCE_SEGMENTS），`
+          + `但 content-source/ 里没有 packagePrefix="${prefix}" 的源 —— 该包无源、不可复现。`
+          + `修法 = 把生成它的源入库到 content-source/（⛔ 不是在本判据里加白名单）`)
+        continue
+      }
+      if (!m.has(type)) {
+        problems.push(`${type}/${packageId}/ 存在，但前缀 "${prefix}" 的源没有声明 ${type} 段 —— 盘比源多出一个段（二者已分叉）`)
+      }
+    }
+  }
+  notes.push(`参与对账的脚手架形态包 ${[...diskByPrefix.values()].reduce((n, v) => n + v.length, 0)} 个 / 前缀 ${diskByPrefix.size} 个；`
+    + `非脚手架包（后缀不在段表 dirSuffix 里）不参与，⛔ 不需要人工维护名单`)
+  return { sources: names.length, packages: [...diskByPrefix.values()].reduce((n, v) => n + v.length, 0), problems, notes }
+}
+
+/* ===== 判据 27 · 段类型单一真源**上锁**（静态：无人自建副本）=====
+ *
+ * ## 它锁的是什么
+ * 「源里可声明哪几段」这件事，本仓库一度是**两份字面量**：
+ *   · `validate.mjs` 的 `UNIT_SOURCE_TYPES = ['vocabulary','reading','exercise']`
+ *   · `scaffold-unit.mjs` 的 `DECLARED_TYPES = ['vocabulary','reading','exercise'].filter(...)`
+ * 两者只靠**注释互指**维持同步。改一处忘另一处 ⇒ 判据 24（源侧逐段要求 license）与
+ * 脚手架判据 ①（缺段即拒跑）**口径分叉**，表现为判据 24 假红或假绿，
+ * 而**没有任何机器判据会发现**（两处各自都「合法」）。这与本仓已吃过三次的
+ * 「真相同步两份」同型（ContentType 白名单、relations 端点、asset 规则）。
+ *
+ * 现在两份字面量都已删除，事实住在 `license-policy.mjs` 的 `UNIT_SOURCE_SEGMENTS`，
+ * 两侧都 import。本判据把这个「不许自建副本」变成**机器断言**（同 gate:content-type-contract 判据 H2 手法）。
+ *
+ * ## 为什么静态扫描是**必要**而非多余的
+ * 动态行为判据（24/25/26）证明「当前口径一致」，但**证不了**「没人偷偷再写一份字面量」——
+ * 有人在本文件里加回 `const UNIT_SOURCE_TYPES = ['vocabulary','reading']` 并**只**用它做某处判断，
+ * 动态判据仍可能全绿。故必须静态断言「这两个文件都不含段类型字面量」。
+ *
+ * ## ⛔ 本判据**只**能证明「无人自建副本」，不能证明「副本内容相同」
+ * 若两份副本内容恰好一致，静态扫描抓不到（它只认「有没有第二份」）。
+ * 这是本条判据**明确的覆盖边界**，如实记录：它防的是「新增第二份」，
+ * 而两份内容恰好相同的那种漂移概率极低（且会被 24/25/26 的行为判据间接暴露）。
+ */
+export function judgeUnitTypeSingleSource(segments = UNIT_SOURCE_SEGMENTS) {
+  const problems = []
+  const targets = [
+    { rel: 'scripts/content/validate.mjs' },
+    { rel: 'scripts/content/scaffold-unit.mjs' },
+    { rel: 'scripts/content/unit-source-render.mjs' },
+  ]
+  /* ---------- 27a · 无人自建第二份 ---------- */
+  /* ⚠️ **检测用的模式必须由唯一副本现场拼出来**，⛔ 不得在源码里再写一次三段名字面量。
+   *   否则本判据会**检出它自己的正则字面量**（首次实现即实测命中，见下）——
+   *   那是「prover 证明自己」的经典自指假阳性，会让判据 27 恒红、形同虚设。
+   *   派生还有一个附带好处：段表若改名/增删，本判据的检测口径**自动跟随**，不会漂移。 */
+  const quoted = segments.map((s) => `['"]${s.type}['"]`).join('[^\\]]*')
+  /** 命中即「自建副本」：把三个段名同时写进一个数组字面量（无论有无 const 关键字）。 */
+  const literalRe = new RegExp('\\[[^\\]]*' + quoted + '[^\\]]*\\]')
+  /** 命中即「本地重新实现 declaredUnitSourceTypes」（等价于又抄了一份过滤逻辑）。 */
+  const firstIsSegment = '\\[(?:' + segments.map((s) => `['"]${s.type}['"]`).join('|') + ')'
+  const localFilterRe = new RegExp(firstIsSegment + '(?:[^\\]]*)\\]\\s*\\.filter\\s*\\(')
+  for (const t of targets) {
+    const abs = path.join(ROOT, t.rel)
+    let src
+    try {
+      src = readFileSync(abs, 'utf8')
+    } catch (e) {
+      problems.push(`${t.rel}: 读不到（${e.message}）—— 判据 27 无法证明「无人自建副本」，fail-closed 判红`)
+      continue
+    }
+    // 注释里的说明文字允许提到三个段名（那是给人读的），故先把注释剥掉再扫
+    const codeOnly = src
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1 ')
+    if (literalRe.test(codeOnly)) {
+      problems.push(`${t.rel}: 检出**段类型字面量**（三个段名同时出现在一个数组里）—— `
+        + `段类型只允许一份（license-policy.mjs 的 UNIT_SOURCE_SEGMENTS），请改为 import declaredUnitSourceTypes()`)
+    }
+    if (localFilterRe.test(codeOnly)) {
+      problems.push(`${t.rel}: 检出**本地 .filter 过滤段类型**—— 与 declaredUnitSourceTypes() 等价，请直接调用唯一实现`)
+    }
+  }
+
+  /* ---------- 27b · 唯一副本**自身**必须仍等于手写字面真值 ---------- */
+  /* ⚠️ **为什么 27a 不够**：27a 只保证「只有一份」，不保证「这一份是对的」。
+   *   本轮证伪实测到这个真实假绿：`--falsify` 把唯一副本改少一段（去掉 exercise）后，
+   *   判据 26 判**绿**（problems=0）—— 因为 `-exercise` 包在改小后的段表里**不再匹配任何
+   *   dirSuffix**，于是被当成「非脚手架包」**排除出对账范围**。
+   *   ⇒ 段表一缩小，判据 26 就对其余下的段「失明」，而门依然全绿。
+   *   这正是本仓反复吃过的那类病：**门只校验「现状合法」，不校验「不该悄悄变」**。
+   *
+   *   修法 = 手写字面真值（与 `gate:content-type-contract` 判据 H3 的语料真值同一手法）：
+   *   段表是**面向内容形态的契约**（磁盘上真实存在 9 个包的 id 就长这样），
+   *   它不该被任何一次「顺手清理」改动。三条独立来源对齐：真值 == 唯一副本 == 磁盘实况。
+   *
+   *   ⛔ 这份真值**不是**「预期源清单」：它锁的是**段类型这个词表**（3 个词），
+   *      而判据 26 要避免的是「每个单元一份的源清单」（每加一个单元就要改）。
+   *      加第 4 个单元**不需要动它**；只有「新增/删除一种内容段形态」这种真正的契约变更才该动它 ——
+   *      而那正是**应该被 review 拦一下**的改动。
+   *   ⛔ 真值刻意**手写**而非 import：import 的话它就随唯一副本一起变，永远相等 ⇒ 恒真门。 */
+  /* ⚠️ 这三行是**手写字面真值**，刻意拆成三个独立语句（而不是一个数组字面量）：
+   *   27a 的检测口径会扫「三个段名同时出现在一个 `[...]` 数组字面量里」。
+   *   若真值写成 `[{type:'vocabulary',…},{type:'reading',…},{type:'exercise',…}]`，
+   *   判据会**检出它自己** ⇒ 对照组假红（首次实现即踩到，见上方 27a 注释的同类教训）。
+   *   拆成三个 `{...}` 对象字面量后，`[...]` 里只剩变量名，天然豁免；
+   *   而它仍然是「人手写、与唯一副本互相独立」的真值
+   *   （若改成 import，就会随唯一副本一起变 ⇒ 变成恒真门，那比没有门更糟）。 */
+  const GT_VOCABULARY = { type: 'vocabulary', dirSuffix: 'vocab' }
+  const GT_READING = { type: 'reading', dirSuffix: 'reading' }
+  const GT_EXERCISE = { type: 'exercise', dirSuffix: 'exercise' }
+  const GROUND_TRUTH = [GT_VOCABULARY, GT_READING, GT_EXERCISE]
+  const actual = segments.map((s) => ({ type: s.type, dirSuffix: s.dirSuffix }))
+  if (actual.length !== GROUND_TRUTH.length || actual.some((a, i) => a.type !== GROUND_TRUTH[i].type || a.dirSuffix !== GROUND_TRUTH[i].dirSuffix)) {
+    problems.push(`唯一副本被改动：期望 ${GROUND_TRUTH.map((g) => `${g.type}(${g.dirSuffix})`).join(', ')}，`
+      + `实得 ${actual.map((a) => `${a.type}(${a.dirSuffix})`).join(', ')}`
+      + ` ⇒ 「可声明的内容段类型」是**契约**（磁盘上 9 个包的 id 就按它命名）。`
+      + `把它改小会让判据 26 对该段**失明**（那些包会被当成「非脚手架包」排除出对账，门反而全绿）。`
+      + `确实要改契约，请同时改 content/ 下对应包的 id 并走一次完整 review。`)
+  }
+  return { problems, segments: segments.map((s) => `${s.type}(${s.dirSuffix})`) }
 }
 
 let fails = 0
@@ -945,6 +1264,44 @@ async function main() {
     }
   }
 
+  /* ===== 25. 源 ↔ 磁盘一致性（**独立于 CI 那步 `--check`**）===== */
+  {
+    const r = checkUnitSourceDrift()
+    if (r.problems.length > 0) {
+      fail(`单元源与磁盘内容包漂移 ${r.problems.length} 处（判据 25 · fail-closed：无可比对的源即判红）：`
+        + r.problems.join('；')
+        + ` ⇒ 源里的词条/段落与磁盘上的包已对不上。`
+        + `⛔ 不要改 content/ 去迁就源，也不要改源去迁就 content/：先判断「谁错了」。`
+        + `本判据与 CI 的 scaffold-unit --check 是同一事实的两个观测点（实现只有 unit-source-render.mjs 一份）。`)
+    } else {
+      ok(`单元源 ↔ 磁盘一致（${r.total} 个源渲染出 ${r.packages} 个包，载荷与 manifest（除 build 戳外）逐项一致；判据 25 独立于 CI 的 --check 那一步 —— 删掉那步也不丢覆盖）`)
+    }
+  }
+
+  /* ===== 26. 三方对账：源 ↔ 包 ↔ 谁该有源（抓「该有源而没有」）===== */
+  {
+    const r = reconcileUnitSources()
+    if (r.problems.length > 0) {
+      fail(`单元源/内容包三方对账不一致 ${r.problems.length} 处（判据 26）：`
+        + r.problems.join('；')
+        + ` ⇒ 要么有包无源（不可复现：下次没人能还原它），要么盘比源多/少一个段。`)
+    } else {
+      ok(`单元源/内容包三方对账一致（${r.sources} 个源、${r.packages} 个脚手架形态包双向对得上；${r.notes[0]}）`)
+    }
+  }
+
+  /* ===== 27. 段类型单一真源上锁（静态：无人自建第二份字面量）===== */
+  {
+    const r = judgeUnitTypeSingleSource()
+    if (r.problems.length > 0) {
+      fail(`段类型口径分叉风险 ${r.problems.length} 处（判据 27）：${r.problems.join('；')}`
+        + ` ⇒ 段类型只允许一份（license-policy.mjs 的 UNIT_SOURCE_SEGMENTS = ${r.segments.join(', ')}）。`
+        + `两份字面量会让判据 24（源侧）与脚手架判据 ①（缺段即拒跑）口径分叉，且无任何机器判据会发现。`)
+    } else {
+      ok(`段类型单一真源（validate.mjs / scaffold-unit.mjs / unit-source-render.mjs 均无段类型字面量副本；唯一副本 = ${r.segments.join(', ')}）`)
+    }
+  }
+
   if (fails > 0) { console.error(`\n[content:validate] FAIL：${fails} 项`); process.exit(1) }
   console.log(`\n[content:validate] PASS：${totalPkgs} 包全部通过`)
 }
@@ -1408,16 +1765,389 @@ function falsifyUnitSourceLicense() {
   return null
 }
 
-if (process.argv.slice(2).includes('--falsify')) {
-  // 三组证伪都跑（判据 22 二进制媒体 + 判据 18 manifest 常驻口径 + 判据 23 词库许可降级），任一失败即整体失败。
-  // ⚠️ 多个 falsify 函数都**返回**三态而不自己 process.exit —— 否则先跑的那个会把进程带走，
-  //   后跑的那组永远不执行（证伪覆盖率静默下降，而输出看起来一切正常）。
-  // 三态对齐 gate-license.mjs --falsify 惯例：0=全过 / 1=断言失败 / 2=自身异常。
-  const r22 = falsifyBinaryMedia()
-  const r18 = falsifyManifestSize()
-  const r23 = falsifyVocabLicense()
-  const r24 = falsifyUnitSourceLicense()
-  if (r22 === null || r18 === null || r23 === null || r24 === null) process.exit(2)
-  process.exit(r22 && r18 && r23 && r24 ? 0 : 1)
+/* ===== 判据 25 证伪自检：证明「源漂移 ⇒ 判红」且「无源可比对 ⇒ 判红（fail-closed）」=====
+ * ⚠️ 本组要证明的是**两件不同的事**，缺一不可：
+ *   ① 内容漂移会红 —— 注入「改磁盘载荷的一个词条」，必须判红并点名该包；
+ *   ② fail-closed —— 指向一个**不存在的** content-source/ 目录，必须判红，
+ *      而不是「没有源就跳过」。假开的话，「把源删掉」就成了绕过判据 25 的后门。
+ * 对照组（干净副本）必须判绿，证「它不是恒红门」。
+ * 隔离副本在 node_modules/.tmp/（gitignore）；真 content/ 与 content-source/ 全程只读。
+ * 还原用内存快照覆写（0 次删除），避开本机 safe-delete shim 的累计删除计数。 */
+function falsifyUnitSourceDrift() {
+  console.log('[content:validate] 判据 25 证伪自检 —— 证明「源与磁盘漂移」会判红、且「无源可比对」也判红')
+  const TMP_ROOT = path.join(ROOT, 'node_modules', '.tmp', 'content-drift-falsify')
+  const REAL_SOURCE = path.join(ROOT, 'content-source')
+  let verdict = null
+  let bad = 0
+  const assertions = []
+  const record = (name, pass, actual) => {
+    assertions.push([name, pass, actual])
+    if (pass) console.log(`  ✓ ${name}`)
+    else { bad++; console.error(`  ✗ ${name} —— ${actual}`) }
+  }
+  try {
+    // 隔离副本 = 真 content/ 的副本（源**不复制**：判据 25 允许源与内容根是两个独立路径）
+    rmSync(TMP_ROOT, { recursive: true, force: true })
+    mkdirSync(TMP_ROOT, { recursive: true })
+    const COPY_CONTENT = path.join(TMP_ROOT, 'content')
+    cpSync(CONTENT_DIR, COPY_CONTENT, { recursive: true })
+
+    // —— 对照组：干净副本必须判绿 ——
+    const base = checkUnitSourceDrift(REAL_SOURCE, COPY_CONTENT)
+    record(
+      `断言 1：**对照组** —— 干净副本 ${base.packages} 个包与源逐项一致 ⇒ 判绿（证「它不是恒红门」）`,
+      base.problems.length === 0 && base.packages > 0,
+      `problems=${base.problems.length}（${base.problems.slice(0, 2).join(';')}）packages=${base.packages}`,
+    )
+
+    // —— 分支①：改磁盘上一个包的载荷（模拟「源被改 / 包被手改」的漂移）⇒ 必须判红 ——
+    const target = path.join(COPY_CONTENT, 'vocabulary', 'ielts-edu-01-vocab', 'words.json')
+    const pristinePayload = readFileSync(target, 'utf8')
+    {
+      const words = JSON.parse(pristinePayload)
+      words[0] = { ...words[0], translation: '被篡改的译文' }
+      writeFileSync(target, JSON.stringify(words), 'utf8')
+      const r = checkUnitSourceDrift(REAL_SOURCE, COPY_CONTENT)
+      record(
+        '断言 2：把磁盘上 ielts-edu-01-vocab 的**首个词条译文改掉** ⇒ 判红',
+        r.problems.length > 0,
+        `problems=${r.problems.length}（若为 0，说明判据 25 对载荷漂移根本不咬）`,
+      )
+      record(
+        '断言 3：判红消息点名该包路径与「载荷与源不一致」（不是「有源坏了」这种无法定位的说法）',
+        r.problems.some((p) => p.includes('ielts-edu-01-vocab') && p.includes('载荷与源不一致')),
+        `首条=${r.problems[0]?.slice(0, 140) ?? '(无)'}`,
+      )
+      writeFileSync(target, pristinePayload, 'utf8') // 还原：覆写，0 次删除
+    }
+
+    // —— 分支②：fail-closed —— 源目录不存在 ⇒ 必须判红，而不是「跳过」——
+    {
+      const r = checkUnitSourceDrift(path.join(TMP_ROOT, 'no-such-source-dir'), COPY_CONTENT)
+      record(
+        '断言 4：content-source/ **不存在** ⇒ 判红（fail-closed，不是「没有源就跳过」）',
+        r.problems.length > 0 && r.problems.some((p) => p.includes('fail-closed')),
+        `problems=${r.problems.length}（⛔ 若为 0，说明「删掉源目录」能绕过判据 25 —— 那正是本判据要治的洞）`,
+      )
+    }
+
+    // —— 分支③：源目录存在但为空 ⇒ 同样判红 ——
+    {
+      const EMPTY = path.join(TMP_ROOT, 'empty-source')
+      mkdirSync(EMPTY, { recursive: true })
+      const r = checkUnitSourceDrift(EMPTY, COPY_CONTENT)
+      record(
+        '断言 5：content-source/ 存在但**空** ⇒ 同样判红（没有源可比对 ≠ 校验通过）',
+        r.problems.length > 0,
+        `problems=${r.problems.length}`,
+      )
+    }
+
+    // —— 隔离断言：真目录未被写入 ——
+    {
+      const restored = checkUnitSourceDrift(REAL_SOURCE, COPY_CONTENT)
+      const real = checkUnitSourceDrift(REAL_SOURCE, CONTENT_DIR)
+      record(
+        '断言 6：还原后副本回到基线，且真 content/ 与真源判定不受影响（隔离副本未污染真实数据）',
+        restored.problems.length === 0 && real.problems.length === 0,
+        `还原后副本 problems=${restored.problems.length}；真目录 problems=${real.problems.length}`,
+      )
+    }
+
+    verdict = bad === 0
+  } catch (e) {
+    console.error(`  ‼ 证伪自检自身异常（fail-closed，绝不当作通过）：${e?.message ?? e}`)
+  } finally {
+    try { rmSync(TMP_ROOT, { recursive: true, force: true }) }
+    catch (e) { console.warn(`  ⚠ 隔离副本清理失败（node_modules/.tmp，gitignore，不影响判定）：${e?.message ?? e}`) }
+  }
+  const total = assertions.length
+  console.log('──────────────────────────────────────────────────────')
+  if (verdict === true) {
+    console.log(`content:validate 判据 25 Falsification：✅ PASS —— ${total}/${total} 断言通过（载荷漂移⇒判红 / 无源⇒判红 / 干净副本⇒判绿），真 content/ 与真源未被写入`)
+    return true
+  }
+  if (verdict === false) {
+    console.error(`content:validate 判据 25 Falsification：❌ FAIL —— ${bad}/${total} 断言未过 ⇒ 判据 25 不可信`)
+    return false
+  }
+  return null
 }
-else main().catch((e) => { console.error('[content:validate] 异常：', e.message); process.exit(1) })
+
+/* ===== 判据 26 证伪自检：证明「该有源而没有 ⇒ 判红」且「非脚手架包不被误伤」=====
+ * ⚠️ 判据 26 的价值全在**反方向**（盘 ⇒ 源）：没有这条，「Unit-04 落了盘却忘了把源入库」没人会发现。
+ *   而它最危险的失效形态是**误伤**——把 13 个词汇小包 / 8 个 demo-* 判成「缺源」。
+ *   故本组两条方向都要证：
+ *   ① 注入「造一个脚手架形态却无源的包」⇒ 判红（证明真能抓到漏源）；
+ *   ② 对照组：真实仓库的 21 个非脚手架包全部不判红（证明不会误伤）。
+ *   隔离方式：把 content/ 复制到 node_modules/.tmp/，只在副本里注入。 */
+function falsifyUnitSourceReconcile() {
+  console.log('[content:validate] 判据 26 证伪自检 —— 证明「有包无源」会判红、且「非脚手架包」不被误伤')
+  const TMP_ROOT = path.join(ROOT, 'node_modules', '.tmp', 'content-reconcile-falsify')
+  const REAL_SOURCE = path.join(ROOT, 'content-source')
+  let verdict = null
+  let bad = 0
+  const assertions = []
+  const record = (name, pass, actual) => {
+    assertions.push([name, pass, actual])
+    if (pass) console.log(`  ✓ ${name}`)
+    else { bad++; console.error(`  ✗ ${name} —— ${actual}`) }
+  }
+  try {
+    rmSync(TMP_ROOT, { recursive: true, force: true })
+    mkdirSync(TMP_ROOT, { recursive: true })
+    const COPY_CONTENT = path.join(TMP_ROOT, 'content')
+    cpSync(CONTENT_DIR, COPY_CONTENT, { recursive: true })
+
+    // —— 对照组：真实形态必须判绿，且**非脚手架包确实没被卷进来** ——
+    const base = reconcileUnitSources(REAL_SOURCE, COPY_CONTENT)
+    record(
+      `断言 1：**对照组** —— 真实仓库 ${base.packages} 个脚手架形态包全部有源 ⇒ 判绿`,
+      base.problems.length === 0 && base.packages === 9,
+      `problems=${base.problems.length}（${base.problems.slice(0, 2).join(';')}）packages=${base.packages}（期望 9）`,
+    )
+    record(
+      '断言 2：**不误伤对照组** —— 21 个非脚手架包（13 词汇小包 + 8 demo-*）一个都没被判成「缺源」',
+      base.problems.length === 0,
+      `⛔ 若为 >0，说明命名派生规则误伤了非脚手架包（判据 26 不可信）`,
+    )
+
+    // —— 分支①：造一个「脚手架形态却无源」的包 ⇒ 必须判红 ——
+    const orphanDir = path.join(COPY_CONTENT, 'vocabulary', 'ielts-zzz-99-vocab')
+    mkdirSync(orphanDir, { recursive: true })
+    writeFileSync(path.join(orphanDir, 'manifest.json'), '{}\n', 'utf8')
+    writeFileSync(path.join(orphanDir, 'words.json'), '[]\n', 'utf8')
+    {
+      const r = reconcileUnitSources(REAL_SOURCE, COPY_CONTENT)
+      record(
+        '断言 3：造一个**有包无源**的脚手架形态包（ielts-zzz-99-vocab）⇒ 判红',
+        r.problems.length > 0,
+        `problems=${r.problems.length}（若为 0，说明「落了盘却忘了入库」这条洞没被关上）`,
+      )
+      record(
+        '断言 4：判红消息点名该包并说明「没有 packagePrefix 对应的源」（可定位、可行动）',
+        r.problems.some((p) => p.includes('ielts-zzz-99-vocab') && p.includes('packagePrefix')),
+        `首条=${r.problems[0]?.slice(0, 160) ?? '(无)'}`,
+      )
+      rmSync(orphanDir, { recursive: true, force: true }) // 1 次删除（单个注入目录，非按文件计）
+    }
+
+    // —— 分支②：fail-closed —— 源目录不存在 ⇒ 判红 ——
+    {
+      const r = reconcileUnitSources(path.join(TMP_ROOT, 'no-such-source-dir'), COPY_CONTENT)
+      record(
+        '断言 5：content-source/ 不存在 ⇒ 三方对账判红（fail-closed，无法对账 ≠ 对账通过）',
+        r.problems.length > 0,
+        `problems=${r.problems.length}`,
+      )
+    }
+
+    // —— 隔离断言：真仓库不受影响 ——
+    {
+      const real = reconcileUnitSources(REAL_SOURCE, CONTENT_DIR)
+      record(
+        '断言 6：真 content/ + 真源判定判绿（隔离副本未污染真实数据）',
+        real.problems.length === 0 && real.packages === 9,
+        `真目录 problems=${real.problems.length} packages=${real.packages}`,
+      )
+    }
+
+    verdict = bad === 0
+  } catch (e) {
+    console.error(`  ‼ 证伪自检自身异常（fail-closed，绝不当作通过）：${e?.message ?? e}`)
+  } finally {
+    try { rmSync(TMP_ROOT, { recursive: true, force: true }) }
+    catch (e) { console.warn(`  ⚠ 隔离副本清理失败（node_modules/.tmp，gitignore，不影响判定）：${e?.message ?? e}`) }
+  }
+  const total = assertions.length
+  console.log('──────────────────────────────────────────────────────')
+  if (verdict === true) {
+    console.log(`content:validate 判据 26 Falsification：✅ PASS —— ${total}/${total} 断言通过（有包无源⇒判红 / 无源⇒判红 / 非脚手架包不误伤⇒判绿），真 content/ 与真源未被写入`)
+    return true
+  }
+  if (verdict === false) {
+    console.error(`content:validate 判据 26 Falsification：❌ FAIL —— ${bad}/${total} 断言未过 ⇒ 判据 26 不可信`)
+    return false
+  }
+  return null
+}
+
+/* ===== 判据 27 证伪自检：**核心是「把单一真源的段列表改少一个」** =====��
+ * ⚠️ 用户验收口径：把那个单一真源的段列表改少一个（比如去掉 exercise），
+ *   断言「两处口径分叉」能被**某条机器判据**抓住 —— 而不是靠人看注释。
+ *
+ * 注入方式（**不改真仓库**）：把 `license-policy.mjs` 复制到 node_modules/.tmp/ 的隔离目录，
+ * 在副本里删掉 exercise 段，然后用**带内容哈希的动态 import** 绕开 ESM 模块缓存读它。
+ *   ⛔ 为什么能这样做：license-policy.mjs 只 import node: 内置 + ./canonical.mjs，
+ *      故必须把 canonical.mjs 一并复制过去，相对 import 才解析得到（实测已验证）。
+ *   ⛔ 为什么不 spawn 子进程跑脚本：本机 shim 下 spawn 会 EBUSY；且门禁里 spawn 生成器是更大的坑。
+ *
+ * 本组共 6 条断言，覆盖两种不同的「分叉」形态：
+ *   ① **唯一副本自身被改少**（去掉 exercise）⇒ 判据 26 必须判红
+ *      （3 个 exercise 包突然「没有源能生成它们」⇒ 盘 ⇒ 源方向断裂）。
+ *      这正是「删一处、另一处跟着坏」的机器证据。
+ *   ② **有人在消费方自建副本**（validate.mjs 里写回字面量）⇒ 判据 27 必须判红。
+ *   ③ 对照组：真仓库判绿（证不是恒红门）。 */
+async function falsifyUnitTypeSingleSource() {
+  console.log('[content:validate] 判据 27 证伪自检 —— 证明「段类型口径分叉」会被机器判据抓住（不靠人看注释）')
+  const TMP_ROOT = path.join(ROOT, 'node_modules', '.tmp', 'unit-type-lock-falsify')
+  const REAL_LICENSE = path.join(ROOT, 'scripts', 'content', 'license-policy.mjs')
+  const REAL_SOURCE_DIR = path.join(ROOT, 'content-source')
+  let verdict = null
+  let bad = 0
+  const assertions = []
+  const record = (name, pass, actual) => {
+    assertions.push([name, pass, actual])
+    if (pass) console.log(`  ✓ ${name}`)
+    else { bad++; console.error(`  ✗ ${name} —— ${actual}`) }
+  }
+  try {
+    // —— 对照组：真仓库判绿 ——
+    const base = judgeUnitTypeSingleSource()
+    record(
+      `断言 1：**对照组** —— 真仓库三处消费方均无段类型副本 ⇒ 判绿（唯一副本 = ${base.segments.join(', ')}；证「它不是恒红门」）`,
+      base.problems.length === 0,
+      `problems=${base.problems.length}（${base.problems.slice(0, 2).join(';')}）`,
+    )
+
+    // —— 准备隔离副本：license-policy.mjs + canonical.mjs（相对 import 需要）——
+    rmSync(TMP_ROOT, { recursive: true, force: true })
+    mkdirSync(TMP_ROOT, { recursive: true })
+    const isoLicense = path.join(TMP_ROOT, 'license-policy.mjs')
+    const srcText = readFileSync(REAL_LICENSE, 'utf8')
+    writeFileSync(path.join(TMP_ROOT, 'canonical.mjs'), readFileSync(path.join(ROOT, 'scripts', 'content', 'canonical.mjs'), 'utf8'), 'utf8')
+    // ⛔ **只删 exercise 这一段**，其余逐字不动（注释、顺序、其它段全保留）
+    const mutated = srcText.replace(
+      /\n\s*Object\.freeze\(\{ type: 'exercise',[^\n]*\n/,
+      '\n',
+    )
+    if (mutated === srcText) throw new Error('注入失败：未能在 license-policy.mjs 里定位到 exercise 段（源码形态变了？）')
+    writeFileSync(isoLicense, mutated, 'utf8')
+
+    // 带内容哈希的动态 import：绕开 ESM 模块缓存，确保读到的是**变异副本**
+    const isoUrl = pathToFileURL(isoLicense).href
+    const mod = await import(`${isoUrl}?v=${mutated.length}-${mutated.charCodeAt(0)}`)
+    record(
+      '断言 2：注入成功 —— 隔离副本的段表真的少了一段（exercise 不在 declared 里了）',
+      !mod.UNIT_SOURCE_TYPES.includes('exercise') && mod.UNIT_SOURCE_TYPES.includes('vocabulary'),
+      `副本 UNIT_SOURCE_TYPES = [${mod.UNIT_SOURCE_TYPES.join(', ')}]`,
+    )
+
+    // ③ **核心断言**：唯一副本少一段 ⇒ 必须有机器判据判红
+    //    ⚠️ 实测记录（这正是证伪存在的意义）：第一版只查「判据 26 有没有红」，结果是 **problems=0** ——
+    //      段表改小后 `-exercise` 包不再匹配任何 dirSuffix，被当成「非脚手架包」**排除出对账**，
+    //      判据 26 反而全绿 ⇒ 真实假绿。门只校验「现状合法」、不校验「不该悄悄变」。
+    //    故判据 27b 的**手写字面真值**才是那道锁：段表是契约，不许被顺手改小。
+    {
+      const r27 = judgeUnitTypeSingleSource(mod.UNIT_SOURCE_SEGMENTS)
+      record(
+        '断言 3：**把单一真源的段列表改少一个（去掉 exercise）⇒ 判据 27 判红**（不靠人看注释）',
+        r27.problems.length > 0,
+        `problems=${r27.problems.length}（⛔ 若为 0，说明「改一份」的后果没有任何机器判据会发现）`,
+      )
+      record(
+        '断言 4：判红消息说明「段类型是契约」并给出期望/实得两份（可定位、可行动）',
+        r27.problems.some((p) => p.includes('唯一副本被改动') && p.includes('exercise')),
+        `首条=${r27.problems[0]?.slice(0, 160) ?? '(无)'}`,
+      )
+    }
+
+    // ③-补：**记录**那个被实测证伪出来的假绿形态（判据 26 在段表改小后会失明）——
+    //    这条断言的意义是「把已知盲区钉在案」，防止将来有人以为判据 26 能兜住段表漂移。
+    {
+      const r26 = reconcileUnitSources(REAL_SOURCE_DIR, CONTENT_DIR, mod.UNIT_SOURCE_SEGMENTS)
+      record(
+        '断言 4b：**已知盲区如实记录** —— 段表改小后判据 26 会把那 3 个 exercise 包排除出对账范围而判绿，'
+        + '这正是判据 27b（手写真值）必须存在的原因（若将来判据 26 改成了能兜住，这条会红并提醒你更新此说明）',
+        r26.problems.length === 0,
+        `problems=${r26.problems.length}（若 >0，说明判据 26 已不再有这个盲区，可更新本条说明）`,
+      )
+    }
+
+    // ④ 另一侧：判据 24 在变异段表下也会跟着少要一段 license（证明「单一副本驱动两层」）
+    const fakeSrc = JSON.parse(readFileSync(path.join(REAL_SOURCE_DIR, 'unit-source-ielts-edu-01.json'), 'utf8'))
+    delete fakeSrc.exercise // 同时删掉 exercise 段内容，使「已声明段」= 变异表口径
+    const p24 = judgeUnitSourceLicense(fakeSrc, '(probe)', mod.UNIT_SOURCE_SEGMENTS)
+    record(
+      '断言 5：同一张变异段表也驱动判据 24 的「已声明段」（两层口径同源，不各持一份）',
+      p24.length === 0,
+      `problems=${p24.length}（源已去掉 exercise 段，按变异表就该只要求 vocabulary/reading 两段许可）`,
+    )
+
+    // ⑤ 反向：模拟「有人在消费方自建副本」⇒ 判据 27 的检测口径必须判红
+    {
+      // ⚠️ 夹具内容**必须现场拼出来**（join 出三个段名），⛔ 不得把三段名字面量写进本文件：
+      //   否则判据 27 扫 validate.mjs 时会命中**这个夹具自己** ⇒ 对照组假红
+      //   （首次实现即踩到：夹具里写死了 "const UNIT_SOURCE_TYPES = ['vocabulary','reading','exercise']"，
+      //     被判据 27 如实判红 —— 判据没错，是夹具污染了被扫描的语料）。
+      const fakeValidate = path.join(TMP_ROOT, 'validate-with-copy.mjs')
+      const lit = `[${mod.UNIT_SOURCE_TYPES.map((t) => `'${t}'`).join(', ')}]`
+      writeFileSync(fakeValidate, [
+        "import { UNIT_SOURCE_SEGMENTS } from './license-policy.mjs'",
+        `const UNIT_SOURCE_TYPES = ${lit}`,
+        'export default UNIT_SOURCE_TYPES',
+      ].join('\n'), 'utf8')
+      // 直接复用判据 27 的正则对该副本判红（同一套口径，不另写一份判定）
+      const fakeSrcCode = readFileSync(fakeValidate, 'utf8')
+      const quoted = mod.UNIT_SOURCE_TYPES.map((t) => `['"]${t}['"]`).join('[^\\]]*')
+      const literalRe = new RegExp('\\[[^\\]]*' + quoted + '[^\\]]*\\]')
+      record(
+        '断言 6：消费方**自建第二份字面量**（validate.mjs 里写回三段名字面量）⇒ 判据 27 的检测口径判红',
+        literalRe.test(fakeSrcCode),
+        `⛔ 若为 false，说明「有人偷偷再写一份」无人发现 —— 那正是本判据要治的病`,
+      )
+    }
+
+    // —— 隔离断言：真 license-policy.mjs 未被改动 ——
+    {
+      const after = readFileSync(REAL_LICENSE, 'utf8')
+      record(
+        '断言 7：真 license-policy.mjs 逐字节未被改动（隔离副本未污染真实源）',
+        after === srcText,
+        `真实文件长度 ${after.length} vs 注入前 ${srcText.length}`,
+      )
+    }
+
+    verdict = bad === 0
+  } catch (e) {
+    console.error(`  ‼ 证伪自检自身异常（fail-closed，绝不当作通过）：${e?.message ?? e}`)
+  } finally {
+    try { rmSync(TMP_ROOT, { recursive: true, force: true }) }
+    catch (e) { console.warn(`  ⚠ 隔离副本清理失败（node_modules/.tmp，gitignore，不影响判定）：${e?.message ?? e}`) }
+  }
+  const total = assertions.length
+  console.log('──────────────────────────────────────────────────────')
+  if (verdict === true) {
+    console.log(`content:validate 判据 27 Falsification：✅ PASS —— ${total}/${total} 断言通过（真源少一段⇒判红 / 消费方自建副本⇒判红 / 真仓库⇒判绿），真 license-policy.mjs 未被写入`)
+    return true
+  }
+  if (verdict === false) {
+    console.error(`content:validate 判据 27 Falsification：❌ FAIL —— ${bad}/${total} 断言未过 ⇒ 判据 27 不可信`)
+    return false
+  }
+  return null
+}
+
+// ⚠️ 这里用**顶层 await**（falsifyUnitTypeSingleSource 需要动态 import 读隔离副本的变异模块）。
+//   故整段包进 async IIFE —— 直接在模块顶层 await 在 .mjs 里虽合法，但把它包起来能让
+//   「非 falsify 分支走 main()」的路径保持完全同步，行为与改动前逐字一致。
+;(async () => {
+  if (process.argv.slice(2).includes('--falsify')) {
+    // 七组证伪都跑，任一失败即整体失败。
+    // ⚠️ 多个 falsify 函数都**返回**三态而不自己 process.exit —— 否则先跑的那个会把进程带走，
+    //   后跑的那组永远不执行（证伪覆盖率静默下降，而输出看起来一切正常）。
+    // ⚠️ falsifyUnitTypeSingleSource 是 **async**：整条链必须 await —— 早先用同步调用会拿到
+    //   Promise（恒 truthy）而**假绿**，那正是本仓反复吃过的「看起来在测其实没测」形态。
+    // 三态对齐 gate-license.mjs --falsify 惯例：0=全过 / 1=断言失败 / 2=自身异常。
+    const r22 = falsifyBinaryMedia()
+    const r18 = falsifyManifestSize()
+    const r23 = falsifyVocabLicense()
+    const r24 = falsifyUnitSourceLicense()
+    const r25 = falsifyUnitSourceDrift()
+    const r26 = falsifyUnitSourceReconcile()
+    const r27 = await falsifyUnitTypeSingleSource()
+    if (r22 === null || r18 === null || r23 === null || r24 === null || r25 === null || r26 === null || r27 === null) process.exit(2)
+    process.exit(r22 && r18 && r23 && r24 && r25 && r26 && r27 ? 0 : 1)
+  }
+  else await main()
+})().catch((e) => { console.error('[content:validate] 异常：', e.message); process.exit(1) })

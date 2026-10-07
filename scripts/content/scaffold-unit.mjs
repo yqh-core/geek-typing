@@ -24,8 +24,11 @@
  *   于是判据 ①（源缺 license 段即拒跑）只在「有人手动跑本脚本」时才触发，
  *   在 PR 阶段是**形同虚设**的（源侧的病，CI 看不见）。
  *   入库后判据 ① 的等价检查已由 `content:validate` 的**判据 24**在 CI 里常驻执行
- *   （读同一批 `content-source/*.json`，口径与本文件的 DECLARED_TYPES 逐字一致）；
+ *   （读同一批 `content-source/*.json`）；
  *   本文件仍是「真正落盘/校验时」的最后一道闸，两层方向相同、职责不同。
+ *   ⚠️ 两层的**段类型口径不再各写一份**：都取 `license-policy.mjs` 的 `declaredUnitSourceTypes()`
+ *   （唯一副本 + `content:validate` 判据 27 机器上锁；此前是两份字面量靠注释互指，改一处忘
+ *   另一处就会让两层口径分叉 —— 判据 24 假红或假绿，且没有任何机器判据会发现）。
  *   ⚠️ `content-source/` **不是**内容包根：它不在 `content/` 下，故不会被
  *   `content:validate` / `content:ingest` 当作包扫描（实测把同类目录放进 content/ 会判红）。
  *   ⚠️ 该目录在 .gitattributes 里是 `-text`：源必须逐字节原样入库，不许 git 改写换行
@@ -35,12 +38,21 @@
  *   · checksum 一律走 license-policy.mjs 的 checksumPayload（唯一实现，禁止手搓）
  *   · --check 只校验不写盘，用于证明「现有包能被同一份源重现」（幂等 / 无漂移）
  *   · **落盘形态一律走 canonical.mjs 的 canonicalFile()**（唯一实现，禁止 JSON.stringify 直写）
+ *   · **可声明的段类型一律走 license-policy.mjs 的 UNIT_SOURCE_SEGMENTS**（唯一实现）
+ *   · ⛔ **import 本模块不得触发写盘**：本文件是**带 CLI 的脚本**，顶层就会 `process.exit`
+ *     （`--help`/无参/缺 `--src`/源非法 四种情形）。因此**门禁与测试绝不能 import 本模块** ——
+ *     要复用段类型口径请 import `license-policy.mjs` 的 `declaredUnitSourceTypes()`。
+ *     （`content:validate` 判据 25 因此**不能**靠 import 本模块来做源↔盘比对，
+ *       它调用的是同一批纯函数 `checksumPayload` / `canonicalFile` / `declaredUnitSourceTypes`，
+ *       详见 validate.mjs 判据 25 区块的「两个观测点」说明。）
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { checksumPayload, PROVIDER_ORIGINAL } from './license-policy.mjs'
-import { canonicalFile } from './canonical.mjs'
+import {
+  declaredUnitSourceTypes,
+} from './license-policy.mjs'
+import { planUnitSource, comparePackageToDisk } from './unit-source-render.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
@@ -141,8 +153,9 @@ if (publishedAt > localDay()) {
   console.error(`publishedAt 是未来日期：${publishedAt} —— 内容发布日期不能提前（按本地日历日比较；A1-E 实测踩过）`)
   process.exit(2)
 }
-const origin = src.origin ?? 'original authored content'
-const builtAt = `${publishedAt}T00:00:00.000Z`
+// ⚠️ `origin` / `builtAt` 已随渲染抽取搬到 `unit-source-render.mjs` 的 planUnitSource()
+//   （它们只被渲染 manifest 用到）。本文件**不再持有第二份推导** ——
+//   同一段推导写两处，改一处就会让「源渲染出的 manifest」与「落盘的 manifest」分叉。
 
 /* ── 判据 23 · 许可段 fail-closed（**缺失 ≠ 默认允许**）──
  * 为什么必须**分段**而不是整个 unit 一个值：本 unit 的 vocabulary 包已改标 MIT（可开源），
@@ -163,16 +176,20 @@ const builtAt = `${publishedAt}T00:00:00.000Z`
  *   （「字段缺失同样不算声明」）—— 同一仓同一件事只有一种判法。
  *
  * `redistributable` 是**必填**显式声明（license-policy:decideLicense 第三维，缺失即判红），
- * 故合并默认值时也必须带上它，不能省。 */
-const DEFAULT_LICENSE = { name: 'Proprietary (self-curated)', commercialUse: true, attributionRequired: false, redistributable: false }
-/** 源里声明了内容段的类型集合（与下方 problems 校验同口径，缺哪段就不建哪个包）。 */
-const DECLARED_TYPES = ['vocabulary', 'reading', 'exercise'].filter((t) => src[t] !== undefined && src[t] !== null)
-/** 取某类型的许可：必须在源里显式声明（判据 23 已先挡住缺段情形，故这里不再有回落分支）。 */
-const licenseFor = (type) => {
-  const override = src.license?.[type]
-  if (!override || typeof override !== 'object' || Array.isArray(override)) return { ...DEFAULT_LICENSE }
-  return { ...DEFAULT_LICENSE, ...override }
-}
+ * 故合并默认值时也必须带上它，不能省。
+ *
+ * ⚠️ `DEFAULT_LICENSE` 与 `licenseFor()` 已随渲染抽取搬到 `unit-source-render.mjs`
+ *   （它们只被渲染 manifest 的 `sources[].license` 用到）。本文件**不再持有第二份** ——
+ *   许可缺省值若在这里和那里各写一份，改一处就会让「无声明时的回落值」分叉，
+ *   而那正是判据 23 当初要治的「静默降级」的同一个位置。 */
+
+/** 源里声明了内容段的类型集合（与下方 problems 校验同口径，缺哪段就不建哪个包）。
+ *  ⚠️ **唯一实现是 `license-policy.mjs` 的 `declaredUnitSourceTypes()`**（含 `UNIT_SOURCE_SEGMENTS` 表）：
+ *     本行此前是一份字面量 `['vocabulary','reading','exercise'].filter(...)`，与 `validate.mjs` 的
+ *     `UNIT_SOURCE_TYPES` 构成「同一事实两份」—— 靠注释互指维持同步，改一处忘另一处就会让
+ *     判据 ①（这里）与判据 24（门禁）口径分叉，且**没有任何机器判据会发现**。
+ *     现改为调用共享纯函数，并由 `content:validate` 判据 27 机器上锁「无人自建副本」。 */
+const DECLARED_TYPES = declaredUnitSourceTypes(src)
 
 /* ── 校验（写盘前先把内容问题挡住，别让门禁去发现）── */
 const problems = []
@@ -243,198 +260,47 @@ if (problems.length) {
   process.exit(1)
 }
 
-/* ── 渲染 ── */
-/** 造一条 source：许可按**内容类型**取（见上方 licenseFor）——
- *  vocabulary 可能已是 MIT（可开源），reading / exercise 仍为专有（不可再分发）。
- *  `redistributable` 必填（license-policy:decideLicense 第三维，缺失即判红）⇒ 默认值也必须带。 */
-const sourceOf = (type) => ({
-  checksum: null, // 占位，下面按包填入
-  origin,
-  provider: PROVIDER_ORIGINAL,
-  importedAt: publishedAt,
-  license: licenseFor(type),
-})
-
-/** 造一个包：payload 落盘 + manifest（checksum 走唯一实现）。返回 {dir, payloadPath, manifestPath, payload, manifest} */
-function buildPackage(type, id, payload, title, description, icon, extraManifest = {}) {
-  const dir = join(OUT_ROOT, type, id)
-  const payloadName = type === 'vocabulary' ? 'words.json' : 'items.json'
-  const checksum = checksumPayload(payload)
-  const namespace = `curated-${id}`
-  const s = { ...sourceOf(type), checksum }
-  const manifest = {
-    schemaVersion: 4,
-    packageId: id,
-    namespace,
-    contentRevision: 1,
-    contentVersion: 1,
-    contentChecksum: checksum,
-    contentPublishedAt: publishedAt,
-    contentHistory: [{ revision: 1, version: 1, checksum, publishedAt }],
-    build: { toolVersion: 'scaffold-unit/1.0', builtAt, sourceChecksum: checksum },
-    id: `content:${type}:${namespace}:${id}`,
-    type,
-    version: '1.0.0',
-    title,
-    description,
-    language: 'en',
-    icon,
-    tags: TAGS,
-    features: {},
-    // stats 三个类型的包都有（实测 reading/exercise 磁盘上是 {items:1}），
-    // 只给 vocabulary 传会让另外两类渲染出「没有 stats」的 manifest ⇒ --check 假红
-    stats: { items: payload.length },
-    sources: [s],
-    offline: { policy: 'lazy', supported: true },
-    ...extraManifest,
-  }
-  return {
-    dir,
-    payloadPath: join(dir, payloadName),
-    manifestPath: join(dir, 'manifest.json'),
-    /* ⚠️ **manifest 与 payload 的落盘形态不是同一套**，别图省事一起 canonicalFile：
-     *   · manifest → canonicalFile()（递归键序归一 + 尾随换行）。仓库里**每一个** manifest 都是这个形态
-     *     （实测 27/27：canonicalFile(JSON.parse(磁盘)) === 磁盘），因为 content:build 用它落盘。
-     *   · payload  → JSON.stringify(payload) + 尾随换行（**保留字面插入序，不排序键**）。
-     *     实测 reading/exercise 的 items.json **不是** canonical 形态：磁盘键序是
-     *     `id,title,body,paragraphs`（插入序），而 canonicalize 会排成 `body,id,paragraphs,title`。
-     *     载荷是**内容本体**，键序带阅读语义（先 id 再 title 再 body），不该被构建器重排。
-     *   · 两者都补尾随换行：canonical.mjs:88 明确写了这是 POSIX 文本文件惯例
-     *     （避免 diff 出现 "\ No newline at end of file"）。
-     *     ⚠️ 实测既有 items.json **缺**这个换行（末字节 `5d`），而 content:build 写的 words.json 有（`0a`）
-     *     —— 同一仓两套排版约定。补齐的理由不是「-disk 上就该这样」，而是 canonical.mjs 已把它写成
-     *     全仓文本文件约定，且 git diff 的 "\ No newline at end of file" 标记本身就会污染 review：
-     *     任何一次触碰该文件都会显示「最后一行被改」，而实际只差一个换行。
-     *
-     *   实测踩过的坑：本脚本原先对两者都直写 JSON.stringify（无换行、manifest 按插入序），
-     *   产出与仓库既有形态不一致 ⇒ 重跑一次就在 git 里留下一批「只有键序和换行不同」的脏改动，
-     *   而内容其实零变化 —— 那种形态让 review 无法区分真漂移与假漂移。
-     *   而 npm run content:build 只归一 content/vocabulary/（build.mjs:105-113 显式跳过其它类型），
-     *   所以 reading / exercise 的错形态不会被后续步骤自动修回来。
-     *   ⚠️ canonicalFile 与 checksum 同源（checksum 只对 canonicalize 结果算、不含尾随换行），
-     *   故改落盘形态**不会**改动任何 contentChecksum / sources[].checksum。 */
-    payloadText: `${JSON.stringify(payload)}\n`,
-    manifestText: canonicalFile(manifest),
-    statsItems: payload.length,
-  }
-}
-
-const TAGS = Array.isArray(src.tags) ? src.tags : ['ielts', 'academic']
-const out = []
-if (has('vocabulary')) {
-  const words = vocabItems.map((v) => {
-    const o = { word: v.word, translation: v.translation }
-    if (v.phonetic) o.phonetic = v.phonetic
-    if (v.definition) o.definition = v.definition
-    return o
-  })
-  const vTitle = src.vocabulary?.title ?? `${prefix} — Core Vocabulary`
-  const vDesc = src.vocabulary?.description ?? `单元核心词汇 ${words.length} 词`
-  out.push(buildPackage('vocabulary', `${prefix}-vocab`, words, vTitle, vDesc, 'GraduationCap',
-    // vocabulary 包的 stats 由 content:build 派生（含 phonetic/definition 计数），这里先给 items
-    { stats: { items: words.length, phonetic: words.filter((w) => w.phonetic).length, definition: words.filter((w) => w.definition).length } }))
-}
-if (has('reading')) {
-  const paras = src.reading.paragraphs
-  out.push(buildPackage('reading', `${prefix}-reading`,
-    [{ id: `${prefix}-passage`, title: src.reading.itemTitle ?? src.reading.title ?? 'Reading passage', body: paras.join('\n\n'), paragraphs: paras }],
-    src.reading.title ?? `${prefix} — Reading`, src.reading.description ?? '单元阅读篇章', 'BookOpen'))
-}
-if (has('exercise')) {
-  out.push(buildPackage('exercise', `${prefix}-exercise`,
-    [{
-      id: `${prefix}-practice`,
-      title: src.exercise.itemTitle ?? src.exercise.title ?? `${prefix} — Practice Set`,
-      questions: { items: src.exercise.questions, collocations: src.exercise.collocations ?? [] },
-    }],
-    src.exercise.title ?? `${prefix} — Practice`, src.exercise.description ?? '单元练习题（含答案与解析）', 'Dumbbell'))
-}
+/* ── 渲染（**唯一实现**在 unit-source-render.mjs 的 planUnitSource）──
+ * ⚠️ 渲染与比对已抽到 `unit-source-render.mjs`，因为 `content:validate` 的**判据 25**
+ *   要做同一件事（源 ↔ 磁盘一致性）却**绝不能 import 本文件** ——
+ *   本文件是带 CLI 的脚本，顶层就会 `process.exit`（`--help` / 无参 / 缺 `--src` / 源非法），
+ *   import 它 = 让门禁在 CI 里跑 CLI，正是本仓明令禁止的「测试与门禁绝不能 import 生成器」。
+ *   两边共用那**一个纯函数** ⇒ 同一事实一份实现，不存在「记得同步两处」。
+ *   本文件保留的只是 CLI 外壳：参数解析、写盘、待办打印、把比对结果渲染成人看的文字。
+ * ⚠️ 抽取时逐字保留了原有渲染口径（键序、尾随换行、stats 派生、build 戳不参与比对）；
+ *   `test:scaffold-unit` 81 条断言全绿即其回归证据。 */
+const { packages: out } = planUnitSource(src, { outRoot: OUT_ROOT })
 
 /* ── --check：逐字节比对，证明「现有包能被同一份源重现」── */
 if (CHECK) {
   let bad = 0
-  /** 去掉 `build` 后按 JSON 语义比 —— `build` 是**构建戳**（toolVersion / builtAt / sourceChecksum），
-   *  记的是「谁在什么时候构建」，不同构建器本就该不同（实测三个包分别是
-   *  content-build/1.1、hand-authored/1.0、scaffold-unit/1.0）。拿它判漂移只会造出假红。
-   *  内容身份（id / type / contentChecksum / sources[].checksum）仍逐项比对。 */
-  const withoutBuild = (m) => {
-    const c = { ...m }
-    delete c.build
-    return stable(c)
-  }
-  /** 键序无关的递归稳定序列化 —— manifest 的 stats 键序因构建器而异
-   *  （实测 {phonetic,definition,items} vs {items,phonetic,definition}），
-   *  直接 JSON.stringify 会把「键序不同」误判成内容漂移。 */
-  const stable = (v) => {
-    if (Array.isArray(v)) return `[${v.map(stable).join(',')}]`
-    if (v && typeof v === 'object') {
-      return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stable(v[k])}`).join(',')}}`
-    }
-    return JSON.stringify(v)
-  }
-  const canon = (s) => JSON.stringify(JSON.parse(s))
   /** 路径统一成仓库相对、正斜杠 —— Windows 下直接 replace 根会留下前导反斜杠，
-   *  打印出来是 `\content\...`，读着像另一个目录。 */
+   * 打印出来是 `\content\...`，读着像另一个目录。 */
   const rel = (p) => p.replace(ROOT, '').replace(/\\/g, '/').replace(/^\//, '')
-  /** 全字段递归 diff，返回人类可读的差异行。
-   *  ⚠️ 不能只 diff 一个「重要的键」白名单：实测 reading/exercise 的差异是 stats，
-   *  压根不在白名单里 ⇒ 报红但不打印任何细节，等于让人猜。要 diff 就全 diff。 */
-  const kindOf = (v) => (Array.isArray(v) ? 'array' : v && typeof v === 'object' ? 'object' : 'primitive')
-  const diffPaths = (disk, gen, path = '', acc = []) => {
-    const at = path || '(root)'
-    const ka = kindOf(disk)
-    const kb = kindOf(gen)
-    if (ka !== kb) {
-      acc.push(`${at}: 类型不同（磁盘=${ka} / 源渲染=${kb}）`)
-      return acc
-    }
-    if (ka === 'primitive') {
-      if (disk !== gen) acc.push(`${at}: 磁盘=${JSON.stringify(disk)} / 源渲染=${JSON.stringify(gen)}`)
-      return acc
-    }
-    if (ka === 'array') {
-      if (disk.length !== gen.length) acc.push(`${at}: 数组长度 磁盘=${disk.length} / 源渲染=${gen.length}`)
-      for (let i = 0; i < Math.min(disk.length, gen.length); i++) diffPaths(disk[i], gen[i], `${path}[${i}]`, acc)
-      return acc
-    }
-    for (const k of [...new Set([...Object.keys(disk), ...Object.keys(gen)])].sort()) {
-      const p = path ? `${path}.${k}` : k
-      const inDisk = Object.prototype.hasOwnProperty.call(disk, k)
-      const inGen = Object.prototype.hasOwnProperty.call(gen, k)
-      if (!inGen) acc.push(`${p}: 源渲染缺少此键（磁盘=${JSON.stringify(disk[k])}）`)
-      else if (!inDisk) acc.push(`${p}: 磁盘缺少此键（源渲染=${JSON.stringify(gen[k])}）`)
-      else diffPaths(disk[k], gen[k], p, acc)
-    }
-    return acc
-  }
+  /** I/O 注入点：把「读盘」交给调用方，使共享实现 comparePackageToDisk 保持纯函数。 */
+  const readText = (p) => (existsSync(p) ? readFileSync(p, 'utf8') : null)
 
   for (const p of out) {
-    if (!existsSync(p.payloadPath)) {
+    const cmp = comparePackageToDisk(p, readText)
+    if (!cmp.payload.exists) {
       console.log(`  ✗ 载荷不存在：${rel(p.payloadPath)}`)
       bad++
       continue
     }
-    // ① 载荷：内容本体，允许排版差异，但 JSON 语义必须一致
-    const diskPayload = readFileSync(p.payloadPath, 'utf8')
-    const byteSame = diskPayload === p.payloadText
-    const payloadSame = byteSame || canon(diskPayload) === canon(p.payloadText)
-    // 文案必须区分三种状态：逐字节 / JSON 语义一致（排版不同）/ 不一致。
-    // 早先只在「非逐字节」时统一打印「JSON 语义一致」，语义其实也不一致时会误导。
-    const how = byteSame ? '逐字节一致' : payloadSame ? 'JSON 语义一致（排版不同）' : '不一致'
-    console.log(`  ${payloadSame ? '✓' : '✗'} 载荷 ${how}：${rel(p.payloadPath)}`)
-    if (!payloadSame) bad++
+    // ① 载荷：内容本体，允许排版差异，但 JSON 语义必须一致。
+    //    三态文案（逐字节一致 / 排版不同 / 不一致）由共享实现给出 —— 本文件不再自述一套，
+    //    否则「文案口径」也会变成两份（早期版本就因此在语义真不一致时误导过）。
+    console.log(`  ${cmp.payload.ok ? '✓' : '✗'} 载荷 ${cmp.payload.how}：${rel(p.payloadPath)}`)
+    if (!cmp.payload.ok) bad++
 
-    if (!existsSync(p.manifestPath)) {
+    if (!cmp.manifest.exists) {
       console.log(`  ✗ manifest 不存在：${rel(p.manifestPath)}`)
       bad++
       continue
     }
-    const diskM = JSON.parse(readFileSync(p.manifestPath, 'utf8'))
-    const genM = JSON.parse(p.manifestText)
-    const mSame = withoutBuild(diskM) === withoutBuild(genM)
-    console.log(`  ${mSame ? '✓' : '✗'} manifest 除 build 戳外全部一致：${rel(p.manifestPath)}`)
-    if (!mSame) {
-      for (const d of diffPaths(diskM, genM)) console.log(`      · ${d}`)
+    console.log(`  ${cmp.manifest.ok ? '✓' : '✗'} manifest 除 build 戳外全部一致：${rel(p.manifestPath)}`)
+    if (!cmp.manifest.ok) {
+      for (const d of cmp.manifest.diffs) console.log(`      · ${d}`)
       bad++
     }
   }
