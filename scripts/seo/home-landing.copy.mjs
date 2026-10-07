@@ -150,6 +150,42 @@ export const TYPING_FIGURE = [
   '</svg>',
 ].join('')
 
+/**
+ * 站点群兄弟站（互导）—— 供落地块渲染成**真 `<a href>` 出站链接**。
+ *
+ * 为什么要它（这是「孤岛」问题的另一半）：
+ *   上一轮修的是**入站**（13 个词库页终于有了入站链接）；但反方向一直空着 ——
+ *   落地块里除本站词库页外，`dist/index.html` 对外一条链接都没有。
+ *   访问 geek-typing 的人看不到 DigDevBox 站点群的其他站，流量自然单向流出。
+ *
+ * 三条硬纪律（破了会红）：
+ *   1. ⛔ **不写死任何统计数字**（「101 个工具」「18 篇文章」这类一律不许出现）。
+ *      不是因为它们不真，而是**它们会腐坏** —— 站点群的文章与工具都在增，
+ *      而落地块是静态产物，改一次就要走一次发布流程。写「有多少」等于给自己埋一个
+ *      必然过期的数字（这与 Home.page.vue 里的文章清单是同一类腐坏点）。
+ *   2. ⛔ **链接 class 不能叫 `gh-card`** —— `gate-home-landing.mjs` 的
+ *      `extractBankLinks()` 用 `/<a\s+class="gh-card"\s+href="..."/ ` 抽取词库卡，
+ *      判据 5/6 会把兄弟站链接当成「多出来的词库卡」判红。
+ *      所以这里用 `gh-site`，两套链接形态互不干扰。
+ *   3. ⛔ **必须是真链接**：纯文字展示对流量互导零收益。
+ *
+ * @type {ReadonlyArray<{id: string, name: string, href: string, desc: string}>}
+ */
+export const SIBLING_SITES = Object.freeze([
+  {
+    id: 'ddb-tools',
+    name: 'DigDevBox 工具箱',
+    href: 'https://digdevbox.com/',
+    desc: '同一站点群里的开发者工具站：在线工具、编码解码、文本与格式化类小工具，打开浏览器就能用，不必安装。',
+  },
+  {
+    id: 'ddb-notes',
+    name: 'Forge Notes',
+    href: 'https://notes.digdevbox.com/',
+    desc: '同一站点群里的技术博客：前端性能优化、Google SEO、VitePress 与 AdSense 集成的实战记录与踩坑笔记。',
+  },
+])
+
 /* ──────────────────────────── 区块定义 ──────────────────────────── */
 
 /**
@@ -178,6 +214,7 @@ export const TYPING_FIGURE = [
  *   facts?: ReadonlyArray<{q: string, a: string}>,
  *   faq?: ReadonlyArray<{q: string, a: string}>,
  *   ctas?: ReadonlyArray<{text: string, href: string, primary?: boolean}>,
+ *   sites?: ReadonlyArray<{id: string, name: string, href: string, desc: string}>,
  * }>}
  */
 export const SECTIONS = Object.freeze([
@@ -301,6 +338,15 @@ export const SECTIONS = Object.freeze([
     ],
   },
   {
+    id: 'gh-sites',
+    heading: '同一站点群里的其他站',
+    body: [
+      'Geek Typing 不是孤立的一个站。它和下面两个站同属DigDevBox 站点群，各有各的定位：一个放工具，一个写文章，这里专门练打字和背单词。',
+    ],
+    // ⛔ 兄弟站清单来自 SIBLING_SITES（见该常量上方纪律），⛔ 零统计数字。
+    sites: SIBLING_SITES,
+  },
+  {
     id: 'gh-cta',
     heading: '现在就开始练',
     body: ['无需注册 · 无需下载 · 断网也能练'],
@@ -382,6 +428,13 @@ export const LANDING_CSS = `#seo-home{box-sizing:border-box;display:block;max-wi
 #seo-home .gh-faq-item{margin:0 0 .6rem;border:1px solid #1e2b45;border-radius:.7rem;background:#101a2d;overflow-wrap:break-word;box-shadow:0 1px 2px rgba(2,6,23,.5)}
 #seo-home .gh-faq-q{display:block;padding:.8rem 1rem;font-weight:600;color:#bfdbfe;cursor:pointer;overflow-wrap:break-word}
 #seo-home .gh-faq-a{margin:0;padding:0 1rem .85rem;color:#cbd5e1;overflow-wrap:break-word}
+#seo-home .gh-sites{margin:1.1rem 0 0;padding:0;list-style:none;display:grid;grid-template-columns:1fr;gap:.7rem}
+#seo-home .gh-site-item{min-width:0;max-width:100%}
+#seo-home .gh-site{display:grid;grid-template-columns:1fr;gap:.3rem;min-width:0;max-width:100%;padding:.95rem 1.1rem;border:1px solid #1e2b45;border-radius:.8rem;background:#101a2d;color:inherit;text-decoration:none;overflow-wrap:break-word;box-shadow:0 1px 2px rgba(2,6,23,.6);transition:transform .15s ease,border-color .15s ease,background .15s ease,box-shadow .15s ease}
+#seo-home .gh-site:hover{border-color:#3b82f6;background:linear-gradient(180deg,#16233c 0%,#111c31 100%);transform:translateY(-2px);box-shadow:0 14px 26px -16px rgba(2,6,23,.95)}
+#seo-home .gh-site-name{display:block;font-weight:600;color:#f8fafc;overflow-wrap:break-word}
+#seo-home .gh-site-desc{display:block;color:#94a3b8;font-size:.9rem;line-height:1.65;overflow-wrap:break-word}
+#seo-home .gh-site-go{display:block;color:#7dd3fc;font-size:.82rem;overflow-wrap:break-word}
 #seo-home .gh-foot{margin:0;padding:1.25rem .25rem 0;border-top:1px solid #1b2740;color:#64748b;font-size:.85rem;overflow-wrap:break-word}
 @media (min-width:640px){
 #seo-home .gh-wrap{padding:1.75rem 1.75rem 2.5rem}
@@ -391,6 +444,7 @@ export const LANDING_CSS = `#seo-home{box-sizing:border-box;display:block;max-wi
 #seo-home #gh-hero .gh-h1{font-size:2.3rem}
 #seo-home .gh-h2{font-size:1.3rem}
 #seo-home .gh-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+#seo-home .gh-sites{grid-template-columns:repeat(2,minmax(0,1fr))}
 #seo-home .gh-cmp-item{grid-template-columns:1fr auto 1fr;align-items:center;gap:.9rem}
 }
 @media (min-width:960px){

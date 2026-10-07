@@ -216,6 +216,28 @@ export function renderHomeLandingBlock({ bankRows, origin, totalWords } = {}) {
 
     if (sec.ctas) parts.push(renderCtas(sec.ctas))
 
+    // gh-sites：站点群兄弟站互导（**真外链**，⛔ class 不是 gh-card）
+    //   ⛔ 为什么不能复用 `gh-card`：门禁的 extractBankLinks() 用
+    //     `<a\s+class="gh-card"\s+href="..."> ` 抽取词库卡来核对词数与 13/13 覆盖，
+    //     兄弟站链接若也叫 gh-card，会被当成「多出来的词库卡」判红（判据 5/6）。
+    //   ⛔ 为什么不用 ctas：cta 渲染成 `.gh-btn`，语义是「本页内的行动号召」，
+    //     而这两个是**站外**站点，语义不同类，且需要 description 才说清各站定位。
+    //   target/rel：站外链接一律新窗口打开并加 noopener（reverse tabnabbing 防护）。
+    if (sec.sites) {
+      parts.push(
+        `<ul class="gh-sites">${sec.sites
+          .map(
+            (s) =>
+              `<li class="gh-site-item"><a class="gh-site" href="${escapeHtml(s.href)}" target="_blank" rel="noopener">` +
+              `<span class="gh-site-name">${escapeHtml(s.name)}</span>` +
+              `<span class="gh-site-desc">${escapeHtml(s.desc)}</span>` +
+              `<span class="gh-site-go">${escapeHtml(s.href)}</span>` +
+              `</a></li>`,
+          )
+          .join('')}</ul>`,
+      )
+    }
+
     parts.push('</section>')
     return parts.join('')
   }).join('\n')

@@ -576,6 +576,13 @@ function falsify() {
             //     （extractVisibleText 会把 SVG 文字算进正文，所以必须整块删而不是只删 figcaption）
             out = out.replace(/<ul class="gh-chips">[\s\S]*?<\/ul>/g, '')
             out = out.replace(/<div class="gh-demo">[\s\S]*?<\/ul><\/div>/g, '')
+            // ③c 抽掉站点群兄弟站互导区（⛔ 见上方「必须随结构同步维护」）：
+            //   gh-sites：每站一个 <li class="gh-site-item">，内含站名 + 描述 + 完整 URL
+            //   （站名与描述都是会被 extractVisibleText 计入正文的文案载体，
+            //     且那行「完整 URL」也是可见文字，所以整块删而不是只删描述。）
+            //   ⚠️ 不加这一条 ⇒ 抽薄后正文仍 ≥ 800 ⇒ 判据 2 不红
+            //     ⇒ falsify 报「判据 2 恒真，没在守」。这正是本注释存在的理由。
+            out = out.replace(/<ul class="gh-sites">[\s\S]*?<\/ul>/g, '')
             // ④ 补一行 9 个关键词，让判据 3 保持绿（证明这刀只砍长度）
             const kw = '英语打字练习 背单词 打字练习 程序员背单词 前端英语词汇 Go 词汇 云原生词汇 K8s 词汇 AI 大模型词汇'
             out = out.replace('<section class="gh-sec" id="gh-cta">', `<p class="gh-p">${kw}</p><section class="gh-sec" id="gh-cta">`)
