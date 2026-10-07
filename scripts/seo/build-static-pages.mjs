@@ -46,6 +46,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { injectIntoIndexHtml, renderHomeLandingBlock } from './home-landing.mjs'
+import { renderRelatedSection, renderSceneSection } from './bank-scenes.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const VOCAB_DIR = join(ROOT, 'content', 'vocabulary')
@@ -314,9 +315,10 @@ export function buildBankJsonLd({ manifest, shown, siteOrigin }) {
  * @param {Array<object>} input.words 该包**全量**词条（截取在本函数内做，保证调用方无法漏）
  * @param {string} input.siteOrigin 站点绝对 origin（如 https://geek-typing.pages.dev）
  * @param {number} [input.wordsPerPage] 单页词条上限
+ * @param {Record<string,string>} [input.bankTitles] 包 id → title（相关词库锚文本用；缺则退回显示 id）
  * @returns {string} 完整 HTML 文档
  */
-export function renderBankPage({ manifest, words, siteOrigin, wordsPerPage = WORDS_PER_PAGE }) {
+export function renderBankPage({ manifest, words, siteOrigin, wordsPerPage = WORDS_PER_PAGE, bankTitles }) {
   const title = String(manifest?.title ?? '').trim()
   const description = String(manifest?.description ?? '').trim()
   const packageId = String(manifest?.packageId ?? '').trim()
@@ -340,6 +342,61 @@ export function renderBankPage({ manifest, words, siteOrigin, wordsPerPage = WOR
   //   gate-home-landing 判据 4 只对 `<!-- seo-home:start -->`…`end` 之间的切片数 <script>，
   //   而本函数产出的是词库页（根本没有落地块），故无冲突。
   const jsonLd = serializeJsonLd(buildBankJsonLd({ manifest, shown, siteOrigin }))
+
+  /*
+   * ── 技术词库页的内容深度区（场景分组 + 相关词库内链）──────────────
+   *
+   * 只对 bank-scenes 声明过的 5 个包生效，其余 8 个包两个函数都返回空串 ⇒
+   * 产物里那些页面的字节数与改动前**逐字节相同**（ECDICT 大包与单元源派生包零影响）。
+   *
+   * 三条纪律在这一段里的落法：
+   *   ① 词条内容一字不改 —— 两个函数都只**读** words.json，分组区只是同一批词的另一种排布，
+   *      完整「词条 → 释义」仍由下方 <dl> 逐条承载，SEO 完整性不受影响。
+   *   ② 内链 href 走 canonicalBankUrl（参数注入）—— 与 canonical / og:url / sitemap <loc> /
+   *      门禁判据 5 同源，⛔ 不含 .html（.html 会 308）。
+   *   ③ 分组区 ⛔ 不用 <dt> —— 判据 12 用 <dt> 个数核对「声明展示数」，复用会让计数翻倍而判红。
+   */
+  const sceneSection = renderSceneSection({ packageId, words, escapeHtml })
+  const relatedSection = renderRelatedSection({
+    packageId,
+    bankTitles,
+    canonicalBankUrl,
+    siteOrigin,
+    escapeHtml,
+  })
+  // 两者都是多行片段；无内容时为空串，不能留下空行把后面的标签挤远。
+  const sceneBlock = sceneSection === '' ? '' : `${sceneSection}\n\n`
+  const relatedBlock = relatedSection === '' ? '' : `${relatedSection}\n\n`
+  /*
+   * 场景分组区的 CSS **只在这 5 个包里输出**。
+   * 为什么要条件化而不是常驻 <style>：ECDICT 大包与单元源派生包本轮⛔ 不许改动，
+   * 而「产物字节数与改动前逐字节相同」是把「没碰」变成可验证事实的最强证据 ——
+   * 常驻 CSS 会让那 8 个页面白白各涨~1.9 KB（内容不变，但字节变了），
+   * 复核时就得靠人肉比对，而不是 `git diff --stat` 一眼看出「只有 5 个文件变了」。
+   * ⛔ 这段 CSS 全部用 class 选择器：不新增裸标签选择器，也不碰 body / html 全局规则。
+   */
+  const sceneCss = sceneSection === '' && relatedSection === '' ? '' : `
+      /* ── 场景分组区（仅 5 个技术词库页有这些元素）───────────── */
+      .scene-lede { color: #e2e8f0; font-weight: 600; }
+      .scene-intro, .scene-count-total { color: #cbd5e1; }
+      .scene-count-total { color: #94a3b8; font-size: .9rem; }
+      .scene-group { margin: 1.25rem 0; padding: .85rem 1rem; border: 1px solid #1e293b;
+                     border-radius: .5rem; background: #0f172a; }
+      .scene-title { font-size: 1rem; margin: 0 0 .35rem; color: #7dd3fc; font-weight: 600;
+                     display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; }
+      .scene-count { font-size: .8rem; font-weight: 400; color: #64748b; }
+      .scene-note { color: #94a3b8; font-size: .9rem; margin: 0 0 .6rem; }
+      /* chip 用 flex 换行：⛔ 不能用固定宽度表格/网格 —— 375px 窄屏下长代码行必须能换行
+         （go-code / ts-code 的词形是整行代码，nowrap 会撑出横向滚动条）。*/
+      .chips { display: flex; flex-wrap: wrap; gap: .4rem; padding: 0; margin: 0; }
+      .chip { list-style: none; padding: .2rem .5rem; border-radius: .35rem; background: #1e293b;
+              color: #e2e8f0; font-size: .85rem; font-family: ui-monospace, SFMono-Regular,
+              Menlo, Consolas, monospace; overflow-wrap: anywhere; word-break: break-word; }
+      .rel-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: .6rem; }
+      .rel-link { display: inline-block; padding: .45rem .8rem; border: 1px solid #334155;
+                  border-radius: .5rem; background: #1e293b; color: #93c5fd; text-decoration: none;
+                  font-size: .9rem; overflow-wrap: anywhere; }
+      .rel-link:hover, .rel-link:focus { background: #334155; color: #e0f2fe; }`
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -384,6 +441,7 @@ ${jsonLd}
       .cta { display: inline-block; margin-top: 1.5rem; padding: .6rem 1.1rem; border-radius: .5rem;
              background: #2563eb; color: #fff; text-decoration: none; font-weight: 600; }
       footer { margin-top: 3rem; color: #64748b; font-size: .85rem; }
+${sceneCss}
     </style>
   </head>
   <body>
@@ -397,7 +455,7 @@ ${jsonLd}
           ? '受单页体积控制，本页只渲染前 ' + shown.length + ' 条；完整词库与练习模式请进入应用。'
           : '该词库全部 ' + total + ' 条已完整列出。'}</p>
 
-        <h2>词汇列表</h2>
+${sceneBlock}${relatedBlock}<h2>词汇列表</h2>
         <dl>
 ${items}
         </dl>
@@ -595,6 +653,13 @@ export function main(opts = {}) {
 
   mkdirSync(bankDir, { recursive: true })
 
+  // 包 id → title（现算，供相关词库内链的锚文本用；⛔ 不写死标题字符串）
+  const bankTitles = {}
+  for (const b of banks) {
+    const bid = String(b.manifest?.packageId ?? '').trim()
+    if (bid !== '') bankTitles[bid] = String(b.manifest?.title ?? '').trim()
+  }
+
   let totalWords = 0
   // ⭐ F2 · v2：首页 <lastmod> 取**内容源**（仓库根 index.html）的 mtime（⛔ 不写死字符串、⛔ 不取 dist/ 产物）。
   //   注意本 entry 在落地块注入**之前**构造，而注入会在末尾覆写 index.html —— 那也是不能取产物 mtime 的另一个理由。
@@ -603,7 +668,7 @@ export function main(opts = {}) {
   ]
   for (const bank of banks) {
     const { manifest, words } = bank
-    const html = renderBankPage({ manifest, words, siteOrigin: origin, wordsPerPage: opts.wordsPerPage })
+    const html = renderBankPage({ manifest, words, siteOrigin: origin, wordsPerPage: opts.wordsPerPage, bankTitles })
     // 页文件名 = packageId + .html。⛔ 绝不用 index.html（见头注②）。
     // ⚠️ **文件名带 .html，URL 不带** —— 文件名是 CF Pages 的部署要求，URL 是规范地址（见 canonicalBankUrl）。
     const file = join(bankDir, `${manifest.packageId}.html`)
