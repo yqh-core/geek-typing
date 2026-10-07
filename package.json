@@ -3,6 +3,22 @@
   "private": true,
   "version": "0.0.0",
   "license": "MIT",
+  "description": "程序员的英语肌肉记忆训练器：英语打字练习 + 背单词两合一，纯前端、无需注册、可离线使用",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yqh-core/geek-typing.git"
+  },
+  "homepage": "https://geek-typing.pages.dev",
+  "keywords": [
+    "typing-practice",
+    "vocabulary",
+    "flashcards",
+    "spaced-repetition",
+    "pwa",
+    "offline-first",
+    "react",
+    "developer-tools"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -70,6 +86,8 @@
     "gate:architecture": "node scripts/gate-architecture.mjs",
     "gate:todo": "node scripts/gate-todo.mjs",
     "gate:content-contract": "node scripts/gate-content-contract.mjs",
+    "verify:readme-facts": "node scripts/verify-readme-facts.mjs",
+    "verify:readme-facts:falsify": "node scripts/verify-readme-facts.mjs --falsify",
     "gate:content-type-contract": "node scripts/gate-content-type-contract.mjs",
     "gate:content-type-contract:falsify": "node scripts/gate-content-type-contract.mjs --falsify",
     "gate:license": "node scripts/gate-license.mjs",
