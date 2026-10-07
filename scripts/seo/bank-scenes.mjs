@@ -30,6 +30,31 @@
  *   门禁与报告都要断言它为空。⛔ 一旦 residual 非空，说明分组规则有缺口，必须补规则
  *   而不是把残词硬塞进某个组。
  *
+ * ── ⛔ 分组粒度下限：任何一组不得少于 5 条词 ─────────────────────────────────
+ *   上一轮（035355e）遗留了 ts-code 的「事件对象」1 条、「模块导出」2 条，
+ *   以及 ai-core 的「常见任务动词」2 条这类**信息密度过低**的组：一个只放 1 个词的
+ *   组，读者看不出「为什么它单独成组」，反而制造认知负担。
+ *   因此本文件的合并纪律是：**每组 ≥ MIN_GROUP_SIZE（5）条词**，
+ *   目标粒度每包 5-7 组。少于 5 条的组必须并入语义最接近的相邻组。
+ *
+ *   ⛔ 但「≥5 条」是**下限而不是目标**：**绝不允许为了凑满 5 条做语义错配的合并**。
+ *   若某条词真的无处可去，就让它留在语义正确的组里（哪怕该组因此不足 5 条），
+ *   并在本文件与报告里说明原因 —— 宁可承认粒度不达标，也不做错配。
+ *   `selfCheck` 会把每包的实际组数与每组条数全部打印出来供人核。
+ *
+ *   ⚠️ 已知取舍：frontend（20 词）在本规则下的**数学上限是 4 组**（20/5=4），
+ *   而强行凑到 4 组必须把 `asynchronous`（异步范式）塞进「组件与架构分层」——
+ *   那是语义错配。故frontend 取 3 组（7/7/6），详见该包内的注释。
+ *
+ * ── ⛔ 内链必须对称 ───────────────────────────────────────────────────────
+ *   `related` 表达的是「这几个词库在真实工作里常一起出现」这一**关系**，
+ *   关系本身没有方向：只写 `ai-core → cloud-native` 而不写反向，
+ *   等于宣称「ai-core 与 cloud-native 相关，但反过来不相关」——
+ *   这既让爬虫对关系方向产生误判，也对读者造成信息损失
+ *   （站在 ai-core 页上看不到它同时属于后端基础设施这条线）。
+ *   裁定：**关系图必须是无向的**，任何有向边都必须有反向边。
+ *   `selfCheck` 的 `assertRelationSymmetric` 会现算并断言这一点。
+ *
  * ── import 本模块不得触发任何写盘 ─────────────────────────────────────────
  *   与 build-static-pages.mjs 同一条纪律：纯逻辑 + 常量，CLI/自检段放在
  *   `import.meta.url` 判定之后（见文件末尾），便于门禁 import 做判定计算。
@@ -98,9 +123,16 @@ export const BANK_SCENES = {
       },
       {
         id: 'agent',
-        label: 'Agent 与编排',
-        note: '让模型进入一个有工具、有循环、能自主推进的工作流。',
-        words: ['orchestration', 'scaffolding', 'autonomous', 'heuristic'],
+        label: 'Agent 编排与任务动词',
+        // ⛔ 035355e 里「Agent 与编排」只有 4 条、「常见任务动词」只有 2 条，两组都不足
+        //   MIN_GROUP_SIZE。此处合并的理由是**语义本就相连**：Agent 编排要解决的就是
+        //   「让模型去做某件事」，而 summarize / classify 正是这件事在 API 上的动词形态。
+        //   拆开看两个都太薄，合起来是「编排 → 动作」这条完整链条。
+        note: '让模型进入有工具、有循环的工作流，以及它在任务里真正执行的那两个动作。',
+        words: [
+          'orchestration', 'scaffolding', 'autonomous', 'heuristic',
+          'summarize', 'classify',
+        ],
       },
       {
         id: 'engineering',
@@ -108,14 +140,9 @@ export const BANK_SCENES = {
         note: '把模型放进真实服务时要盯的指标与工程手段。',
         words: ['throughput', 'latency', 'batching', 'pipeline', 'scalable', 'robust'],
       },
-      {
-        id: 'action',
-        label: '常见任务动词',
-        note: '描述「让模型做某件事」时反复出现的动作词。',
-        words: ['summarize', 'classify'],
-      },
     ],
-    related: ['cloud-native'],
+    // ⛔ 必须与 go-code / cloud-native 的 related 互为反向（见文件头注「内链必须对称」）。
+    related: ['go-code', 'cloud-native'],
   },
 
   /* ── Go 词汇 ────────────────────────────────────────────────────────────── */
@@ -132,12 +159,6 @@ export const BANK_SCENES = {
       + '同一组里的行通常一起出现在同一个函数里。',
     groups: [
       {
-        id: 'json',
-        label: 'JSON 与序列化',
-        note: '结构体与 JSON 之间的来回转换。',
-        patterns: [/json\./, /application\/json/],
-      },
-      {
         id: 'concurrency',
         label: '并发、通道与取消',
         note: 'goroutine、channel、锁、原子操作与上下文取消——Go 并发的主干词汇。',
@@ -148,28 +169,49 @@ export const BANK_SCENES = {
         ],
       },
       {
+        id: 'serialize',
+        label: '序列化、格式化与文件读写',
+        // ⛔ 035355e 里「JSON 与序列化」3 条 + 「格式化与文件读写」3 条，两组都不足
+        //   MIN_GROUP_SIZE。合并理由是语义同源：三者的共同动作都是
+        //   「把内存里的值变成字节流再交出去」——json 编解码、fmt 拼接、os 落盘。
+        //
+        // ⚠️ 本组⛔ 必须排在 error 组之前：`out, err := json.Marshal(v)` 这类行同时含
+        //   独立词 `err` 与 `json.`，若 error 组在前就会被 error 的 /\berr\b/ 抢走。
+        //   resolveScenes 的 patterns 是**有序**的，这里的顺序是语义的一部分。
+        note: '结构体与 JSON 之间的来回转换、fmt 字符串拼接，以及把字节写进文件。',
+        patterns: [/json\./, /application\/json/, /fmt\.Sprintf/, /os\.WriteFile/],
+      },
+      {
         id: 'error',
         label: '错误处理与资源释放',
         note: 'err 冒泡、错误包装与 defer 收尾——Go 里最该形成肌肉记忆的一段。',
         patterns: [/\berr\b/, /Errorf/, /errors\.New/, /log\.Fatal/, /\bdefer\b/],
       },
       {
-        id: 'func',
-        label: '类型定义与方法签名',
-        note: '结构体声明、构造函数、指针接收者方法与 Stringer 接口。',
-        patterns: [/^type\s+\w+\s+struct/, /^func\s/, /String\(\)\s+string/, /^return\s/],
+        id: 'skeleton',
+        label: '类型定义、方法签名与服务骨架',
+        // ⛔ 035355e 里「类型定义与方法签名」6 条 + 「HTTP 服务与测试」4 条。
+        //   合并理由：两者是同一件事的两半——先声明类型与构造函数，再把服务起起来、
+        //   注册路由、写响应头，最后用 t.Run 跑子测试。这是「一个 Go 服务从类型到
+        //   路由到测试」的完整骨架链，拆开看每半都不完整。
+        note: '结构体声明、构造函数、指针接收者方法与 Stringer 接口，加上起服务、'
+          + '注册路由、写响应头与 t.Run 子测试。',
+        patterns: [
+          /^type\s+\w+\s+struct/, /^func\s/, /String\(\)\s+string/, /^return\s/,
+          /t\.Run/, /http\./, /w\.WriteHeader/,
+        ],
       },
       {
         id: 'control',
-        label: '流程控制',
-        note: '带初始化语句的 if 与类型 switch。',
-        patterns: [/^if\s/, /^switch\s/],
-      },
-      {
-        id: 'decl',
-        label: '变量与常量声明',
-        note: '带初始值的 var 与包级 const。',
-        patterns: [/^var\s+\w+\s+\w/, /^const\s/],
+        label: '流程控制与变量声明',
+        // ⛔ 035355e 里「流程控制」3 条 + 「变量与常量声明」2 条。
+        //   合并理由：两者都是「不进任何库、直接决定这行代码走哪条路」的骨架语法，
+        //   放在一起正好是「带初始化的 if / 类型 switch / var / const」这条主线。
+        //
+        // ⚠️ 本组 ⛔ 必须排在 collection 组之前：`if strings.HasPrefix(name, "test") {`
+        //   同时命中 /^if\s/ 与 /strings\./，顺序决定它属于语法组还是字符串组。
+        note: '带初始化语句的 if、类型 switch，以及带初始值的 var 与包级 const。',
+        patterns: [/^if\s/, /^switch\s/, /^var\s+\w+\s+\w/, /^const\s/],
       },
       {
         id: 'collection',
@@ -180,20 +222,9 @@ export const BANK_SCENES = {
           /strings\./, /bytes\.Buffer/, /io\.ReadAll/,
         ],
       },
-      {
-        id: 'stdlib',
-        label: '格式化与文件读写',
-        note: 'fmt 拼接与 os 文件写入（含权限位）。',
-        patterns: [/fmt\.Sprintf/, /os\.WriteFile/],
-      },
-      {
-        id: 'http',
-        label: 'HTTP 服务与测试',
-        note: '起服务、注册路由、写响应头，以及 t.Run 子测试。',
-        patterns: [/t\.Run/, /http\./, /w\.WriteHeader/],
-      },
     ],
-    related: ['cloud-native'],
+    // ⛔ 必须与 ai-core / cloud-native 的 related 互为反向（见文件头注「内链必须对称」）。
+    related: ['ai-core', 'cloud-native'],
   },
 
   /* ── TypeScript 词汇 ────────────────────────────────────────────────────── */
@@ -217,12 +248,6 @@ export const BANK_SCENES = {
         patterns: [/useState\(/, /useEffect\(/, /useRef/, /useMemo/, /useParams/],
       },
       {
-        id: 'types',
-        label: '类型定义与类型标注',
-        note: 'interface、联合类型、泛型与 as 断言。',
-        patterns: [/^interface\s/, /^type\s/, /number\[\]/, /\bas\s+Row/],
-      },
-      {
         id: 'array',
         label: '数组与集合操作',
         note: 'map / filter / reduce / find / some / every / Set 去重与遍历。',
@@ -232,22 +257,81 @@ export const BANK_SCENES = {
         ],
       },
       {
-        id: 'async',
-        label: '异步与数据请求',
-        note: 'async / await、Promise.all 并发与 fetch 取JSON。',
-        patterns: [/\bawait\b/, /\basync\b/, /Promise\./, /fetch\(/, /\.json\(\)/],
-      },
-      {
-        id: 'template',
-        label: '模板字符串与展开解构',
-        note: '模板字符串插值、对象展开、数组与对象解构。',
-        patterns: [/`\$\{/, /\.\.\./, /\{ id, name/],
+        id: 'types',
+        label: '类型定义与模块导出',
+        // ⛔ 035355e 里「类型定义与类型标注」5 条 + 「模块导出与环境常量」2 条。
+        //   合并理由：两者都是「在模块边界上声明这个模块对外长什么样」——
+        //   interface / type / 泛型 / as 断言描述类型契约，export default / export const
+        //   把这个契约暴露出去，是同一条「模块接口声明」链的两半。
+        //
+        // ⚠️ 本组 ⛔ 必须排在 safety 组之前：`type Handler<T> = (event: T) => void;`
+        //   同时命中 /^type\s/ 与 /\?\s*\{/，顺序决定它属于类型组还是空值处理组。
+        //
+        // ⚠️ 本组⛔刻意不含 /NODE_ENV/：`const isDev = process.env.NODE_ENV !== 'prod';`
+        //   同时命中本组的 /^export\s/（否）与 runtime 组的 /process\.env/（是）。
+        //   它是**环境变量**，语义上属于「运行时与浏览器 API」，
+        //   故让它由 runtime 组认领，不在此处重复声明（重复声明会把它抢到错误的组）。
+        note: 'interface、联合类型、泛型与 as 断言，以及默认导出与具名导出。',
+        patterns: [/^interface\s/, /^type\s/, /number\[\]/, /\bas\s+Row/, /^export\s/],
       },
       {
         id: 'dom',
         label: '浏览器与 DOM',
-        note: 'window / document 事件、localStorage 与元素尺寸读取。',
-        patterns: [/window\./, /document\./, /localStorage/, /addEventListener/, /getBoundingClientRect/, /\bel\?\./, /\bel\./],
+        // ⛔ 035355e 里「事件对象」只有 1 条（`const stop = (e: Event) => e.stopPropagation();`）。
+        //   合并理由：stopPropagation 是**浏览器事件机制**的一部分，与本组的
+        //   addEventListener / window / document 天然同属「浏览器侧的事件与 DOM 操作」。
+        //   （另一条候选是「异步与请求」——事件回调确实常与请求同现，但事件对象的
+        //   类型标注与冒泡处理讲的是 DOM 事件语义，不是异步语义，故取 DOM。）
+        //
+        // ⚠️ 本组 ⛔ 必须排在 async 组之前：`const width = el?.getBoundingClientRect().width;`
+        //   同时命中本组的 /\bel\?\./ 与 async 组的 /\?\./。它量的是元素尺寸（DOM 语义），
+        //   不是空值兜底（async 语义），故必须让本组先命中。
+        //   ⚠️ 这是一个**易退化点**：若日后把本组移到 async 之后，该词会静默改投 async 组，
+        //   而 selfCheck 的 residual/unknown 断言**抓不到**（它仍被归组了，只是归错组）。
+        //   要检出这类「归错组」，需现算出每条词的候选组序列并人工核对顺序语义。
+        note: 'window / document 事件、localStorage、元素尺寸读取，'
+          + '以及事件对象类型标注与阻止冒泡。',
+        patterns: [
+          /window\./, /document\./, /localStorage/, /addEventListener/,
+          /getBoundingClientRect/, /\bel\?\./, /\bel\./,
+          /stopPropagation/, /Event\)/,
+        ],
+      },
+      {
+        id: 'async',
+        label: '异步请求与空值处理',
+        // ⛔ 035355e 里「异步与数据请求」4 条 + 「错误与空值处理」4 条。
+        //   合并理由：async / await / Promise.all / fetch 与 throw / ?? / ?. / 三元
+        //   在真实代码里是**成对出现**的——请求失败要抛错、响应可能为空要兜底，
+        //   拆成两组反而割裂了「取数据」这条完整链路。
+        //
+        // ⚠️ 本组 ⛔ 必须排在 runtime 组之前：`const json = await res.json();`
+        //   同时命中 /\bawait\b/ 与 /\.json\(\)/，两组都在时顺序决定归属。
+        note: 'async / await、Promise.all 并发与 fetch 取JSON，'
+          + '以及请求链上配套的抛错、空值合并、三元表达式与可选链。',
+        patterns: [
+          /\bawait\b/, /\basync\b/, /Promise\./, /fetch\(/, /\.json\(\)/,
+          /throw new Error/, /\?\?/, /\?\./, /\?\s+'/, /\?\s*\{/,
+        ],
+      },
+      {
+        id: 'template',
+        label: '模板字符串、展开与 JSX',
+        // ⛔ 035355e 里「模板字符串与展开解构」4 条 + 「JSX 与样式对象」3 条。
+        //   合并理由：两者都是「把值拼进一段文本/标记里」——模板字符串插值、
+        //   对象展开、数组与对象解构、className、条件渲染与内联样式对象字面量，
+        //   都是同一条「构造 UI 文本」的表达手段。
+        //   ⚠️ `=\s*\{\s*\w+:` 而不是 `=\{ color:` —— 真实词形是 `= { color: 'red', margin: 0 };`
+        //   （`=` 与 `{` 之间有空格）。写死无空格版会静默漏词，由 selfCheck 的 residual 断言抓住。
+        //
+        // ⚠️ 本组 ⛔ 必须排在 dom 组之前：`const width = el?.getBoundingClientRect().width;`
+        //   同时命中 /\.\.\./（无）与 /\bel\./，顺序决定归属。
+        note: '模板字符串插值、对象展开、数组与对象解构，以及 JSX、className、'
+          + '条件渲染与内联样式对象。',
+        patterns: [
+          /`\$\{/, /\.\.\./, /\{ id, name/,
+          /className/, /return <</, /<List/, /return <div/, /=\s*\{\s*color:/,
+        ],
       },
       {
         id: 'runtime',
@@ -255,33 +339,8 @@ export const BANK_SCENES = {
         note: '定时器、深拷贝、JSON 解析、Node 环境变量与随机 ID。',
         patterns: [/structuredClone/, /crypto\.randomUUID/, /process\.env/, /JSON\.parse/, /setInterval/, /clearTimeout/, /toUpperCase/],
       },
-      {
-        id: 'jsx',
-        label: 'JSX 与样式对象',
-        note: 'className、条件渲染与内联样式对象字面量。',
-        // ⚠️ `=\s*\{\s*\w+:` 而不是 `=\{ color:` —— 真实词形是 `= { color: 'red', margin: 0 };`
-        //   （`=` 与 `{` 之间有空格）。写死无空格版会静默漏词，由 selfCheck 的 residual 断言抓住。
-        patterns: [/className/, /return <</, /<List/, /return <div/, /=\s*\{\s*color:/],
-      },
-      {
-        id: 'safety',
-        label: '错误与空值处理',
-        note: '抛错、空值合并、三元表达式与可选链。',
-        patterns: [/throw new Error/, /\?\?/, /\?\./, /\?\s+'/, /\?\s*\{/],
-      },
-      {
-        id: 'module',
-        label: '模块导出与环境常量',
-        note: '默认导出、具名导出与基础地址常量。',
-        patterns: [/^export\s/, /NODE_ENV/],
-      },
-      {
-        id: 'event',
-        label: '事件对象',
-        note: '事件对象类型标注与阻止冒泡。',
-        patterns: [/stopPropagation/, /Event\)/],
-      },
     ],
+    // ⛔ 必须与 frontend 的 related 互为反向（见文件头注「内链必须对称」）。
     related: ['frontend'],
   },
 
@@ -297,6 +356,12 @@ export const BANK_SCENES = {
       + 'kubectl 输出和故障排查记录里反复出现，但很少有人系统地按用途学过——'
       + '它们往往只记住了「见过」，不知道该归到哪一类。下面按在 K8s 里的职责分组，'
       + '排查问题时可以顺着组去回忆相关资源。',
+    // ⚠️ 诚实性说明：本包共 30 词，按 MIN_GROUP_SIZE=5 划分，目标 5-7 组要求至少 25-35 词。
+    //   30 词若要拆成 5 组（每组 ≥5），最接近的均衡解是 5/5/5/5/10 或 5/5/5/7/8——
+    //   必然要把「集群核心（kubernetes/scheduler/etcd/kubelet/kubeadm/controlplane/reconcile）」
+    //   或「工作负载（replicaset/deployment/daemonset/statefulset/rollout/rollback/autoscaling…）」
+    //   这类**同类词集**从中间劈开才能凑出第 5 组。那是语义错配，故本包诚实取 **4 组**。
+    //   「100% 归组、零遗漏」不受组数影响，由 selfCheck 的 residual/unknown 断言独立承担。
     groups: [
       {
         id: 'cluster',
@@ -306,9 +371,16 @@ export const BANK_SCENES = {
       },
       {
         id: 'workload',
-        label: '工作负载与发布',
-        note: '不同形态的应用负载，以及它们的滚动发布与回滚。',
-        words: ['replicaset', 'deployment', 'daemonset', 'statefulset', 'rollout', 'rollback', 'autoscaling'],
+        label: '工作负载、容器与发布',
+        // ⛔ 035355e 里「工作负载与发布」7 条 + 「容器与运行时」2 条。
+        //   合并理由：container / containerd 正是「工作负载跑在什么上面」的答案——
+        //   Deployment 拉起 Pod、Pod 由 container 打包、containerd 负责跑它，
+        //   这是同一条「负载 → 容器 → 发布」的纵深链。
+        note: '不同形态的应用负载、承载它们的容器与运行时，以及滚动发布与回滚。',
+        words: [
+          'replicaset', 'deployment', 'daemonset', 'statefulset', 'rollout', 'rollback',
+          'autoscaling', 'container', 'containerd',
+        ],
       },
       {
         id: 'config',
@@ -318,24 +390,22 @@ export const BANK_SCENES = {
       },
       {
         id: 'network',
-        label: '流量与网关',
-        note: '流量进集群的路径，以及出故障时的止损手段。',
-        words: ['loadbalancer', 'gateway', 'sidecar', 'circuitbreaker'],
-      },
-      {
-        id: 'runtime',
-        label: '容器与运行时',
-        note: '容器本身与节点上真正跑它的运行时。',
-        words: ['container', 'containerd'],
-      },
-      {
-        id: 'observability',
-        label: '可观测性与探针',
-        note: '集群状态的观测手段，以及决定「要不要重启它」的两类探针。',
-        words: ['observability', 'telemetry', 'readinessprobe', 'livenessprobe'],
+        label: '流量、网关与可观测性',
+        // ⛔ 035355e 里「流量与网关」4 条 + 「可观测性与探针」4 条。
+        //   合并理由：两者都是「**运行中的集群对外表现如何**」——网关/负载均衡/熔断
+        //   描述流量进出与止损，探针/telemetry 描述状态被观测与上报。
+        //   它们都不是「集群里有哪些对象」，而是「这些对象跑起来之后处于什么状态」，
+        //   放在一起正是「运行态观测与治理」这条线。
+        note: '流量进集群的路径与出故障时的止损手段，以及集群状态的观测手段'
+          + '与决定「要不要重启它」的两类探针。',
+        words: [
+          'loadbalancer', 'gateway', 'sidecar', 'circuitbreaker',
+          'observability', 'telemetry', 'readinessprobe', 'livenessprobe',
+        ],
       },
     ],
-    related: ['go-code', 'ai-core'],
+    // ⛔ 必须与 ai-core / go-code 的 related 互为反向（见文件头注「内链必须对称」）。
+    related: ['ai-core', 'go-code'],
   },
 
   /* ── 前端英语词汇 ───────────────────────────────────────────────────────── */
@@ -359,35 +429,63 @@ export const BANK_SCENES = {
       },
       {
         id: 'perf',
-        label: '性能优化手法',
-        note: '减少计算、减少请求、减少产物体积。',
-        words: ['memoization', 'debounce', 'throttle', 'treeShaking'],
-      },
-      {
-        id: 'build',
-        label: '构建、转译与兼容',
-        note: '从源码到产物的加工环节，以及老浏览器兼容补丁。',
-        words: ['bundler', 'transpile', 'polyfill'],
+        label: '性能优化与产物控制',
+        // ⛔ 035355e 里「性能优化手法」4 条 + 「构建、转译与兼容」3 条。
+        //   合并理由：四个性能词与三个构建词解决的是**同一个问题的不同层**——
+        //   memoization / debounce / throttle 省的是「运行时算得少」，
+        //   treeShaking / bundler / transpile / polyfill 省的是「产物体积与兼容」。
+        //   前者在源码层，后者在构建层，合起来是「让东西跑得快、传得小」。
+        note: '运行时减少计算与请求（memoization / debounce / throttle），'
+          + '以及构建期减少产物体积与兼容老浏览器（treeShaking / bundler / transpile / polyfill）。',
+        words: [
+          'memoization', 'debounce', 'throttle', 'treeShaking',
+          'bundler', 'transpile', 'polyfill',
+        ],
       },
       {
         id: 'arch',
-        label: '组件与架构分层',
-        note: '组件边界、中间件与数据访问层的职责划分。',
-        words: ['component', 'middleware', 'repository', 'refactor'],
-      },
-      {
-        id: 'delivery',
-        label: '交付与异步',
-        note: '把代码变成线上服务的过程，以及异步这一基础范式。',
-        words: ['asynchronous', 'deployment'],
+        label: '组件架构与交付形态',
+        // ⛔ 035355e 里「组件与架构分层」4 条 + 「交付与异步」2 条。
+        //   合并理由：component / middleware / repository / refactor 讲的是
+        //   「代码怎么分层」，而 deployment / asynchronous 讲的是「这套分层怎么上线、
+        //   请求怎么进来」——从源码结构到线上形态是同一条「架构 → 交付」链。
+        //
+        // ⚠️ 诚实性说明：本包共 20 词，按 MIN_GROUP_SIZE=5 划分，**数学上限就是 4 组**
+        //   （20/5=4）。而强行凑成 4 组必须把 `asynchronous`（异步范式）与
+        //   component/middleware/repository（架构分层）拆开——那是语义错配。
+        //   故本包诚实取 **3 组**（7/7/6），低于 TARGET_GROUP_RANGE 的下界 5。
+        //   这是「⛔ 绝不为凑数做语义错配的合并」这条纪律的直接代价，属预期结果。
+        note: '组件边界、中间件与数据访问层的职责划分，以及这套结构上到线上的形态：'
+          + '部署与异步。',
+        words: [
+          'component', 'middleware', 'repository', 'refactor',
+          'asynchronous', 'deployment',
+        ],
       },
     ],
+    // ⛔ 必须与 ts-code 的 related 互为反向（见文件头注「内链必须对称」）。
     related: ['ts-code'],
   },
 }
 
 /** 本次做差异化内容的 5 个包（⛔ 刻意不含 ielts/kaoyan/toefl/cet4/cet6 与三个 ielts-*-vocab 单元源派生包）。 */
 export const SCENED_BANK_IDS = Object.keys(BANK_SCENES)
+
+/**
+ * ⛔ 分组粒度下限：任何一组不得少于这么多条词。
+ *
+ * 存在的理由：上一轮（035355e）留下了 ts-code 的「事件对象」1 条、「模块导出」2 条，
+ * ai-core 的「常见任务动词」2 条这类组。一个只放 1 个词的组，读者无法从中得到
+ * 「成组记忆」的收益（这正是整个分区存在的理由），反而凭空多出一层标题噪声。
+ *
+ * ⚠️ 这是**下限**，不是「必须凑满」：见文件头注的「⛔ 绝不为凑数做语义错配的合并」。
+ *   frontend（20 词）在数学上就凑不出 5-7 组，本文件选择诚实地缩到 3 组并在包内
+ *   注释说明，而不是硬凑到 4 组把 `asynchronous` 塞进不相干的组。
+ */
+export const MIN_GROUP_SIZE = 5
+
+/** 目标组数区间（软目标：selfCheck 只提示不判红，理由见 MIN_GROUP_SIZE 上方说明）。 */
+export const TARGET_GROUP_RANGE = { min: 5, max: 7 }
 
 /**
  * ⛔ 绝不允许被场景分组逻辑改动的包 ——ECDICT 大包与单元源派生包。
@@ -596,11 +694,45 @@ ${links}
 /* ─────────────────────────────── 自检段 ──────────────────────────────── */
 
 /**
+ * 断言内链关系图是**无向的**（没有任何单向边）。
+ *
+ * 为什么值得机器断言而不是靠人核：`related` 是 5 处手写的字符串数组，
+ * 「加了一条新边却忘了加反向」是极易发生且极难被肉眼发现的错误
+ * ——两次 selfCheck 输出看起来都完全正常。因此把「A→B 蕴含 B→A」写成代码。
+ *
+ * @returns {string[]} 违例描述（空数组 = 对称）
+ */
+export function assertRelationSymmetric(scenes = BANK_SCENES) {
+  const ids = Object.keys(scenes)
+  const violations = []
+  for (const id of ids) {
+    for (const target of scenes[id]?.related ?? []) {
+      if (!scenes[target]) {
+        violations.push(`${id} → ${target}：目标包不存在于 BANK_SCENES`)
+        continue
+      }
+      const back = scenes[target]?.related ?? []
+      if (!back.includes(id)) {
+        violations.push(`${id} → ${target}：缺少反向边（${target} 未回指 ${id}）`)
+      }
+    }
+  }
+  return violations
+}
+
+/**
  * 自检：逐包现算分组覆盖率，打印每组实际条数。
  *
  * ⛔ 断言 `residual.length === 0`（无遗漏）与 `unknown.length === 0`（无过期声明）。
  *   任一不成立 ⇒ 分组规则与内容已失配，必须先修规则再上线。
  *   直接运行本文件即可：`node scripts/seo/bank-scenes.mjs`
+ *
+ * ⛔ 本轮新增两条断言（**只增不减**，原有两条判定逻辑一字未改）：
+ *   ① 每组 ≥ MIN_GROUP_SIZE（5 词）—— 粒度下限；
+ *   ② related 关系图无单向边 —— 见 assertRelationSymmetric。
+ *   ⚠️ 组数落在 TARGET_GROUP_RANGE 之外时**只提示不判红**：frontend（20 词）
+ *   在「每组≥5」约束下数学上限为 4 组，凑到 5-7 组必然要求语义错配。
+ *   「100% 归组、零遗漏」这个保证由residual/unknown 两条断言独立承担，不受粒度影响。
  */
 export function selfCheck(vocabDir) {
   const results = []
@@ -611,30 +743,63 @@ export function selfCheck(vocabDir) {
     const words = JSON.parse(readFileSync(file, 'utf8'))
     const r = resolveScenes(id, words)
     const assigned = r.groups.reduce((s, g) => s + g.items.length, 0)
-    const ok = r.residual.length === 0 && r.unknown.length === 0 && assigned === words.length
+    // 粒度断言：任何一组不得少于 MIN_GROUP_SIZE 条词
+    const thin = r.groups.filter((g) => g.items.length < MIN_GROUP_SIZE)
+    const ok = r.residual.length === 0
+      && r.unknown.length === 0
+      && assigned === words.length
+      && thin.length === 0
     if (!ok) failed = true
-    results.push({ id, total: words.length, assigned, residual: r.residual, unknown: r.unknown, groups: r.groups, ok })
+    results.push({
+      id, total: words.length, assigned,
+      residual: r.residual, unknown: r.unknown,
+      groups: r.groups, thin, ok,
+    })
   }
+  const asym = assertRelationSymmetric()
+  if (asym.length > 0) failed = true
+
   console.log('[bank-scenes] 场景分组自检（词形现算，非声明）')
   for (const r of results) {
     console.log(`\n  ${r.id} · 共 ${r.total} 词 · 已归组 ${r.assigned} · ${r.ok ? '✅ 无遗漏' : '❌ 有缺口'}`)
     for (const g of r.groups) {
-      console.log(`    · ${g.label.padEnd(14, ' ')} ${String(g.items.length).padStart(3)} 词`)
+      console.log(`    · ${g.label.padEnd(16, ' ')} ${String(g.items.length).padStart(3)} 词`)
     }
+    const inRange = r.groups.length >= TARGET_GROUP_RANGE.min && r.groups.length <= TARGET_GROUP_RANGE.max
+    console.log(`    → ${r.groups.length} 组（目标 ${TARGET_GROUP_RANGE.min}-${TARGET_GROUP_RANGE.max} 组）`
+      + `${inRange ? '' : '⚠️  不在目标区间，见该包注释里的诚实性说明'}`)
     if (r.residual.length > 0) {
       console.log(`    ⛔ 未归组 ${r.residual.length} 条：${r.residual.map((x) => x.word).join(' | ')}`)
     }
     if (r.unknown.length > 0) {
       console.log(`    ⛔ 声明但词表不存在 ${r.unknown.length} 条：${r.unknown.join(' | ')}`)
     }
+    if (r.thin.length > 0) {
+      console.log(`    ⛔ 粒度不足（<${MIN_GROUP_SIZE} 词）${r.thin.length} 组：`
+        + `${r.thin.map((g) => `${g.label}(${g.items.length})`).join(' | ')}`)
+    }
   }
+
+  console.log('\n[bank-scenes] 内链对称性（有向邻接表的对称性）')
+  for (const id of SCENED_BANK_IDS) {
+    const rel = BANK_SCENES[id]?.related ?? []
+    console.log(`  ${id.padEnd(14)} → ${rel.length > 0 ? rel.join(', ') : '(无)'}`)
+  }
+  if (asym.length > 0) {
+    console.error(`\n[bankscenes]❌ 内链存在单向边 ${asym.length} 处：`)
+    for (const v of asym) console.error(`    ⛔ ${v}`)
+  } else {
+    console.log('  ✅ 无单向边：每条 A→B 都存在反向 B→A')
+  }
+
   if (failed) {
     console.error('\n[bankscenes]❌ 分组与词表失配：必须补规则（不得把残词硬塞进某组）')
     process.exitCode = 1
   } else {
-    console.log(`\n[bank-scenes] ✅ ${results.length} 个包全部词条 100% 归组，无过期声明`)
+    console.log(`\n[bank-scenes] ✅ ${results.length} 个包全部词条 100% 归组，无过期声明，`
+      + `每组 ≥${MIN_GROUP_SIZE} 词，内链全部对称`)
   }
-  return { failed, results }
+  return { failed, results, asym }
 }
 
 import { readFileSync } from 'node:fs'
