@@ -374,40 +374,42 @@ export const SECTIONS = Object.freeze([
  *   ⚠️ 这条同时约束了 SVG：**示意图不给 width/height 属性**，尺寸由下面 `.gh-shot svg` 接管。
  *
  * ── 视觉体系（本轮从「SEO 文字块」升级到「产品首页区块」的落点）────────────
- *   ·分层：Hero 与末尾 CTA 用渐变 + 重阴影「夹住」中段，中段区块用面板卡片交替底色。
+ *   ·分层：Hero 与末尾 CTA 用 teal-soft 实底 + 重阴影「夹住」中段，中段区块用面板卡片交替底色。
+ *   ·单色纪律（2026-10-13 P0 UI 改造）：品牌色收敛为 dd-tokens teal 单色相（C-2），
+ *     蓝紫渐变已全部拆除；示意图内的绿/红/蓝是产品功能色（敲对/敲错/光标），属既有豁免。
  *   · 响应式：**移动优先** —— 基础样式即单列，640px / 960px 两个断点逐级升列。
  *     词库网格 1 → 2 → 3 列，能力卡 1 → 2 → 3 列，对比行 1 列 → 三段一行，示意图与要点 1 → 双栏。
  *   · 层次：卡片/按钮/示意图统一用 box-shadow；CTA 用渐变 + 阴影 + hover 位移。
  */
-export const LANDING_CSS = `#seo-home{box-sizing:border-box;display:block;max-width:100%;margin:0;padding:0 0 .5rem;background:#070b16;color:#e2e8f0;font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.75;overflow-wrap:break-word;word-break:break-word}
+export const LANDING_CSS = `#seo-home{--dd-primary:#14b8a6;--dd-primary-hover:#2dd4bf;--dd-primary-soft:#0f2b28;--dd-accent-text:#5eead4;--dd-on-primary:#04201d;/* ^ dd-tokens.css v1.2 dark 值同步（geek-typing 未整站接令牌，landing 块内联挂载，改令牌源须同步此处） */box-sizing:border-box;display:block;max-width:100%;margin:0;padding:0 0 .5rem;background:#070b16;color:#e2e8f0;font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.75;overflow-wrap:break-word;word-break:break-word}
 #seo-home *{box-sizing:border-box}
 #seo-home .gh-wrap{max-width:52rem;margin:0 auto;padding:1.25rem 1.25rem 2rem}
-#seo-home .gh-skip{display:inline-block;max-width:100%;margin:0 0 1.25rem;padding:.45rem .95rem;border:1px solid #26364f;border-radius:999px;background:#0e1729;color:#93c5fd;font-size:.9rem;text-decoration:none;overflow-wrap:break-word;box-shadow:0 1px 2px rgba(2,6,23,.7);transition:background .15s ease,color .15s ease}
-#seo-home .gh-skip:hover{background:#17243d;color:#bfdbfe}
+#seo-home .gh-skip{display:inline-block;max-width:100%;margin:0 0 1.25rem;padding:.45rem .95rem;border:1px solid #26364f;border-radius:999px;background:#0e1729;color:var(--dd-accent-text);font-size:.9rem;text-decoration:none;overflow-wrap:break-word;box-shadow:0 1px 2px rgba(2,6,23,.7);transition:background .15s ease,color .15s ease}
+#seo-home .gh-skip:hover{background:#17243d;color:var(--dd-accent-text)}
 #seo-home .gh-sec{margin:0 0 1.25rem;padding:1.6rem 1.25rem;border:1px solid #1b2740;border-radius:1rem;background:#0c1424;box-shadow:0 1px 2px rgba(2,6,23,.65);overflow-wrap:break-word}
 #seo-home .gh-h1{margin:0 0 .85rem;font-size:1.85rem;line-height:1.3;color:#f8fafc;letter-spacing:-.01em;overflow-wrap:break-word}
 #seo-home .gh-h2{margin:0 0 .8rem;font-size:1.2rem;line-height:1.4;color:#f1f5f9;overflow-wrap:break-word}
 #seo-home .gh-p{margin:0 0 .85rem;color:#cbd5e1;overflow-wrap:break-word}
 #seo-home .gh-note{margin:0 0 1.25rem;color:#94a3b8;font-size:.9rem;overflow-wrap:break-word}
-#seo-home #gh-hero{margin:0 0 1.5rem;padding:2.25rem 1.5rem 2rem;border:0;border-radius:1.25rem;background:radial-gradient(125% 130% at 8% -5%,#1e40af 0%,#15295f 42%,#0a1226 100%);box-shadow:0 24px 48px -24px rgba(2,6,23,.95),inset 0 1px 0 rgba(148,163,184,.12)}
+#seo-home #gh-hero{margin:0 0 1.5rem;padding:2.25rem 1.5rem 2rem;border:0;border-radius:1.25rem;background:var(--dd-primary-soft);border:1px solid #134e4a;box-shadow:0 24px 48px -24px rgba(2,6,23,.95),inset 0 1px 0 rgba(148,163,184,.12)}
 #seo-home #gh-hero .gh-h1{font-size:2rem}
-#seo-home #gh-hero .gh-p{color:#d3dced}
-#seo-home #gh-demo{background:linear-gradient(180deg,#0f1a30 0%,#0b1425 100%);border-color:#22314c;box-shadow:0 18px 36px -24px rgba(2,6,23,.95),inset 0 1px 0 rgba(148,163,184,.08)}
-#seo-home #gh-cta{border:0;border-radius:1.25rem;background:linear-gradient(135deg,#1e40af 0%,#1e3a8a 45%,#172554 100%);box-shadow:0 24px 48px -24px rgba(2,6,23,.95),inset 0 1px 0 rgba(148,163,184,.12);text-align:center}
+#seo-home #gh-hero .gh-p{color:#d5e5e1}
+#seo-home #gh-demo{background:linear-gradient(180deg,#101a2d 0%,#0b1425 100%);border-color:#1b2740;box-shadow:0 18px 36px -24px rgba(2,6,23,.95),inset 0 1px 0 rgba(148,163,184,.08)}
+#seo-home #gh-cta{border:0;border-radius:1.25rem;background:var(--dd-primary-soft);border:1px solid #134e4a;box-shadow:0 24px 48px -24px rgba(2,6,23,.95),inset 0 1px 0 rgba(148,163,184,.12);text-align:center}
 #seo-home #gh-cta .gh-p{color:#dbeafe}
 #seo-home #gh-cta .gh-cta{justify-content:center}
 #seo-home .gh-chips{display:flex;flex-wrap:wrap;gap:.5rem;margin:1.25rem 0 0;padding:0;list-style:none}
-#seo-home .gh-chip{padding:.3rem .7rem;border:1px solid rgba(147,197,253,.28);border-radius:999px;background:rgba(59,130,246,.12);color:#bfdbfe;font-size:.82rem;overflow-wrap:break-word}
+#seo-home .gh-chip{padding:.3rem .7rem;border:1px solid rgba(45,212,191,.28);border-radius:999px;background:rgba(20,184,166,.12);color:var(--dd-accent-text);font-size:.82rem;overflow-wrap:break-word}
 #seo-home .gh-cta{display:flex;flex-wrap:wrap;gap:.75rem;margin:1.35rem 0 0}
 #seo-home .gh-btn{display:inline-block;max-width:100%;padding:.65rem 1.25rem;border:1px solid #26364f;border-radius:.65rem;background:#111c31;color:#e2e8f0;font-weight:600;text-decoration:none;overflow-wrap:break-word;box-shadow:0 1px 2px rgba(2,6,23,.7);transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}
-#seo-home .gh-btn-primary{border-color:transparent;background:linear-gradient(135deg,#60a5fa 0%,#3b82f6 45%,#2563eb 100%);color:#fff;box-shadow:0 10px 24px -10px rgba(37,99,235,.95),inset 0 1px 0 rgba(255,255,255,.22)}
+#seo-home .gh-btn-primary{border-color:transparent;background:var(--dd-primary);color:var(--dd-on-primary);box-shadow:0 10px 24px -10px rgba(15,118,110,.55),inset 0 1px 0 rgba(255,255,255,.25)}
 #seo-home .gh-btn:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 14px 28px -12px rgba(2,6,23,.9)}
-#seo-home .gh-btn-primary:hover{box-shadow:0 16px 32px -10px rgba(37,99,235,.95),inset 0 1px 0 rgba(255,255,255,.28)}
+#seo-home .gh-btn-primary:hover{background:var(--dd-primary-hover);box-shadow:0 16px 32px -10px rgba(15,118,110,.65),inset 0 1px 0 rgba(255,255,255,.3)}
 #seo-home .gh-grid{display:grid;grid-template-columns:1fr;gap:.85rem;margin:0;padding:0}
 #seo-home .gh-card{min-width:0;max-width:100%;padding:.95rem 1.05rem;border:1px solid #1e2b45;border-radius:.8rem;background:#101a2d;color:inherit;text-decoration:none;overflow-wrap:break-word;box-shadow:0 1px 2px rgba(2,6,23,.6);transition:transform .15s ease,border-color .15s ease,background .15s ease,box-shadow .15s ease}
-#seo-home .gh-card:hover{border-color:#3b82f6;background:linear-gradient(180deg,#16233c 0%,#111c31 100%);transform:translateY(-2px);box-shadow:0 14px 26px -16px rgba(2,6,23,.95)}
+#seo-home .gh-card:hover{border-color:var(--dd-primary-hover);background:linear-gradient(180deg,#16233c 0%,#111c31 100%);transform:translateY(-2px);box-shadow:0 14px 26px -16px rgba(2,6,23,.95)}
 #seo-home .gh-card-title{display:block;font-weight:600;color:#f8fafc;overflow-wrap:break-word}
-#seo-home .gh-card-count{display:block;margin-top:.3rem;color:#7dd3fc;font-size:.88rem;overflow-wrap:break-word}
+#seo-home .gh-card-count{display:block;margin-top:.3rem;color:var(--dd-accent-text);font-size:.88rem;overflow-wrap:break-word}
 #seo-home .gh-card-id{display:block;margin-top:.15rem;color:#64748b;font-size:.78rem;overflow-wrap:break-word}
 #seo-home .gh-demo{display:grid;grid-template-columns:1fr;gap:1.1rem;margin:1.1rem 0 0;align-items:start}
 #seo-home .gh-shot{margin:0;padding:0;min-width:0}
@@ -421,20 +423,20 @@ export const LANDING_CSS = `#seo-home{box-sizing:border-box;display:block;max-wi
 #seo-home .gh-cmp-kind{color:#e2e8f0;font-weight:600}
 #seo-home .gh-cmp-arrow{color:#475569}
 #seo-home .gh-cmp-res{color:#94a3b8}
-#seo-home .gh-fact{margin:0 0 .7rem;padding:.85rem 1rem;border:1px solid #1b2740;border-left:3px solid #3b82f6;border-radius:.7rem;background:#101a2d;overflow-wrap:break-word}
+#seo-home .gh-fact{margin:0 0 .7rem;padding:.85rem 1rem;border:1px solid #1b2740;border-left:3px solid var(--dd-primary);border-radius:.7rem;background:#101a2d;overflow-wrap:break-word}
 #seo-home .gh-fact-q{display:block;font-weight:600;color:#f8fafc;overflow-wrap:break-word}
 #seo-home .gh-fact-a{display:block;margin-top:.25rem;color:#cbd5e1;overflow-wrap:break-word}
 #seo-home .gh-faq{margin:0;padding:0}
 #seo-home .gh-faq-item{margin:0 0 .6rem;border:1px solid #1e2b45;border-radius:.7rem;background:#101a2d;overflow-wrap:break-word;box-shadow:0 1px 2px rgba(2,6,23,.5)}
-#seo-home .gh-faq-q{display:block;padding:.8rem 1rem;font-weight:600;color:#bfdbfe;cursor:pointer;overflow-wrap:break-word}
+#seo-home .gh-faq-q{display:block;padding:.8rem 1rem;font-weight:600;color:var(--dd-accent-text);cursor:pointer;overflow-wrap:break-word}
 #seo-home .gh-faq-a{margin:0;padding:0 1rem .85rem;color:#cbd5e1;overflow-wrap:break-word}
 #seo-home .gh-sites{margin:1.1rem 0 0;padding:0;list-style:none;display:grid;grid-template-columns:1fr;gap:.7rem}
 #seo-home .gh-site-item{min-width:0;max-width:100%}
 #seo-home .gh-site{display:grid;grid-template-columns:1fr;gap:.3rem;min-width:0;max-width:100%;padding:.95rem 1.1rem;border:1px solid #1e2b45;border-radius:.8rem;background:#101a2d;color:inherit;text-decoration:none;overflow-wrap:break-word;box-shadow:0 1px 2px rgba(2,6,23,.6);transition:transform .15s ease,border-color .15s ease,background .15s ease,box-shadow .15s ease}
-#seo-home .gh-site:hover{border-color:#3b82f6;background:linear-gradient(180deg,#16233c 0%,#111c31 100%);transform:translateY(-2px);box-shadow:0 14px 26px -16px rgba(2,6,23,.95)}
+#seo-home .gh-site:hover{border-color:var(--dd-primary-hover);background:linear-gradient(180deg,#16233c 0%,#111c31 100%);transform:translateY(-2px);box-shadow:0 14px 26px -16px rgba(2,6,23,.95)}
 #seo-home .gh-site-name{display:block;font-weight:600;color:#f8fafc;overflow-wrap:break-word}
 #seo-home .gh-site-desc{display:block;color:#94a3b8;font-size:.9rem;line-height:1.65;overflow-wrap:break-word}
-#seo-home .gh-site-go{display:block;color:#7dd3fc;font-size:.82rem;overflow-wrap:break-word}
+#seo-home .gh-site-go{display:block;color:var(--dd-accent-text);font-size:.82rem;overflow-wrap:break-word}
 #seo-home .gh-foot{margin:0;padding:1.25rem .25rem 0;border-top:1px solid #1b2740;color:#64748b;font-size:.85rem;overflow-wrap:break-word}
 @media (min-width:640px){
 #seo-home .gh-wrap{padding:1.75rem 1.75rem 2.5rem}
