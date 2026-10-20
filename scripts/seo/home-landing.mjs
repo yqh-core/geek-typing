@@ -250,6 +250,12 @@ export function renderHomeLandingBlock({ bankRows, origin, totalWords } = {}) {
     `<style>${LANDING_CSS}</style>`,
     sections,
     `<p class="gh-foot">${escapeHtml(LANDING_FOOTER)}</p>`,
+    // ⚠️ 这里必须闭合**两个** `</div>`：分别对应上方 `.gh-wrap` 与 `#seo-home`。
+    //   曾缺一个闭合 ⇒ 浏览器解析器把后续 `#root`+beacon 全吞进块内（e2e H4「块内零
+    //   script」判红的真根因，2026-10-20 DOM 探针实测 beaconInsideSeoHome=true）。
+    //   保持逐行各一个 `</div>`：gate-home-landing 的 --falsify 注入按字面
+    //   `</div>\n<!-- seo-home:end -->` 匹配（:606/:640），合并成一行会让注入静默失效。
+    '</div>',
     '</div>',
     LANDING_END_COMMENT,
   ].join('\n')
