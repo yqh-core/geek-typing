@@ -266,6 +266,34 @@ async function main() {
     return origPush(m)
   }
 
+  /* CF Web Analytics beacon 在 loopback origin 下对 cdn-cgi/rum 的 XHR 必 CORS 失败，
+   * 刷进上面的 Log.entryAdded 采集器 → 「全程零 console error」判据被环境噪声打红
+   * （与 tests/e2e.mjs 的 stubCfBeacon 同一根因、同一处置口径）。本脚本是裸 CDP，
+   * 没有 Playwright 的 context.route，等价手段 = Fetch 域在 Request 阶段把它桩成空脚本。
+   * ⚠️ 只在 BASE 为 127.0.0.1/localhost 时启用：--base 指向生产域时不桩，保留真实 beacon 覆盖。 */
+  if (/^(127\.0\.0\.1|localhost)$/.test(new URL(BASE).hostname)) {
+    await s.send('Fetch.enable', {
+      patterns: [{ urlPattern: '*://*.cloudflareinsights.com/*', requestStage: 'Request' }],
+    })
+    const stubBody = btoa('/* CF beacon stubbed for loopback verify (CORS noise under non-prod origin) */')
+    const origPush2 = s.events.push
+    s.events.push = (m) => {
+      if (m.method === 'Fetch.requestPaused' && (m.params?.request?.url || '').includes('cloudflareinsights.com')) {
+        s.send('Fetch.fulfillRequest', {
+          requestId: m.params.requestId,
+          responseCode: 200,
+          responseHeaders: [
+            { name: 'Content-Type', value: 'application/javascript' },
+            // module script 永远走 CORS 检查：缺这条会把「XHR 被拦」换成「script 被拦」，噪声换了个姿势而已
+            { name: 'Access-Control-Allow-Origin', value: '*' },
+          ],
+          body: stubBody,
+        }).catch(() => {})
+      }
+      return origPush2(m)
+    }
+  }
+
   const shot = async (name) => {
     if (!KEEP) return
     const r = await s.send('Page.captureScreenshot', { format: 'png' })

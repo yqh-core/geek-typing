@@ -46,6 +46,24 @@ const IS_PROD = process.argv.includes('--prod')
 const LOCAL_PORT = 4173
 const BASE = process.env.E2E_BASE ?? (IS_PROD ? PROD_BASE : `http://127.0.0.1:${LOCAL_PORT}`)
 
+/* CF Web Analytics beacon（static.cloudflareinsights.com/beacon.min.js）在本地 preview 源
+ * （http://127.0.0.1:4173）下，其对 cdn-cgi/rum 的 XHR 因 ACAO 不含端口而必 CORS 失败，
+ * 每次页面加载刷一条 console error，污染 e2e「无 console error」三条断言（CI 门禁③ 挂点）。
+ * 生产域名（geek-typing.pages.dev）下该 beacon 工作正常，无此噪声——属第三方分析脚本在
+ * 非生产 origin 的环境噪声，不是被测应用代码的缺陷，故与 :1957 过滤 favicon 同类处理：
+ * 仅本地把 beacon 请求桩成空脚本（脚本不执行 → 不发 XHR → 无 error）。
+ * IS_PROD 守卫：test:e2e:prod 打真实域时不桩，保留对生产 beacon 的覆盖。 */
+const stubCfBeacon = (context) =>
+  IS_PROD
+    ? Promise.resolve()
+    : context.route(/cloudflareinsights\.com/, (r) =>
+        r.fulfill({
+          status: 200,
+          contentType: 'application/javascript',
+          body: '/* CF Web Analytics beacon stubbed for local e2e (CORS noise under preview origin) */',
+        }),
+      )
+
 const results = []
 let failures = 0
 
@@ -206,6 +224,7 @@ async function run() {
   const browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] })
   const ctx = await browser.newContext({ viewport: { width: 1360, height: 1000 } })
   await lockLangZh(ctx)
+  await stubCfBeacon(ctx)
   const page = await ctx.newPage()
 
   const consoleErrors = []
@@ -1397,6 +1416,7 @@ async function run() {
   console.log('\n【14】批8：移动端手势 / 命令面板 / 预热')
   const mctx = await browser.newContext({ viewport: { width: 375, height: 812 }, hasTouch: true })
   await lockLangZh(mctx)
+  await stubCfBeacon(mctx)
   const mpage = await mctx.newPage()
   const mConsoleErrors = []
   /* 移动端上下文原先**只收 error、丢弃 warning**（对比主上下文 :214-215 是 error+warning 都收）。
