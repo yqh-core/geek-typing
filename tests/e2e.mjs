@@ -39,7 +39,7 @@ import { findChrome } from './helpers/chrome.mjs'
  * 两个口径由**同一次遍历**同时累出），口径说明见该文件头。 */
 const CATALOG = catalogTotals()
 
-const PROD_BASE = 'https://geek-typing.pages.dev'
+const PROD_BASE = 'https://geek-typing.digdevbox.com'
 const IS_PROD = process.argv.includes('--prod')
 // 本地自举端口：e2e 固定 4173；offline-audit 用 4174。两套件端口隔离，
 // 避免连跑时第一条命令的 preview 拆除窗口污染第二条（EVIDENCE-INDEX §9.4）。

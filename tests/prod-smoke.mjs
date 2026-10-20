@@ -25,7 +25,7 @@ import { chromium } from 'playwright-core'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const BASE = process.env.E2E_BASE ?? 'https://geek-typing.pages.dev'
+const BASE = process.env.E2E_BASE ?? 'https://geek-typing.digdevbox.com'
 
 function findChrome() {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH

@@ -24,7 +24,7 @@ import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ensurePreviewServer, stopPreview, clearMarkerInExitHook } from './preview-server.mjs'
 
-const PROD_BASE = 'https://geek-typing.pages.dev'
+const PROD_BASE = 'https://geek-typing.digdevbox.com'
 const IS_PROD = process.argv.includes('--prod')
 // 本地自举端口：offline 固定 4174（e2e 用 4173）。两套件端口隔离，
 // 避免连跑时第一条命令的 preview 拆除窗口污染第二条（EVIDENCE-INDEX §9.4）。

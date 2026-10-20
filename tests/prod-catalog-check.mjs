@@ -26,7 +26,7 @@ import { catalogTotals } from './helpers/catalog-totals.mjs'
 //    留着就是 lint 棘轮上的一条新增 warning。
 import { findChrome } from './helpers/chrome.mjs'
 
-const BASE = process.env.E2E_BASE ?? 'https://geek-typing.pages.dev'
+const BASE = process.env.E2E_BASE ?? 'https://geek-typing.digdevbox.com'
 
 const exe = findChrome()
 if (!exe) {
