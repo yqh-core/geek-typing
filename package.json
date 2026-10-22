@@ -85,6 +85,8 @@
     "test:ui-contract:falsify": "node tests/ui-contract.mjs --falsify",
     "gate:architecture": "node scripts/gate-architecture.mjs",
     "gate:todo": "node scripts/gate-todo.mjs",
+    "gate:i18n": "node scripts/gate-i18n.mjs",
+    "gate:i18n:falsify": "node scripts/gate-i18n.mjs --falsify",
     "gate:content-contract": "node scripts/gate-content-contract.mjs",
     "verify:readme-facts": "node scripts/verify-readme-facts.mjs",
     "verify:readme-facts:falsify": "node scripts/verify-readme-facts.mjs --falsify",
