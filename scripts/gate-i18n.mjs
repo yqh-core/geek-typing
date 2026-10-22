@@ -33,7 +33,8 @@
  *   npm run gate:i18n            # 读真 en.ts|zh.ts + 扫 src 的 t() 字面量
  *   npm run gate:i18n:falsify    # ① 词法解析器回归夹具（独立，不经 runChecks）② 内存注入证伪
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -213,19 +214,52 @@ function listSrcFiles(dir) {
  * 字符串起点」——强行套用会把 PracticePanel 这类正常文件误判成「字符串未闭合」而 Fatal。严格 lexer
  * 只用于**纯数据的词典文件**（en.ts/zh.ts 无正则/JSX/关键字，安全），组件扫描退回到剥注释+正则。
  *
- * 误差方向可控：
- *   - 漏报（某真实 t() 因同行前置 URL 的 `//` 被当注释截断而没扫到）→ 安全：只是少检一个键，不会误红。
+ * 误差方向可控（v2.1 收紧后）：
+ *   - 行注释改用**字符串感知**截断（见 stripLineComment），修掉了 v2「同行 URL 的 `//` 吞掉其后
+ *     真实 t() ⇒ KEY_USAGE_MISSING 假绿」这条漏报。残余：不识别正则字面量里的裸 `//`，
+ *     真实代码里 t() 同行含此形态的正则实测为 0，可接受。
  *   - 误报（注释/字符串里的假 t('ghost') 被计入）→ 已用「先剥块/行注释」压到很低；若仍命中且该键真不在
  *     词典，会判红 —— 属可接受的保守误报（宁红勿漏），需在报告里人工分诊。
  * 契约边界：仅静态直接调用 t('literal')；别名/解构改名/动态拼接键/其它 i18n API 不覆盖（明示，不谎称）。
  */
+/**
+ * 逐行把「引号外的 `//` 之后」当行注释截掉 —— **字符串/模板感知**版。
+ * v2.1 修复（独立审查 P0）：旧实现用 `(^|[^:])\/\/[^\n]*` 一刀切，导致同一行里
+ * `const u = 'http://a//b'; t('key');` 的第二个 `//`（虽是字符串正文）被当行注释，
+ * 连累其后的真实 `t('key')` 被吞 → KEY_USAGE_MISSING **假绿**。对完整性门禁而言
+ * 「漏报」不是安全方向，故必须修：`//` 仅当处于**所有引号/模板之外**时才判为注释。
+ * 受支持子集与残余边界：本函数按 ' " ` 三种界定符 + `\` 转义逐行扫；**不识别正则字面量**
+ * （`/x//y/` 这类含裸 `//` 的正则会被误当注释起点）。词典/组件里 `t('字面量')` 同行出现
+ * 「含裸 `//` 的正则字面量」的概率实测为 0（真实 URL 恒在字符串内），故残余风险可接受、
+ * 且方向是「宁可漏剥一行注释 → 顶多把注释里的假 t() 计入 → 保守判红」，不是假绿。
+ */
+function stripLineComment(line) {
+  let q = null // 当前引号：' " 或 `
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]
+    if (q) {
+      if (c === '\\') { i++; continue } // 转义：跳过下一字符
+      if (c === q) q = null
+      continue
+    }
+    if (c === "'" || c === '"' || c === '`') { q = c; continue }
+    if (c === '/' && line[i + 1] === '/') return line.slice(0, i) // 引号外的 // = 行注释起点
+  }
+  return line
+}
+
 function collectLiteralKeys(files) {
   const used = new Set()
   const re = /\bt\(\s*(['"])([^'"]+)\1/g
   for (const f of files) {
     let txt
     try { txt = readFileSync(f, 'utf8') } catch { continue }
-    const cleaned = txt.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+    // 块注释跨行可整体剥（无歧义）；行注释改用字符串感知的逐行截断（见 stripLineComment）
+    const cleaned = txt
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n')
+      .map(stripLineComment)
+      .join('\n')
     let m
     while ((m = re.exec(cleaned)) !== null) used.add(m[2])
   }
@@ -327,16 +361,26 @@ function parserFixtures() {
     const e = en.find((x) => x.key === 'a')
     ok('F-ESCAPE 转义引号完整取值', e && e.value.includes('say "hi"') && e.value.includes("'x'"), `value=${JSON.stringify(e && e.value)}`)
   }
-  // F-COMMENT：组件宽松扫描 —— 注释里的假 t() 不计入；各真实 t() 分行即可命中。
-  //   （宽松是**有意**的：严格词法器无法安全吃 .tsx 的正则/JSX 撇号，见 collectLiteralKeys 注释。）
+  // F-COMMENT：组件扫描 —— **直接调用生产 collectLiteralKeys**（写临时 .tsx），
+  //   证明「注释里的假 t() 不计入 / 分行真实 t() 命中 / 同行 URL 之后的 t() 不再被吞」。
+  //   （v2.1 独立审查 P1：旧夹具自行复制了扫描逻辑，掩盖了 collectLiteralKeys 的真实行为；现改成打生产函数。）
   {
-    const looseClean = (code) => code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
-    const collect = (code) => { const s = new Set(); const re = /\bt\(\s*(['"])([^'"]+)\1/g; let m; const c = looseClean(code); while ((m = re.exec(c)) !== null) s.add(m[2]); return s }
-    const found = collect("const x = t('real.key');\n// t('ghost.comment')\n/* t('ghost.block') */\nconst y = t('after');")
-    ok('F-COMMENT 注释里的假 t() 不计入、分行真实 t() 命中', found.has('real.key') && found.has('after') && !found.has('ghost.comment') && !found.has('ghost.block'), `found={${[...found].join(',')}}`)
-    // 已知边界（编码为期望，而非当作 bug）：同行 URL 的 `//b` 会被当行注释截断 → 漏报该行后续 t()（安全方向：少检不误红）
-    const limited = collect("const u = 'http://a//b'; const y = t('sameLineAfter');")
-    ok('F-COMMENT 边界：同行 URL 后 t() 漏报（宽松启发式的已知安全局限）', !limited.has('sameLineAfter'), `found={${[...limited].join(',')}}`)
+    const dir = mkdtempSync(join(tmpdir(), 'gate-i18n-'))
+    const f = join(dir, 'c.tsx')
+    writeFileSync(f, "const x = t('real.key');\n// t('ghost.comment')\n/* t('ghost.block') */\nconst y = t('after');\nconst u = 'http://a//b'; const w = t('sameLineAfter');\n")
+    const found = collectLiteralKeys([f])
+    rmSync(dir, { recursive: true, force: true })
+    ok('F-COMMENT 注释里假 t() 不计入、分行真实 t() 命中',
+      found.has('real.key') && found.has('after') && !found.has('ghost.comment') && !found.has('ghost.block'),
+      `found={${[...found].join(',')}}`)
+    // P0 修复回归：同行字符串里的 URL `//` 不再吞掉其后的真实 t()（v2 曾漏报，被旧夹具当"预期"）
+    ok('F-COMMENT P0修复：同行 URL 之后 t() 被捕获（不再假绿）', found.has('sameLineAfter'), `found={${[...found].join(',')}}`)
+  }
+  // F-TMPL-INTERP：模板插值 `${ … }` 内含 `}`（字符串/对象/嵌套模板）不得提前闭合、不得吞键（P1 补测）
+  {
+    const e = parseDict("export const en = { 'a': `x${ '}' }y`, 'b': 'ok' }", 'F-TMPL-INTERP')
+    const keys = e.map((x) => x.key)
+    ok('F-TMPL-INTERP 插值内 } 不破坏键解析', keys.length === 2 && keys.includes('a') && keys.includes('b'), `keys=[${keys.join(', ')}]`)
   }
   // F-CLOSE-STR / F-CLOSE-CMT / F-CLOSE-TPL / F-UNSUP：畸形/超子集必须抛 Fatal（fail-closed）
   const mustThrow = (id, fn) => { let threw = false; try { fn() } catch (e) { threw = e instanceof Fatal } ok(id, threw) }

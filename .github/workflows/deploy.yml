@@ -172,6 +172,12 @@ jobs:
       # 本地可用 `npm run gate:lint:falsify` 复核这道门本身确实会判红。
       - name: Lint（oxlint）
         run: npm run gate:lint
+      # i18n 键门禁（gate:i18n · 批次4）：词典键配平 / 英文词典无 CJK 污染 / 组件静态 t() 命中词典。
+      # 纯静态（只读 src/i18n/en.ts|zh.ts + 扫 src 的 t()），不依赖 dist ⇒ 属 gate-static 这条闸。
+      # 只跑常规模式进 CI；故障注入自证 `gate:i18n:falsify`（15 项解析夹具 + 8 例注入）属证据任务，
+      # 与 verify:provider:falsify / test:ui-contract:falsify 同约定**不进 CI**，本地跑复核。
+      - name: i18n 键门禁（gate:i18n）
+        run: npm run gate:i18n
 
   # ── 闸门 2：需要 dist/ 与 preview 服务器 ───────────────────────────────────
   gate-build:
@@ -276,6 +282,12 @@ jobs:
       # 「npm run preview & + curl 探活」是冗余的）。
       - name: 端到端测试
         run: npm run test:e2e
+      # 语言切换 <html lang> 同步真机验收（test:i18n · 批次4）：点 lang-en/lang-zh 后读
+      # document.documentElement.lang，并验刷新持久化。必须排在「安装 Chromium」之后（复用 e2e 已装的浏览器）。
+      # 补的是源码静态检查看不到的盲区：LangProvider 有 applyHtmlLang ≠ 切换后 <html lang> 真的变了。
+      # 三态：无浏览器/preview 未就绪 → exit 2（UNDECIDED），不冒充通过；只打本机 4176，绝不打生产。
+      - name: i18n <html lang> 同步真机验收（test:i18n）
+        run: npm run test:i18n
       # 学习单元真机验收（Stage 2 V1/V2/V3/V5）。必须排在「安装 Chromium」**之后**：
       # 本脚本零 Playwright 依赖、自己找浏览器（tests/helpers/chrome.mjs，认
       # PLAYWRIGHT_BROWSERS_PATH 下的 chromium），没装 Chromium 时它只会报「找不到浏览器」。

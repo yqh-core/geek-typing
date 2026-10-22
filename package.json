@@ -34,6 +34,7 @@
     "lint:text": "node scripts/scan-mojibake.mjs",
     "test:learning": "node tests/learning-model.mjs",
     "test:offline": "node tests/offline-audit.mjs",
+    "test:i18n": "node tests/i18n-lang.mjs",
     "test:prod": "node tests/offline-audit.mjs --prod",
     "test:e2e:prod": "node tests/e2e.mjs --prod",
     "test:smoke": "node tests/prod-smoke.mjs",
