@@ -1,35 +1,40 @@
 #!/usr/bin/env node
 /**
- * 批次 4 · geek-typing —— i18n 键门禁（gate-i18n.mjs）
+ * 批次 4 · geek-typing —— i18n 键门禁（gate-i18n.mjs）v2（词法解析器版）
  *
- * 背景（评审一手证据）：geek-typing 有 en.ts / zh.ts 双语词典（261/261 计数相等），
- * 但**没有**任何自动化门禁证明「两词典键集合一致」「英文词典未被中文污染」「组件里
- * t('字面量') 引用的键真实存在」。对比 digttsreader 已有 tests/unit/i18n-keys.test.ts，
- * 本站缺这一层 = 新增语言或漏译时**静默降级**（界面切成英文、某句仍是中文，或 t('缺失键')
- * 直接把 key 字符串渲染给用户），肉眼才看得见。本门把它变成构建期判据。
+ * 背景：geek-typing 有 en.ts / zh.ts 双语，但无自动化门禁证明「键集合一致 / 英文未漏译中文 /
+ * 组件 t('字面量') 引用的键存在」。缺此层 = 新增语言或漏译时静默降级，肉眼才见。
  *
- * 与仓库既有门同族（见 gate-license.mjs）：三分退出码、runChecks 返回命中集、
- * --falsify 自证「不会失败的门等于没有门」。区别：本站门禁**全在进程内**用内存态输入
- * 证伪，**不写任何文件、不 spawn 子进程**（本机 node 预加载 shim 会 EBUSY），因此无字节还原环节。
+ * v2 相对 v1 的根因修复（独立审查复现，见下「已知误报/漏报」）：
+ *   v1 用三条互相冲突的正则近似 TS（indexOf { } + 顶层引号冒号 + 事后删 // 与 /* *\/），
+ *   导致三类缺陷——本 v2 改**单一词法扫描器**（tokenize：注释 / 单双引号串 / 模板串含 ${} / 转义），
+ *   parseDict 与 scanUsedKeys 都走它，从**结构上**消除误报/漏报；再补独立回归夹具自测。
  *
- * 三条判据（任一命中 ⇒ FAIL，独立 code 以便分诊）：
- *   1. KEY_BALANCE        —— en.ts 与 zh.ts 的键集合必须完全相等（zh 为准源，见 zh.ts 头注释）。
- *                            报告「仅 zh 有」「仅 en 有」两个方向。
- *   2. EN_CJK_RESIDUE     —— 英文词典任一 value 的**正文**含中日韩字符 ⇒ 该条尚未真正翻译（英文站泄漏中文）。
- *                            例外：`` `...` `` 行内代码段里的 CJK 是**示例负载**（如 bank.help 的
- *                            `` `quantization = 量化` `` 演示导入格式），属刻意内容、非漏译，判据剥除后再测。
- *   3. KEY_USAGE_MISSING  —— 组件里 t('字面量键') / t("字面量键") 引用的键，在 zh 准源里不存在。
- *                            （仅静态字面量；动态拼接键不可静态判定，如实不覆盖，与 ttsreader 同界。）
+ * 已知误报/漏报（v1，均独立复现；本次真实词典未触发但属静默失效隐患，故必修）：
+ *   R1（漏报 EN_CJK）：值里 `... https://x 未译 ...`，v1 事后 strip 注释把 `//` 到行尾删掉 →
+ *       URL 之后的中文被连带删除 → 判绿。词法扫描下 URL 属字符串正文、不删 → 修复。
+ *   R2（误识别键）：值若是模板串（合法 TS），模板内看似 `  'k':` 的示例文本被 v1 当顶层键 → 幻影键、
+ *       可能假报不配平。词法扫描下模板内容是单个 template token、不再扫键 → 修复。
+ *   R3（覆盖不足）：v1 的 CJK 范围漏 CJK 扩展 B（U+20000 𠀀）等。改用 Unicode 属性
+ *       \p{Script=Han|Hiragana|Katakana|Hangul}（含扩展汉字）→ 修复。
  *
- * 退出码：0=PASS；1=FAIL（存在违规）；2=Fatal（词典文件读不到 / 解析不出任何键 / 未知 flag）——
- *   **解析失败绝不降级成 PASS**。
+ * 三条判据（任一命中 ⇒ FAIL，独立 code）：
+ *   1. KEY_BALANCE      —— en.ts 与 zh.ts 键集合完全相等（zh 为准源）；同侧重复键亦判红。
+ *   2. EN_CJK_RESIDUE   —— 英文词典任一 value 正文含中日韩（Han/假名/谚文，含扩展）⇒ 未真正译出。
+ *                          例外：剥行内 `code` 段（示例负载，如 bank.help 的 `quantization = 量化`）后再测。
+ *   3. KEY_USAGE_MISSING —— 组件 t('字面量')/t("字面量") 引用的键不在 zh 准源。
+ *                          契约：仅覆盖「直接 t(字面量) 调用」这一静态子集；别名/解构后改名/动态拼接键
+ *                          不可静态判定，如实列为边界（与 digttsreader 的 i18n-keys 测试同界），不谎称全覆盖。
+ *
+ * 退出码：0=PASS；1=FAIL；2=Fatal（词典读不到 / 词法不闭合（未终止串/注释/模板、括号不平衡）/
+ *   键非字符串等**超出受支持子集**的形态 / 未解析到键 / 未知 flag）——**解析失败绝不降级成 PASS**。
  *
  * 用法：
- *   npm run gate:i18n            # 读真 src/i18n/en.ts|zh.ts + 扫 src 的 t() 字面量
- *   npm run gate:i18n:falsify   # 进程内注入故障，断言命中集精确等于预期 + 对照组判绿
+ *   npm run gate:i18n            # 读真 en.ts|zh.ts + 扫 src 的 t() 字面量
+ *   npm run gate:i18n:falsify    # ① 词法解析器回归夹具（独立，不经 runChecks）② 内存注入证伪
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { join, resolve, dirname, relative } from 'node:path'
+import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -39,82 +44,196 @@ const SRC_DIR = join(ROOT, 'src')
 /** 脚本自身错误（EXIT=2）—— 与「判据不成立（EXIT=1）」严格区分。 */
 class Fatal extends Error {}
 
-const CJK = /[\u3400-\u4DBF\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/
+/** 中日韩（Han 含扩展 A/B/…、假名、谚文），Unicode 属性正则。 */
+const CJK = /\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}/u
+
+/* ============================ 词法扫描核心 ============================ */
 
 /**
- * 从 `export const xx: Record<string,string> = { ... }` 里**精确**抽取 { key, value }。
- * 逐字符扫描：跟踪单/双引号与 `/* *\/`、`//` 注释；只在对象字面量**顶层**（depth 1）记录
- * `key : value`。key 一律是带引号的字符串；value 取到该条结束（逗号/换行由下一 key 界定，
- * 我们只关心 value 的文本用于 CJK 判定，故把 key 之后到下一个顶层 key 之前、去注释的片段作 value）。
- * 简化策略：先剥注释，再按「顶层引号串 + 冒号」切 key，冒号后到下一个 key 前为 value。
+ * 把源码切成 token 序列：kind ∈ code | comment | str | template。
+ * 关键：字符串 / 模板 / 注释**内部**的 { } : // 等一律不作为代码解读（结构性消除 R1/R2）。
+ * 模板串的 ${…} 插值表达式按嵌套代码消费（其内的串/模板/大括号正确配对），但插值表达式内容
+ * 不计入「可读文案」（value 仅取模板的字面文本段）——表达式不是 UI 文案。
+ * 任何不闭合（未终止串/注释/模板）⇒ 抛 Fatal（fail-closed，绝不静默判绿）。
+ */
+function tokenize(src, label) {
+  const toks = []
+  const n = src.length
+  let i = 0
+  let codeStart = 0
+  const flushCode = (end) => {
+    if (end > codeStart) toks.push({ kind: 'code', value: src.slice(codeStart, end) })
+  }
+  while (i < n) {
+    const c = src[i]
+    const d = src[i + 1]
+    if (c === '/' && d === '*') {
+      flushCode(i)
+      let j = i + 2
+      while (j < n && !(src[j] === '*' && src[j + 1] === '/')) j++
+      if (j >= n) throw new Fatal(`${label}：块注释未闭合`)
+      j += 2
+      toks.push({ kind: 'comment' }); i = j; codeStart = j; continue
+    }
+    if (c === '/' && d === '/') {
+      flushCode(i)
+      let j = i + 2
+      while (j < n && src[j] !== '\n') j++
+      toks.push({ kind: 'comment' }); i = j; codeStart = j; continue
+    }
+    if (c === "'" || c === '"') {
+      flushCode(i)
+      const q = c
+      let j = i + 1
+      let val = ''
+      let closed = false
+      while (j < n) {
+        const e = src[j]
+        if (e === '\\') { val += src[j + 1] ?? ''; j += 2; continue }
+        if (e === q) { closed = true; j++; break }
+        if (e === '\n') throw new Fatal(`${label}：字符串未闭合（跨行需转义换行）`)
+        val += e; j++
+      }
+      if (!closed) throw new Fatal(`${label}：字符串未闭合`)
+      toks.push({ kind: 'str', value: val }); i = j; codeStart = j; continue
+    }
+    if (c === '`') {
+      flushCode(i)
+      let j = i + 1
+      let val = ''
+      let closed = false
+      while (j < n) {
+        const e = src[j]
+        if (e === '\\') { val += src[j + 1] ?? ''; j += 2; continue }
+        if (e === '`') { closed = true; j++; break }
+        if (e === '$' && src[j + 1] === '{') {
+          // 消费平衡的插值表达式（不纳入文案）；内部串/模板/括号正确配对
+          let depth = 1
+          j += 2
+          while (j < n && depth > 0) {
+            const g = src[j]
+            if (g === '{') depth++
+            else if (g === '}') depth--
+            else if (g === "'" || g === '"') {
+              const q2 = g; j++
+              while (j < n) { if (src[j] === '\\') { j += 2; continue } if (src[j] === q2) break; j++ }
+            } else if (g === '`') {
+              j++
+              while (j < n && src[j] !== '`') { if (src[j] === '\\') j++; j++ }
+            }
+            j++
+          }
+          if (depth > 0) throw new Fatal(`${label}：模板插值 \${ 未闭合`)
+          continue
+        }
+        val += e; j++
+      }
+      if (!closed) throw new Fatal(`${label}：模板字符串未闭合`)
+      toks.push({ kind: 'template', value: val }); i = j; codeStart = j; continue
+    }
+    i++
+  }
+  flushCode(n)
+  return toks
+}
+
+/**
+ * 从 export const … = { ... } 词法抽取顶层 { key, value }。
+ * 受支持子集：键必须是字符串字面量；值必须是字符串/模板字面量（其它形态 → fail-closed Fatal）。
  */
 function parseDict(src, label) {
-  const open = src.indexOf('{')
-  const close = src.lastIndexOf('}')
-  if (open < 0 || close < 0 || close <= open) {
-    throw new Fatal(`${label}：找不到对象字面量 { ... }，无法抽取键（解析失败，绝不判绿）`)
-  }
-  let body = src.slice(open + 1, close)
-  // 剥块注释与行注释（词典无嵌套注释、value 内无 // https 这类串——见样本；保守只剥整行注释与 /* */）
-  body = body.replace(/\/\*[\s\S]*?\*\//g, '')
+  const toks = tokenize(src, label)
   const entries = []
-  // 逐行扫描顶层 key：`  'key': <开始值>` 或 `  'key':\n    <值>`
-  // 我们按 key 边界切分：匹配 (^\s*)(['"])(...)\2(\s*:) 作为一条起点。
-  const keyRe = /^[ \t]*(['"])([^'"]+)\1[ \t]*:/gm
-  const marks = []
-  let m
-  while ((m = keyRe.exec(body)) !== null) {
-    marks.push({ key: m[2], start: m.index, valFrom: m.index + m[0].length })
+  let depth = 0
+  let objSeen = false
+  for (let k = 0; k < toks.length; k++) {
+    const t = toks[k]
+    if (t.kind === 'comment') continue
+    if (t.kind === 'code') {
+      for (const ch of t.value) {
+        if (ch === '{' || ch === '(' || ch === '[') depth++
+        else if (ch === '}' || ch === ')' || ch === ']') depth--
+      }
+      continue
+    }
+    // str/template token：只在对象体内（depth>=1 且已见过 {）考虑
+    if (!objSeen) {
+      // 对象是否已开始：看之前 code 里是否出现过把 depth 推到 >=1 的 {
+      // 简化：第一个 str 出现在 depth>=1 时才可能是键；否则是 Record<...> 之前的杂项
+    }
+    if (depth < 1) continue
+    objSeen = true
+    if (t.kind !== 'str') {
+      // 对象体内出现裸模板作为「值」在下方处理；作为「键」不支持 → 交给下面键判定（模板不可能是键）
+      // 若一个 template token 出现在「不是刚读完键」的位置，视为值延续，忽略（已由上一个键消费）
+      continue
+    }
+    // str token：判断其后是否紧跟 `:`（键）——向后找第一个非 comment token 的代码片段
+    const nextCode = (() => { let j = k + 1; while (j < toks.length && toks[j].kind === 'comment') j++; return toks[j] && toks[j].kind === 'code' ? toks[j].value.match(/^\s*(:)/) : null })()
+    if (!nextCode) continue // 不是键（可能是值的一部分/函数参数等），跳过
+    // 是键：向后取第一个非 comment token 作为值
+    let v = k + 2
+    while (v < toks.length && toks[v].kind === 'comment') v++
+    // 跳过键与值之间的 code（空白 + 冒号 + 空白）
+    while (v < toks.length && toks[v].kind === 'code') {
+      const rest = toks[v].value.replace(/^\s*:\s*/, '')
+      if (rest.trim() === '') { v++; continue }
+      // 冒号后 code 里直接是其它内容（非空白）→ 值不是字符串/模板字面量开头 → fail-closed
+      throw new Fatal(`${label}：键 "${t.value}" 的值不是字符串/模板字面量（超出受支持子集）`)
+    }
+    const vt = toks[v]
+    if (!vt || (vt.kind !== 'str' && vt.kind !== 'template')) {
+      throw new Fatal(`${label}：键 "${t.value}" 缺少字符串/模板值（受支持子集外或格式异常）`)
+    }
+    entries.push({ key: t.value, value: vt.value })
   }
-  if (marks.length === 0) {
-    throw new Fatal(`${label}：未解析到任何键（正则失配？词典格式变更？）—— 解析失败，绝不判绿`)
-  }
-  for (let i = 0; i < marks.length; i++) {
-    const next = i + 1 < marks.length ? marks[i + 1].start : body.length
-    const rawVal = body.slice(marks[i].valFrom, next)
-    // 去掉行注释与首尾空白、结尾逗号，再剥引号（单或双）
-    const cleaned = rawVal.replace(/\/\/[^\n]*/g, '').replace(/\s+/g, ' ').trim().replace(/,\s*$/, '')
-    const unq = cleaned.match(/^(['"])((?:\\.|(?!\1).)*)\1$/s)
-    entries.push({ key: marks[i].key, value: unq ? unq[2] : cleaned })
-  }
+  if (depth !== 0) throw new Fatal(`${label}：括号不平衡（词法解析器状态异常）`)
+  if (entries.length === 0) throw new Fatal(`${label}：未解析到任何键（词典为空或超出受支持子集）`)
   return entries
 }
 
-/** 递归列出 src 下 .ts/.tsx（跳过词典与测试文件目录内注释噪音无妨；仅取调用点）。 */
+/* ============================ 组件 t() 扫描 ============================ */
+
 function listSrcFiles(dir) {
   const out = []
   for (const name of readdirSync(dir)) {
     const p = join(dir, name)
     const st = statSync(p)
-    if (st.isDirectory()) {
-      if (/(node_modules|\.git)/.test(name)) continue
-      out.push(...listSrcFiles(p))
-    } else if (/\.tsx?$/.test(name)) {
-      out.push(p)
-    }
+    if (st.isDirectory()) { if (!/(node_modules|\.git)/.test(name)) out.push(...listSrcFiles(p)) }
+    else if (/\.tsx?$/.test(name)) out.push(p)
   }
   return out
 }
 
-/** 扫组件里的 `t('key')` / `t("key")` 静态字面量键。 */
+/**
+ * 扫组件里 t('字面量') / t("字面量") 的静态键 —— **刻意用宽松启发式，不用上面的严格词法器**。
+ *
+ * 为什么不复用严格 lexer（这正是独立审查揭示的边界）：组件是 .tsx，含正则字面量（/['"]/）与
+ * JSX 文本里的裸撇号（it's），手写小型 JS/TS 词法器无法可靠区分「除法 vs 正则」「JSX 文本撇号 vs
+ * 字符串起点」——强行套用会把 PracticePanel 这类正常文件误判成「字符串未闭合」而 Fatal。严格 lexer
+ * 只用于**纯数据的词典文件**（en.ts/zh.ts 无正则/JSX/关键字，安全），组件扫描退回到剥注释+正则。
+ *
+ * 误差方向可控：
+ *   - 漏报（某真实 t() 因同行前置 URL 的 `//` 被当注释截断而没扫到）→ 安全：只是少检一个键，不会误红。
+ *   - 误报（注释/字符串里的假 t('ghost') 被计入）→ 已用「先剥块/行注释」压到很低；若仍命中且该键真不在
+ *     词典，会判红 —— 属可接受的保守误报（宁红勿漏），需在报告里人工分诊。
+ * 契约边界：仅静态直接调用 t('literal')；别名/解构改名/动态拼接键/其它 i18n API 不覆盖（明示，不谎称）。
+ */
 function collectLiteralKeys(files) {
   const used = new Set()
   const re = /\bt\(\s*(['"])([^'"]+)\1/g
   for (const f of files) {
     let txt
     try { txt = readFileSync(f, 'utf8') } catch { continue }
-    // 去块/行注释避免注释里的 t('...') 误报
-    txt = txt.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+    const cleaned = txt.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
     let m
-    while ((m = re.exec(txt)) !== null) used.add(m[2])
+    while ((m = re.exec(cleaned)) !== null) used.add(m[2])
   }
   return used
 }
 
-/**
- * 纯函数判据主体（内存态输入，正常/证伪共用一条路径）。
- * 返回 { hits:Set, logs, counts }。
- */
+/* ============================ 判据（纯函数） ============================ */
+
 function runChecks(enEntries, zhEntries, usedKeys) {
   const hits = new Set()
   const logs = []
@@ -125,124 +244,161 @@ function runChecks(enEntries, zhEntries, usedKeys) {
   const zhKeys = zhEntries.map((e) => e.key)
   const enSet = new Set(enKeys)
   const zhSet = new Set(zhKeys)
-
-  // 判据 1：键集合一致
   const onlyZh = zhKeys.filter((k) => !enSet.has(k))
   const onlyEn = enKeys.filter((k) => !zhSet.has(k))
-  // 重复键检查（同侧）
-  const dupEn = enKeys.filter((k, i) => enKeys.indexOf(k) !== i)
-  const dupZh = zhKeys.filter((k, i) => zhKeys.indexOf(k) !== i)
+  const dupEn = [...new Set(enKeys.filter((k, i) => enKeys.indexOf(k) !== i))]
+  const dupZh = [...new Set(zhKeys.filter((k, i) => zhKeys.indexOf(k) !== i))]
   if (onlyZh.length || onlyEn.length || dupEn.length || dupZh.length) {
     const parts = []
     if (onlyZh.length) parts.push(`仅 zh 有(en 缺)：${onlyZh.slice(0, 12).join(', ')}${onlyZh.length > 12 ? ` …(+${onlyZh.length - 12})` : ''}`)
     if (onlyEn.length) parts.push(`仅 en 有(zh 缺)：${onlyEn.slice(0, 12).join(', ')}${onlyEn.length > 12 ? ` …(+${onlyEn.length - 12})` : ''}`)
-    if (dupEn.length) parts.push(`en 重复键：${[...new Set(dupEn)].join(', ')}`)
-    if (dupZh.length) parts.push(`zh 重复键：${[...new Set(dupZh)].join(', ')}`)
+    if (dupEn.length) parts.push(`en 重复键：${dupEn.join(', ')}`)
+    if (dupZh.length) parts.push(`zh 重复键：${dupZh.join(', ')}`)
     fail('KEY_BALANCE', `en(${enKeys.length})/zh(${zhKeys.length}) 键集合不一致 → ${parts.join(' | ')}`)
   } else {
     logs.push(`  ✓ 键配平：en/zh 各 ${enKeys.length} 键，集合完全相等，无重复`)
   }
 
-  // 判据 2：英文词典 CJK 污染（正文；剥 `` `...` `` 行内代码示例后判，示例负载豁免）
   const cjk = enEntries.filter((e) => CJK.test(e.value.replace(/`[^`]*`/g, '')))
   if (cjk.length) {
-    fail('EN_CJK_RESIDUE', `英文词典 ${cjk.length} 条 value 正文含中日韩字符（未真正译出，行内代码示例已豁免）：${cjk.slice(0, 10).map((e) => `${e.key}="${e.value.slice(0, 20)}"`).join(', ')}${cjk.length > 10 ? ` …(+${cjk.length - 10})` : ''}`)
+    fail('EN_CJK_RESIDUE', `英文词典 ${cjk.length} 条 value 正文含中日韩（未真正译出；行内 code 示例已豁免）：${cjk.slice(0, 10).map((e) => `${e.key}="${e.value.slice(0, 24)}"`).join(', ')}${cjk.length > 10 ? ` …(+${cjk.length - 10})` : ''}`)
   } else {
-    logs.push(`  ✓ 英文词典正文无 CJK 污染（${enEntries.length} 条 value，已豁免行内代码示例）`)
+    logs.push(`  ✓ 英文词典正文无 CJK 污染（${enEntries.length} 条 value，已豁免行内 code 示例）`)
   }
 
-  // 判据 3：t('字面量') 引用的键必须存在于 zh 准源
   const missing = [...usedKeys].filter((k) => !zhSet.has(k)).sort()
   if (missing.length) {
     fail('KEY_USAGE_MISSING', `组件 t('key') 引用了 zh 准源里不存在的键 ${missing.length} 个：${missing.slice(0, 15).join(', ')}${missing.length > 15 ? ` …(+${missing.length - 15})` : ''}`)
   } else {
     logs.push(`  ✓ 组件静态 t('key') 全部命中词典（引用 ${usedKeys.size} 个唯一键）`)
   }
-
   return { hits, logs, errors, counts: { enKeys: enKeys.length, zhKeys: zhKeys.length, usedKeys: usedKeys.size } }
 }
 
-function parseArgs(argv) {
-  const args = argv.slice(2)
-  let falsify = false
-  for (const a of args) {
-    if (a === '--falsify') falsify = true
-    else throw new Fatal(`未知参数 ${JSON.stringify(a)} —— 本门不接受未知 flag`)
-  }
-  return { falsify }
-}
-
-/** 读真词典 + 扫真 src → 供正常模式与证伪的对照组基座。 */
 function loadReal() {
-  const enText = readFileSync(join(I18N_DIR, 'en.ts'), 'utf8')
-  const zhText = readFileSync(join(I18N_DIR, 'zh.ts'), 'utf8')
-  const en = parseDict(enText, 'en.ts')
-  const zh = parseDict(zhText, 'zh.ts')
+  const en = parseDict(readFileSync(join(I18N_DIR, 'en.ts'), 'utf8'), 'en.ts')
+  const zh = parseDict(readFileSync(join(I18N_DIR, 'zh.ts'), 'utf8'), 'zh.ts')
   const used = collectLiteralKeys(listSrcFiles(SRC_DIR))
   return { en, zh, used }
 }
 
-/* ---------------------- 证伪自检（纯内存，绝不写文件） ---------------------- */
+/* ============================ 证伪自检 ============================ */
+
+/**
+ * ① 词法解析器回归夹具：直接喂手写 TS 源给 parseDict / collectLiteralKeys / runChecks，
+ *    断言**解析结果本身**（键集/值/命中 code），**不经** runChecks 读真词典那条路径。
+ *    —— 独立证明解析器理解 URL/模板/转义/扩展汉字/畸形输入，而非只证明注入故障会命中。
+ */
+function parserFixtures() {
+  const results = []
+  let bad = 0
+  const ok = (id, cond, note = '') => { results.push(`  ${cond ? '✓' : '✗'} ${id}${note ? ' — ' + note : ''}`); if (!cond) bad++ }
+
+  // F-URL：值含 https:// 且其后有未译中文 → EN_CJK_RESIDUE 必须命中（v1 漏报）
+  {
+    const en = parseDict(`export const en = { 'a.help': 'See https://x.dev 未译 text', 'b': 'ok' }`, 'F-URL-en')
+    const zh = parseDict(`export const zh = { 'a.help': '看 https://x.dev 未译 文字', 'b': '好' }`, 'F-URL-zh')
+    const r = runChecks(en, zh, new Set())
+    ok('F-URL 值内 // 不再误删、正文中文判红', r.hits.has('EN_CJK_RESIDUE'), `hits={${[...r.hits].join(',')}}`)
+    ok('F-URL 键集解析正确(2)', en.length === 2 && zh.length === 2)
+  }
+  // F-TMPL：模板串值里的伪键不得被当顶层键（v1 幻影键）
+  {
+    const en = parseDict("export const en = { 'help': `Example:\n  'fake.key': 'not real'\n`, 'real.key': 'Real' }", 'F-TMPL')
+    const keys = en.map((e) => e.key)
+    ok('F-TMPL 模板伪键不被计入', !keys.includes('fake.key') && keys.length === 2 && keys.includes('help') && keys.includes('real.key'), `keys=[${keys.join(', ')}]`)
+  }
+  // F-EXTB：CJK 扩展 B（𠀀）应被识别为汉字
+  {
+    ok('F-EXTB 扩展汉字被识别', /\p{Script=Han}/u.test('\u{20000}'), 'U+20000 ∈ Han 属性')
+    const en = parseDict("export const en = { 'x': 'a\u{20000}b' }", 'F-EXTB-en')
+    const zh = parseDict("export const zh = { 'x': '中' }", 'F-EXTB-zh')
+    ok('F-EXTB 经 runChecks 判红 EN_CJK_RESIDUE', runChecks(en, zh, new Set()).hits.has('EN_CJK_RESIDUE'))
+  }
+  // F-DUP：同侧重复键必须判红
+  {
+    const en = parseDict("export const en = { 'a': 'x', 'a': 'y' }", 'F-DUP-en')
+    const zh = parseDict("export const zh = { 'a': 'x', 'a': 'y' }", 'F-DUP-zh')
+    ok('F-DUP 重复键判红', runChecks(en, zh, new Set()).hits.has('KEY_BALANCE'))
+  }
+  // F-ESCAPE：转义引号不破坏值边界
+  {
+    const en = parseDict(`export const en = { 'a': 'say "hi" & \\'x\\' ok', 'b': 'y' }`, 'F-ESC')
+    const e = en.find((x) => x.key === 'a')
+    ok('F-ESCAPE 转义引号完整取值', e && e.value.includes('say "hi"') && e.value.includes("'x'"), `value=${JSON.stringify(e && e.value)}`)
+  }
+  // F-COMMENT：组件宽松扫描 —— 注释里的假 t() 不计入；各真实 t() 分行即可命中。
+  //   （宽松是**有意**的：严格词法器无法安全吃 .tsx 的正则/JSX 撇号，见 collectLiteralKeys 注释。）
+  {
+    const looseClean = (code) => code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+    const collect = (code) => { const s = new Set(); const re = /\bt\(\s*(['"])([^'"]+)\1/g; let m; const c = looseClean(code); while ((m = re.exec(c)) !== null) s.add(m[2]); return s }
+    const found = collect("const x = t('real.key');\n// t('ghost.comment')\n/* t('ghost.block') */\nconst y = t('after');")
+    ok('F-COMMENT 注释里的假 t() 不计入、分行真实 t() 命中', found.has('real.key') && found.has('after') && !found.has('ghost.comment') && !found.has('ghost.block'), `found={${[...found].join(',')}}`)
+    // 已知边界（编码为期望，而非当作 bug）：同行 URL 的 `//b` 会被当行注释截断 → 漏报该行后续 t()（安全方向：少检不误红）
+    const limited = collect("const u = 'http://a//b'; const y = t('sameLineAfter');")
+    ok('F-COMMENT 边界：同行 URL 后 t() 漏报（宽松启发式的已知安全局限）', !limited.has('sameLineAfter'), `found={${[...limited].join(',')}}`)
+  }
+  // F-CLOSE-STR / F-CLOSE-CMT / F-CLOSE-TPL / F-UNSUP：畸形/超子集必须抛 Fatal（fail-closed）
+  const mustThrow = (id, fn) => { let threw = false; try { fn() } catch (e) { threw = e instanceof Fatal } ok(id, threw) }
+  mustThrow('F-CLOSE-STR 未闭合字符串 → Fatal', () => parseDict("export const en = { 'a': 'oops }", 'F1'))
+  mustThrow('F-CLOSE-CMT 未闭合块注释 → Fatal', () => parseDict("export const en = { /* nope 'a':'b' }", 'F2'))
+  mustThrow('F-CLOSE-TPL 未闭合模板 → Fatal', () => parseDict('export const en = { `a }', 'F3'))
+  mustThrow('F-UNSUP 值非字符串字面量(数字) → Fatal', () => parseDict("export const en = { 'a': 123 }", 'F4'))
+  mustThrow('F-EMPTY 无键 → Fatal', () => parseDict('export const en = {}', 'F5'))
+
+  return { results, bad }
+}
+
 function falsify() {
-  console.log('[gate:i18n] 证伪自检 —— 证明每条判据都能判红（内存注入，不动真词典/不写文件）')
+  console.log('[gate:i18n] 证伪自检')
+  console.log('────────── ① 词法解析器回归夹具（独立，不经真词典）──────────')
+  const fx = parserFixtures()
+  for (const l of fx.results) console.log(l)
+
+  console.log('────────── ② 判据注入证伪（内存注入，不动真词典）──────────')
   const real = loadReal()
   const clone = (arr) => arr.map((e) => ({ ...e }))
-  let bad = 0
+  let bad = fx.bad
   const results = []
   const check = (letter, name, expect, en, zh, used) => {
     const r = runChecks(en, zh, used)
     const got = [...r.hits].sort()
     const want = [...expect].sort()
     const exact = got.length === want.length && got.every((x, i) => x === want[i])
-    if (exact) {
-      results.push(`  ✓ ${letter} ${want.length ? `恰好判红 {${got.join(',')}}` : '恰好判绿（对照组）'} —— ${name}`)
-    } else {
-      bad++
-      results.push(`  ✗ ${letter} 未达预期：期望 {${want.join(',') || '∅'}}，实际 {${got.join(',') || '∅'}} —— ${name}`)
-      if (got.length === 0 && want.length > 0) results.push('      该判据是空转的（注入故障后仍判 PASS）')
-    }
+    if (exact) results.push(`  ✓ ${letter} ${want.length ? `恰好判红 {${got.join(',')}}` : '恰好判绿（对照组）'} —— ${name}`)
+    else { bad++; results.push(`  ✗ ${letter} 期望 {${want.join(',') || '∅'}}，实际 {${got.join(',') || '∅'}} —— ${name}`) }
   }
-
-  // CTRL：真输入 → 判绿
-  check('CTRL', '真词典 + 真引用（本门必须判绿，否则前面全失真）', [], real.en, real.zh, real.used)
-  // B1：en 少一个键 → 仅 zh 有 → KEY_BALANCE
-  { const en = clone(real.en); en.splice(5, 1); check('B1', 'en 删一个键 → 键集合不一致', ['KEY_BALANCE'], en, clone(real.zh), new Set()) }
-  // B2：en 多一个 zh 没有的键 → 仅 en 有
-  { const en = clone(real.en); en.push({ key: 'zonly.extra.key', value: 'Extra' }); check('B2', 'en 多一个键 → 键集合不一致', ['KEY_BALANCE'], en, clone(real.zh), new Set()) }
-  // C1：某 en value 正文塞中文 → EN_CJK_RESIDUE
-  { const en = clone(real.en); en[0] = { ...en[0], value: 'Practice 练习' }; check('C1', '英文正文 value 含中文 → 污染判红', ['EN_CJK_RESIDUE'], en, clone(real.zh), new Set()) }
-  // C2：某 en value 的中文在行内代码示例里 → 豁免 → 判绿（证明豁免不是"无视所有 CJK"）
-  { const en = clone(real.en); en[0] = { ...en[0], value: 'One per line like `x = 中文`, ok' }; check('C2', '中文在 `` `code` `` 示例内 → 豁免判绿', [], en, clone(real.zh), new Set()) }
-  // V1：引用一个词典里没有的键 → KEY_USAGE_MISSING
-  { check('V1', '组件引用不存在键 → 覆盖缺失', ['KEY_USAGE_MISSING'], clone(real.en), clone(real.zh), new Set(['no.such.key.xyz'])) }
-  // V2：对照组，used 全是真键 → 判绿
-  { const used = new Set(real.used.size ? [...real.used] : []); check('V2', '引用集合保持合法（仅测覆盖维度不误伤）', [], clone(real.en), clone(real.zh), used) }
+  check('CTRL', '真词典+真引用必须判绿', [], real.en, real.zh, real.used)
+  { const en = clone(real.en); en.splice(5, 1); check('B1', 'en 删一键 → 不配平', ['KEY_BALANCE'], en, clone(real.zh), new Set()) }
+  { const en = clone(real.en); en.push({ key: 'z.extra', value: 'x' }); check('B2', 'en 加一键 → 不配平', ['KEY_BALANCE'], en, clone(real.zh), new Set()) }
+  { const en = clone(real.en); en[0] = { ...en[0], value: 'Practice 练习' }; check('C1', '英文正文含中文 → 判红', ['EN_CJK_RESIDUE'], en, clone(real.zh), new Set()) }
+  { const en = clone(real.en); en[0] = { ...en[0], value: 'a `x = 中` b `y = 文` c' }; check('C2', '中文在多段行内 code 示例内 → 豁免判绿', [], en, clone(real.zh), new Set()) }
+  { const en = clone(real.en); en[0] = { ...en[0], value: 'See https://x 未译' }; check('C3', 'URL 后中文不再被误删 → 判红(v1 R1 回归)', ['EN_CJK_RESIDUE'], en, clone(real.zh), new Set()) }
+  { check('V1', '引用不存在键 → 覆盖缺失', ['KEY_USAGE_MISSING'], clone(real.en), clone(real.zh), new Set(['no.such'])) }
+  { check('V2', '引用合法集合 → 判绿', [], clone(real.en), clone(real.zh), new Set(real.used)) }
 
   for (const l of results) console.log(l)
   console.log('──────────────────────────────────────────────────────')
-  if (bad === 0) {
-    console.log(`i18n Gate Falsification：✅ PASS —— ${7}/7 用例符合预期（含 3 条判绿对照组），真词典未被触碰`)
-    process.exit(0)
-  }
-  console.error(`i18n Gate Falsification：❌ FAIL —— ${bad} 项问题（存在恒真判据 ⇒ 本门不可信）`)
-  process.exit(1)
+  if (bad === 0) { console.log(`i18n Gate Falsification：✅ PASS —— 夹具 ${fx.results.length} 项全绿 + 注入 ${8 - 0} 例符合预期（含 2 判绿对照组）；真词典未被触碰`); process.exit(0) }
+  console.error(`i18n Gate Falsification：❌ FAIL —— ${bad} 项问题（解析器/判据不可信）`); process.exit(1)
 }
 
-/* ------------------------------- 入口 ------------------------------- */
+function parseArgs(argv) {
+  let falsifyMode = false
+  for (const a of argv.slice(2)) { if (a === '--falsify') falsifyMode = true; else throw new Fatal(`未知参数 ${JSON.stringify(a)} —— 不接受未知 flag`) }
+  return { falsifyMode }
+}
+
 try {
-  const { falsify: wantFalsify } = parseArgs(process.argv)
-  if (wantFalsify) { falsify() } else {
+  const { falsifyMode } = parseArgs(process.argv)
+  if (falsifyMode) { falsify() } else {
     const real = loadReal()
     const r = runChecks(real.en, real.zh, real.used)
     for (const l of r.logs) console.log(l)
     for (const e of r.errors) console.error(e)
     console.log('──────────────────────────────────────────────────────')
-    if (r.hits.size === 0) {
-      console.log(`i18n Gate: PASS —— en ${r.counts.enKeys} 键 / zh ${r.counts.zhKeys} 键 / 引用 ${r.counts.usedKeys} 唯一键`)
-      process.exit(0)
-    }
-    console.error(`i18n Gate: FAIL —— 命中 ${[...r.hits].join(', ')}`)
-    process.exit(1)
+    if (r.hits.size === 0) { console.log(`i18n Gate: PASS —— en ${r.counts.enKeys} 键 / zh ${r.counts.zhKeys} 键 / 引用 ${r.counts.usedKeys} 唯一键`); process.exit(0) }
+    console.error(`i18n Gate: FAIL —— 命中 ${[...r.hits].join(', ')}`); process.exit(1)
   }
 } catch (e) {
   if (e instanceof Fatal) { console.error(`❌ EXIT=2：${e.message}`); process.exit(2) }
