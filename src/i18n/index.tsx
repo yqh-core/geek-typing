@@ -3,10 +3,11 @@
  * - 语言状态 'zh' | 'en'，持久化到本机存储键 'gt.lang'（P1.7-W2C 起经 settings 通道读写）
  * - 默认语言按 navigator.language 探测
  * - t(key) 缺 key 时回退中文，再兜底 key 本身
+ * - 语言变化时同步 `<html lang>`（可访问性 / SEO）；映射见 HTML_LANG，SSR 下跳过
  *
  * 本文件只导出「类型 + 组件」；Context 在 src/i18n/context.ts，hook（useLang / useT）在 src/i18n/hooks.ts。
  */
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { settingsChannel } from '../core/persistence/channels'
 import { zh } from './zh'
 import { en } from './en'
@@ -16,6 +17,16 @@ export type { Lang }
 
 /** 双语字典表 */
 const DICTS: Record<Lang, Record<string, string>> = { zh, en }
+
+/** `<html lang>` 取值：zh→zh-CN、en→en（与静态 index.html 的 lang="zh-CN" 一致，切换后随之更新）。 */
+const HTML_LANG: Record<Lang, string> = { zh: 'zh-CN', en: 'en' }
+
+/** 同步文档根语言；SSR / 测试环境无 document 时安全跳过（与 digttsreader applyHtmlLang 同口径）。 */
+function applyHtmlLang(l: Lang): void {
+  if (typeof document !== 'undefined' && document.documentElement) {
+    document.documentElement.lang = HTML_LANG[l]
+  }
+}
 
 /** 从本机存储 / 浏览器语言探测初始语言 */
 function detectLang(): Lang {
@@ -33,6 +44,9 @@ function detectLang(): Lang {
 
 export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(detectLang)
+
+  // 首帧与每次语言切换后同步 <html lang>（覆盖初始探测 + 所有 setLang 路径，不止 Header 点击）。
+  useEffect(() => { applyHtmlLang(lang) }, [lang])
 
   const value = useMemo<LangContextValue>(
     () => ({
