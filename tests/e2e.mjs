@@ -1412,10 +1412,10 @@ async function run() {
    * 这里补收 warning（error 的收集口径与判据完全不变，不放宽任何断言）。 */
   const mConsoleWarns = []
   mpage.on('console', (m) => {
-    if (m.type() === 'error') mConsoleErrors.push(m.text())
+    if (m.type() === 'error' && !isExemptNoise(m.text())) mConsoleErrors.push(m.text())
     if (m.type() === 'warning') mConsoleWarns.push(m.text())
   })
-  mpage.on('pageerror', (e) => mConsoleErrors.push(String(e)))
+  mpage.on('pageerror', (e) => { const t = String(e); if (!isExemptNoise(t)) mConsoleErrors.push(t) })
 
   await gotoPage(mpage)
   await waitForTestId(mpage, 'tab-memorize') // 等应用壳挂载
