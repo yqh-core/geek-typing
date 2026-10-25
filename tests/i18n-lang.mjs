@@ -124,29 +124,29 @@ const expect = (name, actual, want) => {
 
 try {
   browser = await chromium.launch({ executablePath, headless: true })
-  const page = await browser.newPage()
+  // 关键非恒真设计：用 en-US locale 的 context 打开。旧实现（探测浏览器语言）在这里
+  // 会直接渲染英文 UI 并露出 lang-en 按钮 → 本门禁必然判红；新实现钉死中文 → 判绿。
+  const ctx = await browser.newContext({ locale: 'en-US' })
+  const page = await ctx.newPage()
   await page.goto(BASE, { waitUntil: 'load', timeout: 30000 })
-  // 等语言按钮挂载（React 首帧），否则点击会 race
-  await page.waitForSelector('[data-testid="lang-en"], [data-testid="lang-zh"]', { timeout: 15000 })
+  await page.waitForFunction(() => document.querySelector('#root')?.children.length > 0, null, { timeout: 15000 })
 
   const readLang = () => page.evaluate(() => document.documentElement.lang)
+  const toggleCount = () => page.locator('[data-testid="lang-en"], [data-testid="lang-zh"]').count()
+  const bodyText = () => page.evaluate(() => document.body.innerText)
 
-  // 点击切英文 → <html lang> 必须是 en
-  await page.click('[data-testid="lang-en"]')
-  expect('切英文后 html lang', await readLang(), 'en')
+  expect('英文浏览器下语言切换按钮数', await toggleCount(), 0)
+  expect('英文浏览器下 html lang', await readLang(), 'zh-CN')
+  // 非空白页对照：钉死中文必须真的渲染出中文导航（防「UI 全删也绿」）
+  const zhBody = await bodyText()
+  expect('应用区中文导航在场', ['练习', '词库', '设置'].every((k) => zhBody.includes(k)), true)
 
-  // 点击切中文 → <html lang> 必须是 zh-CN（与静态 index.html 初始值一致）
-  await page.click('[data-testid="lang-zh"]')
-  expect('切中文后 html lang', await readLang(), 'zh-CN')
-
-  // 刷新 → 持久化的选择应还原成 zh-CN（证明同步覆盖了「探测/持久化」路径，不止点击那一刻）
+  // 伪造历史英文偏好 → 刷新后仍中文（钉死语义）
+  await page.evaluate(() => { try { localStorage.setItem('gt.lang', 'en') } catch {} })
   await page.reload({ waitUntil: 'load' })
-  await page.waitForSelector('[data-testid="lang-en"], [data-testid="lang-zh"]', { timeout: 15000 })
-  expect('刷新后持久化 html lang', await readLang(), 'zh-CN')
-
-  // 反向：刷新后再切英文，仍须同步为 en（防止只有首帧生效）
-  await page.click('[data-testid="lang-en"]')
-  expect('刷新后再切英文 html lang', await readLang(), 'en')
+  await page.waitForFunction(() => document.querySelector('#root')?.children.length > 0, null, { timeout: 15000 })
+  expect('注入 gt.lang=en 刷新后 html lang 仍', await readLang(), 'zh-CN')
+  expect('注入后按钮仍不存在', await toggleCount(), 0)
 }
 catch (e) {
   stopPreview(server)
@@ -158,5 +158,5 @@ finally {
 }
 
 if (failures.length) { console.error(`\ni18n lang 真机验收：FAIL（${failures.length} 项）`); process.exit(1) }
-console.log('\ni18n lang 真机验收：PASS —— 切换与刷新后 <html lang> 均随语言同步（en / zh-CN）')
+console.log('\ni18n lang 真机验收：PASS —— 语言切换 UI 已按产品裁定移除，英文浏览器/伪造偏好/刷新下均钉死中文（lang=zh-CN、按钮=0）')
 process.exit(0)

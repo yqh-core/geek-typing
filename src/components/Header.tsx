@@ -77,7 +77,7 @@ export default function Header(props: HeaderProps) {
   } = props
 
   const t = useT()
-  const { lang, setLang } = useLang()
+  const { lang } = useLang() // 2026-10-25 产品裁定：中文用户站，语言切换 UI 已移除；lang 仍供双语数据字段显示逻辑使用
   // 同页互斥：同一时刻只开一个下拉
   const [openId, setOpenId] = useState<string | null>(null)
   const [bankManagerOpen, setBankManagerOpen] = useState(false)
@@ -291,24 +291,7 @@ export default function Header(props: HeaderProps) {
             </button>
           </Dropdown>
 
-          {/* 语言切换 */}
-          <div className={`flex items-center p-0.5 rounded-lg border ${theme.border}`}>
-            {(['zh', 'en'] as const).map((l) => (
-              <button
-                key={l}
-                data-testid={`lang-${l}`}
-                onClick={() => {
-                  sound.tap()
-                  setLang(l)
-                }}
-                className={`px-2 py-1 rounded-md text-[11px] transition-colors ${
-                  lang === l ? `${theme.accent} bg-white/10` : theme.sub
-                }`}
-              >
-                {l === 'zh' ? '中' : 'EN'}
-              </button>
-            ))}
-          </div>
+          {/* 语言切换：2026-10-25 产品裁定移除（面向中文用户，无中英文切换） */}
 
           {/* PWA 安装入口：永远渲染（不支持 beforeinstallprompt 时点击给手动说明），
               已安装成standalone 时自动消失。放在命令面板入口之前 —— 两者都是「工具型」

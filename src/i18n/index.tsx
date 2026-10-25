@@ -28,18 +28,11 @@ function applyHtmlLang(l: Lang): void {
   }
 }
 
-/** 从本机存储 / 浏览器语言探测初始语言 */
+/** 初始语言 —— 2026-10-25 产品裁定：Geek Typing 面向中文用户，移除中英文切换功能，UI 钉死中文。
+ *  i18n 机制与 en.ts 词条整体保留（零成本、可逆；恢复切换 = 还原本函数 + Header 按钮块）。
+ *  存储键 gt.lang 不再读取：任何历史英文偏好在加载时直接失效，属预期行为。 */
 function detectLang(): Lang {
-  try {
-    // P1.7-W2C：原生读收口到 persistence 通道（settings 域授权）。沿用原有降级语义 ——
-    // 通道抛出的 NamespaceError 与存储不可用同样被下面的 catch 吃掉并留痕，与 W2B upgrade.ts 同口径。
-    const saved = settingsChannel.read('gt.lang')
-    if (saved === 'zh' || saved === 'en') return saved
-  } catch (e) {
-    // G4-3 零静默失败：读取失败按浏览器语言兜底但留痕（S3 迁移时移除）
-    console.warn('[i18n] 语言读取失败，按浏览器语言兜底', e)
-  }
-  return navigator.language?.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+  return 'zh'
 }
 
 export function LangProvider({ children }: { children: ReactNode }) {

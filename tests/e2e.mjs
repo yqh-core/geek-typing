@@ -253,7 +253,7 @@ async function run() {
     (await page.locator('[data-testid="dropdown-practice"]').count()) === 1 &&
       (await page.locator('[data-testid="dropdown-banks"]').count()) === 1 &&
       (await page.locator('[data-testid="dropdown-settings"]').count()) === 1 &&
-      (await page.locator('[data-testid="lang-zh"]').count()) === 1 &&
+      (await page.locator('[data-testid="lang-en"], [data-testid="lang-zh"]').count()) === 0 && // 2026-10-25 产品裁定：语言切换已移除
       (await page.locator('[data-testid="open-stats"]').count()) === 1,
   )
   // 打开练习下拉检查三模式
@@ -518,37 +518,18 @@ async function run() {
       (await page.locator('[data-testid="memorize-again"]').count()) > 0,
   )
 
-  /* ---------- 10. 中英双语 ---------- */
-  console.log('\n【10】中英双语切换')
-  await page.click('[data-testid="lang-en"]')
-  await page.waitForTimeout(300)
-  const bodyEn = norm(await page.textContent('body'))
-  check('en 即时生效', ['Typing', 'Vocabulary', 'Practice', 'Settings'].every((k) => bodyEn.includes(k)))
-  // 切到 CET-4（无 nameEn，显示中文名属词库数据豁免）之外的主要 UI 不应残留中文
-  //
-  // ⚠️ **断言范围必须限定在 `#root`（应用区），不能扫整个 body** ——
-  //   本条判据的语义是「**应用导航 UI** 在 en 模式下不残留中文」。
-  //   而 `#seo-home` 落地块是**构建期注入的静态中文落地页**，位于 `#root` 之外：
-  //     - 它承载的是中文搜索关键词（英语打字练习 / 背单词 / K8s 词汇 …），本来就只面向中文 SERP；
-  //     - 门禁 H4 断言落地块内 `<script` 出现 **0 次** ⇒ 它**按设计无法**响应语言切换；
-  //     - 若把范围改回整个 body，本条会把「落地块存在中文」误判成「i18n 漏翻」，
-  //       而修它的唯一办法是给落地块加运行时 JS —— 那会同时踩 H4（零 JS）与 H7（体积），
-  //       代价是拿一个有搜索价值的落地页换一个本就不该由它承担的职责。
-  //   所以正确做法是**把断言收敛到它真正该管的范围**（应用区），而不是让落地块去满足一个不属于它的契约。
-  const appEn = norm(await page.textContent('#root'))
-  check(
-    'en 模式应用区（#root）无中文导航残留',
-    !appEn.includes('练习') && !appEn.includes('设置') && !appEn.includes('背单词'),
-    `扫描范围=#root（落地块 #seo-home 为静态中文落地页，按设计不参与 i18n）；应用区含「练习」=${appEn.includes('练习')} 「设置」=${appEn.includes('设置')} 「背单词」=${appEn.includes('背单词')}`,
-  )
+  /* ---------- 10. 语言 UI 移除与中文钉死（2026-10-25 产品裁定：中文用户站，不做中英文切换） ---------- */
+  console.log('\n【10】语言移除与中文钉死')
+  check('语言切换按钮不存在',
+    (await page.locator('[data-testid="lang-en"], [data-testid="lang-zh"]').count()) === 0)
+  const bodyZh = norm(await page.textContent('body'))
+  check('中文导航在场（练习/词库/设置）', ['练习', '词库', '设置'].every((k) => bodyZh.includes(k)))
+  // 钉死语义：伪造历史英文偏好 → 刷新后仍中文、lang 仍 zh-CN（旧探测实现此处会变英文 → 判红）
+  await page.evaluate(() => { try { localStorage.setItem('gt.lang', 'en') } catch {} })
   await reloadPage(page)
-  // 语言偏好经 localStorage 恢复后由 React 渲染 → 轮询等英文导航就位
-  await waitForBodyText(page, ['Typing', 'Practice'])
-  const bodyEn2 = norm(await page.textContent('body'))
-  check('en 刷新保持', bodyEn2.includes('Typing') && bodyEn2.includes('Practice'))
-  await waitForTestId(page, 'lang-zh')
-  await page.click('[data-testid="lang-zh"]')
-  await page.waitForTimeout(200)
+  await waitForBodyText(page, ['练习', '词库'])
+  check('注入 gt.lang=en 刷新后仍钉死中文',
+    (await page.evaluate(() => document.documentElement.lang)) === 'zh-CN')
 
   /* ---------- 11. 移动端视口 ---------- */
   console.log('\n【11】移动端视口')
