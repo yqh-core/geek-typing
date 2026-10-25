@@ -229,11 +229,17 @@ async function run() {
 
   const consoleErrors = []
   const consoleWarns = []
+  // CI 数据中心 IP 必触发 Google reCAPTCHA 挑战 iframe，其父框嵌入被站点 CSP
+  // （Report-Only frame-ancestors）拒绝并记 console error——第三方噪声、与本次改动
+  // 及应用自身代码无关（本地住宅 IP 恒 0 条；CI run 40160912826 的【12】【16】两节
+  // 同条红）。豁免只认「Report Only + frame-ancestors + google/recaptcha」三条件同时
+  // 命中，其余 CSP/error 一律不豁免（无 why 不放行，e2e 噪声豁免纪律）。
+  const isExemptNoise = (t) => /Report Only/.test(t) && /frame-ancestors/.test(t) && /google\.com|recaptcha/i.test(t)
   page.on('console', (m) => {
-    if (m.type() === 'error') consoleErrors.push(m.text())
+    if (m.type() === 'error' && !isExemptNoise(m.text())) consoleErrors.push(m.text())
     if (m.type() === 'warning') consoleWarns.push(m.text())
   })
-  page.on('pageerror', (e) => consoleErrors.push(String(e)))
+  page.on('pageerror', (e) => { const t = String(e); if (!isExemptNoise(t)) consoleErrors.push(t) })
 
   await gotoPage(page)
   await gotoTyping(page) // V3-P0a：默认落 Home，打字类用例先切 typing
