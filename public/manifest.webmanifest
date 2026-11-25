@@ -1,8 +1,8 @@
 {
-  "name": "Geek Typing · 极客打字背单词",
+  "name": "Geek Typing — Developer Typing Practice",
   "short_name": "Geek Typing",
-  "description": "无输入框的打字背单词工具：雅思核心 3000 词、四六级词库、TS/Go 代码行练习、错题艾宾浩斯复习、中英双语、全键盘命令流，敲对变绿、机械键盘音效。",
-  "lang": "zh-CN",
+  "description": "English typing practice with developer vocabulary, spelling feedback, timed rounds, code practice and local progress.",
+  "lang": "en",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
