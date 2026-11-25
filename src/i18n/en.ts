@@ -198,6 +198,7 @@ export const en: Record<string, string> = {
 
   /* Home (V3-P0a) */
   'home.title': 'Developer Typing Practice',
+  'home.intro': 'Type the word you see. Missed words return in your review plan.',
   'home.goal': 'Daily goal',
   'home.goalDone': 'Goal reached 🎉',
   'home.reviewTitle': 'Review due',
