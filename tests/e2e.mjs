@@ -598,11 +598,11 @@ async function run() {
     landingAlive.mounted &&
       landingAlive.exists &&
       !landingAlive.inRoot &&
-      ['英语打字练习', '背单词'].every((k) => landingAlive.text.includes(k)) &&
+      ['typing practice', 'developer typing practice', 'programming vocabulary'].every((k) => landingAlive.text.toLowerCase().includes(k)) &&
       landingAlive.links === 13 &&
       landingAlive.scripts === 0,
     `home-panel 已挂载=${landingAlive.mounted}；#seo-home 存在=${landingAlive.exists}；在 #root 内=${landingAlive.inRoot}；` +
-      `关键词命中=${['英语打字练习', '背单词'].filter((k) => landingAlive.text.includes(k)).join('/')}；` +
+      `关键词命中=${['typing practice', 'developer typing practice', 'programming vocabulary'].filter((k) => landingAlive.text.toLowerCase().includes(k)).join('/')}；` +
       `词库真链接=${landingAlive.links} 个；块内 <script>=${landingAlive.scripts} 个`,
   )
   // ② 移动端 390px 下落地块不得造成横向溢出（CSS 须用 max-width + overflow-wrap，禁固定 px 宽）
@@ -1999,7 +1999,7 @@ async function run() {
    * 171 → 172：SW precache flaky 修复（CI run 37304973473 门禁③ 169/171）新增一条判据
    * 「预热降级可观测：controller 从未出现 ⇒ 必须有 [warmBanks] 降级 warn」（14.10，条件式：
    * 正常接管路径不要求，故不会恒红）。原 171 与文档/记忆里的口径同步 +1，无删除。 */
-  const E2E_CASES_EXPECTED = 175
+  const E2E_CASES_EXPECTED = 180
   if (results.length !== E2E_CASES_EXPECTED) {
     console.error(
       `\n✗ e2e 用例数漂移：实际执行 ${results.length} 项，期望 ${E2E_CASES_EXPECTED} 项` +
