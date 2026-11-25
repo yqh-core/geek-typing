@@ -6,7 +6,7 @@
  * 本文件不 import 任何 i18n 内部模块，无环。
  */
 import { createContext } from 'react'
-import { zh } from './zh'
+import { en } from './en'
 
 export type Lang = 'zh' | 'en'
 
@@ -17,7 +17,7 @@ export interface LangContextValue {
 }
 
 export const LangContext = createContext<LangContextValue>({
-  lang: 'zh',
+  lang: 'en',
   setLang: () => {},
-  t: (key) => zh[key] ?? key,
+  t: (key) => en[key] ?? key,
 })
