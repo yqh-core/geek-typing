@@ -77,7 +77,7 @@ export default function Header(props: HeaderProps) {
   } = props
 
   const t = useT()
-  const { lang } = useLang() // 2026-10-25 产品裁定：中文用户站，语言切换 UI 已移除；lang 仍供双语数据字段显示逻辑使用
+  const { lang, setLang } = useLang()
   // 同页互斥：同一时刻只开一个下拉
   const [openId, setOpenId] = useState<string | null>(null)
   const [bankManagerOpen, setBankManagerOpen] = useState(false)
@@ -106,7 +106,12 @@ export default function Header(props: HeaderProps) {
             id="practice"
             openId={openId}
             onOpenChange={setOpenId}
-            label={t('nav.practice')}
+            label={
+              <span className="inline-flex items-center gap-1.5">
+                {t('nav.practice')}
+                <span className={`text-[10px] ${theme.sub}`}>{t(`mode.${currentMode}`)}</span>
+              </span>
+            }
             theme={theme}
             testId="dropdown-practice"
           >
@@ -291,7 +296,20 @@ export default function Header(props: HeaderProps) {
             </button>
           </Dropdown>
 
-          {/* 语言切换：2026-10-25 产品裁定移除（面向中文用户，无中英文切换） */}
+          {/* English is the default; keep a visible locale switch for Chinese readers. */}
+          <button
+            type="button"
+            data-testid={lang === 'en' ? 'lang-zh' : 'lang-en'}
+            onClick={() => {
+              sound.tap()
+              setLang(lang === 'en' ? 'zh' : 'en')
+            }}
+            aria-label={lang === 'en' ? 'Switch to Chinese' : 'Switch to English'}
+            title={lang === 'en' ? 'Switch to Chinese' : 'Switch to English'}
+            className={`px-2.5 py-1.5 rounded-lg border ${theme.border} text-xs font-semibold ${theme.sub} transition-all hover:opacity-80 active:scale-95`}
+          >
+            {lang === 'en' ? '中文' : 'English'}
+          </button>
 
           {/* PWA 安装入口：永远渲染（不支持 beforeinstallprompt 时点击给手动说明），
               已安装成standalone 时自动消失。放在命令面板入口之前 —— 两者都是「工具型」
