@@ -1,5 +1,5 @@
 /**
- * 首页落地块 · 中文文案唯一事实源（home-landing.copy）
+ * 首页落地块 · English-first copy source（home-landing.copy）
  *
  * ⛔ **本文件是纯数据 + 纯字符串，零逻辑**。它不含任何函数、任何条件分支、任何模板拼接。
  *   任何区块文案改动**只改这一个文件**；`home-landing.mjs` 负责把它变成 HTML，
@@ -16,28 +16,24 @@
  *      本文件里出现的数字只允许是「写死的文案里必要的量词」，而 block 数与词数都不写死。
  *      ⛔ 同一条纪律顺带管住**示意图**：TYPING_FIGURE 里的字符位置是坐标不是统计，
  *      所以它可以写死；但它**不许出现任何 WPM / 正确率 / 人数 / 词数**这类数字。
- *   3. ✅ 只写能从代码验证的事实：纯前端、localStorage、无需注册、可离线、无第三方追踪。
+ *   3. ✅ 只写能从代码验证的事实：浏览器端练习、localStorage、无需注册、缓存后可离线。
+ *      页面仍加载广告与站点分析脚本，因此不得声称零第三方追踪。
  *
- * ── 关键词策略（禁止堆砌）────────────────────────────────────────────────
- *   主词：英语打字练习 / 背单词 / 打字练习 / 程序员背单词
- *   细分词（中文 SERP 上工具站的真空档）：前端英语词汇 / Go 词汇 / 云原生词汇 /
- *         K8s 词汇 / AI 大模型词汇
- *   落地方式：主词进H1 与 Hero 正文；细分词集中落在 gh-banks 的一句技术栈定位陈述里 ——
- *   那是它们**唯一自然出现的位置**（技术栈词库的引导句），不是硬塞。
+ * ── Keyword strategy ───────────────────────────────────────────────────────
+ * Primary terms: typing practice, English typing practice, typing test and developer typing practice.
+ * Supporting terms: programming vocabulary, coding vocabulary, timed typing test, spelling practice.
+ * Place terms naturally in the H1, first-fold copy, practice modes and vocabulary-bank descriptions.
  */
 
 /**
- * 落地块相对 `#root` 的位置（配置项，便于日后翻转）。
+ * 落地块相对 `#root` 的 DOM 位置。
  *
- * `'before-root'` = 放在 `<div id="root"></div>` **之前**：首屏即定位与关键词
- *   （Google 移动优先更友好），这是本轮采纳值。
- * `'after-root'`  = 放在其后（工具优先，老用户打开即摸到应用）。
+ * SEO 支持内容必须留在 `#root` 外、源码顺序位于 root 前，确保 React 不会清理，
+ * 并继续满足 gate-home-landing 的入站链接、正文与移动端门禁。
+ * index.html 的 body flex layout 将 `#root` 视觉排序到前面、`#seo-home` 排到后面，
+ * 所以访客先看到可交互练习界面，而爬虫仍能读取静态正文与 13 个真实词库链接。
  *
- * ⚠️ **无论哪种取值，落地块都必须在 `#root` 之外**，不能放进 `#root` 内部 ——
- *   React 19 `createRoot` 会 `clearContainerSparingly(#root)` 清空 `#root` 内的既有子节点
- *   （真机实测：块在 `#root` 内 `insideExists:false` 被清，在 `#root` 外 `outsideExists:true` 存活）。
- *   本项只决定「前」还是「后」，不决定「内」还是「外」。
- */
+ * ⚠️ 不要将块注入 `#root` 内部：React 19 createRoot 会清空 root 的既有子节点。 */
 export const LANDING_PLACEMENT = 'before-root'
 
 /** 落地块根元素 id（CSS 作用域锚点 + 门禁 H1 锚点） */
@@ -53,19 +49,19 @@ export const LANDING_END_COMMENT = '<!-- seo-home:end -->'
  * @type {readonly string[]}
  */
 export const TARGET_KEYWORDS = Object.freeze([
-  '英语打字练习',
-  '背单词',
-  '打字练习',
-  '程序员背单词',
-  '前端英语词汇',
-  'Go 词汇',
-  '云原生词汇',
-  'K8s 词汇',
-  'AI 大模型词汇',
+  'typing practice',
+  'English typing practice',
+  'typing test',
+  'developer typing practice',
+  'programming vocabulary',
+  'coding vocabulary',
+  'timed typing test',
+  'spelling practice',
+  'code typing practice',
 ])
 
-/** 顶部「跳过介绍」链接文案（落地块放 #root 之前的代价：老用户要多滚一屏，这里做缓解） */
-export const SKIP_LINK_TEXT = '跳过介绍，直接开始练习'
+/** Skip link: the interactive app is visually ordered before this supporting-copy section. */
+export const SKIP_LINK_TEXT = 'Skip to the practice app'
 
 /** 应用锚点 —— 应用挂载后 React 渲染进 #root，跳转目标就是它 */
 export const APP_ANCHOR = '#root'
@@ -100,8 +96,8 @@ export const APP_ANCHOR = '#root'
  * @type {string}
  */
 export const TYPING_FIGURE = [
-  '<svg class="gh-shot-svg" viewBox="0 0 640 320" preserveAspectRatio="xMidYMid meet" role="img" aria-label="英语打字练习界面示意图">',
-  '<title>英语打字练习界面示意图：敲对的字符显示为绿色，敲错的字符标红，灰色为待敲字符</title>',
+  '<svg class="gh-shot-svg" viewBox="0 0 640 320" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Typing practice interface: correct letters turn green and mistakes turn red">',
+  '<title>Typing practice interface: correct letters turn green, mistakes turn red, and pending letters stay muted</title>',
   '<defs><linearGradient id="ghShotGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22c55e"/><stop offset="1" stop-color="#a3e635"/></linearGradient></defs>',
   // 窗口外框 + 标题栏
   '<rect x="0" y="0" width="640" height="320" rx="14" fill="#0b1220"/>',
@@ -113,7 +109,7 @@ export const TYPING_FIGURE = [
   '<circle cx="60" cy="19" r="5.5" fill="#22c55e"/>',
   '<text x="320" y="24" text-anchor="middle" font-size="13" fill="#8093b8">geek-typing</text>',
   // 行 1：上一个词（deploy，其中 p 敲错 → 标红 + 下划线）
-  '<text x="64" y="90" font-size="12" fill="#5b6b8a">上一个词</text>',
+  '<text x="64" y="90" font-size="12" fill="#5b6b8a">Previous word</text>',
   '<text x="150" y="90" font-size="17" fill="#4ade80">d</text>',
   '<text x="161.5" y="90" font-size="17" fill="#4ade80">e</text>',
   '<text x="173" y="90" font-size="17" fill="#f87171">p</text>',
@@ -122,7 +118,7 @@ export const TYPING_FIGURE = [
   '<text x="207.5" y="90" font-size="17" fill="#4ade80">y</text>',
   '<rect x="172" y="94" width="11" height="2" rx="1" fill="#f87171"/>',
   // 行 2：当前单词（manifest）—— 已敲对变绿 / 当前字符高亮 / 待敲为灰 + 光标
-  '<text x="64" y="156" font-size="12" fill="#5b6b8a">当前单词</text>',
+  '<text x="64" y="156" font-size="12" fill="#5b6b8a">Current word</text>',
   '<rect x="276" y="116" width="26" height="44" rx="7" fill="#1d3a63" stroke="#38bdf8"/>',
   '<text x="150" y="152" font-size="38" font-weight="700" fill="#4ade80">m</text>',
   '<text x="176" y="152" font-size="38" font-weight="700" fill="#4ade80">a</text>',
@@ -134,19 +130,19 @@ export const TYPING_FIGURE = [
   '<text x="332" y="152" font-size="38" font-weight="700" fill="#64748b">t</text>',
   '<rect x="302" y="118" width="4" height="40" rx="2" fill="#38bdf8"/>',
   // 行 3：提示
-  '<text x="64" y="196" font-size="12" fill="#5b6b8a">提示</text>',
-  '<text x="150" y="196" font-size="13" fill="#7c8db5">照着上面这个单词敲，敲错的那个字符会标红</text>',
+  '<text x="64" y="196" font-size="12" fill="#5b6b8a">Prompt</text>',
+  '<text x="150" y="196" font-size="13" fill="#7c8db5">Type the word above. Incorrect letters are marked in red.</text>',
   // 本轮进度条（不标数字：示意图不编造战绩）
-  '<text x="64" y="240" font-size="12" fill="#5b6b8a">本轮进度</text>',
+  '<text x="64" y="240" font-size="12" fill="#5b6b8a">Session progress</text>',
   '<rect x="150" y="230" width="420" height="9" rx="4.5" fill="#1b2740"/>',
   '<rect x="150" y="230" width="196" height="9" rx="4.5" fill="url(#ghShotGrad)"/>',
   // 图例：绿=敲对 / 红=敲错 / 灰=待敲
   '<rect x="150" y="282" width="13" height="13" rx="3" fill="#4ade80"/>',
-  '<text x="171" y="293" font-size="13" fill="#cbd5e1">敲对</text>',
+  '<text x="171" y="293" font-size="13" fill="#cbd5e1">Correct</text>',
   '<rect x="230" y="282" width="13" height="13" rx="3" fill="#f87171"/>',
-  '<text x="251" y="293" font-size="13" fill="#cbd5e1">敲错</text>',
+  '<text x="251" y="293" font-size="13" fill="#cbd5e1">Mistake</text>',
   '<rect x="310" y="282" width="13" height="13" rx="3" fill="#64748b"/>',
-  '<text x="331" y="293" font-size="13" fill="#cbd5e1">待敲</text>',
+  '<text x="331" y="293" font-size="13" fill="#cbd5e1">Pending</text>',
   '</svg>',
 ].join('')
 
@@ -174,15 +170,15 @@ export const TYPING_FIGURE = [
 export const SIBLING_SITES = Object.freeze([
   {
     id: 'ddb-tools',
-    name: 'DigDevBox 工具箱',
+    name: 'DigDevBox Developer Tools',
     href: 'https://digdevbox.com/',
-    desc: '同一站点群里的开发者工具站：在线工具、编码解码、文本与格式化类小工具，打开浏览器就能用，不必安装。',
+    desc: 'A task-first collection of practical developer utilities for text, encoding, formatting and everyday workflows.',
   },
   {
     id: 'ddb-notes',
     name: 'Forge Notes',
     href: 'https://notes.digdevbox.com/',
-    desc: '同一站点群里的技术博客：前端性能优化、Google SEO、VitePress 与 AdSense 集成的实战记录与踩坑笔记。',
+    desc: 'Technical articles and field notes on developer tools, search growth, web performance and product engineering.',
   },
 ])
 
@@ -218,139 +214,73 @@ export const SIBLING_SITES = Object.freeze([
  * }>}
  */
 export const SECTIONS = Object.freeze([
-  {
-    id: 'gh-hero',
-    heading: '英语打字练习：程序员的肌肉记忆背单词工具',
+  { id: 'gh-hero', heading: 'Developer Typing Practice for Programming Vocabulary',
     body: [
-      '屏幕出一个单词，你照着敲，敲对了就变绿。敲完这一个词，你的手指比刚才更记得它怎么拼 —— 这就是英语打字练习真正的收益：把背单词从「眼睛认得」变成「手会写」。',
-      '本站是一个纯前端的打字练习工具：{total} 个词库、{totalWords} 条词条，打开浏览器就能用。',
+      'Type the word on screen, one character at a time. Correct letters turn green and mistakes turn red, so you practise accurate spelling instead of only recognising a word.',
+      'Geek Typing combines English typing practice with developer typing practice for programming vocabulary and coding vocabulary. Use its timed typing test, spelling practice and code typing practice with live WPM and accuracy feedback.',
     ],
-    // Hero 徽标条：全部是可从代码验证的事实，零数字（纪律 2/3）
-    chips: ['纯前端运行', '无需注册', 'localStorage 本地保存', '断网也能练'],
-    ctas: [
-      { text: '立即开始练习', href: APP_ANCHOR, primary: true },
-      { text: '先看看词库', href: '#gh-banks', primary: false },
-    ],
+    chips: ['Runs in your browser', 'No account required', 'Progress saved on this device', 'Offline-ready after caching'],
+    ctas: [{ text: 'Start practice', href: APP_ANCHOR, primary: true }, { text: 'Explore word banks', href: '#gh-banks', primary: false }],
   },
-  {
-    id: 'gh-demo',
-    heading: '产品界面：敲对一个字符，它就变绿',
-    body: [
-      '下面这张图是练习界面的示意 —— 一个词摆在上面，你照着敲，敲对的字符立刻变绿，敲错的那一个当场标红，光标停在下一个待敲的字符上。它不是截图，是用内联 SVG 画出来的，所以不加载任何外部图片，断网也照样显示。',
-    ],
-    figure: {
-      svg: TYPING_FIGURE,
-      caption:
-        '示意图：上一行里拼错的那个字符标红；当前单词已敲对的部分是绿色，灰色的是还没敲的字符，蓝色高亮块是光标所在位置；下方是本轮进度。',
-    },
+  { id: 'gh-demo', heading: 'See How the Typing Practice Works',
+    body: ['The practice view gives each character clear feedback: correct letters turn green, an incorrect key is highlighted in red, and the caret marks the next character. This product illustration is inline SVG, so it does not depend on an external image.'],
+    figure: { svg: TYPING_FIGURE, caption: 'Illustration of the practice view: completed letters, an incorrect character, the current caret and session progress.' },
     key: [
-      { k: '敲对 → 变绿', v: '每敲对一个字符，那个字符立刻变绿，光标前进一格。' },
-      { k: '敲错 → 标红', v: '拼错的那一个字符当场变红并停住，不用等事后回忆才发现拼不对。' },
-      { k: '错词 → 进复习', v: '敲错的词会被排进后面的复习轮，下次练还会再出现。' },
+      { k: 'Correct', v: 'Each correct keystroke advances the caret and confirms the character.' },
+      { k: 'Mistakes', v: 'An incorrect key is highlighted immediately, so you can see where spelling went wrong.' },
+      { k: 'Review', v: 'Words you miss can be brought back in later review rounds.' },
     ],
   },
-  {
-    id: 'gh-why',
-    heading: '为什么用打字练背单词，而不是看着单词表背',
-    body: [],
+  { id: 'gh-why', heading: 'Build Spelling Recall Through Active Typing', body: [],
     cards: [
-      {
-        title: '手指先记住，脑子才记住',
-        text: '背了就忘，是因为眼睛认得这个词、手却不会写。打字逼你把每一个字母落到指尖上，记忆从「视觉识别」变成「运动技能」。',
-      },
-      {
-        title: '错在哪一个字母，当场就知道',
-        text: '拼错的一瞬间就变红，不用等第二天回忆起来才发现自己拼不对。错在哪个字母、错了几次，当场清清楚楚。',
-      },
-      {
-        title: '有节奏，才记得住',
-        text: '机械键盘音效与连击反馈，把背单词从一件枯燥的事变成一件有手感的事 —— 程序员背单词需要的就是这种「顺手」。',
-      },
+      { title: 'Move beyond recognition', text: 'Typing requires you to produce the spelling, not just recognise a word on a flashcard. Each round becomes an active recall task.' },
+      { title: 'See errors as they happen', text: 'Character-level feedback shows exactly where a spelling went wrong, while accuracy and speed remain visible during the round.' },
+      { title: 'Practise words developers use', text: 'Choose focused technical vocabulary and code-adjacent word banks rather than relying only on generic typing-test passages.' },
     ],
   },
-  {
-    id: 'gh-banks',
-    heading: '词库：技术栈与考试词条一次覆盖',
+  { id: 'gh-banks', heading: 'Explore Developer and English Vocabulary Banks',
     body: [
-      '下面每一个词库都是真链接，点进去就是一份可直接阅读的静态词表；每个词库卡片上的数字都直接来自本站的内容包，不是估的。',
-      '技术栈那几本是中文搜索里的真空档：前端英语词汇、Go 词汇、云原生词汇、K8s 词汇、AI 大模型词汇 —— 它们不是本站发明的分类，是技术人每天真在用、而工具站基本没做的那些词。',
+      'Open a word bank to browse its entries, then use the same set for typing and spelling practice. Each card links to a real vocabulary page, and entry counts are generated from the source content.',
+      'The collection combines programming and technical terminology with broader English vocabulary. It is designed to make everyday development language easier to recall and spell accurately.',
     ],
-    // ⛔ cards 不在这里列 —— 13 个词库卡片由 home-landing.mjs 从 content/ 现算生成。
-    //   理由：写死包名清单 = 下一个新增词汇包会被静默漏掉，且「漏掉」在这条链路上零告警。
   },
-  {
-    id: 'gh-diff',
-    heading: '打字练习的工具不少，能顺带把单词记住的很少',
+  { id: 'gh-diff', heading: 'More Than a Typing Speed Test',
     body: [
-      'Geek Typing 想做的是**程序员的英语肌肉记忆训练器**：把「敲代码」的手感搬到「背单词」上 —— 机械键盘音效、IDE 风格皮肤、默写与限时模式、错词自动排进复习轮。',
-      '只测速度的打字工具，让你知道自己快不快；纯背单词工具让你记住意思；两者之间的那条缝 —— 「我记住了意思，但代码里还是拼不对」—— 就是这个站点填的位置。',
+      'Geek Typing combines typing practice with vocabulary recall: use Classic for accurate repetition, Spelling to recall a word from its meaning, Timed 60s to challenge your pace, or Code to practise real code lines and symbols.',
+      'Live WPM, accuracy, key-level feedback and review rounds connect speed practice with learning. Switch word banks, import your own list and keep your progress in the browser.',
     ],
     comparisons: [
-      { kind: '只测打字速度，不背单词', result: '你知道它快，不知道自己记住了没有' },
-      { kind: '背单词工具，没有打字环节', result: '意思记住了，拼写还是错的' },
-      { kind: '有打字练习，词库是通用四六级', result: '考得过试，写不出 commit message' },
+      { kind: 'Typing tests focused only on speed', result: 'Measure pace, but do not reinforce a vocabulary set.' },
+      { kind: 'Flashcards without typing', result: 'Build recognition without practising exact spelling keystroke by keystroke.' },
+      { kind: 'Generic word lists', result: 'Miss the technical terminology and code-adjacent practice developers need.' },
     ],
   },
-  {
-    id: 'gh-facts',
-    heading: '你的数据在哪、会不会上传',
-    // ⛔ 这不是「用户怎么说」，是**可从代码验证的事实陈述**。
-    //   每一条都能在src/ 与 public/ 里找到对应实现，所以门禁断言它存在，但**不断言具体文字**
-    //   （断言具体文字 = 把文案锁成契约，而文案本可迭代）。
-    body: [],
+  { id: 'gh-facts', heading: 'Your Practice Data and Privacy', body: [],
     facts: [
-      { q: '本站是纯前端应用', a: '所有练习逻辑都在你的浏览器里运行，没有后端服务参与每一次按键。' },
-      { q: '学习记录保存在浏览器本地', a: '进度、错词与设置写在浏览器的 localStorage 里，不上传到任何服务器。' },
-      { q: '不需要注册，也没有账号', a: '没有登录、没有注册流程、没有广告，打开就能用。' },
-      { q: '断网也能继续练', a: '它是可安装的网页应用，已经加载过的词库在离线状态下照常练习。' },
-      { q: '没有第三方追踪', a: '产物里不含第三方统计脚本；学习数据不出你的浏览器。' },
+      { q: 'Practice runs in your browser', a: 'Typing interaction and immediate feedback are handled client-side; no account is required to start.' },
+      { q: 'Progress is stored on this device', a: 'Practice history, review state and preferences are saved in browser storage rather than a cloud learning account.' },
+      { q: 'No sign-up flow', a: 'Open the site and start practising. You do not need to create an account or connect a profile.' },
+      { q: 'Offline-ready', a: 'The installable web app can continue working offline after the app shell and selected content have been cached.' },
     ],
   },
-  {
-    id: 'gh-faq',
-    heading: '常见问题',
-    body: [],
+  { id: 'gh-faq', heading: 'Frequently Asked Questions', body: [],
     faq: [
-      {
-        q: 'Geek Typing 是做什么的？',
-        a: '一个英语打字练习工具：屏幕上出一个单词，你照着敲，敲对了变绿。顺带把单词记住 —— 所以它既是打字练习，也是背单词工具。',
-      },
-      {
-        q: '需要注册吗？',
-        a: '不需要。打开网页就能用，没有账号、没有登录。',
-      },
-      {
-        q: '支持离线吗？',
-        a: '支持。它可以装成桌面应用，断网也能继续练已经加载好的词库。',
-      },
-      {
-        q: '词库准吗？',
-        a: '词条与释义直接来自本站的内容包，没有为了凑数编词。词库卡片上写的词数就是内容包里的真实条数。',
-      },
-      {
-        q: '手机上能用吗？',
-        a: '能，页面是响应式的。不过它是给键盘准备的，横屏或桌面用更顺手。',
-      },
-      {
-        q: '我是程序员，最该从哪个词库开始？',
-        a: '前端工程化词库或 Go 骨架代码 —— 这两个是你每天真会敲到的词。',
-      },
+      { q: 'What is Geek Typing?', a: 'Geek Typing is a browser-based typing practice tool with English and developer vocabulary banks. It combines character-level feedback with spelling practice and review.' },
+      { q: 'Which practice modes are available?', a: 'Classic, Spelling, Timed 60s and Code modes are available. Choose a mode from the Practice menu before starting a round.' },
+      { q: 'Is this only a typing speed test?', a: 'No. WPM and accuracy feedback are paired with focused vocabulary banks, spelling recall, code-line practice and review of missed words.' },
+      { q: 'Can I use my own vocabulary?', a: 'Yes. You can import a custom word bank from a text or JSON file and practise it in the app.' },
+      { q: 'Do I need an account?', a: 'No account is required. Your practice history and preferences are saved in browser storage on your device.' },
+      { q: 'Can I practise offline?', a: 'The app is installable and supports offline use after the app and the content you need have been cached.' },
+      { q: 'Is it useful on a phone?', a: 'The layout is responsive, but a physical keyboard gives the most natural typing-practice experience.' },
     ],
   },
-  {
-    id: 'gh-sites',
-    heading: '同一站点群里的其他站',
-    body: [
-      'Geek Typing 不是孤立的一个站。它和下面两个站同属DigDevBox 站点群，各有各的定位：一个放工具，一个写文章，这里专门练打字和背单词。',
-    ],
-    // ⛔ 兄弟站清单来自 SIBLING_SITES（见该常量上方纪律），⛔ 零统计数字。
+  { id: 'gh-sites', heading: 'More Tools from the DigDevBox Network',
+    body: ['Geek Typing focuses on typing and vocabulary practice. Explore the related developer tools and technical notes through these separate sites.'],
     sites: SIBLING_SITES,
   },
-  {
-    id: 'gh-cta',
-    heading: '现在就开始练',
-    body: ['无需注册 · 无需下载 · 断网也能练'],
-    ctas: [{ text: '立即开始练习', href: APP_ANCHOR, primary: true }],
+  { id: 'gh-cta', heading: 'Ready for a Practice Round?',
+    body: ['Choose a word bank, pick a mode and start typing.'],
+    ctas: [{ text: 'Start typing', href: APP_ANCHOR, primary: true }],
   },
 ])
 
@@ -381,7 +311,7 @@ export const SECTIONS = Object.freeze([
  *     词库网格 1 → 2 → 3 列，能力卡 1 → 2 → 3 列，对比行 1 列 → 三段一行，示意图与要点 1 → 双栏。
  *   · 层次：卡片/按钮/示意图统一用 box-shadow；CTA 用渐变 + 阴影 + hover 位移。
  */
-export const LANDING_CSS = `#seo-home{--dd-primary:#14b8a6;--dd-primary-hover:#2dd4bf;--dd-primary-soft:#0f2b28;--dd-accent-text:#5eead4;--dd-on-primary:#04201d;/* ^ dd-tokens.css v1.2 dark 值同步（geek-typing 未整站接令牌，landing 块内联挂载，改令牌源须同步此处） */box-sizing:border-box;display:block;max-width:100%;margin:0;padding:0 0 .5rem;background:#070b16;color:#e2e8f0;font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.75;overflow-wrap:break-word;word-break:break-word}
+export const LANDING_CSS = `#seo-home{--dd-primary:#14b8a6;--dd-primary-hover:#2dd4bf;--dd-primary-soft:#0f2b28;--dd-accent-text:#5eead4;--dd-on-primary:#04201d;/* ^ dd-tokens.css v1.2 dark 值同步（geek-typing 未整站接令牌，landing 块内联挂载，改令牌源须同步此处） */box-sizing:border-box;display:block;max-width:100%;margin:0;padding:0 0 .5rem;background:#070b16;color:#e2e8f0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.75;overflow-wrap:break-word;word-break:break-word}
 #seo-home *{box-sizing:border-box}
 #seo-home .gh-wrap{max-width:52rem;margin:0 auto;padding:1.25rem 1.25rem 2rem}
 #seo-home .gh-skip{display:inline-block;max-width:100%;margin:0 0 1.25rem;padding:.45rem .95rem;border:1px solid #26364f;border-radius:999px;background:#0e1729;color:var(--dd-accent-text);font-size:.9rem;text-decoration:none;overflow-wrap:break-word;box-shadow:0 1px 2px rgba(2,6,23,.7);transition:background .15s ease,color .15s ease}
@@ -457,4 +387,4 @@ export const LANDING_CSS = `#seo-home{--dd-primary:#14b8a6;--dd-primary-hover:#2
 }`
 
 /** 页脚文案（同样只写真能从代码验证的事实） */
-export const LANDING_FOOTER = 'Geek Typing · 纯前端英语打字练习工具 · 词条来自本站内容包，未做改写'
+export const LANDING_FOOTER = 'Geek Typing · English typing practice for developers · Vocabulary entries come from the published content banks.'

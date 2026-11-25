@@ -13,6 +13,8 @@ body,
 }
 
 body {
+  display: flex;
+  flex-direction: column;
   margin: 0;
   background-color: #0b1120;
   color: #e2e8f0;
@@ -45,4 +47,14 @@ body {
   outline: 2px solid #34d399 !important;
   outline-offset: 2px !important;
   border-radius: 2px;
+}
+
+/* Keep the crawlable copy outside React's root, but show the interactive app first. */
+#root {
+  order: -1;
+  width: 100%;
+}
+
+#seo-home {
+  order: 1;
 }

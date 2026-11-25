@@ -4,7 +4,7 @@
 export const en: Record<string, string> = {
   /* Header / nav */
   'app.subtitle': 'Type words like code',
-  'app.tagline': 'Practice English. Type better. Remember more.',
+  'app.tagline': 'Build typing speed and developer-vocabulary recall.',
   'nav.practice': 'Practice',
   'nav.banks': 'Banks',
   'nav.settings': 'Settings',
@@ -197,7 +197,7 @@ export const en: Record<string, string> = {
   'mastery.strong': 'Strong',
 
   /* Home (V3-P0a) */
-  'home.title': "Today's Practice",
+  'home.title': 'Developer Typing Practice',
   'home.goal': 'Daily goal',
   'home.goalDone': 'Goal reached 🎉',
   'home.reviewTitle': 'Review due',

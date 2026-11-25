@@ -80,9 +80,21 @@ export default function HomePanel({
             </div>
           )}
         </div>
-        <div data-testid="home-streak" className="flex items-center gap-1.5 text-sm font-semibold">
-          <Flame size={15} className="text-orange-400" />
-          {t('streak.title')} {streakDays} {t('streak.dayUnit')}
+        <div className="flex items-center gap-3">
+          <div data-testid="home-streak" className="flex items-center gap-1.5 text-sm font-semibold">
+            <Flame size={15} className="text-orange-400" />
+            {t('streak.title')} {streakDays} {t('streak.dayUnit')}
+          </div>
+          <button
+            data-testid="home-primary-start"
+            type="button"
+            onClick={onNewRound}
+            aria-label={t('home.startNew')}
+            className={`${btnCls} px-5 py-3 text-sm shadow-lg shadow-emerald-950/20`}
+          >
+            <Play size={14} />
+            {t('home.startNew')}
+          </button>
         </div>
       </div>
 

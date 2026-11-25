@@ -98,7 +98,7 @@ export function renderBankCard(row, origin) {
   const title = String(row?.title ?? '').trim()
   const count = Number(row?.wordCount ?? 0)
   const href = canonicalBankUrl(origin, packageId)
-  return `<a class="gh-card" href="${escapeHtml(href)}"><span class="gh-card-title">${escapeHtml(title)}</span><span class="gh-card-count">${count} 词</span><span class="gh-card-id">${escapeHtml(packageId)}</span></a>`
+  return `<a class="gh-card" href="${escapeHtml(href)}"><span class="gh-card-title">${escapeHtml(title)}</span><span class="gh-card-count">${count} words</span><span class="gh-card-id">${escapeHtml(packageId)}</span></a>`
 }
 
 /**
@@ -175,7 +175,7 @@ export function renderHomeLandingBlock({ bankRows, origin, totalWords } = {}) {
         `<div class="gh-grid" id="gh-banks-grid">${rows.map((r) => renderBankCard(r, origin)).join('')}</div>`,
       )
       parts.push(
-        `<p class="gh-note">以上 ${totalPackages} 个词库共 ${total} 条词条，每个数字都取自本站内容包 content/vocabulary/&lt;包&gt;/words.json 的真实长度。</p>`,
+        `<p class="gh-note">${totalPackages} vocabulary banks · ${total} entries. Counts are generated from the source content/vocabulary/&lt;package&gt;/words.json files.</p>`,
       )
     }
 
@@ -244,8 +244,8 @@ export function renderHomeLandingBlock({ bankRows, origin, totalWords } = {}) {
 
   return [
     LANDING_START_COMMENT,
-    `<div id="${LANDING_ROOT_ID}">`,
-    // 跳过介绍链接（落地块放 #root 之前的代价缓解，指向应用锚点）
+    `<div id="${LANDING_ROOT_ID}" lang="en">`,
+    // Supporting-copy shortcut back to the interactive app above.
     `<div class="gh-wrap"><a class="gh-skip" href="${escapeHtml(APP_ANCHOR)}">${escapeHtml(SKIP_LINK_TEXT)}</a>`,
     `<style>${LANDING_CSS}</style>`,
     sections,

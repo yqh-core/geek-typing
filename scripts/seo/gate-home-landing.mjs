@@ -116,8 +116,8 @@ export function extractBankLinks(block) {
     const href = m[1]
     const inner = m[2]
     const pkg = href.match(/\/pages\/bank\/([^/?#]+)/)
-    // 卡片上的词数：<span class="gh-card-count">43 词</span>
-    const c = inner.match(/class="gh-card-count">\s*(\d+)\s*词/)
+    // Generated card counts use the localized unit (Chinese or English).
+    const c = inner.match(/class="gh-card-count">\s*(\d+)\s*(?:词|words)/i)
     out.push({ href, pkgId: pkg ? decodeURIComponent(pkg[1]) : null, count: c ? Number(c[1]) : null })
   }
   return out

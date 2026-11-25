@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 /**
- * 批次 4 · geek-typing —— 语言切换的 <html lang> 同步真机验收（i18n-lang.mjs）
+ * Geek Typing —— English-first locale, switching and <html lang> persistence (i18n-lang.mjs)
  *
- * 评审第 2 步要求：不能只看源码里有 applyHtmlLang，要在**真实浏览器**里点语言按钮、
- * 读 documentElement.lang，证明「切换 → 文档根语言真的变」且「刷新 → 选择被持久化」。
- * 这是可访问性 + SEO 的语言声明正确性，源码静态匹配替代不了。
+ * Use a real browser to verify first-visit English, both locale switches, document language
+ * changes and persisted preferences after refresh. Static source checks are not sufficient.
  *
  * 三态退出码（与全仓门禁一致）：
  *   0 = PASS；1 = FAIL（语言未按预期同步）；2 = Fatal/UNDECIDED（找不到 Chromium / preview 未就绪）
@@ -124,39 +123,49 @@ const expect = (name, actual, want) => {
 
 try {
   browser = await chromium.launch({ executablePath, headless: true })
-  // 关键非恒真设计：用 en-US locale 的 context 打开。旧实现（探测浏览器语言）在这里
-  // 会直接渲染英文 UI 并露出 lang-en 按钮 → 本门禁必然判红；新实现钉死中文 → 判绿。
   const ctx = await browser.newContext({ locale: 'en-US' })
   const page = await ctx.newPage()
   await page.goto(BASE, { waitUntil: 'load', timeout: 30000 })
   await page.waitForFunction(() => document.querySelector('#root')?.children.length > 0, null, { timeout: 15000 })
 
   const readLang = () => page.evaluate(() => document.documentElement.lang)
-  const toggleCount = () => page.locator('[data-testid="lang-en"], [data-testid="lang-zh"]').count()
   const bodyText = () => page.evaluate(() => document.body.innerText)
+  const waitLang = (value) => page.waitForFunction((expected) => document.documentElement.lang === expected, value, { timeout: 5000 })
 
-  expect('英文浏览器下语言切换按钮数', await toggleCount(), 0)
-  expect('英文浏览器下 html lang', await readLang(), 'zh-CN')
-  // 非空白页对照：钉死中文必须真的渲染出中文导航（防「UI 全删也绿」）
-  const zhBody = await bodyText()
-  expect('应用区中文导航在场', ['练习', '词库', '设置'].every((k) => zhBody.includes(k)), true)
+  expect('first visit document language', await readLang(), 'en')
+  const englishBody = await bodyText()
+  expect('English navigation renders by default', ['Practice', 'Banks', 'Settings'].every((k) => englishBody.includes(k)), true)
+  expect('English default exposes Chinese toggle', await page.locator('[data-testid="lang-zh"]').count(), 1)
 
-  // 伪造历史英文偏好 → 刷新后仍中文（钉死语义）
-  await page.evaluate(() => { try { localStorage.setItem('gt.lang', 'en') } catch {} })
+  await page.click('[data-testid="lang-zh"]')
+  await waitLang('zh-CN')
+  expect('Chinese toggle updates document language', await readLang(), 'zh-CN')
+  const chineseBody = await bodyText()
+  expect('Chinese navigation renders', ['练习', '词库', '设置'].every((k) => chineseBody.includes(k)), true)
+  expect('Chinese UI exposes English toggle', await page.locator('[data-testid="lang-en"]').count(), 1)
+
   await page.reload({ waitUntil: 'load' })
   await page.waitForFunction(() => document.querySelector('#root')?.children.length > 0, null, { timeout: 15000 })
-  expect('注入 gt.lang=en 刷新后 html lang 仍', await readLang(), 'zh-CN')
-  expect('注入后按钮仍不存在', await toggleCount(), 0)
+  await waitLang('zh-CN')
+  expect('Chinese preference survives refresh', await readLang(), 'zh-CN')
+
+  await page.click('[data-testid="lang-en"]')
+  await waitLang('en')
+  expect('English toggle restores English document language', await readLang(), 'en')
+  await page.reload({ waitUntil: 'load' })
+  await page.waitForFunction(() => document.querySelector('#root')?.children.length > 0, null, { timeout: 15000 })
+  await waitLang('en')
+  expect('English preference survives refresh', await readLang(), 'en')
 }
 catch (e) {
   stopPreview(server)
-  fatal(`浏览器操作异常：${e.message}`)
+  fatal('Browser interaction failed: ' + e.message)
 }
 finally {
   if (browser) await browser.close().catch(() => {})
   stopPreview(server)
 }
 
-if (failures.length) { console.error(`\ni18n lang 真机验收：FAIL（${failures.length} 项）`); process.exit(1) }
-console.log('\ni18n lang 真机验收：PASS —— 语言切换 UI 已按产品裁定移除，英文浏览器/伪造偏好/刷新下均钉死中文（lang=zh-CN、按钮=0）')
+if (failures.length) { console.error('\ni18n language acceptance: FAIL (' + failures.length + ' checks)'); process.exit(1) }
+console.log('\ni18n language acceptance: PASS — English first visit, Chinese/English switching and preference persistence confirmed.')
 process.exit(0)
