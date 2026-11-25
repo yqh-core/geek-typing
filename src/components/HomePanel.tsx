@@ -67,6 +67,9 @@ export default function HomePanel({
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <div className={`text-2xl font-bold ${theme.accent}`}>{t('home.title')}</div>
+          <p data-testid="home-intro" className={`mt-1 max-w-xl text-xs leading-relaxed ${theme.sub}`}>
+            {t('home.intro')}
+          </p>
           <div className={`mt-1 flex items-center gap-1.5 text-xs ${theme.sub}`}>
             <CalendarDays size={13} />
             {dateText}
