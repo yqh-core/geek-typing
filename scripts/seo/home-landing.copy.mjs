@@ -25,18 +25,15 @@
  */
 
 /**
- * 落地块相对 `#root` 的位置（配置项，便于日后翻转）。
+ * 落地块相对 `#root` 的 DOM 位置。
  *
- * `'before-root'` = 放在 `<div id="root"></div>` **之前**：首屏即定位与关键词
- *   （Google 移动优先更友好），这是本轮采纳值。
- * `'after-root'`  = 放在其后（工具优先，老用户打开即摸到应用）。
+ * SEO 支持内容必须留在 `#root` 外、源码顺序位于 root 前，确保 React 不会清理，
+ * 并继续满足 gate-home-landing 的入站链接、正文与移动端门禁。
+ * index.html 的 body flex layout 将 `#root` 视觉排序到前面、`#seo-home` 排到后面，
+ * 所以访客先看到可交互练习界面，而爬虫仍能读取静态正文与 13 个真实词库链接。
  *
- * ⚠️ **无论哪种取值，落地块都必须在 `#root` 之外**，不能放进 `#root` 内部 ——
- *   React 19 `createRoot` 会 `clearContainerSparingly(#root)` 清空 `#root` 内的既有子节点
- *   （真机实测：块在 `#root` 内 `insideExists:false` 被清，在 `#root` 外 `outsideExists:true` 存活）。
- *   本项只决定「前」还是「后」，不决定「内」还是「外」。
- */
-export const LANDING_PLACEMENT = 'after-root'
+ * ⚠️ 不要将块注入 `#root` 内部：React 19 createRoot 会清空 root 的既有子节点。 */
+export const LANDING_PLACEMENT = 'before-root'
 
 /** 落地块根元素 id（CSS 作用域锚点 + 门禁 H1 锚点） */
 export const LANDING_ROOT_ID = 'seo-home'
