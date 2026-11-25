@@ -2007,7 +2007,7 @@ async function run() {
    * 171 → 172：SW precache flaky 修复（CI run 37304973473 门禁③ 169/171）新增一条判据
    * 「预热降级可观测：controller 从未出现 ⇒ 必须有 [warmBanks] 降级 warn」（14.10，条件式：
    * 正常接管路径不要求，故不会恒红）。原 171 与文档/记忆里的口径同步 +1，无删除。 */
-  const E2E_CASES_EXPECTED = 180
+  const E2E_CASES_EXPECTED = 181
   if (results.length !== E2E_CASES_EXPECTED) {
     console.error(
       `\n✗ e2e 用例数漂移：实际执行 ${results.length} 项，期望 ${E2E_CASES_EXPECTED} 项` +
