@@ -240,7 +240,15 @@ async function run() {
   /* ---------- 0. Home first fold and primary practice action ---------- */
   console.log('【0】Home first fold')
   const primaryStart = page.locator('[data-testid="home-primary-start"]')
+  const homeIntro = page.locator('[data-testid="home-intro"]')
   await page.setViewportSize({ width: 390, height: 844 })
+  const mobileIntroBox = await homeIntro.boundingBox()
+  check(
+    'Mobile first fold explains the typing and review loop',
+    !!mobileIntroBox && mobileIntroBox.y >= 0 && mobileIntroBox.y + mobileIntroBox.height <= 844
+      && (await homeIntro.textContent())?.includes('敲错的词'),
+    mobileIntroBox ? 'bottom=' + Math.round(mobileIntroBox.y + mobileIntroBox.height) : 'intro not visible',
+  )
   const mobileStartBox = await primaryStart.boundingBox()
   check(
     'Mobile first fold shows the primary practice action',
@@ -1999,7 +2007,7 @@ async function run() {
    * 171 → 172：SW precache flaky 修复（CI run 37304973473 门禁③ 169/171）新增一条判据
    * 「预热降级可观测：controller 从未出现 ⇒ 必须有 [warmBanks] 降级 warn」（14.10，条件式：
    * 正常接管路径不要求，故不会恒红）。原 171 与文档/记忆里的口径同步 +1，无删除。 */
-  const E2E_CASES_EXPECTED = 180
+  const E2E_CASES_EXPECTED = 181
   if (results.length !== E2E_CASES_EXPECTED) {
     console.error(
       `\n✗ e2e 用例数漂移：实际执行 ${results.length} 项，期望 ${E2E_CASES_EXPECTED} 项` +
