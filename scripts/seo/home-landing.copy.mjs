@@ -16,7 +16,8 @@
  *      本文件里出现的数字只允许是「写死的文案里必要的量词」，而 block 数与词数都不写死。
  *      ⛔ 同一条纪律顺带管住**示意图**：TYPING_FIGURE 里的字符位置是坐标不是统计，
  *      所以它可以写死；但它**不许出现任何 WPM / 正确率 / 人数 / 词数**这类数字。
- *   3. ✅ 只写能从代码验证的事实：纯前端、localStorage、无需注册、可离线、无第三方追踪。
+ *   3. ✅ 只写能从代码验证的事实：浏览器端练习、localStorage、无需注册、缓存后可离线。
+ *      页面仍加载广告与站点分析脚本，因此不得声称零第三方追踪。
  *
  * ── Keyword strategy ───────────────────────────────────────────────────────
  * Primary terms: typing practice, English typing practice, typing test and developer typing practice.
@@ -59,7 +60,7 @@ export const TARGET_KEYWORDS = Object.freeze([
   'code typing practice',
 ])
 
-/** 顶部「跳过介绍」链接文案（落地块放 #root 之前的代价：老用户要多滚一屏，这里做缓解） */
+/** Skip link: the interactive app is visually ordered before this supporting-copy section. */
 export const SKIP_LINK_TEXT = 'Skip to the practice app'
 
 /** 应用锚点 —— 应用挂载后 React 渲染进 #root，跳转目标就是它 */
@@ -216,7 +217,7 @@ export const SECTIONS = Object.freeze([
   { id: 'gh-hero', heading: 'Developer Typing Practice for Programming Vocabulary',
     body: [
       'Type the word on screen, one character at a time. Correct letters turn green and mistakes turn red, so you practise accurate spelling instead of only recognising a word.',
-      'Geek Typing combines English typing practice with developer-focused vocabulary, live WPM and accuracy feedback, and focused review. Choose a word bank and start a round in your browser.',
+      'Geek Typing combines English typing practice with developer typing practice for programming vocabulary and coding vocabulary. Use its timed typing test, spelling practice and code typing practice with live WPM and accuracy feedback.',
     ],
     chips: ['Runs in your browser', 'No account required', 'Progress saved on this device', 'Offline-ready after caching'],
     ctas: [{ text: 'Start practice', href: APP_ANCHOR, primary: true }, { text: 'Explore word banks', href: '#gh-banks', primary: false }],
