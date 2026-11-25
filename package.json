@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "license": "MIT",
-  "description": "程序员的英语肌肉记忆训练器：英语打字练习 + 背单词两合一，纯前端、无需注册、可离线使用",
+  "description": "Developer-focused English typing practice with programming vocabulary, spelling feedback and offline-ready browser practice",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yqh-core/geek-typing.git"
