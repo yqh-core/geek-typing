@@ -196,6 +196,7 @@ export const zh: Record<string, string> = {
 
   /* 今日推荐首页（V3-P0a） */
   'home.title': '今日练习',
+  'home.intro': '看见什么就敲什么；敲错的词会自动进入复习计划。',
   'home.goal': '今日目标',
   'home.goalDone': '已达标 🎉',
   'home.reviewTitle': '到期复习',
