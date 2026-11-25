@@ -2,7 +2,7 @@
  * 轻量 i18n：自研实现，不引第三方库。
  * - 语言状态 'zh' | 'en'，持久化到本机存储键 'gt.lang'（P1.7-W2C 起经 settings 通道读写）
  * - 首次访问默认 English；显式的 gt.lang 偏好会持久化并优先恢复
- * - t(key) 缺 key 时回退中文，再兜底 key 本身
+ * - t(key) 缺 key 时回退英文，再兜底 key 本身
  * - 语言变化时同步 `<html lang>`（可访问性 / SEO）；映射见 HTML_LANG，SSR 下跳过
  *
  * 本文件只导出「类型 + 组件」；Context 在 src/i18n/context.ts，hook（useLang / useT）在 src/i18n/hooks.ts。
