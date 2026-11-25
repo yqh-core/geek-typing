@@ -105,16 +105,9 @@ const norm = (s) => (s ?? '').replace(/\s+/g, ' ')
  */
 const NAV_TIMEOUT = 30000
 
-/** 锁定 UI 语言为中文。
- *  应用按 navigator.language 探测默认语言（src/i18n/index.tsx:24，以 'zh' 前缀判断），
- *  而 CI runner 的 navigator.language 是 en-US ⇒ 本文件里大量按中文文案写的断言
- *  （102 条）会在 CI 上全数假失败，且「等文案就位」会一路等到超时、把 job 拖死。
- *  语言不是这些用例的变量，故显式钉死为默认值。
- *
- *  注意**只作默认值、不覆盖已有选择**：addInitScript 在每次导航（含 reload）都会执行，
- *  若无条件写入，会把「用户切到 en 后刷新应保持 en」这条正确行为一起改掉（§10 用例会失败）。
- *  因此仅在 key 不存在时写入 —— 首次进入消除环境依赖，显式切换仍可持久化。
- *  语言切换用例（点 lang-en / lang-zh）走显式点击，不受影响。 */
+/** Existing content assertions are written in Chinese, so seed an explicit zh preference.
+ *  Production first visits default to English; locale switching and persistence are covered
+ *  separately. Only seed when no preference exists, never overwrite a deliberate choice. */
 const lockLangZh = (ctx) =>
   ctx.addInitScript(() => {
     try {
@@ -242,7 +235,33 @@ async function run() {
   page.on('pageerror', (e) => { const t = String(e); if (!isExemptNoise(t)) consoleErrors.push(t) })
 
   await gotoPage(page)
-  await gotoTyping(page) // V3-P0a：默认落 Home，打字类用例先切 typing
+  await waitForTestId(page, 'home-primary-start')
+
+  /* ---------- 0. Home first fold and primary practice action ---------- */
+  console.log('【0】Home first fold')
+  const primaryStart = page.locator('[data-testid="home-primary-start"]')
+  await page.setViewportSize({ width: 390, height: 844 })
+  const mobileStartBox = await primaryStart.boundingBox()
+  check(
+    'Mobile first fold shows the primary practice action',
+    !!mobileStartBox && mobileStartBox.y >= 0 && mobileStartBox.y + mobileStartBox.height <= 844,
+    mobileStartBox ? 'bottom=' + Math.round(mobileStartBox.y + mobileStartBox.height) : 'button not visible',
+  )
+  await page.setViewportSize({ width: 1360, height: 900 })
+  const desktopStartBox = await primaryStart.boundingBox()
+  check(
+    'Desktop first fold shows the primary practice action',
+    !!desktopStartBox && desktopStartBox.y >= 0 && desktopStartBox.y + desktopStartBox.height <= 900,
+    desktopStartBox ? 'bottom=' + Math.round(desktopStartBox.y + desktopStartBox.height) : 'button not visible',
+  )
+  await primaryStart.click()
+  await waitForTestId(page, 'word')
+  check(
+    'Primary home action opens an active typing round',
+    (await page.locator('[data-testid="tab-typing"]').getAttribute('aria-selected')) === 'true' &&
+      (await page.locator('[data-testid="word"]').count()) === 1,
+  )
+  await gotoTyping(page)
 
   /* ---------- 1. 首屏与下拉导航 ---------- */
   console.log('【1】首屏与下拉导航')
@@ -259,7 +278,7 @@ async function run() {
     (await page.locator('[data-testid="dropdown-practice"]').count()) === 1 &&
       (await page.locator('[data-testid="dropdown-banks"]').count()) === 1 &&
       (await page.locator('[data-testid="dropdown-settings"]').count()) === 1 &&
-      (await page.locator('[data-testid="lang-en"], [data-testid="lang-zh"]').count()) === 0 && // 2026-10-25 产品裁定：语言切换已移除
+      (await page.locator('[data-testid="lang-en"], [data-testid="lang-zh"]').count()) === 1 &&
       (await page.locator('[data-testid="open-stats"]').count()) === 1,
   )
   // 打开练习下拉检查三模式
@@ -524,18 +543,24 @@ async function run() {
       (await page.locator('[data-testid="memorize-again"]').count()) > 0,
   )
 
-  /* ---------- 10. 语言 UI 移除与中文钉死（2026-10-25 产品裁定：中文用户站，不做中英文切换） ---------- */
-  console.log('\n【10】语言移除与中文钉死')
-  check('语言切换按钮不存在',
-    (await page.locator('[data-testid="lang-en"], [data-testid="lang-zh"]').count()) === 0)
-  const bodyZh = norm(await page.textContent('body'))
-  check('中文导航在场（练习/词库/设置）', ['练习', '词库', '设置'].every((k) => bodyZh.includes(k)))
-  // 钉死语义：伪造历史英文偏好 → 刷新后仍中文、lang 仍 zh-CN（旧探测实现此处会变英文 → 判红）
-  await page.evaluate(() => { try { localStorage.setItem('gt.lang', 'en') } catch {} })
+  /* ---------- 10. Language switching and persistence ---------- */
+  console.log('\n【10】English / Chinese language switching')
+  check(
+    'Chinese UI exposes an English switch',
+    (await page.locator('[data-testid="lang-en"]').count()) === 1 &&
+      (await page.locator('[data-testid="lang-zh"]').count()) === 0,
+  )
+  await page.click('[data-testid="lang-en"]')
+  await waitForBodyText(page, ['Practice', 'Banks', 'Settings'])
+  check('English switch updates document language', (await page.evaluate(() => document.documentElement.lang)) === 'en')
+  const bodyEn = norm(await page.textContent('body'))
+  check('English navigation is visible', ['Practice', 'Banks', 'Settings'].every((k) => bodyEn.includes(k)))
+  await page.click('[data-testid="lang-zh"]')
+  await waitForBodyText(page, ['练习', '词库', '设置'])
+  check('Chinese switch updates document language', (await page.evaluate(() => document.documentElement.lang)) === 'zh-CN')
   await reloadPage(page)
-  await waitForBodyText(page, ['练习', '词库'])
-  check('注入 gt.lang=en 刷新后仍钉死中文',
-    (await page.evaluate(() => document.documentElement.lang)) === 'zh-CN')
+  await waitForBodyText(page, ['练习', '词库', '设置'])
+  check('Chinese preference survives refresh', (await page.evaluate(() => document.documentElement.lang)) === 'zh-CN')
 
   /* ---------- 11. 移动端视口 ---------- */
   console.log('\n【11】移动端视口')
