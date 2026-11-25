@@ -133,7 +133,8 @@ try {
   const waitLang = (value) => page.waitForFunction((expected) => document.documentElement.lang === expected, value, { timeout: 5000 })
 
   expect('first visit document language', await readLang(), 'en')
-  expect('English navigation renders by default', ['Practice', 'Banks', 'Settings'].every((k) => (await bodyText()).includes(k)), true)
+  const englishBody = await bodyText()
+  expect('English navigation renders by default', ['Practice', 'Banks', 'Settings'].every((k) => englishBody.includes(k)), true)
   expect('English default exposes Chinese toggle', await page.locator('[data-testid="lang-zh"]').count(), 1)
 
   await page.click('[data-testid="lang-zh"]')
