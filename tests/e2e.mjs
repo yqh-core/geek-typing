@@ -240,7 +240,15 @@ async function run() {
   /* ---------- 0. Home first fold and primary practice action ---------- */
   console.log('【0】Home first fold')
   const primaryStart = page.locator('[data-testid="home-primary-start"]')
+  const homeIntro = page.locator('[data-testid="home-intro"]')
   await page.setViewportSize({ width: 390, height: 844 })
+  const mobileIntroBox = await homeIntro.boundingBox()
+  check(
+    'Mobile first fold explains the typing and review loop',
+    !!mobileIntroBox && mobileIntroBox.y >= 0 && mobileIntroBox.y + mobileIntroBox.height <= 844
+      && (await homeIntro.textContent())?.includes('敲错的词'),
+    mobileIntroBox ? 'bottom=' + Math.round(mobileIntroBox.y + mobileIntroBox.height) : 'intro not visible',
+  )
   const mobileStartBox = await primaryStart.boundingBox()
   check(
     'Mobile first fold shows the primary practice action',
